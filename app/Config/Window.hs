@@ -11,5 +11,5 @@ import Monomer (AppConfig, appFontDef, appTheme, lightTheme)
 themeConfig :: [AppConfig e]
 themeConfig =
   [ appTheme lightTheme,
-    appFontDef "Regular" "iosevka_medium.ttf"
+    appFontDef "Regular" "app/Config/Resources/iosevka_medium.ttf"
   ]
