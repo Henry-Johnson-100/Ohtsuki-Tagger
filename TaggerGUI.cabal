@@ -24,6 +24,8 @@ executable TaggerGUI
 
   other-extensions:    OverloadedStrings
                       ,TemplateHaskell
+                      ,FlexibleInstances
+                      ,FunctionalDependencies
 
   ghc-options:         -threaded
 
