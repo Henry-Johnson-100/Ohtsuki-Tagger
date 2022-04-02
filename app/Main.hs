@@ -1,4 +1,6 @@
 module Main where
 
+import qualified Window.Main
+
 main :: IO ()
-main = putStrLn "Hello, Haskell!"
+main = Window.Main.runWindow
