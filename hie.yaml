@@ -5,3 +5,6 @@ cradle:
 
     - path: "app/Node/Base.hs"
       component: "tagger:exe:TaggerGUI"
+
+    - path: "app/Node/FileDb.hs"
+      component: "tagger:exe:TaggerGUI"
