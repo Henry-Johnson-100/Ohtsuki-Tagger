@@ -2,3 +2,6 @@ cradle:
   cabal:
     - path: "app/Main.hs"
       component: "tagger:exe:TaggerGUI"
+
+    - path: "app/Node/Base.hs"
+      component: "tagger:exe:TaggerGUI"
