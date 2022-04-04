@@ -2,12 +2,3 @@ cradle:
   cabal:
     - path: "app/Main.hs"
       component: "TaggerGUI:exe:TaggerGUI"
-
-    - path: "app/Window/Main.hs"
-      component: "TaggerGUI:exe:TaggerGUI"
-
-    - path: "app/Window/Core.hs"
-      component: "TaggerGUI:exe:TaggerGUI"
-
-    - path: "app/Config/Window.hs"
-      component: "TaggerGUI:exe:TaggerGUI"

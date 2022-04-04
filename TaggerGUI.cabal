@@ -18,9 +18,7 @@ extra-source-files:  CHANGELOG.md
 executable TaggerGUI
   main-is:             Main.hs
 
-  other-modules:       Window.Main
-                      ,Window.Core
-                      ,Config.Window
+  other-modules:       
 
   other-extensions:    OverloadedStrings
                       ,TemplateHaskell
