@@ -1,6 +1,7 @@
 module Type.Model.Prim
   ( TaggerModel (..),
     TaggerEvent (..),
+    emptyTaggerModel,
   )
 where
 
@@ -18,6 +19,9 @@ data TaggerModel = TaggerModel
     _taggerDescriptorTree :: Maybe DescriptorTree
   }
   deriving (Show, Eq)
+
+emptyTaggerModel :: TaggerModel
+emptyTaggerModel = TaggerModel [] [] Nothing [] Nothing
 
 data TaggerEvent
   = -- Open DB Connection, populate FileDb, DescriptorDb and DescriptorTree with #ALL#
