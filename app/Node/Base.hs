@@ -71,7 +71,13 @@ fileSinglePreviewWidget ::
   s ->
   WidgetNode s e
 fileSinglePreviewWidget model =
-  maybe (label "") (image . pack . filePath . file) (model ^. fileSingle)
+  let imagePreview =
+        maybe
+          (label "No Preview")
+          (flip image_ [alignMiddle, fitEither] . pack . filePath . file)
+          (model ^. fileSingle)
+      boxedPreview = stdDelayTooltip "Image Preivew" . box $ imagePreview
+   in boxedPreview
 
 fileWithTagsLabel :: FileWithTags -> WidgetNode s e
 fileWithTagsLabel (FileWithTags f ts) =
