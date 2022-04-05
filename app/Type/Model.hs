@@ -10,6 +10,7 @@ module Type.Model
     descriptorDb,
     descriptorTree,
     connectionString,
+    HasFileSingle,
   )
 where
 

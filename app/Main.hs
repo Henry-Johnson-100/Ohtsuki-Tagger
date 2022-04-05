@@ -4,6 +4,7 @@
 
 {-# HLINT ignore "Use :" #-}
 {-# HLINT ignore "Redundant bracket" #-}
+{-# HLINT ignore "Use ?~" #-}
 
 module Main where
 
@@ -33,13 +34,17 @@ taggerEventHandler ::
 taggerEventHandler wenv node model event =
   case event of
     TaggerInit ->
-      [ Model model,
-        Task
+      [ Task
           ( FileDbUpdate
               <$> (getAllFilesIO (model ^. connectionString))
-          )
+          ),
+        Model $
+          model
+            & fileSingle
+              .~ (Just (FileWithTags (File "/home/monax/Pictures/dog.jpg") []))
       ]
     FileDbUpdate fs -> [Model $ model & fileDb .~ fs]
+    FileSinglePut i -> [Model $ model & fileSingle .~ (Just i)]
 
 taggerApplicationUI ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -53,7 +58,8 @@ taggerApplicationUI wenv model = widgetTree
           spacer,
           label "Tagger",
           spacer,
-          fileDbWidget $ take 10 (model ^. fileDb)
+          fileDbWidget $ take 10 (model ^. fileDb),
+          fileSinglePreviewWidget model
         ]
         `styleBasic` [padding 10]
 

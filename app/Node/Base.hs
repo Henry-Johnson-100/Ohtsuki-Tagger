@@ -1,17 +1,21 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Node.Base
   ( themeConfig,
     fileWithTagsLabel,
     fileDbWidget,
+    fileSinglePreviewWidget,
   )
 where
 
+import Control.Lens
 import Data.List hiding (concat, intercalate, unlines, unwords)
 import Data.Text hiding (map)
 import Data.Typeable
 import Database.Tagger.Type
 import Monomer
+import Type.Model
 import Prelude hiding (concat, unlines, unwords)
 
 class GetPlainText g where
@@ -58,6 +62,16 @@ fileDbWidget fwts =
           )
       fileWithTagsStack = vstack . fileWithTagsZone $ fwts
    in stdDelayTooltip "File Database" fileWithTagsStack
+
+fileSinglePreviewWidget ::
+  ( WidgetModel s,
+    WidgetEvent e,
+    Type.Model.HasFileSingle s (Maybe FileWithTags)
+  ) =>
+  s ->
+  WidgetNode s e
+fileSinglePreviewWidget model =
+  maybe (label "") (image . pack . filePath . file) (model ^. fileSingle)
 
 fileWithTagsLabel :: FileWithTags -> WidgetNode s e
 fileWithTagsLabel (FileWithTags f ts) =
