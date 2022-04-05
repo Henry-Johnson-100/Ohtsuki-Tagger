@@ -28,7 +28,7 @@ executable TaggerGUI
   ghc-options:         -threaded
 
   build-depends:       base ^>=4.13.0.0
-                      ,monomer
+                      ,monomer == 1.3.0.0
                       ,lens
                       ,text
                       ,tagger-db
