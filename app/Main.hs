@@ -3,16 +3,26 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use :" #-}
+{-# HLINT ignore "Redundant bracket" #-}
 
 module Main where
 
-import Data.Text
+import Control.Lens
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader
+import Data.Maybe
+import Data.Text hiding (map)
 import Database.Tagger.Access
 import Database.Tagger.Type
 import Monomer
 import Monomer.Common.Lens
 import Node.Base
 import Type.Model
+
+getAllFilesIO :: String -> IO [FileWithTags]
+getAllFilesIO connString =
+  connectThenRun connString $
+    fetchAllFiles >>= fmap catMaybes . mapM getFileWithTags >>= liftIO . return
 
 taggerEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -22,7 +32,14 @@ taggerEventHandler ::
   [AppEventResponse TaggerModel TaggerEvent]
 taggerEventHandler wenv node model event =
   case event of
-    TaggerInit -> [Model model]
+    TaggerInit ->
+      [ Model model,
+        Task
+          ( FileDbUpdate
+              <$> (getAllFilesIO (model ^. connectionString))
+          )
+      ]
+    FileDbUpdate fs -> [Model $ model & fileDb .~ fs]
 
 taggerApplicationUI ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -34,7 +51,9 @@ taggerApplicationUI wenv model = widgetTree
       vstack
         [ label "Tagger",
           spacer,
-          label "Tagger"
+          label "Tagger",
+          spacer,
+          vstack (label <$> (map (pack . show) (model ^. fileDb)))
         ]
         `styleBasic` [padding 10]
 
@@ -47,7 +66,7 @@ taggerApplicationConfig =
 runTaggerWindow :: IO ()
 runTaggerWindow =
   startApp
-    emptyTaggerModel
+    (emptyTaggerModel "/home/monax/Repo/Haskell/TaggerLib/images.db.backup")
     taggerEventHandler
     taggerApplicationUI
     taggerApplicationConfig

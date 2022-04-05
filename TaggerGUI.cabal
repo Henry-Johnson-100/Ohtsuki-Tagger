@@ -32,5 +32,6 @@ executable TaggerGUI
                       ,lens
                       ,text
                       ,tagger-db
+                      ,transformers
   hs-source-dirs:      app
   default-language:    Haskell2010

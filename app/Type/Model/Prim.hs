@@ -12,15 +12,16 @@ import Database.Tagger.Type
   )
 
 data TaggerModel = TaggerModel
-  { _taggerFileDb :: [FileWithTags],
-    _taggerFileSelection :: [FileWithTags],
-    _taggerFileSingle :: Maybe FileWithTags,
-    _taggerDescriptorDb :: [Descriptor],
-    _taggerDescriptorTree :: Maybe DescriptorTree
+  { _taggerFileDb :: ![FileWithTags],
+    _taggerFileSelection :: ![FileWithTags],
+    _taggerFileSingle :: !(Maybe FileWithTags),
+    _taggerDescriptorDb :: ![Descriptor],
+    _taggerDescriptorTree :: !(Maybe DescriptorTree),
+    _taggerConnectionString :: !String
   }
   deriving (Show, Eq)
 
-emptyTaggerModel :: TaggerModel
+emptyTaggerModel :: String -> TaggerModel
 emptyTaggerModel = TaggerModel [] [] Nothing [] Nothing
 
 data TaggerEvent
