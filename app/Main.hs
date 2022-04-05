@@ -11,7 +11,7 @@ import Control.Lens
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import Data.Maybe
-import Data.Text hiding (map)
+import Data.Text hiding (head, map, take)
 import Database.Tagger.Access
 import Database.Tagger.Type
 import Monomer
@@ -53,7 +53,7 @@ taggerApplicationUI wenv model = widgetTree
           spacer,
           label "Tagger",
           spacer,
-          vstack (label <$> (map (pack . show) (model ^. fileDb)))
+          fileDbWidget $ take 10 (model ^. fileDb)
         ]
         `styleBasic` [padding 10]
 
