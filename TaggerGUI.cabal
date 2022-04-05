@@ -17,6 +17,8 @@ executable TaggerGUI
   main-is:             Main.hs
 
   other-modules:       Node.Base
+                      ,Type.Model
+                      ,Type.Model.Prim
 
   other-extensions:    OverloadedStrings
                       ,TemplateHaskell
