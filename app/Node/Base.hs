@@ -14,6 +14,7 @@ module Node.Base
 where
 
 import Control.Lens
+import Control.Monad
 import Data.List hiding (concat, intercalate, unlines, unwords)
 import Data.Text hiding (map)
 import Data.Typeable
@@ -57,11 +58,11 @@ showTags = map (pack . descriptor) . sort
 stdDelayTooltip :: Text -> WidgetNode s e -> WidgetNode s e
 stdDelayTooltip = flip tooltip_ [tooltipDelay 750]
 
-previewImageButton :: (WidgetModel s) => FileWithTags -> WidgetNode s TaggerEvent
-previewImageButton fwt =
-  flip styleHover [bgColor bgLightGray]
-    . flip styleBasic [bgColor bgDefault]
-    $ button (getPlainText fwt) . FileSinglePut $ fwt
+styledButton :: (WidgetModel s) => TaggerEvent -> Text -> WidgetNode s TaggerEvent
+styledButton a t =
+  button t a
+    `styleBasic` [bgColor bgDefault]
+    `styleHover` [bgColor bgLightGray]
 
 fPrintDescriptorTree :: DescriptorTree -> Text
 fPrintDescriptorTree = p "" 0
@@ -106,32 +107,39 @@ descriptorTreeWidget =
       WidgetNode s e
     infraBox dsf = box . hstack . map dsf
 
+fileWithTagButton ::
+  (WidgetModel s) =>
+  TaggerEvent ->
+  FileWithTags ->
+  WidgetNode s TaggerEvent
+fileWithTagButton a fwt =
+  case fwt of
+    FileWithTags f ts ->
+      let fileSubZone = styledButton a (getPlainText f)
+          fwtSpacer = hstack [spacer, label ":", spacer]
+          tagsSubZone =
+            vstack
+              ( map
+                  ( flip styleBasic [textFont "Thin"]
+                      . label
+                      . getPlainText
+                  )
+                  ts
+              )
+          fwtSplit =
+            vstack
+              [ hstack
+                  [fileSubZone, fwtSpacer, tagsSubZone],
+                separatorLine
+              ]
+              `styleHover` [bgColor bgLightGray]
+       in fwtSplit
+
 fileDbWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent
 fileDbWidget fwts =
   let fileWithTagsZone =
         map
-          ( \fwt ->
-              case fwt of
-                (FileWithTags f ts) ->
-                  let fileSubZone = previewImageButton fwt
-                      fwtSpacer = hstack [spacer, label ":", spacer]
-                      tagsSubZone =
-                        vstack
-                          . map
-                            ( flip styleBasic [textFont "Thin"]
-                                . label
-                                . getPlainText
-                            )
-                          $ ts
-                      fwtSplit =
-                        flip styleHover [bgColor bgLightGray] $
-                          hstack
-                            [ fileSubZone,
-                              fwtSpacer,
-                              tagsSubZone
-                            ]
-                   in fwtSplit
-          )
+          (liftM2 fileWithTagButton FileSinglePut id)
       fileWithTagsStack = vstack . fileWithTagsZone $ fwts
    in stdDelayTooltip "File Database" fileWithTagsStack
 
