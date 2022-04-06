@@ -10,6 +10,7 @@ module Node.Base
     fileDbWidget,
     fileSinglePreviewWidget,
     descriptorTreeWidget,
+    configPanel
   )
 where
 
@@ -63,6 +64,21 @@ styledButton a t =
   button t a
     `styleBasic` [bgColor bgDefault]
     `styleHover` [bgColor bgLightGray]
+
+configPanel ::
+  (WidgetModel s, WidgetEvent e, HasFileSetArithmetic s FileSetArithmetic) =>
+  WidgetNode s e
+configPanel = box . vgrid $ [setArithmeticDropDown]
+
+setArithmeticDropDown ::
+  (WidgetModel s, WidgetEvent e, HasFileSetArithmetic s FileSetArithmetic) =>
+  WidgetNode s e
+setArithmeticDropDown =
+  dropdown
+    fileSetArithmetic
+    [Union, Intersect, Diff]
+    (label . pack . show)
+    (label . pack . show)
 
 fPrintDescriptorTree :: DescriptorTree -> Text
 fPrintDescriptorTree = p "" 0
@@ -120,14 +136,14 @@ fileWithTagButton a fwt =
             label ":" `styleBasic` [paddingL 1, paddingR 1, paddingT 0, paddingB 0]
           tagsSubZone =
             scroll . flip label_ [multiline] . unlines . map getPlainText $ ts
-            -- hgrid
-            --   ( map
-            --       ( flip styleBasic [textFont "Thin"]
-            --           . label
-            --           . getPlainText
-            --       )
-            --       ts
-            --   )
+          -- hgrid
+          --   ( map
+          --       ( flip styleBasic [textFont "Thin"]
+          --           . label
+          --           . getPlainText
+          --       )
+          --       ts
+          --   )
           fwtSplit =
             vstack
               [ hstack

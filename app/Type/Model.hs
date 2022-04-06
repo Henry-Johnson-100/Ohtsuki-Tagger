@@ -14,6 +14,7 @@ module Type.Model
     doSoloTag,
     HasFileSingle,
     HasDoSoloTag,
+    HasFileSetArithmetic,
   )
 where
 
