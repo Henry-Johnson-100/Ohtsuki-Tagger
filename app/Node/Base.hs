@@ -1,9 +1,11 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use lambda" #-}
 
 module Node.Base
   ( themeConfig,
-    fileWithTagsLabel,
     fileDbWidget,
     fileSinglePreviewWidget,
   )
@@ -46,19 +48,28 @@ showTags = map (pack . descriptor) . sort
 stdDelayTooltip :: Text -> WidgetNode s e -> WidgetNode s e
 stdDelayTooltip = flip tooltip_ [tooltipDelay 750]
 
-fileDbWidget :: (WidgetModel s, WidgetEvent e) => [FileWithTags] -> WidgetNode s e
+previewImageButton :: (WidgetModel s) => FileWithTags -> WidgetNode s TaggerEvent
+previewImageButton = button "Preview" . FileSinglePut
+
+fileDbWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent
 fileDbWidget fwts =
-  let _def = label "bruh"
-      fileWithTagsZone =
+  let fileWithTagsZone =
         map
-          ( \(FileWithTags f ts) ->
-              let _def = label "bruh"
-                  fileSubZone = flip label_ [ellipsis] . getPlainText $ f
-                  fwtSpacer = hstack [spacer, label ":", spacer]
-                  tagsSubZone = vstack . map (label . getPlainText) $ ts
-                  fwtSplit =
-                    hstack [fileSubZone, fwtSpacer, tagsSubZone]
-               in fwtSplit
+          ( \fwt ->
+              case fwt of
+                (FileWithTags f ts) ->
+                  let fileSubZone = flip label_ [ellipsis] . getPlainText $ f
+                      fwtSpacer = hstack [spacer, label ":", spacer]
+                      tagsSubZone = vstack . map (label . getPlainText) $ ts
+                      fileDbSinglePutButton = previewImageButton fwt
+                      fwtSplit =
+                        hstack
+                          [ fileSubZone,
+                            fwtSpacer,
+                            tagsSubZone,
+                            fileDbSinglePutButton
+                          ]
+                   in fwtSplit
           )
       fileWithTagsStack = vstack . fileWithTagsZone $ fwts
    in stdDelayTooltip "File Database" fileWithTagsStack
@@ -78,12 +89,3 @@ fileSinglePreviewWidget model =
           (model ^. fileSingle)
       boxedPreview = stdDelayTooltip "Image Preivew" . box $ imagePreview
    in boxedPreview
-
-fileWithTagsLabel :: FileWithTags -> WidgetNode s e
-fileWithTagsLabel (FileWithTags f ts) =
-  let fileLabel = flip label_ [ellipsis] . pack . filePath $ f
-      tagStack = vstack (label <$> showTags ts)
-      desSpacer = hstack [spacer, label ":", spacer]
-   in hstack $ [fileLabel, desSpacer, tagStack]
-
--- label_ ((pack . filePath) f !++ pack " : " !++ showTags ts) [ellipsis]
