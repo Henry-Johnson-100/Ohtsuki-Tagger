@@ -11,6 +11,7 @@ module Main where
 import Control.Lens
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
+import Data.List
 import Data.Maybe
 import Data.Text hiding (head, map, take)
 import Database.Tagger.Access
@@ -24,6 +25,13 @@ getAllFilesIO :: String -> IO [FileWithTags]
 getAllFilesIO connString =
   connectThenRun connString $
     fetchAllFiles >>= fmap catMaybes . mapM getFileWithTags >>= liftIO . return
+
+doSetAction :: FileSetArithmetic -> [FileWithTags] -> [FileWithTags] -> [FileWithTags]
+doSetAction a s o =
+  case a of
+    Union -> s `union` o
+    Intersect -> s `intersect` o
+    Diff -> s \\ o
 
 taggerEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -45,6 +53,12 @@ taggerEventHandler wenv node model event =
       ]
     FileDbUpdate fs -> [Model $ model & fileDb .~ fs]
     FileSinglePut i -> [Model $ model & fileSingle .~ (Just i)]
+    FileSetArithmetic a -> [Model $ model & fileSetArithmetic .~ a]
+    FileSelectionUpdate ts ->
+      [ Model $
+          model & fileSelection
+            .~ (doSetAction (model ^. fileSetArithmetic) (model ^. fileSelection) ts)
+      ]
 
 taggerApplicationUI ::
   WidgetEnv TaggerModel TaggerEvent ->
