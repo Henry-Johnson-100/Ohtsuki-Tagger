@@ -8,7 +8,7 @@ where
 
 import Database.Tagger.Type
   ( Descriptor,
-    DescriptorTree,
+    DescriptorTree (NullTree),
     FileWithTags,
   )
 
@@ -18,13 +18,13 @@ data TaggerModel = TaggerModel
     _taggerFileSetArithmetic :: !FileSetArithmetic,
     _taggerFileSingle :: !(Maybe FileWithTags),
     _taggerDescriptorDb :: ![Descriptor],
-    _taggerDescriptorTree :: !(Maybe DescriptorTree),
+    _taggerDescriptorTree :: !DescriptorTree,
     _taggerConnectionString :: !String
   }
   deriving (Show, Eq)
 
 emptyTaggerModel :: String -> TaggerModel
-emptyTaggerModel = TaggerModel [] [] Union Nothing [] Nothing
+emptyTaggerModel = TaggerModel [] [] Union Nothing [] NullTree
 
 data FileSetArithmetic
   = Union

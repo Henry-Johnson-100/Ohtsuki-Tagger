@@ -5,10 +5,12 @@
 {-# HLINT ignore "Use :" #-}
 {-# HLINT ignore "Redundant bracket" #-}
 {-# HLINT ignore "Use ?~" #-}
+{-# HLINT ignore "Use <&>" #-}
 
 module Main where
 
 import Control.Lens
+import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import Data.List
@@ -22,11 +24,27 @@ import Node.Base
 import Type.Model
 
 getAllFilesIO :: String -> IO [FileWithTags]
-getAllFilesIO connString =
-  connectThenRun connString $
-    fetchAllFiles >>= fmap catMaybes . mapM getFileWithTags >>= liftIO . return
+getAllFilesIO =
+  flip
+    connectThenRun
+    (fetchAllFiles >>= fmap catMaybes . mapM getFileWithTags >>= liftIO . return)
 
-doSetAction :: FileSetArithmetic -> [FileWithTags] -> [FileWithTags] -> [FileWithTags]
+getAllIndexedDescriptorsIO :: String -> IO [Descriptor]
+getAllIndexedDescriptorsIO =
+  flip
+    connectThenRun
+    ( fetchAllIndexedDescriptors
+        >>= liftIO . return
+    )
+
+getDescriptorTreeALL :: String -> IO DescriptorTree
+getDescriptorTreeALL =
+  flip connectThenRun $ do
+    mk <- lookupDescriptorAutoKey "#ALL#"
+    ktr <- maybe (return NullTree) fetchInfraTree mk
+    liftIO . return $ ktr
+
+doSetAction :: Eq a => FileSetArithmetic -> [a] -> [a] -> [a]
 doSetAction a s o =
   case a of
     Union -> s `union` o
@@ -46,6 +64,7 @@ taggerEventHandler wenv node model event =
           ( FileDbUpdate
               <$> (getAllFilesIO (model ^. connectionString))
           ),
+        Task (DescriptorTreePut <$> (getDescriptorTreeALL (model ^. connectionString))),
         Model $
           model
             & fileSingle
@@ -59,6 +78,7 @@ taggerEventHandler wenv node model event =
           model & fileSelection
             .~ (doSetAction (model ^. fileSetArithmetic) (model ^. fileSelection) ts)
       ]
+    DescriptorTreePut tr -> [Model $ model & descriptorTree .~ tr]
 
 taggerApplicationUI ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -75,7 +95,7 @@ taggerApplicationUI wenv model = widgetTree
           fileDbWidget $ take 10 (model ^. fileDb),
           fileSinglePreviewWidget model
         ]
-        `styleBasic` [padding 10]
+        `styleBasic` [padding 2]
 
 taggerApplicationConfig :: [AppConfig TaggerEvent]
 taggerApplicationConfig =
