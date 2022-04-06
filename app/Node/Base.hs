@@ -133,7 +133,7 @@ fileWithTagButton a fwt =
                 separatorLine
               ]
               `styleHover` [bgColor bgLightGray]
-       in fwtSplit
+       in box fwtSplit
 
 fileDbWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent
 fileDbWidget fwts =
@@ -141,7 +141,7 @@ fileDbWidget fwts =
         map
           (liftM2 fileWithTagButton FileSinglePut id)
       fileWithTagsStack = vstack . fileWithTagsZone $ fwts
-   in stdDelayTooltip "File Database" fileWithTagsStack
+   in stdDelayTooltip "File Database" $ fileWithTagsStack
 
 fileSinglePreviewWidget ::
   ( HasDoSoloTag s1 Bool,
@@ -155,16 +155,22 @@ fileSinglePreviewWidget model =
         box_ [] $
           maybe
             (label "No Preview")
-            (flip image_ [alignMiddle, fitEither] . pack . filePath . file)
+            (flip image_ [alignBottom, fitEither] . pack . filePath . file)
             (model ^. fileSingle)
       doSoloTagCheckbox =
-        labeledCheckbox_
-          "Solo Tagging Mode"
-          doSoloTag
-          [textBottom, maxLines 1, ellipsis]
-          `styleBasic` [textFont "Thin"]
+        box_ [alignCenter] $
+          labeledCheckbox_
+            "Solo Tagging Mode"
+            doSoloTag
+            [textRight, maxLines 1, ellipsis]
+            `styleBasic` [ textFont "Thin",
+                           paddingB 5,
+                           paddingT 0,
+                           border 0 bgDefault,
+                           radius 0
+                         ]
       imageZone =
         box_ [onClick ToggleDoSoloTag]
-          . hsplit
+          . vsplit_ []
           $ (imagePreview, doSoloTagCheckbox)
    in imageZone

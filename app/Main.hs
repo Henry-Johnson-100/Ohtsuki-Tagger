@@ -89,15 +89,23 @@ taggerApplicationUI ::
 taggerApplicationUI wenv model = widgetTree
   where
     widgetTree =
-      hstack
-        [ vstack
-            [ spacer,
-              fileDbWidget $ take 10 (model ^. fileDb),
-              fileSinglePreviewWidget model
-            ]
-            `styleBasic` [padding 2],
-          descriptorTreeWidget (model ^. descriptorTree)
+      hgrid
+        [ vsplit
+            ( fileDbWidget (take 10 (model ^. fileDb)),
+              descriptorTreeWidget (model ^. descriptorTree)
+            ),
+          (fileSinglePreviewWidget model)
         ]
+
+-- hstack
+--   [ vstack
+--       [ spacer,
+--         fileDbWidget $ take 10 (model ^. fileDb),
+--         fileSinglePreviewWidget model
+--       ]
+--       `styleBasic` [padding 2],
+--     descriptorTreeWidget (model ^. descriptorTree)
+--   ]
 
 taggerApplicationConfig :: [AppConfig TaggerEvent]
 taggerApplicationConfig =
