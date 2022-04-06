@@ -19,12 +19,13 @@ data TaggerModel = TaggerModel
     _taggerFileSingle :: !(Maybe FileWithTags),
     _taggerDescriptorDb :: ![Descriptor],
     _taggerDescriptorTree :: !DescriptorTree,
+    _taggerDoSoloTag :: !Bool,
     _taggerConnectionString :: !String
   }
   deriving (Show, Eq)
 
 emptyTaggerModel :: String -> TaggerModel
-emptyTaggerModel = TaggerModel [] [] Union Nothing [] NullTree
+emptyTaggerModel = TaggerModel [] [] Union Nothing [] NullTree False
 
 data FileSetArithmetic
   = Union
@@ -57,4 +58,6 @@ data TaggerEvent
     DescriptorTreeGet
   | -- Clear the current descriptor tree
     DescriptorTreeClear
+    -- Triggers a functionality like 'cycle'
+  | ToggleDoSoloTag
   deriving (Show, Eq)

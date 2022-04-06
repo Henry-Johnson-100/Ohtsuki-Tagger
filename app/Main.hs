@@ -79,6 +79,8 @@ taggerEventHandler wenv node model event =
             .~ (doSetAction (model ^. fileSetArithmetic) (model ^. fileSelection) ts)
       ]
     DescriptorTreePut tr -> [Model $ model & descriptorTree .~ tr]
+    ToggleDoSoloTag ->
+      [Model $ model & (doSoloTag .~ (not (model ^. doSoloTag)))]
 
 taggerApplicationUI ::
   WidgetEnv TaggerModel TaggerEvent ->

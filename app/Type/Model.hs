@@ -11,6 +11,7 @@ module Type.Model
     descriptorTree,
     connectionString,
     fileSetArithmetic,
+    doSoloTag,
     HasFileSingle,
   )
 where
