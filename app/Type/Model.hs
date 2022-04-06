@@ -13,6 +13,7 @@ module Type.Model
     fileSetArithmetic,
     doSoloTag,
     HasFileSingle,
+    HasDoSoloTag,
   )
 where
 

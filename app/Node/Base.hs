@@ -144,17 +144,27 @@ fileDbWidget fwts =
    in stdDelayTooltip "File Database" fileWithTagsStack
 
 fileSinglePreviewWidget ::
-  ( WidgetModel s,
-    WidgetEvent e,
-    Type.Model.HasFileSingle s (Maybe FileWithTags)
+  ( HasDoSoloTag s1 Bool,
+    HasFileSingle s2 (Maybe FileWithTags),
+    Typeable s1
   ) =>
-  s ->
-  WidgetNode s e
+  s2 ->
+  WidgetNode s1 TaggerEvent
 fileSinglePreviewWidget model =
   let imagePreview =
-        maybe
-          (label "No Preview")
-          (flip image_ [alignMiddle, fitEither] . pack . filePath . file)
-          (model ^. fileSingle)
-      boxedPreview = stdDelayTooltip "Image Preivew" . box $ imagePreview
-   in boxedPreview
+        box_ [] $
+          maybe
+            (label "No Preview")
+            (flip image_ [alignMiddle, fitEither] . pack . filePath . file)
+            (model ^. fileSingle)
+      doSoloTagCheckbox =
+        labeledCheckbox_
+          "Solo Tagging Mode"
+          doSoloTag
+          [textBottom, maxLines 1, ellipsis]
+          `styleBasic` [textFont "Thin"]
+      imageZone =
+        box_ [onClick ToggleDoSoloTag]
+          . hsplit
+          $ (imagePreview, doSoloTagCheckbox)
+   in imageZone
