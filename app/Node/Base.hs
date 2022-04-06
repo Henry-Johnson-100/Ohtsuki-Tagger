@@ -116,16 +116,18 @@ fileWithTagButton a fwt =
   case fwt of
     FileWithTags f ts ->
       let fileSubZone = styledButton a (getPlainText f)
-          fwtSpacer = hstack [spacer, label ":", spacer]
+          fwtSpacer =
+            label ":" `styleBasic` [paddingL 1, paddingR 1, paddingT 0, paddingB 0]
           tagsSubZone =
-            vstack
-              ( map
-                  ( flip styleBasic [textFont "Thin"]
-                      . label
-                      . getPlainText
-                  )
-                  ts
-              )
+            scroll . flip label_ [multiline] . unlines . map getPlainText $ ts
+            -- hgrid
+            --   ( map
+            --       ( flip styleBasic [textFont "Thin"]
+            --           . label
+            --           . getPlainText
+            --       )
+            --       ts
+            --   )
           fwtSplit =
             vstack
               [ hstack
@@ -140,8 +142,8 @@ fileDbWidget fwts =
   let fileWithTagsZone =
         map
           (liftM2 fileWithTagButton FileSinglePut id)
-      fileWithTagsStack = vstack . fileWithTagsZone $ fwts
-   in stdDelayTooltip "File Database" $ fileWithTagsStack
+      fileWithTagsStack = box . vstack . fileWithTagsZone $ fwts
+   in stdDelayTooltip "File Database" fileWithTagsStack
 
 fileSinglePreviewWidget ::
   ( HasDoSoloTag s1 Bool,
