@@ -34,11 +34,18 @@ instance GetPlainText Descriptor where
 instance GetPlainText FileWithTags where
   getPlainText = getPlainText . file
 
+bgDefault :: Color
+bgDefault = Color 0 0 0 0
+
+bgLightGray :: Color
+bgLightGray = Color 203 203 203 0.8
+
 themeConfig :: [AppConfig e]
 themeConfig =
   [ appWindowTitle "Hello World",
     appTheme lightTheme,
-    appFontDef "Regular" "./resources/iosevka_thin.ttf"
+    appFontDef "Regular" "/usr/local/share/fonts/i/iosevka_light.ttf",
+    appFontDef "Thin" "/usr/local/share/fonts/i/iosevka_thin.ttf"
   ]
 
 showTags :: [Descriptor] -> [Text]
@@ -51,7 +58,10 @@ stdDelayTooltip :: Text -> WidgetNode s e -> WidgetNode s e
 stdDelayTooltip = flip tooltip_ [tooltipDelay 750]
 
 previewImageButton :: (WidgetModel s) => FileWithTags -> WidgetNode s TaggerEvent
-previewImageButton = button "Preview" . FileSinglePut
+previewImageButton fwt =
+  flip styleHover [bgColor bgLightGray]
+    . flip styleBasic [bgColor bgDefault]
+    $ button (getPlainText fwt) . FileSinglePut $ fwt
 
 fPrintDescriptorTree :: DescriptorTree -> Text
 fPrintDescriptorTree = p "" 0
@@ -79,8 +89,22 @@ descriptorTreeWidget ::
 descriptorTreeWidget =
   box
     . scroll_ [wheelRate 50]
+    . flip styleBasic [textFont "Thin"]
     . flip label_ [multiline]
     . fPrintDescriptorTree
+  where
+    -- #TODO eventually make a button
+    -- just don't know what the event will be yet
+    dButton :: (WidgetModel s, WidgetEvent e) => Descriptor -> WidgetNode s e
+    dButton = label . pack . descriptor
+    -- #TODO find a way to format a collection node to be more like a box
+    -- Used to group infra nodes to take up less vertical space
+    infraBox ::
+      (WidgetModel s, WidgetEvent e) =>
+      (Descriptor -> WidgetNode s e) ->
+      [Descriptor] ->
+      WidgetNode s e
+    infraBox dsf = box . hstack . map dsf
 
 fileDbWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent
 fileDbWidget fwts =
@@ -89,17 +113,23 @@ fileDbWidget fwts =
           ( \fwt ->
               case fwt of
                 (FileWithTags f ts) ->
-                  let fileSubZone = flip label_ [ellipsis] . getPlainText $ f
+                  let fileSubZone = previewImageButton fwt
                       fwtSpacer = hstack [spacer, label ":", spacer]
-                      tagsSubZone = vstack . map (label . getPlainText) $ ts
-                      fileDbSinglePutButton = previewImageButton fwt
+                      tagsSubZone =
+                        vstack
+                          . map
+                            ( flip styleBasic [textFont "Thin"]
+                                . label
+                                . getPlainText
+                            )
+                          $ ts
                       fwtSplit =
-                        hstack
-                          [ fileSubZone,
-                            fwtSpacer,
-                            tagsSubZone,
-                            fileDbSinglePutButton
-                          ]
+                        flip styleHover [bgColor bgLightGray] $
+                          hstack
+                            [ fileSubZone,
+                              fwtSpacer,
+                              tagsSubZone
+                            ]
                    in fwtSplit
           )
       fileWithTagsStack = vstack . fileWithTagsZone $ fwts
