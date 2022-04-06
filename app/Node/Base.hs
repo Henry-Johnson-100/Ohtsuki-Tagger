@@ -3,11 +3,13 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use lambda" #-}
+{-# HLINT ignore "Eta reduce" #-}
 
 module Node.Base
   ( themeConfig,
     fileDbWidget,
     fileSinglePreviewWidget,
+    descriptorTreeWidget,
   )
 where
 
@@ -50,6 +52,35 @@ stdDelayTooltip = flip tooltip_ [tooltipDelay 750]
 
 previewImageButton :: (WidgetModel s) => FileWithTags -> WidgetNode s TaggerEvent
 previewImageButton = button "Preview" . FileSinglePut
+
+fPrintDescriptorTree :: DescriptorTree -> Text
+fPrintDescriptorTree = p "" 0
+  where
+    p :: Text -> Int -> DescriptorTree -> Text
+    p t l tr =
+      case tr of
+        NullTree -> t
+        -- Infra (Descriptor d) -> append t (append (Data.Text.replicate l "-") (pack d))
+        Infra (Descriptor d) ->
+          t
+            !++ "\n"
+            !++ Data.Text.replicate l " "
+            !++ "|"
+            !++ pack d
+        Meta (Descriptor d) cs ->
+          t !++ "\n"
+            !++ Data.List.foldl'
+              (\t' tr' -> p t' (l + 1) tr')
+              (Data.Text.replicate l " " !++ "|" !++ pack d)
+              cs
+
+descriptorTreeWidget ::
+  (WidgetModel s, WidgetEvent e) => DescriptorTree -> WidgetNode s e
+descriptorTreeWidget =
+  box
+    . scroll_ [wheelRate 50]
+    . flip label_ [multiline]
+    . fPrintDescriptorTree
 
 fileDbWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent
 fileDbWidget fwts =

@@ -40,7 +40,7 @@ getAllIndexedDescriptorsIO =
 getDescriptorTreeALL :: String -> IO DescriptorTree
 getDescriptorTreeALL =
   flip connectThenRun $ do
-    mk <- lookupDescriptorAutoKey "#ALL#"
+    mk <- lookupDescriptorAutoKey "META"
     ktr <- maybe (return NullTree) fetchInfraTree mk
     liftIO . return $ ktr
 
@@ -87,15 +87,15 @@ taggerApplicationUI ::
 taggerApplicationUI wenv model = widgetTree
   where
     widgetTree =
-      vstack
-        [ label "Tagger",
-          spacer,
-          label "Tagger",
-          spacer,
-          fileDbWidget $ take 10 (model ^. fileDb),
-          fileSinglePreviewWidget model
+      hstack
+        [ vstack
+            [ spacer,
+              fileDbWidget $ take 10 (model ^. fileDb),
+              fileSinglePreviewWidget model
+            ]
+            `styleBasic` [padding 2],
+          descriptorTreeWidget (model ^. descriptorTree)
         ]
-        `styleBasic` [padding 2]
 
 taggerApplicationConfig :: [AppConfig TaggerEvent]
 taggerApplicationConfig =
