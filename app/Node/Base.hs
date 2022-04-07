@@ -9,7 +9,7 @@
 
 module Node.Base
   ( themeConfig,
-    fileDbWidget,
+    fileSelectionWidget,
     fileSinglePreviewWidget,
     descriptorTreeWidget,
     configPanel,
@@ -161,13 +161,45 @@ fileWithTagButton a fwt =
               `styleHover` [bgColor bgLightGray]
        in box fwtSplit
 
-fileDbWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent
-fileDbWidget fwts =
+fileSelectionWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent
+fileSelectionWidget fwts =
   let fileWithTagsZone =
         map
           (\fwt -> fileWithTagWidget [previewButton fwt, selectButton fwt] fwt)
       fileWithTagsStack = stdScroll $ box_ [] . vstack . fileWithTagsZone $ fwts
    in stdDelayTooltip "File Database" fileWithTagsStack
+  where
+    -- A widget that shows a FileWithTags, an arbitrary number of buttons
+    -- and sizes appropriately to the parent container
+    fileWithTagWidget ::
+      (WidgetModel s) =>
+      [WidgetNode s TaggerEvent] ->
+      FileWithTags ->
+      WidgetNode s TaggerEvent
+    fileWithTagWidget bs fwt =
+      let _temp x = const . label $ ""
+          buttonGridNode bs' =
+            box_ [alignLeft] $ hstack_ [] bs'
+          fileNode f' = box_ [alignLeft] $ flip label_ [ellipsis] (pack . filePath $ f')
+          tagsNode ts' =
+            box_ [alignTop, alignLeft] $
+              flip
+                label_
+                []
+                (intercalate ", " . map (pack . descriptor) $ ts')
+                `styleBasic` [textColor textBlue]
+          fwtSplitNode (fn', tn') =
+            box_ [alignLeft] $ vsplit_ [] $ (stdScroll fn', stdScroll tn')
+       in box_
+            [alignLeft]
+            $ vstack_
+              []
+              [ hstack_ [] $
+                  [ buttonGridNode bs,
+                    fwtSplitNode (fileNode . file $ fwt, tagsNode . tags $ fwt)
+                  ],
+                separatorLine
+              ]
 
 fileSinglePreviewWidget ::
   (WidgetModel s, HasFileSingle s (Maybe FileWithTags), HasDoSoloTag s Bool) =>
@@ -210,35 +242,3 @@ fileSinglePreviewWidget = imageZone
                              border 0 bgDefault,
                              radius 0
                            ]
-
--- | A widget that shows a FileWithTags, an arbitrary number of buttons
--- and sizes appropriately to the parent container
-fileWithTagWidget ::
-  (WidgetModel s) =>
-  [WidgetNode s TaggerEvent] ->
-  FileWithTags ->
-  WidgetNode s TaggerEvent
-fileWithTagWidget bs fwt =
-  let _temp x = const . label $ ""
-      buttonGridNode bs' =
-        box_ [alignLeft] $ hstack_ [] bs'
-      fileNode f' = box_ [alignLeft] $ flip label_ [ellipsis] (pack . filePath $ f')
-      tagsNode ts' =
-        box_ [alignTop, alignLeft] $
-          flip
-            label_
-            []
-            (intercalate ", " . map (pack . descriptor) $ ts')
-            `styleBasic` [textColor textBlue]
-      fwtSplitNode (fn', tn') =
-        box_ [alignLeft] $ vsplit_ [] $ (stdScroll fn', stdScroll tn')
-   in box_
-        [alignLeft]
-        $ vstack_
-          []
-          [ hstack_ [] $
-              [ buttonGridNode bs,
-                fwtSplitNode (fileNode . file $ fwt, tagsNode . tags $ fwt)
-              ],
-            separatorLine
-          ]
