@@ -1,11 +1,12 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Use lambda" #-}
 {-# HLINT ignore "Eta reduce" #-}
 {-# HLINT ignore "Redundant flip" #-}
 {-# HLINT ignore "Redundant $" #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use lambda-case" #-}
 
 module Node.Application
   ( themeConfig,
@@ -86,10 +87,20 @@ descriptorTreeWidget model =
             NullTree -> acc
             Infra d -> vstack [acc, makeDepthWidget textBlack l d]
             Meta d cs ->
-              Data.List.foldl'
-                (buildTreeWidgetAccum (l + 1))
+              appendVStack
                 (vstack [acc, hstack [makeDepthWidget textBlue l d]])
-                cs
+                ( vstack $
+                    map
+                      ( \c ->
+                          case c of
+                            Infra d' -> makeDepthWidget textBlack (l + 1) d'
+                            Meta d' _ -> makeDepthWidget textBlue (l + 1) d'
+                            NullTree ->
+                              spacer
+                                `styleBasic` [padding 0, border 0 bgDefault]
+                      )
+                      cs
+                )
         makeDepthWidget textColor' l' d' =
           hstack
             [ label (replicate l' "  " !++ "|"),
