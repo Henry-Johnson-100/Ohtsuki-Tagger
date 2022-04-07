@@ -138,6 +138,9 @@ clearSelectionButton ::
   WidgetNode s TaggerEvent
 clearSelectionButton = styledButton FileSelectionClear "CS"
 
+appendToQueryButton :: Typeable s => Text -> WidgetNode s TaggerEvent
+appendToQueryButton t = styledButton (FileSelectionAppendQuery t) "Add"
+
 descriptorTreeWidget ::
   (WidgetModel s, HasDescriptorTree s DescriptorTree) => s -> WidgetNode s TaggerEvent
 descriptorTreeWidget model =
@@ -162,11 +165,16 @@ descriptorTreeWidget model =
                 (buildTreeWidgetAccum (l + 1))
                 (vstack [acc, hstack [makeDepthWidget l d]])
                 cs
-        makeDepthWidget l' d' = hstack [label (replicate l' " " !++ "|"), dButton d']
+        makeDepthWidget l' d' =
+          hstack
+            [ label (replicate l' " " !++ "|"),
+              dButton d',
+              appendToQueryButton (pack . descriptor $ d')
+            ]
     appendVStack x y = vstack [x, y]
     dButton :: (WidgetModel s) => Descriptor -> WidgetNode s TaggerEvent
     dButton d =
-      flip styleBasic [padding 0, bgColor bgDefault]
+      flip styleBasic [padding 0, bgColor bgDefault, border 0 bgDefault]
         . flip styledButton (pack . descriptor $ d)
         . RequestDescriptorTree
         . pack

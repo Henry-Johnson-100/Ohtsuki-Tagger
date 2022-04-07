@@ -79,10 +79,6 @@ taggerEventHandler wenv node model event =
   case event of
     TaggerInit ->
       [ Task
-          ( FileSelectionUpdate
-              <$> (getAllFilesIO (model ^. connectionString))
-          ),
-        Task
           ( DescriptorTreePut
               <$> (lookupDescriptorTree (model ^. connectionString) "Character")
           ),
@@ -100,6 +96,11 @@ taggerEventHandler wenv node model event =
             .~ (doSetAction (model ^. fileSetArithmetic) (model ^. fileSelection) ts)
       ]
     FileSelectionStageQuery t -> [Model $ model & fileSelectionQuery .~ t]
+    FileSelectionAppendQuery t ->
+      [ Model $
+          model & fileSelectionQuery
+            .~ (Data.Text.unwords [model ^. fileSelectionQuery, t])
+      ]
     FileSelectionCommitQuery ->
       [ Task
           ( FileSelectionUpdate

@@ -58,6 +58,8 @@ data TaggerEvent
     FileSelectionUpdate ![FileWithTags]
   | -- Set model _taggerFileSelectionQuery to the argument.
     FileSelectionStageQuery !Text
+  | -- Appends some text to the current query, separated by a space.
+    FileSelectionAppendQuery !Text
   | -- Send a query to the db, uses _TaggerQueryCriteria to match query type
     -- and _taggerFileSelectionQuery
     FileSelectionCommitQuery
