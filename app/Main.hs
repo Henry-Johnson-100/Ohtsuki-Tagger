@@ -13,6 +13,7 @@ import Control.Lens
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
+import Data.Char
 import Data.List
 import Data.Maybe
 import Data.Text hiding (head, map, take)
@@ -37,10 +38,24 @@ queryByTag cs ts =
     filesWithTags <- fmap catMaybes . mapM getFileWithTags $ fileAKsWithTags
     liftIO . return $ filesWithTags
 
+queryUntagged :: ConnString -> [String] -> IO [FileWithTags]
+queryUntagged cs ns =
+  connectThenRun cs $ do
+    untaggedKeys <-
+      case ns of
+        [] -> fetchUntaggedFiles
+        (n : _) ->
+          if Data.List.all isDigit n
+            then fmap (take . read $ n) fetchUntaggedFiles
+            else fetchUntaggedFiles
+    filesWithTags <- fmap catMaybes . mapM getFileWithTags $ untaggedKeys
+    liftIO . return $ filesWithTags
+
 doQueryWithCriteria :: QueryCriteria -> ConnString -> [String] -> IO [FileWithTags]
 doQueryWithCriteria qc =
   case qc of
     ByTag -> queryByTag
+    ByUntagged -> queryUntagged
 
 getAllFilesIO :: ConnString -> IO [FileWithTags]
 getAllFilesIO =

@@ -42,6 +42,7 @@ data QueryCriteria
   = ByTag
   | ByPattern
   | ByRelation
+  | ByUntagged
   deriving (Eq)
 
 instance Show QueryCriteria where
@@ -50,6 +51,7 @@ instance Show QueryCriteria where
       ByTag -> "Tag"
       ByPattern -> "Pattern"
       ByRelation -> "Relation"
+      ByUntagged -> "Untagged"
 
 data TaggerEvent
   = -- Open DB Connection, populate FileDb, DescriptorDb and DescriptorTree with #ALL#
