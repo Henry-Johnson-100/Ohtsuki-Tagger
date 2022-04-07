@@ -47,6 +47,9 @@ bgLightGray = Color 203 203 203 0.8
 textBlue :: Color
 textBlue = Color 7 58 198 0.78
 
+textBlack :: Color
+textBlack = Color 0 0 0 1
+
 themeConfig :: [AppConfig e]
 themeConfig =
   [ appWindowTitle "Hello World",
@@ -159,16 +162,16 @@ descriptorTreeWidget model =
         buildTreeWidgetAccum l acc tr =
           case tr of
             NullTree -> acc
-            Infra d -> vstack [acc, makeDepthWidget l d]
+            Infra d -> vstack [acc, makeDepthWidget textBlack l d]
             Meta d cs ->
               Data.List.foldl'
                 (buildTreeWidgetAccum (l + 1))
-                (vstack [acc, hstack [makeDepthWidget l d]])
+                (vstack [acc, hstack [makeDepthWidget textBlue l d]])
                 cs
-        makeDepthWidget l' d' =
+        makeDepthWidget textColor' l' d' =
           hstack
-            [ label (replicate l' " " !++ "|"),
-              dButton d',
+            [ label (replicate l' "  " !++ "|"),
+              dButton d' `styleBasic` [textColor textColor', bgColor bgDefault, border 0 bgDefault] `styleHover` [bgColor bgLightGray],
               appendToQueryButton (pack . descriptor $ d')
             ]
     appendVStack x y = vstack [x, y]
