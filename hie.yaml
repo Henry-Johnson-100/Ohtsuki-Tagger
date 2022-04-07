@@ -20,3 +20,12 @@ cradle:
 
     - path: "app/Type/Model/Prim.hs"
       component: "tagger:exe:TaggerGUI"
+
+    - path: "app/Database/Tagger/Access.hs"
+      component: "tagger:exe:TaggerGUI"
+
+    - path: "app/Database/Tagger/Type.hs"
+      component: "tagger:exe:TaggerGUI"
+
+    - path: "app/Database/Tagger/Schema.hs"
+      component: "tagger:exe:TaggerGUI"
