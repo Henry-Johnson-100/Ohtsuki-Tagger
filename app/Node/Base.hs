@@ -84,6 +84,7 @@ configPanel =
     [ clearSelectionButton,
       setArithmeticDropdown,
       queryTextField,
+      commitQueryButton,
       setQueryCriteriaDropdown
     ]
 
@@ -100,6 +101,10 @@ setArithmeticDropdown =
 queryTextField ::
   (WidgetModel s, HasFileSelectionQuery s Text) => WidgetNode s TaggerEvent
 queryTextField = textField_ fileSelectionQuery []
+
+commitQueryButton ::
+  (WidgetModel s) => WidgetNode s TaggerEvent
+commitQueryButton = styledButton FileSelectionCommitQuery "Query"
 
 setQueryCriteriaDropdown ::
   (WidgetModel s, WidgetEvent e, HasQueryCriteria s QueryCriteria) =>
