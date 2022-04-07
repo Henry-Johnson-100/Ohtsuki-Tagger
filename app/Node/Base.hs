@@ -16,13 +16,13 @@ module Node.Base
   )
 where
 
-import Control.Lens
-import Control.Monad
-import Data.List hiding (concat, intercalate, replicate, unlines, unwords)
-import Data.Text hiding (map)
-import Data.Typeable
+import Control.Lens ((^.))
+import Data.List (foldl', map)
+import Data.Text (Text, append, intercalate, pack, replicate)
 import Database.Tagger.Type
 import Monomer
+import Node.Color
+import Node.Micro
 import Type.Model
 import Prelude hiding (concat, replicate, unlines, unwords)
 
@@ -38,18 +38,6 @@ instance GetPlainText Descriptor where
 instance GetPlainText FileWithTags where
   getPlainText = getPlainText . file
 
-bgDefault :: Color
-bgDefault = Color 0 0 0 0
-
-bgLightGray :: Color
-bgLightGray = Color 203 203 203 0.8
-
-textBlue :: Color
-textBlue = Color 7 58 198 0.78
-
-textBlack :: Color
-textBlack = Color 0 0 0 1
-
 themeConfig :: [AppConfig e]
 themeConfig =
   [ appWindowTitle "Hello World",
@@ -58,22 +46,8 @@ themeConfig =
     appFontDef "Thin" "/usr/local/share/fonts/i/iosevka_thin.ttf"
   ]
 
-showTags :: [Descriptor] -> [Text]
-showTags = map (pack . descriptor) . sort
-
 (!++) :: Text -> Text -> Text
 (!++) = Data.Text.append
-
-stdDelayTooltip :: Text -> WidgetNode s e -> WidgetNode s e
-stdDelayTooltip = flip tooltip_ [tooltipDelay 750]
-
-stdScroll = scroll_ [wheelRate 50]
-
-styledButton :: (WidgetModel s) => TaggerEvent -> Text -> WidgetNode s TaggerEvent
-styledButton a t =
-  button t a
-    `styleBasic` [bgColor bgDefault, border 0 bgDefault]
-    `styleHover` [bgColor bgLightGray]
 
 configPanel ::
   ( WidgetModel s,
@@ -90,59 +64,6 @@ configPanel =
       commitQueryButton,
       setQueryCriteriaDropdown
     ]
-
-setArithmeticDropdown ::
-  (WidgetModel s, WidgetEvent e, HasFileSetArithmetic s FileSetArithmetic) =>
-  WidgetNode s e
-setArithmeticDropdown =
-  dropdown
-    fileSetArithmetic
-    [Union, Intersect, Diff]
-    (label . pack . show)
-    (label . pack . show)
-
-queryTextField ::
-  (WidgetModel s, HasFileSelectionQuery s Text) => WidgetNode s TaggerEvent
-queryTextField = textField_ fileSelectionQuery []
-
-commitQueryButton ::
-  (WidgetModel s) => WidgetNode s TaggerEvent
-commitQueryButton = styledButton FileSelectionCommitQuery "Query"
-
-setQueryCriteriaDropdown ::
-  (WidgetModel s, WidgetEvent e, HasQueryCriteria s QueryCriteria) =>
-  WidgetNode s e
-setQueryCriteriaDropdown =
-  dropdown
-    queryCriteria
-    [ByTag, ByRelation, ByPattern]
-    (label . pack . show)
-    (label . pack . show)
-
-resetDescriptorTreeButton ::
-  (WidgetModel s) =>
-  WidgetNode s TaggerEvent
-resetDescriptorTreeButton = styledButton (RequestDescriptorTree "META") "Top"
-
-selectButton ::
-  (WidgetModel s) =>
-  FileWithTags ->
-  WidgetNode s TaggerEvent
-selectButton = flip styledButton "Select" . FileSelectionUpdate . (: [])
-
-previewButton ::
-  (WidgetModel s) =>
-  FileWithTags ->
-  WidgetNode s TaggerEvent
-previewButton = flip styledButton "Preview" . FileSinglePut
-
-clearSelectionButton ::
-  (WidgetModel s) =>
-  WidgetNode s TaggerEvent
-clearSelectionButton = styledButton FileSelectionClear "CS"
-
-appendToQueryButton :: Typeable s => Text -> WidgetNode s TaggerEvent
-appendToQueryButton t = styledButton (FileSelectionAppendQuery t) "Add"
 
 descriptorTreeWidget ::
   (WidgetModel s, HasDescriptorTree s DescriptorTree) => s -> WidgetNode s TaggerEvent
@@ -183,28 +104,6 @@ descriptorTreeWidget model =
         . pack
         . descriptor
         $ d
-
-fileWithTagButton ::
-  (WidgetModel s) =>
-  TaggerEvent ->
-  FileWithTags ->
-  WidgetNode s TaggerEvent
-fileWithTagButton a fwt =
-  case fwt of
-    FileWithTags f ts ->
-      let fileSubZone = styledButton a (getPlainText f)
-          fwtSpacer =
-            label ":" `styleBasic` [paddingL 1, paddingR 1, paddingT 0, paddingB 0]
-          tagsSubZone =
-            scroll . flip label_ [multiline] . unlines . map getPlainText $ ts
-          fwtSplit =
-            vstack
-              [ hstack
-                  [fileSubZone, fwtSpacer, tagsSubZone],
-                separatorLine
-              ]
-              `styleHover` [bgColor bgLightGray]
-       in box fwtSplit
 
 fileSelectionWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent
 fileSelectionWidget fwts =

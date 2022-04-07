@@ -6,6 +6,12 @@ cradle:
     - path: "app/Node/Base.hs"
       component: "tagger:exe:TaggerGUI"
 
+    - path: "app/Node/Color.hs"
+      component: "tagger:exe:TaggerGUI"
+
+    - path: "app/Node/Micro.hs"
+      component: "tagger:exe:TaggerGUI"
+
     - path: "app/Type/Model.hs"
       component: "tagger:exe:TaggerGUI"
 

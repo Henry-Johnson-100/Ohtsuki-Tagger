@@ -17,6 +17,8 @@ executable TaggerGUI
   main-is:             Main.hs
 
   other-modules:       Node.Base
+                      ,Node.Color
+                      ,Node.Micro
                       ,Type.Model
                       ,Type.Model.Prim
 
