@@ -16,13 +16,13 @@ where
 
 import Control.Lens
 import Control.Monad
-import Data.List hiding (concat, intercalate, unlines, unwords)
+import Data.List hiding (concat, intercalate, replicate, unlines, unwords)
 import Data.Text hiding (map)
 import Data.Typeable
 import Database.Tagger.Type
 import Monomer
 import Type.Model
-import Prelude hiding (concat, unlines, unwords)
+import Prelude hiding (concat, replicate, unlines, unwords)
 
 class GetPlainText g where
   getPlainText :: g -> Text
@@ -122,18 +122,26 @@ descriptorTreeWidget ::
   (WidgetModel s, HasDescriptorTree s DescriptorTree) => s -> WidgetNode s TaggerEvent
 descriptorTreeWidget model =
   box . scroll_ [wheelRate 50] . flip styleBasic [textFont "Thin"] $
-    vstack [resetDescriptorTreeButton, (flip label_ [multiline] . fPrintDescriptorTree) (model ^. descriptorTree)]
+    vstack [resetDescriptorTreeButton, buildTreeWidget (model ^. descriptorTree)]
   where
-    -- box
-    --   . scroll_ [wheelRate 50]
-    --   . flip styleBasic [textFont "Thin"]
-    --   . flip label_ [multiline]
-    --   . fPrintDescriptorTree
-
-    -- #TODO eventually make a button
-    -- just don't know what the event will be yet
-    dButton :: (WidgetModel s, WidgetEvent e) => Descriptor -> WidgetNode s e
-    dButton = label . pack . descriptor
+    buildTreeWidget :: (WidgetModel s) => DescriptorTree -> WidgetNode s TaggerEvent
+    buildTreeWidget = buildTreeWidgetAccum 1 (vstack [])
+      where
+        buildTreeWidgetAccum ::
+          (WidgetModel s) =>
+          Int ->
+          WidgetNode s TaggerEvent ->
+          DescriptorTree ->
+          WidgetNode s TaggerEvent
+        buildTreeWidgetAccum l acc tr =
+          case tr of
+            NullTree -> acc
+            Infra d -> vstack [acc, makeDepthWidget l d]
+            Meta d cs -> Data.List.foldl' (buildTreeWidgetAccum (l + 1)) (vstack [acc, hstack [makeDepthWidget l d]]) cs
+        makeDepthWidget l' d' = hstack [label (replicate l' " " !++ "|"), dButton d']
+    appendVStack x y = vstack [x, y]
+    dButton :: (WidgetModel s) => Descriptor -> WidgetNode s TaggerEvent
+    dButton d = flip styledButton (pack . descriptor $ d) . RequestDescriptorTree . pack . descriptor $ d
     -- #TODO find a way to format a collection node to be more like a box
     -- Used to group infra nodes to take up less vertical space
     infraBox ::
