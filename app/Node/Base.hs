@@ -97,31 +97,10 @@ previewButton ::
   WidgetNode s TaggerEvent
 previewButton = flip styledButton "Preview" . FileSinglePut
 
-fPrintDescriptorTree :: DescriptorTree -> Text
-fPrintDescriptorTree = p "" 0
-  where
-    p :: Text -> Int -> DescriptorTree -> Text
-    p t l tr =
-      case tr of
-        NullTree -> t
-        -- Infra (Descriptor d) -> append t (append (Data.Text.replicate l "-") (pack d))
-        Infra (Descriptor d) ->
-          t
-            !++ "\n"
-            !++ Data.Text.replicate l " "
-            !++ "|"
-            !++ pack d
-        Meta (Descriptor d) cs ->
-          t !++ "\n"
-            !++ Data.List.foldl'
-              (\t' tr' -> p t' (l + 1) tr')
-              (Data.Text.replicate l " " !++ "|" !++ pack d)
-              cs
-
 descriptorTreeWidget ::
   (WidgetModel s, HasDescriptorTree s DescriptorTree) => s -> WidgetNode s TaggerEvent
 descriptorTreeWidget model =
-  box . scroll_ [wheelRate 50] . flip styleBasic [textFont "Thin"] $
+  box . scroll_ [wheelRate 50] . flip styleBasic [textFont "Regular"] $
     vstack [resetDescriptorTreeButton, buildTreeWidget (model ^. descriptorTree)]
   where
     buildTreeWidget :: (WidgetModel s) => DescriptorTree -> WidgetNode s TaggerEvent
@@ -137,19 +116,21 @@ descriptorTreeWidget model =
           case tr of
             NullTree -> acc
             Infra d -> vstack [acc, makeDepthWidget l d]
-            Meta d cs -> Data.List.foldl' (buildTreeWidgetAccum (l + 1)) (vstack [acc, hstack [makeDepthWidget l d]]) cs
+            Meta d cs ->
+              Data.List.foldl'
+                (buildTreeWidgetAccum (l + 1))
+                (vstack [acc, hstack [makeDepthWidget l d]])
+                cs
         makeDepthWidget l' d' = hstack [label (replicate l' " " !++ "|"), dButton d']
     appendVStack x y = vstack [x, y]
     dButton :: (WidgetModel s) => Descriptor -> WidgetNode s TaggerEvent
-    dButton d = flip styledButton (pack . descriptor $ d) . RequestDescriptorTree . pack . descriptor $ d
-    -- #TODO find a way to format a collection node to be more like a box
-    -- Used to group infra nodes to take up less vertical space
-    infraBox ::
-      (WidgetModel s, WidgetEvent e) =>
-      (Descriptor -> WidgetNode s e) ->
-      [Descriptor] ->
-      WidgetNode s e
-    infraBox dsf = box . hstack . map dsf
+    dButton d =
+      flip styleBasic [padding 0, bgColor bgDefault]
+        . flip styledButton (pack . descriptor $ d)
+        . RequestDescriptorTree
+        . pack
+        . descriptor
+        $ d
 
 fileWithTagButton ::
   (WidgetModel s) =>
