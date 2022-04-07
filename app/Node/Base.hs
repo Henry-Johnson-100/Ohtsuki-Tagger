@@ -234,7 +234,11 @@ fileWithTagWidget bs fwt =
         box_ [alignLeft] $ vsplit_ [] $ (stdScroll fn', stdScroll tn')
    in box_
         [alignLeft]
-        $ hstack_ [] $
-          [ buttonGridNode bs,
-            fwtSplitNode (fileNode . file $ fwt, tagsNode . tags $ fwt)
+        $ vstack_
+          []
+          [ hstack_ [] $
+              [ buttonGridNode bs,
+                fwtSplitNode (fileNode . file $ fwt, tagsNode . tags $ fwt)
+              ],
+            separatorLine
           ]
