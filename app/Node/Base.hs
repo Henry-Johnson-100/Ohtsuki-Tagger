@@ -80,6 +80,11 @@ setArithmeticDropDown =
     (label . pack . show)
     (label . pack . show)
 
+resetDescriptorTreeButton ::
+  (WidgetModel s) =>
+  WidgetNode s TaggerEvent
+resetDescriptorTreeButton = styledButton (RequestDescriptorTree "META") "Top"
+
 selectButton ::
   (WidgetModel s) =>
   FileWithTags ->
@@ -114,14 +119,17 @@ fPrintDescriptorTree = p "" 0
               cs
 
 descriptorTreeWidget ::
-  (WidgetModel s, WidgetEvent e) => DescriptorTree -> WidgetNode s e
-descriptorTreeWidget =
-  box
-    . scroll_ [wheelRate 50]
-    . flip styleBasic [textFont "Thin"]
-    . flip label_ [multiline]
-    . fPrintDescriptorTree
+  (WidgetModel s, HasDescriptorTree s DescriptorTree) => s -> WidgetNode s TaggerEvent
+descriptorTreeWidget model =
+  box . scroll_ [wheelRate 50] . flip styleBasic [textFont "Thin"] $
+    vstack [resetDescriptorTreeButton, (flip label_ [multiline] . fPrintDescriptorTree) (model ^. descriptorTree)]
   where
+    -- box
+    --   . scroll_ [wheelRate 50]
+    --   . flip styleBasic [textFont "Thin"]
+    --   . flip label_ [multiline]
+    --   . fPrintDescriptorTree
+
     -- #TODO eventually make a button
     -- just don't know what the event will be yet
     dButton :: (WidgetModel s, WidgetEvent e) => Descriptor -> WidgetNode s e

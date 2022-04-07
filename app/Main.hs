@@ -23,13 +23,15 @@ import Monomer.Common.Lens
 import Node.Base
 import Type.Model
 
-getAllFilesIO :: String -> IO [FileWithTags]
+type ConnString = String
+
+getAllFilesIO :: ConnString -> IO [FileWithTags]
 getAllFilesIO =
   flip
     connectThenRun
     (fetchAllFiles >>= fmap catMaybes . mapM getFileWithTags >>= liftIO . return)
 
-getAllIndexedDescriptorsIO :: String -> IO [Descriptor]
+getAllIndexedDescriptorsIO :: ConnString -> IO [Descriptor]
 getAllIndexedDescriptorsIO =
   flip
     connectThenRun
@@ -37,12 +39,11 @@ getAllIndexedDescriptorsIO =
         >>= liftIO . return
     )
 
-getDescriptorTreeALL :: String -> IO DescriptorTree
-getDescriptorTreeALL =
-  flip connectThenRun $ do
-    mk <- lookupDescriptorAutoKey "META"
-    ktr <- maybe (return NullTree) fetchInfraTree mk
-    liftIO . return $ ktr
+lookupDescriptorTree :: ConnString -> String -> IO DescriptorTree
+lookupDescriptorTree cs lk = connectThenRun cs $ do
+  mk <- lookupDescriptorAutoKey lk
+  ktr <- maybe (return NullTree) (fetchInfraTree) mk
+  liftIO . return $ ktr
 
 doSetAction :: Eq a => FileSetArithmetic -> [a] -> [a] -> [a]
 doSetAction a s o =
@@ -64,7 +65,10 @@ taggerEventHandler wenv node model event =
           ( FileDbUpdate
               <$> (getAllFilesIO (model ^. connectionString))
           ),
-        Task (DescriptorTreePut <$> (getDescriptorTreeALL (model ^. connectionString))),
+        Task
+          ( DescriptorTreePut
+              <$> (lookupDescriptorTree (model ^. connectionString) "Character")
+          ),
         Model $
           model
             & fileSingle
@@ -81,6 +85,12 @@ taggerEventHandler wenv node model event =
     DescriptorTreePut tr -> [Model $ model & descriptorTree .~ tr]
     ToggleDoSoloTag ->
       [Model $ model & (doSoloTag .~ (not (model ^. doSoloTag)))]
+    RequestDescriptorTree s ->
+      [ Task
+          ( DescriptorTreePut
+              <$> (lookupDescriptorTree (model ^. connectionString) (unpack s))
+          )
+      ]
 
 taggerApplicationUI ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -92,7 +102,7 @@ taggerApplicationUI wenv model = widgetTree
       hgrid
         [ vgrid
             [ fileDbWidget (take 10 (model ^. fileDb)),
-              descriptorTreeWidget (model ^. descriptorTree)
+              descriptorTreeWidget model
             ],
           vgrid
             [ configPanel,

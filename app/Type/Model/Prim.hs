@@ -6,6 +6,7 @@ module Type.Model.Prim
   )
 where
 
+import Data.Text
 import Database.Tagger.Type
   ( Descriptor,
     DescriptorTree (NullTree),
@@ -58,6 +59,8 @@ data TaggerEvent
     DescriptorTreeGet
   | -- Clear the current descriptor tree
     DescriptorTreeClear
-    -- Triggers a functionality like 'cycle'
-  | ToggleDoSoloTag
+  | -- Triggers a functionality like 'cycle'
+    ToggleDoSoloTag
+  | -- Like DescriptorTreePut but looks up a descriptorTree from text
+    RequestDescriptorTree !Text
   deriving (Show, Eq)

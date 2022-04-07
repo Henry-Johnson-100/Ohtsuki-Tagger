@@ -15,6 +15,7 @@ module Type.Model
     HasFileSingle,
     HasDoSoloTag,
     HasFileSetArithmetic,
+    HasDescriptorTree,
   )
 where
 
