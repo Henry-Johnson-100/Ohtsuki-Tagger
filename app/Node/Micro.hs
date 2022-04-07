@@ -52,7 +52,7 @@ setQueryCriteriaDropdown =
 resetDescriptorTreeButton ::
   (WidgetModel s) =>
   WidgetNode s TaggerEvent
-resetDescriptorTreeButton = styledButton (RequestDescriptorTree "META") "Top"
+resetDescriptorTreeButton = styledButton (RequestDescriptorTree "#ALL#") "Top"
 
 selectButton ::
   (WidgetModel s) =>

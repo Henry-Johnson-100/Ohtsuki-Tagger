@@ -106,7 +106,7 @@ taggerEventHandler wenv node model event =
     TaggerInit ->
       [ Task
           ( DescriptorTreePut
-              <$> (lookupDescriptorTree (model ^. connectionString) "Character")
+              <$> (lookupDescriptorTree (model ^. connectionString) "#ALL#")
           ),
         Model $
           model
@@ -175,7 +175,7 @@ taggerApplicationConfig =
 runTaggerWindow :: IO ()
 runTaggerWindow =
   startApp
-    (emptyTaggerModel "/home/monax/Repo/Haskell/TaggerLib/images_test.db")
+    (emptyTaggerModel "/home/monax/Repo/Haskell/TaggerLib/images.db")
     taggerEventHandler
     taggerApplicationUI
     taggerApplicationConfig
