@@ -101,7 +101,7 @@ taggerApplicationUI wenv model = widgetTree
     widgetTree =
       hgrid
         [ vgrid
-            [ fileDbWidget (take 10 (model ^. fileDb)),
+            [ fileDbWidget  (model ^. fileDb),
               descriptorTreeWidget model
             ],
           vgrid
