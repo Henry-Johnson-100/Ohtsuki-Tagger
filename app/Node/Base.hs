@@ -4,6 +4,7 @@
 
 {-# HLINT ignore "Use lambda" #-}
 {-# HLINT ignore "Eta reduce" #-}
+{-# HLINT ignore "Redundant flip" #-}
 
 module Node.Base
   ( themeConfig,
@@ -203,3 +204,21 @@ fileSinglePreviewWidget = imageZone
                              border 0 bgDefault,
                              radius 0
                            ]
+
+-- | A widget that shows a FileWithTags, an arbitrary number of buttons
+-- and sizes appropriately to the parent container
+fileWithTagWidget ::
+  (WidgetModel s) =>
+  [WidgetNode s TaggerEvent] ->
+  FileWithTags ->
+  WidgetNode s TaggerEvent
+fileWithTagWidget bs fwt =
+  let _temp x = const . label $ ""
+      buttonGridNode bs' = box_ [alignLeft] $ hgrid_ [] bs'
+      fileNode f' = box_ [alignRight] $ flip label_ [ellipsis] (pack . filePath $ f')
+      tagsNode ts' =
+        box_ [alignTop, alignLeft] $
+          scroll_ [wheelRate 50] $
+            flip label_ [] (intercalate ", " . map (pack . descriptor) $ ts')
+      fwtGridNode ns' = box_ [alignTop] $ hgrid ns'
+   in fwtGridNode [buttonGridNode bs, fileNode . file $ fwt, tagsNode . tags $ fwt]
