@@ -81,6 +81,8 @@ data TaggerEvent
     DescriptorDbUpdate ![Descriptor]
   | -- Put the InfraTree of a descriptor
     DescriptorTreePut !DescriptorTree
+  | -- Put the parent meta tree of the current tree in the model
+    DescriptorTreePutParent
   | -- Get a flattened descriptor tree
     DescriptorTreeGet
   | -- Clear the current descriptor tree

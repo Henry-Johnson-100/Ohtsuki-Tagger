@@ -1,11 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Use :" #-}
 {-# HLINT ignore "Redundant bracket" #-}
 {-# HLINT ignore "Use ?~" #-}
 {-# HLINT ignore "Use <&>" #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use lambda-case" #-}
 
 module Main where
 
@@ -82,11 +84,27 @@ getAllIndexedDescriptorsIO =
         >>= liftIO . return
     )
 
-lookupDescriptorTree :: ConnString -> String -> IO DescriptorTree
-lookupDescriptorTree cs lk = connectThenRun cs $ do
+lookupDescriptorTreeDir ::
+  ConnString ->
+  (DescriptorAutoKey -> Result DescriptorTree) ->
+  String ->
+  IO DescriptorTree
+lookupDescriptorTreeDir cs d lk = connectThenRun cs $ do
   mk <- lookupDescriptorAutoKey lk
-  ktr <- maybe (return NullTree) (fetchInfraTree) mk
+  ktr <- maybe (return NullTree) d mk
   liftIO . return $ ktr
+
+lookupInfraDescriptorTree :: ConnString -> String -> IO DescriptorTree
+lookupInfraDescriptorTree cs = lookupDescriptorTreeDir cs fetchInfraTree
+
+getParentDescriptorTree :: ConnString -> DescriptorTree -> IO DescriptorTree
+getParentDescriptorTree cs dtr =
+  connectThenRun cs $ do
+    headNode <- return . getNode $ dtr
+    mk <- maybe (return Nothing) (lookupDescriptorAutoKey . descriptor) headNode
+    metaTreeChildren <- maybe (return []) (fmap descriptorTreeChildren . fetchMetaTree) mk
+    ch <- return . (\xs -> case xs of [] -> Nothing; x : _ -> Just x) $ metaTreeChildren
+    liftIO $ maybe (lookupInfraDescriptorTree cs "#ALL#") (liftIO . return) ch
 
 doSetAction :: Eq a => FileSetArithmetic -> [a] -> [a] -> [a]
 doSetAction a s o =
@@ -106,7 +124,7 @@ taggerEventHandler wenv node model event =
     TaggerInit ->
       [ Task
           ( DescriptorTreePut
-              <$> (lookupDescriptorTree (model ^. connectionString) "#ALL#")
+              <$> (lookupInfraDescriptorTree (model ^. connectionString) "#ALL#")
           ),
         Model $
           model
@@ -139,12 +157,21 @@ taggerEventHandler wenv node model event =
       ]
     FileSelectionClear -> [Model $ model & fileSelection .~ []]
     DescriptorTreePut tr -> [Model $ model & descriptorTree .~ tr]
+    DescriptorTreePutParent ->
+      [ Task
+          ( DescriptorTreePut
+              <$> ( getParentDescriptorTree
+                      (model ^. connectionString)
+                      (model ^. descriptorTree)
+                  )
+          )
+      ]
     ToggleDoSoloTag ->
       [Model $ model & (doSoloTag .~ (not (model ^. doSoloTag)))]
     RequestDescriptorTree s ->
       [ Task
           ( DescriptorTreePut
-              <$> (lookupDescriptorTree (model ^. connectionString) (unpack s))
+              <$> (lookupInfraDescriptorTree (model ^. connectionString) (unpack s))
           )
       ]
 
