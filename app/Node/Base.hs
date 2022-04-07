@@ -5,6 +5,7 @@
 {-# HLINT ignore "Use lambda" #-}
 {-# HLINT ignore "Eta reduce" #-}
 {-# HLINT ignore "Redundant flip" #-}
+{-# HLINT ignore "Redundant $" #-}
 
 module Node.Base
   ( themeConfig,
@@ -43,6 +44,9 @@ bgDefault = Color 0 0 0 0
 bgLightGray :: Color
 bgLightGray = Color 203 203 203 0.8
 
+textBlue :: Color
+textBlue = Color 7 58 198 0.78
+
 themeConfig :: [AppConfig e]
 themeConfig =
   [ appWindowTitle "Hello World",
@@ -59,6 +63,8 @@ showTags = map (pack . descriptor) . sort
 
 stdDelayTooltip :: Text -> WidgetNode s e -> WidgetNode s e
 stdDelayTooltip = flip tooltip_ [tooltipDelay 750]
+
+stdScroll = scroll_ [wheelRate 50]
 
 styledButton :: (WidgetModel s) => TaggerEvent -> Text -> WidgetNode s TaggerEvent
 styledButton a t =
@@ -101,7 +107,7 @@ previewButton = flip styledButton "Preview" . FileSinglePut
 descriptorTreeWidget ::
   (WidgetModel s, HasDescriptorTree s DescriptorTree) => s -> WidgetNode s TaggerEvent
 descriptorTreeWidget model =
-  box . scroll_ [wheelRate 50] . flip styleBasic [textFont "Regular"] $
+  box . stdScroll . flip styleBasic [textFont "Regular"] $
     vstack [resetDescriptorTreeButton, buildTreeWidget (model ^. descriptorTree)]
   where
     buildTreeWidget :: (WidgetModel s) => DescriptorTree -> WidgetNode s TaggerEvent
@@ -159,8 +165,8 @@ fileDbWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent
 fileDbWidget fwts =
   let fileWithTagsZone =
         map
-          (\fwt -> fileWithTagWidget [previewButton fwt] fwt)
-      fileWithTagsStack = box . vstack . fileWithTagsZone $ fwts
+          (\fwt -> fileWithTagWidget [previewButton fwt, selectButton fwt] fwt)
+      fileWithTagsStack = stdScroll $ box_ [] . vstack . fileWithTagsZone $ fwts
    in stdDelayTooltip "File Database" fileWithTagsStack
 
 fileSinglePreviewWidget ::
@@ -214,11 +220,21 @@ fileWithTagWidget ::
   WidgetNode s TaggerEvent
 fileWithTagWidget bs fwt =
   let _temp x = const . label $ ""
-      buttonGridNode bs' = box_ [alignLeft] $ hgrid_ [] bs'
+      buttonGridNode bs' =
+        box_ [alignLeft] $ hstack_ [] bs'
       fileNode f' = box_ [alignLeft] $ flip label_ [ellipsis] (pack . filePath $ f')
       tagsNode ts' =
         box_ [alignTop, alignLeft] $
-          scroll_ [wheelRate 50] $
-            flip label_ [] (intercalate ", " . map (pack . descriptor) $ ts')
-      fwtGridNode ns' = box_ [alignTop] $ hgrid ns'
-   in fwtGridNode [buttonGridNode bs, fileNode . file $ fwt, tagsNode . tags $ fwt]
+          flip
+            label_
+            []
+            (intercalate ", " . map (pack . descriptor) $ ts')
+            `styleBasic` [textColor textBlue]
+      fwtSplitNode (fn', tn') =
+        box_ [alignLeft] $ vsplit_ [] $ (stdScroll fn', stdScroll tn')
+   in box_
+        [alignLeft]
+        $ hstack_ [] $
+          [ buttonGridNode bs,
+            fwtSplitNode (fileNode . file $ fwt, tagsNode . tags $ fwt)
+          ]
