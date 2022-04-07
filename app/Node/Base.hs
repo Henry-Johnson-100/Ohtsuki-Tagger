@@ -10,7 +10,7 @@ module Node.Base
     fileDbWidget,
     fileSinglePreviewWidget,
     descriptorTreeWidget,
-    configPanel
+    configPanel,
   )
 where
 
@@ -62,7 +62,7 @@ stdDelayTooltip = flip tooltip_ [tooltipDelay 750]
 styledButton :: (WidgetModel s) => TaggerEvent -> Text -> WidgetNode s TaggerEvent
 styledButton a t =
   button t a
-    `styleBasic` [bgColor bgDefault]
+    `styleBasic` [bgColor bgDefault, border 0 bgDefault]
     `styleHover` [bgColor bgLightGray]
 
 configPanel ::
@@ -79,6 +79,18 @@ setArithmeticDropDown =
     [Union, Intersect, Diff]
     (label . pack . show)
     (label . pack . show)
+
+selectButton ::
+  (WidgetModel s) =>
+  FileWithTags ->
+  WidgetNode s TaggerEvent
+selectButton = flip styledButton "Select" . FileSelectionUpdate . (: [])
+
+previewButton ::
+  (WidgetModel s) =>
+  FileWithTags ->
+  WidgetNode s TaggerEvent
+previewButton = flip styledButton "Preview" . FileSinglePut
 
 fPrintDescriptorTree :: DescriptorTree -> Text
 fPrintDescriptorTree = p "" 0
