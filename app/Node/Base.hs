@@ -73,9 +73,9 @@ styledButton a t =
     `styleHover` [bgColor bgLightGray]
 
 configPanel ::
-  (WidgetModel s, WidgetEvent e, HasFileSetArithmetic s FileSetArithmetic) =>
-  WidgetNode s e
-configPanel = box . vgrid $ [setArithmeticDropDown]
+  (WidgetModel s, HasFileSetArithmetic s FileSetArithmetic) =>
+  WidgetNode s TaggerEvent
+configPanel = box . vgrid $ [clearSelectionButton, setArithmeticDropDown]
 
 setArithmeticDropDown ::
   (WidgetModel s, WidgetEvent e, HasFileSetArithmetic s FileSetArithmetic) =>
@@ -103,6 +103,11 @@ previewButton ::
   FileWithTags ->
   WidgetNode s TaggerEvent
 previewButton = flip styledButton "Preview" . FileSinglePut
+
+clearSelectionButton ::
+  (WidgetModel s) =>
+  WidgetNode s TaggerEvent
+clearSelectionButton = styledButton FileSelectionClear "CS"
 
 descriptorTreeWidget ::
   (WidgetModel s, HasDescriptorTree s DescriptorTree) => s -> WidgetNode s TaggerEvent

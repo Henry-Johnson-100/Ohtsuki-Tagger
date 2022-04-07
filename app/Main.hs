@@ -62,7 +62,7 @@ taggerEventHandler wenv node model event =
   case event of
     TaggerInit ->
       [ Task
-          ( FileDbUpdate
+          ( FileSelectionUpdate
               <$> (getAllFilesIO (model ^. connectionString))
           ),
         Task
@@ -74,7 +74,6 @@ taggerEventHandler wenv node model event =
             & fileSingle
               .~ (Just (FileWithTags (File "/home/monax/Pictures/dog.jpg") []))
       ]
-    FileDbUpdate fs -> [Model $ model & fileDb .~ fs]
     FileSinglePut i -> [Model $ model & fileSingle .~ (Just i)]
     FileSetArithmetic a -> [Model $ model & fileSetArithmetic .~ a]
     FileSelectionUpdate ts ->
@@ -82,6 +81,7 @@ taggerEventHandler wenv node model event =
           model & fileSelection
             .~ (doSetAction (model ^. fileSetArithmetic) (model ^. fileSelection) ts)
       ]
+    FileSelectionClear -> [Model $ model & fileSelection .~ []]
     DescriptorTreePut tr -> [Model $ model & descriptorTree .~ tr]
     ToggleDoSoloTag ->
       [Model $ model & (doSoloTag .~ (not (model ^. doSoloTag)))]
@@ -101,7 +101,7 @@ taggerApplicationUI wenv model = widgetTree
     widgetTree =
       hgrid
         [ vgrid
-            [ fileSelectionWidget  (model ^. fileDb),
+            [ fileSelectionWidget (model ^. fileSelection),
               descriptorTreeWidget model
             ],
           vgrid

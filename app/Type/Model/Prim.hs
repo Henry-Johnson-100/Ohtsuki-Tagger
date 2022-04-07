@@ -6,7 +6,7 @@ module Type.Model.Prim
   )
 where
 
-import Data.Text
+import Data.Text (Text)
 import Database.Tagger.Type
   ( Descriptor,
     DescriptorTree (NullTree),
@@ -14,8 +14,7 @@ import Database.Tagger.Type
   )
 
 data TaggerModel = TaggerModel
-  { _taggerFileDb :: ![FileWithTags],
-    _taggerFileSelection :: ![FileWithTags],
+  { _taggerFileSelection :: ![FileWithTags],
     _taggerFileSetArithmetic :: !FileSetArithmetic,
     _taggerFileSingle :: !(Maybe FileWithTags),
     _taggerDescriptorDb :: ![Descriptor],
@@ -26,7 +25,7 @@ data TaggerModel = TaggerModel
   deriving (Show, Eq)
 
 emptyTaggerModel :: String -> TaggerModel
-emptyTaggerModel = TaggerModel [] [] Union Nothing [] NullTree False
+emptyTaggerModel = TaggerModel [] Union Nothing [] NullTree False
 
 data FileSetArithmetic
   = Union
@@ -37,8 +36,6 @@ data FileSetArithmetic
 data TaggerEvent
   = -- Open DB Connection, populate FileDb, DescriptorDb and DescriptorTree with #ALL#
     TaggerInit
-  | -- Replace current DB with the given list.
-    FileDbUpdate ![FileWithTags]
   | -- Update current selection
     FileSelectionUpdate ![FileWithTags]
   | -- Clear current selection

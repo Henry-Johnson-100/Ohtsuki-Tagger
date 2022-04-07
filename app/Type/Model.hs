@@ -4,7 +4,6 @@
 
 module Type.Model
   ( module Type.Model.Prim,
-    fileDb,
     fileSelection,
     fileSingle,
     descriptorDb,
