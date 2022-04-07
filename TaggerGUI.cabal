@@ -16,7 +16,7 @@ extra-source-files:  CHANGELOG.md
 executable TaggerGUI
   main-is:             Main.hs
 
-  other-modules:       Node.Base
+  other-modules:       Node.Application
                       ,Node.Color
                       ,Node.Micro
                       ,Type.Model

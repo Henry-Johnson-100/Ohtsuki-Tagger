@@ -20,7 +20,7 @@ import Database.Tagger.Access
 import Database.Tagger.Type
 import Monomer
 import Monomer.Common.Lens
-import Node.Base
+import Node.Application
 import Type.Model
 
 type ConnString = String

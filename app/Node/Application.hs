@@ -7,7 +7,7 @@
 {-# HLINT ignore "Redundant flip" #-}
 {-# HLINT ignore "Redundant $" #-}
 
-module Node.Base
+module Node.Application
   ( themeConfig,
     fileSelectionWidget,
     fileSinglePreviewWidget,
