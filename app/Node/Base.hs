@@ -145,14 +145,6 @@ fileWithTagButton a fwt =
             label ":" `styleBasic` [paddingL 1, paddingR 1, paddingT 0, paddingB 0]
           tagsSubZone =
             scroll . flip label_ [multiline] . unlines . map getPlainText $ ts
-          -- hgrid
-          --   ( map
-          --       ( flip styleBasic [textFont "Thin"]
-          --           . label
-          --           . getPlainText
-          --       )
-          --       ts
-          --   )
           fwtSplit =
             vstack
               [ hstack
@@ -171,33 +163,43 @@ fileDbWidget fwts =
    in stdDelayTooltip "File Database" fileWithTagsStack
 
 fileSinglePreviewWidget ::
-  ( HasDoSoloTag s1 Bool,
-    HasFileSingle s2 (Maybe FileWithTags),
-    Typeable s1
-  ) =>
-  s2 ->
-  WidgetNode s1 TaggerEvent
-fileSinglePreviewWidget model =
-  let imagePreview =
-        box_ [] $
-          maybe
-            (label "No Preview")
-            (flip image_ [alignBottom, fitEither] . pack . filePath . file)
-            (model ^. fileSingle)
-      doSoloTagCheckbox =
-        box_ [alignCenter] $
-          labeledCheckbox_
-            "Solo Tagging Mode"
-            doSoloTag
-            [textRight, maxLines 1, ellipsis]
-            `styleBasic` [ textFont "Thin",
-                           paddingB 5,
-                           paddingT 0,
-                           border 0 bgDefault,
-                           radius 0
-                         ]
-      imageZone =
-        box_ [onClick ToggleDoSoloTag]
-          . vsplit_ []
-          $ (imagePreview, doSoloTagCheckbox)
-   in imageZone
+  (WidgetModel s, HasFileSingle s (Maybe FileWithTags), HasDoSoloTag s Bool) =>
+  s ->
+  WidgetNode s TaggerEvent
+fileSinglePreviewWidget = imageZone
+  where
+    imageZone ::
+      (WidgetModel s, HasFileSingle s (Maybe FileWithTags), HasDoSoloTag s Bool) =>
+      s ->
+      WidgetNode s TaggerEvent
+    imageZone model =
+      box_ [onClick ToggleDoSoloTag]
+        . vsplit_ []
+        $ (imagePreview model, doSoloTagCheckBox)
+      where
+        imagePreview ::
+          (WidgetModel s, WidgetEvent e, HasFileSingle s (Maybe FileWithTags)) =>
+          s ->
+          WidgetNode s e
+        imagePreview m' =
+          box_
+            []
+            $ maybe
+              (label "No Preview")
+              (flip image_ [alignBottom, fitEither] . pack . filePath . file)
+              (m' ^. fileSingle)
+        doSoloTagCheckBox ::
+          (WidgetModel s, HasDoSoloTag s Bool) => WidgetNode s TaggerEvent
+        doSoloTagCheckBox =
+          box_
+            [alignCenter]
+            $ labeledCheckbox_
+              "Solo Tagging Mode"
+              doSoloTag
+              [textRight, maxLines 1, ellipsis]
+              `styleBasic` [ textFont "Thin",
+                             paddingB 5,
+                             paddingT 0,
+                             border 0 bgDefault,
+                             radius 0
+                           ]
