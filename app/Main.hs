@@ -76,6 +76,7 @@ taggerEventHandler wenv node model event =
       ]
     FileSinglePut i -> [Model $ model & fileSingle .~ (Just i)]
     FileSetArithmetic a -> [Model $ model & fileSetArithmetic .~ a]
+    FileSetQueryCriteria q -> [Model $ model & queryCriteria .~ q]
     FileSelectionUpdate ts ->
       [ Model $
           model & fileSelection

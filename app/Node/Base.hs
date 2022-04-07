@@ -73,17 +73,32 @@ styledButton a t =
     `styleHover` [bgColor bgLightGray]
 
 configPanel ::
-  (WidgetModel s, HasFileSetArithmetic s FileSetArithmetic) =>
+  ( WidgetModel s,
+    HasFileSetArithmetic s FileSetArithmetic,
+    HasQueryCriteria s QueryCriteria
+  ) =>
   WidgetNode s TaggerEvent
-configPanel = box . vgrid $ [clearSelectionButton, setArithmeticDropDown]
+configPanel =
+  box . vgrid $
+    [clearSelectionButton, setArithmeticDropdown, setQueryCriteriaDropdown]
 
-setArithmeticDropDown ::
+setArithmeticDropdown ::
   (WidgetModel s, WidgetEvent e, HasFileSetArithmetic s FileSetArithmetic) =>
   WidgetNode s e
-setArithmeticDropDown =
+setArithmeticDropdown =
   dropdown
     fileSetArithmetic
     [Union, Intersect, Diff]
+    (label . pack . show)
+    (label . pack . show)
+
+setQueryCriteriaDropdown ::
+  (WidgetModel s, WidgetEvent e, HasQueryCriteria s QueryCriteria) =>
+  WidgetNode s e
+setQueryCriteriaDropdown =
+  dropdown
+    queryCriteria
+    [ByTag, ByRelation, ByPattern]
     (label . pack . show)
     (label . pack . show)
 
