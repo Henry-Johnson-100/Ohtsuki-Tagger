@@ -25,6 +25,23 @@ import Type.Model
 
 type ConnString = String
 
+queryByTag :: ConnString -> [String] -> IO [FileWithTags]
+queryByTag cs ts =
+  connectThenRun cs $ do
+    tagQResult <- mapM lookupDescriptorAutoKey ts
+    fileAKsWithTags <-
+      fmap (Data.List.foldl1' union)
+        . mapM fetchFilesWithTag
+        . catMaybes
+        $ tagQResult
+    filesWithTags <- fmap catMaybes . mapM getFileWithTags $ fileAKsWithTags
+    liftIO . return $ filesWithTags
+
+doQueryWithCriteria :: QueryCriteria -> ConnString -> [String] -> IO [FileWithTags]
+doQueryWithCriteria qc =
+  case qc of
+    ByTag -> queryByTag
+
 getAllFilesIO :: ConnString -> IO [FileWithTags]
 getAllFilesIO =
   flip
@@ -81,6 +98,17 @@ taggerEventHandler wenv node model event =
       [ Model $
           model & fileSelection
             .~ (doSetAction (model ^. fileSetArithmetic) (model ^. fileSelection) ts)
+      ]
+    FileSelectionStageQuery t -> [Model $ model & fileSelectionQuery .~ t]
+    FileSelectionCommitQuery ->
+      [ Task
+          ( FileSelectionUpdate
+              <$> ( doQueryWithCriteria
+                      (model ^. queryCriteria)
+                      (model ^. connectionString)
+                      (map unpack . Data.Text.words $ (model ^. fileSelectionQuery))
+                  )
+          )
       ]
     FileSelectionClear -> [Model $ model & fileSelection .~ []]
     DescriptorTreePut tr -> [Model $ model & descriptorTree .~ tr]

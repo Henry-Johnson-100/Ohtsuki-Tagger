@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Type.Model.Prim
   ( TaggerModel (..),
     TaggerEvent (..),
@@ -18,6 +20,7 @@ data TaggerModel = TaggerModel
   { _taggerFileSelection :: ![FileWithTags],
     _taggerFileSetArithmetic :: !FileSetArithmetic,
     _taggerQueryCriteria :: !QueryCriteria,
+    _taggerFileSelectionQuery :: !Text,
     _taggerFileSingle :: !(Maybe FileWithTags),
     _taggerDescriptorDb :: ![Descriptor],
     _taggerDescriptorTree :: !DescriptorTree,
@@ -27,7 +30,7 @@ data TaggerModel = TaggerModel
   deriving (Show, Eq)
 
 emptyTaggerModel :: String -> TaggerModel
-emptyTaggerModel = TaggerModel [] Union ByTag Nothing [] NullTree False
+emptyTaggerModel = TaggerModel [] Union ByTag "" Nothing [] NullTree False
 
 data FileSetArithmetic
   = Union
@@ -53,6 +56,11 @@ data TaggerEvent
     TaggerInit
   | -- Update current selection
     FileSelectionUpdate ![FileWithTags]
+  | -- Set model _taggerFileSelectionQuery to the argument.
+    FileSelectionStageQuery !Text
+  | -- Send a query to the db, uses _TaggerQueryCriteria to match query type
+    -- and _taggerFileSelectionQuery
+    FileSelectionCommitQuery
   | -- Clear current selection
     FileSelectionClear
   | -- | Set querying set arithmetic to Union, Intersect, or Diff

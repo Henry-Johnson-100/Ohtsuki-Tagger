@@ -11,12 +11,14 @@ module Type.Model
     connectionString,
     fileSetArithmetic,
     queryCriteria,
+    fileSelectionQuery,
     doSoloTag,
     HasFileSingle,
     HasDoSoloTag,
     HasFileSetArithmetic,
     HasDescriptorTree,
     HasQueryCriteria,
+    HasFileSelectionQuery,
   )
 where
 

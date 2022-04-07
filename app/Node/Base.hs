@@ -75,12 +75,17 @@ styledButton a t =
 configPanel ::
   ( WidgetModel s,
     HasFileSetArithmetic s FileSetArithmetic,
-    HasQueryCriteria s QueryCriteria
+    HasQueryCriteria s QueryCriteria,
+    HasFileSelectionQuery s Text
   ) =>
   WidgetNode s TaggerEvent
 configPanel =
   box . vgrid $
-    [clearSelectionButton, setArithmeticDropdown, setQueryCriteriaDropdown]
+    [ clearSelectionButton,
+      setArithmeticDropdown,
+      queryTextField,
+      setQueryCriteriaDropdown
+    ]
 
 setArithmeticDropdown ::
   (WidgetModel s, WidgetEvent e, HasFileSetArithmetic s FileSetArithmetic) =>
@@ -91,6 +96,10 @@ setArithmeticDropdown =
     [Union, Intersect, Diff]
     (label . pack . show)
     (label . pack . show)
+
+queryTextField ::
+  (WidgetModel s, HasFileSelectionQuery s Text) => WidgetNode s TaggerEvent
+queryTextField = textField_ fileSelectionQuery []
 
 setQueryCriteriaDropdown ::
   (WidgetModel s, WidgetEvent e, HasQueryCriteria s QueryCriteria) =>
