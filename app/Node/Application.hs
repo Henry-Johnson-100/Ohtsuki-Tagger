@@ -74,7 +74,7 @@ descriptorTreeWidget model =
     vstack [resetDescriptorTreeButton, buildTreeWidget (model ^. descriptorTree)]
   where
     buildTreeWidget :: (WidgetModel s) => DescriptorTree -> WidgetNode s TaggerEvent
-    buildTreeWidget = buildTreeWidgetAccum 1 (vstack [])
+    buildTreeWidget = buildTreeWidgetAccum 0 (vstack [])
       where
         buildTreeWidgetAccum ::
           (WidgetModel s) =>
@@ -103,7 +103,7 @@ descriptorTreeWidget model =
                 )
         makeDepthWidget textColor' l' d' =
           hstack
-            [ label (replicate l' "  " !++ "|"),
+            [ label (replicate l' "--" !++ "|"),
               dButton d' `styleBasic` [textColor textColor', bgColor bgDefault, border 0 bgDefault] `styleHover` [bgColor bgLightGray],
               appendToQueryButton (pack . descriptor $ d')
             ]
