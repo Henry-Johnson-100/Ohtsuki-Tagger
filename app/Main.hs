@@ -51,10 +51,21 @@ queryUntagged cs ns =
     filesWithTags <- fmap catMaybes . mapM getFileWithTags $ untaggedKeys
     liftIO . return $ filesWithTags
 
+-- | Kinda hacky
+queryRelation :: ConnString -> [String] -> IO [FileWithTags]
+queryRelation cs ds =
+  connectThenRun cs $ do
+    tagQResult <- fmap catMaybes . mapM lookupDescriptorAutoKey $ ds
+    infraTrees <-
+      fmap (Data.List.concatMap flattenTree) . mapM fetchInfraTree $ tagQResult
+    fwts <- liftIO . queryByTag cs . map descriptor $ infraTrees
+    liftIO . return $ fwts
+
 doQueryWithCriteria :: QueryCriteria -> ConnString -> [String] -> IO [FileWithTags]
 doQueryWithCriteria qc =
   case qc of
     ByTag -> queryByTag
+    ByRelation -> queryRelation
     ByUntagged -> queryUntagged
 
 getAllFilesIO :: ConnString -> IO [FileWithTags]
@@ -164,7 +175,7 @@ taggerApplicationConfig =
 runTaggerWindow :: IO ()
 runTaggerWindow =
   startApp
-    (emptyTaggerModel "/home/monax/Repo/Haskell/TaggerLib/images.db.backup")
+    (emptyTaggerModel "/home/monax/Repo/Haskell/TaggerLib/images_test.db")
     taggerEventHandler
     taggerApplicationUI
     taggerApplicationConfig
