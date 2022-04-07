@@ -40,10 +40,11 @@ instance GetPlainText FileWithTags where
 
 themeConfig :: [AppConfig e]
 themeConfig =
-  [ appWindowTitle "Hello World",
+  [ appWindowTitle "Tagger",
     appTheme lightTheme,
     appFontDef "Regular" "/usr/local/share/fonts/i/iosevka_light.ttf",
-    appFontDef "Thin" "/usr/local/share/fonts/i/iosevka_thin.ttf"
+    appFontDef "Thin" "/usr/local/share/fonts/i/iosevka_thin.ttf",
+    appFontDef "Bold" "/usr/local/share/fonts/i/iosevka_bold.ttf"
   ]
 
 (!++) :: Text -> Text -> Text
