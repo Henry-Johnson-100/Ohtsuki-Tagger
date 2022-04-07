@@ -19,6 +19,7 @@ executable TaggerGUI
   other-modules:       Node.Application
                       ,Node.Color
                       ,Node.Micro
+                      ,Event.Task
                       ,Type.Model
                       ,Type.Model.Prim
 
