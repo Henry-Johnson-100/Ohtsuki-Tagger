@@ -159,7 +159,7 @@ fileDbWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent
 fileDbWidget fwts =
   let fileWithTagsZone =
         map
-          (liftM2 fileWithTagButton FileSinglePut id)
+          (\fwt -> fileWithTagWidget [previewButton fwt] fwt)
       fileWithTagsStack = box . vstack . fileWithTagsZone $ fwts
    in stdDelayTooltip "File Database" fileWithTagsStack
 
@@ -215,7 +215,7 @@ fileWithTagWidget ::
 fileWithTagWidget bs fwt =
   let _temp x = const . label $ ""
       buttonGridNode bs' = box_ [alignLeft] $ hgrid_ [] bs'
-      fileNode f' = box_ [alignRight] $ flip label_ [ellipsis] (pack . filePath $ f')
+      fileNode f' = box_ [alignLeft] $ flip label_ [ellipsis] (pack . filePath $ f')
       tagsNode ts' =
         box_ [alignTop, alignLeft] $
           scroll_ [wheelRate 50] $
