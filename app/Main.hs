@@ -96,12 +96,12 @@ taggerEventHandler wenv node model event =
               <$> (lookupInfraDescriptorTree (model ^. connectionString) (unpack s))
           )
       ]
-    ShellCmd t ->
+    ShellCmd ->
       [ Task
           ( PutExtern
               <$> do
-                unless (Data.Text.null t) $ do
-                  let procArgs = Data.Text.words t
+                unless (Data.Text.null (model ^. shellCmd)) $ do
+                  let procArgs = Data.Text.words (model ^. shellCmd)
                   p <-
                     createProcess $
                       proc
@@ -109,7 +109,7 @@ taggerEventHandler wenv node model event =
                         ( let givenArgs = Data.List.tail . map unpack $ procArgs
                            in givenArgs ++ map (filePath . file) (model ^. fileSelection)
                         )
-                  putStrLn $ "Running " ++ unpack t
+                  putStrLn $ "Running " ++ unpack (model ^. shellCmd)
           )
       ]
     PutExtern _ -> []

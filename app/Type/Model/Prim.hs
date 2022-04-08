@@ -25,13 +25,27 @@ data TaggerModel = TaggerModel
     _taggerDescriptorDb :: ![Descriptor],
     _taggerDescriptorTree :: !DescriptorTree,
     _taggerDoSoloTag :: !Bool,
+    _taggerShellCmd :: !Text,
     _taggerExtern :: !(),
     _taggerConnectionString :: !String
   }
   deriving (Show, Eq)
 
 emptyTaggerModel :: String -> TaggerModel
-emptyTaggerModel = TaggerModel [] Union ByTag "" Nothing [] NullTree False ()
+emptyTaggerModel s =
+  TaggerModel
+    { _taggerFileSelection = [],
+      _taggerFileSetArithmetic = Union,
+      _taggerQueryCriteria = ByTag,
+      _taggerFileSelectionQuery = "",
+      _taggerFileSingle = Nothing,
+      _taggerDescriptorDb = [],
+      _taggerDescriptorTree = NullTree,
+      _taggerDoSoloTag = False,
+      _taggerShellCmd = "feh -D120 -zx. -g800x800 -Bwhite",
+      _taggerExtern = (),
+      _taggerConnectionString = s
+    }
 
 data FileSetArithmetic
   = Union
@@ -93,7 +107,7 @@ data TaggerEvent
   | -- Like DescriptorTreePut but looks up a descriptorTree from text
     RequestDescriptorTree !Text
   | -- Run the text as shell cmd
-    ShellCmd !Text
+    ShellCmd
   | -- Receives nothing and does nothing
     PutExtern !()
   deriving (Show, Eq)

@@ -13,12 +13,14 @@ module Type.Model
     queryCriteria,
     fileSelectionQuery,
     doSoloTag,
+    shellCmd,
     HasFileSingle,
     HasDoSoloTag,
     HasFileSetArithmetic,
     HasDescriptorTree,
     HasQueryCriteria,
     HasFileSelectionQuery,
+    HasShellCmd,
   )
 where
 

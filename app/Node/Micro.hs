@@ -35,6 +35,14 @@ queryTextField ::
   (WidgetModel s, HasFileSelectionQuery s Text) => WidgetNode s TaggerEvent
 queryTextField = textField_ fileSelectionQuery []
 
+shellCmdTextField ::
+  (WidgetModel s, HasShellCmd s Text) => WidgetNode s TaggerEvent
+shellCmdTextField = textField_ shellCmd []
+
+doShellCmdButton ::
+  (WidgetModel s) => WidgetNode s TaggerEvent
+doShellCmdButton = styledButton ShellCmd "Cmd"
+
 commitQueryButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
 commitQueryButton = styledButton FileSelectionCommitQuery "Query"

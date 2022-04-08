@@ -55,7 +55,8 @@ configPanel ::
   ( WidgetModel s,
     HasFileSetArithmetic s FileSetArithmetic,
     HasQueryCriteria s QueryCriteria,
-    HasFileSelectionQuery s Text
+    HasFileSelectionQuery s Text,
+    HasShellCmd s Text
   ) =>
   WidgetNode s TaggerEvent
 configPanel =
@@ -64,7 +65,9 @@ configPanel =
       setArithmeticDropdown,
       queryTextField,
       commitQueryButton,
-      setQueryCriteriaDropdown
+      setQueryCriteriaDropdown,
+      shellCmdTextField,
+      doShellCmdButton
     ]
 
 descriptorTreeWidget ::
