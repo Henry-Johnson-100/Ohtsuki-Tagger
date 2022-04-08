@@ -1,31 +1,31 @@
 cradle:
   cabal:
     - path: "app/Main.hs"
-      component: "tagger:exe:TaggerGUI"
+      component: "tagger:exe:tagger"
 
     - path: "app/Node/Application.hs"
-      component: "tagger:exe:TaggerGUI"
+      component: "tagger:exe:tagger"
 
     - path: "app/Node/Color.hs"
-      component: "tagger:exe:TaggerGUI"
+      component: "tagger:exe:tagger"
 
     - path: "app/Node/Micro.hs"
-      component: "tagger:exe:TaggerGUI"
+      component: "tagger:exe:tagger"
 
     - path: "app/Event/Task.hs"
-      component: "tagger:exe:TaggerGUI"
+      component: "tagger:exe:tagger"
 
     - path: "app/Type/Model.hs"
-      component: "tagger:exe:TaggerGUI"
+      component: "tagger:exe:tagger"
 
     - path: "app/Type/Model/Prim.hs"
-      component: "tagger:exe:TaggerGUI"
+      component: "tagger:exe:tagger"
 
     - path: "app/Database/Tagger/Access.hs"
-      component: "tagger:exe:TaggerGUI"
+      component: "tagger:exe:tagger"
 
     - path: "app/Database/Tagger/Type.hs"
-      component: "tagger:exe:TaggerGUI"
+      component: "tagger:exe:tagger"
 
     - path: "app/Database/Tagger/Schema.hs"
-      component: "tagger:exe:TaggerGUI"
+      component: "tagger:exe:tagger"
