@@ -103,12 +103,13 @@ taggerEventHandler wenv node model event =
                 unless (Data.Text.null (model ^. shellCmd)) $ do
                   let procArgs = Data.Text.words (model ^. shellCmd)
                   p <-
-                    createProcess $
-                      proc
-                        (unpack . head $ procArgs)
-                        ( let givenArgs = Data.List.tail . map unpack $ procArgs
-                           in putFileArgs givenArgs (map (filePath . file) (model ^. fileSelection))
-                        )
+                    createProcess
+                      . shell
+                      $ Data.List.unwords
+                        . putFileArgs
+                          (map unpack procArgs)
+                        . map (filePath . file)
+                        $ (model ^. fileSelection)
                   putStrLn $ "Running " ++ unpack (model ^. shellCmd)
           )
       ]
