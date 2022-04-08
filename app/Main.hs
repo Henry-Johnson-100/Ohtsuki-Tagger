@@ -123,7 +123,7 @@ taggerApplicationConfig =
 runTaggerWindow :: IO ()
 runTaggerWindow =
   startApp
-    (emptyTaggerModel "/home/monax/Repo/Haskell/TaggerLib/images.db")
+    (emptyTaggerModel "/home/monax/Repo/Haskell/tagger/images.db")
     taggerEventHandler
     taggerApplicationUI
     taggerApplicationConfig

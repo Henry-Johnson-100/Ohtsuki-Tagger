@@ -151,6 +151,20 @@ FROM
   Descriptor
 WHERE
   descriptor IN ('#UNRELATED#', '#META#');
+-- Unrelate tags that have more than one relation
+DELETE FROM
+  MetaDescriptor
+WHERE
+  infraDescriptorId IN (
+    SELECT
+      infraDescriptorId
+    FROM
+      MetaDescriptor
+    GROUP BY
+      infraDescriptorId
+    HAVING
+      COUNT(*) > 1
+  );
 -- Relate #UNRELATED# to tags not infra to anything
 INSERT INTO
   MetaDescriptor (metaDescriptorId, infraDescriptorId)
