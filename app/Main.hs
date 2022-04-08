@@ -106,7 +106,9 @@ taggerEventHandler wenv node model event =
                     createProcess $
                       proc
                         (unpack . head $ procArgs)
-                        (Data.List.tail . map unpack $ procArgs)
+                        ( let givenArgs = Data.List.tail . map unpack $ procArgs
+                           in givenArgs ++ map (filePath . file) (model ^. fileSelection)
+                        )
                   putStrLn $ "Running " ++ unpack t
           )
       ]
