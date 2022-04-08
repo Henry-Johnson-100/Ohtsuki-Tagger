@@ -107,12 +107,21 @@ taggerEventHandler wenv node model event =
                       proc
                         (unpack . head $ procArgs)
                         ( let givenArgs = Data.List.tail . map unpack $ procArgs
-                           in givenArgs ++ map (filePath . file) (model ^. fileSelection)
+                           in putFileArgs givenArgs (map (filePath . file) (model ^. fileSelection))
                         )
                   putStrLn $ "Running " ++ unpack (model ^. shellCmd)
           )
       ]
     PutExtern _ -> []
+
+-- | Replaces "${file} in the first list with the entirety of the second."
+putFileArgs :: [String] -> [String] -> [String]
+putFileArgs args files =
+  let atFileArg = Data.List.break (== "%file") args
+   in (fst atFileArg) ++ files ++ (tail' . snd $ atFileArg)
+  where
+    tail' [] = []
+    tail' (_ : xs) = xs
 
 taggerApplicationUI ::
   WidgetEnv TaggerModel TaggerEvent ->
