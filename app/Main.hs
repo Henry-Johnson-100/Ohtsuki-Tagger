@@ -100,8 +100,14 @@ taggerEventHandler wenv node model event =
       [ Task
           ( PutExtern
               <$> do
-                p <- createProcess (proc "feh" ["-xd.", "-g800x800", unpack t])
-                return ()
+                unless (Data.Text.null t) $ do
+                  let procArgs = Data.Text.words t
+                  p <-
+                    createProcess $
+                      proc
+                        (unpack . head $ procArgs)
+                        (Data.List.tail . map unpack $ procArgs)
+                  putStrLn $ "Running " ++ unpack t
           )
       ]
     PutExtern _ -> []
