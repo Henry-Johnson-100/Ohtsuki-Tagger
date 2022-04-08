@@ -1,5 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Redundant $" #-}
 
 module Node.Micro where
 
@@ -30,6 +33,28 @@ setArithmeticDropdown =
     [Union, Intersect, Diff]
     (label . pack . show)
     (label . pack . show)
+
+queryWidget ::
+  ( WidgetModel s,
+    HasFileSelectionQuery s Text,
+    HasQueryCriteria s QueryCriteria,
+    HasFileSetArithmetic s FileSetArithmetic
+  ) =>
+  WidgetNode s TaggerEvent
+queryWidget =
+  keystroke [("Enter", FileSelectionCommitQuery)]
+    . hstack
+    $ [ queryTextField,
+        setQueryCriteriaDropdown,
+        setArithmeticDropdown,
+        commitQueryButton
+      ]
+
+shellCmdWidget :: (WidgetModel s, HasShellCmd s Text) => WidgetNode s TaggerEvent
+shellCmdWidget =
+  keystroke [("Enter", ShellCmd)]
+    . hstack
+    $ [shellCmdTextField, doShellCmdButton]
 
 queryTextField ::
   (WidgetModel s, HasFileSelectionQuery s Text) => WidgetNode s TaggerEvent

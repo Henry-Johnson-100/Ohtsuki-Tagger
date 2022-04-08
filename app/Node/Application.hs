@@ -62,12 +62,8 @@ configPanel ::
 configPanel =
   box . vgrid $
     [ clearSelectionButton,
-      setArithmeticDropdown,
-      queryTextField,
-      commitQueryButton,
-      setQueryCriteriaDropdown,
-      shellCmdTextField,
-      doShellCmdButton
+      queryWidget,
+      shellCmdWidget
     ]
 
 descriptorTreeWidget ::
