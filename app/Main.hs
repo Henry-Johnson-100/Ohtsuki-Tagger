@@ -134,7 +134,7 @@ taggerApplicationUI wenv model = widgetTree
       hgrid
         [ vgrid
             [ fileSelectionWidget (model ^. fileSelection),
-              descriptorTreeWidget model
+              vstack [queryWidget, descriptorTreeWidget model]
             ],
           vgrid
             [ configPanel,

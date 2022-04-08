@@ -14,6 +14,7 @@ module Node.Application
     fileSinglePreviewWidget,
     descriptorTreeWidget,
     configPanel,
+    queryWidget,
   )
 where
 
@@ -61,9 +62,7 @@ configPanel ::
   WidgetNode s TaggerEvent
 configPanel =
   box . vgrid $
-    [ clearSelectionButton,
-      queryWidget,
-      shellCmdWidget
+    [ shellCmdWidget
     ]
 
 descriptorTreeWidget ::
@@ -103,7 +102,12 @@ descriptorTreeWidget model =
         makeDepthWidget textColor' l' d' =
           hstack
             [ label (replicate l' "--" !++ "|"),
-              dButton d' `styleBasic` [textColor textColor', bgColor bgDefault, border 0 bgDefault] `styleHover` [bgColor bgLightGray],
+              dButton d'
+                `styleBasic` [ textColor textColor',
+                               bgColor bgDefault,
+                               border 0 bgDefault
+                             ]
+                `styleHover` [bgColor bgLightGray],
               appendToQueryButton (pack . descriptor $ d')
             ]
     appendVStack x y = vstack [x, y]
@@ -197,3 +201,19 @@ fileSinglePreviewWidget = imageZone
                              border 0 bgDefault,
                              radius 0
                            ]
+
+queryWidget ::
+  ( WidgetModel s,
+    HasFileSelectionQuery s Text,
+    HasQueryCriteria s QueryCriteria,
+    HasFileSetArithmetic s FileSetArithmetic
+  ) =>
+  WidgetNode s TaggerEvent
+queryWidget =
+  keystroke [("Enter", FileSelectionCommitQuery)] $
+    hgrid_
+      []
+      [ box_ [] . hstack_ [] $ [clearSelectionButton, commitQueryButton, queryTextField],
+        box_ [] $
+          hstack_ [] [setQueryCriteriaDropdown, setArithmeticDropdown]
+      ]

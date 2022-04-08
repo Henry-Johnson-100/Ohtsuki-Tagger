@@ -24,49 +24,33 @@ styledButton a t =
     `styleBasic` [bgColor bgDefault, border 0 bgDefault]
     `styleHover` [bgColor bgLightGray]
 
-queryWidget ::
-  ( WidgetModel s,
-    HasFileSelectionQuery s Text,
-    HasQueryCriteria s QueryCriteria,
-    HasFileSetArithmetic s FileSetArithmetic
-  ) =>
-  WidgetNode s TaggerEvent
-queryWidget =
-  keystroke [("Enter", FileSelectionCommitQuery)] $
-    hgrid_
-      []
-      [ queryTextField,
-        box_ [] $
-          hstack_ [] [setQueryCriteriaDropdown, setArithmeticDropdown, commitQueryButton]
-      ]
-  where
-    queryTextField ::
-      (WidgetModel s, HasFileSelectionQuery s Text) => WidgetNode s TaggerEvent
-    queryTextField = textField_ fileSelectionQuery []
+queryTextField ::
+  (WidgetModel s, HasFileSelectionQuery s Text) => WidgetNode s TaggerEvent
+queryTextField = textField_ fileSelectionQuery []
 
-    setQueryCriteriaDropdown ::
-      (WidgetModel s, WidgetEvent e, HasQueryCriteria s QueryCriteria) =>
-      WidgetNode s e
-    setQueryCriteriaDropdown =
-      dropdown
-        queryCriteria
-        [ByTag, ByRelation, ByPattern]
-        (label . pack . show)
-        (label . pack . show)
+setQueryCriteriaDropdown ::
+  (WidgetModel s, WidgetEvent e, HasQueryCriteria s QueryCriteria) =>
+  WidgetNode s e
+setQueryCriteriaDropdown =
+  dropdown
+    queryCriteria
+    [ByTag, ByRelation, ByPattern]
+    (label . pack . show)
+    (label . pack . show)
 
-    setArithmeticDropdown ::
-      (WidgetModel s, WidgetEvent e, HasFileSetArithmetic s FileSetArithmetic) =>
-      WidgetNode s e
-    setArithmeticDropdown =
-      dropdown
-        fileSetArithmetic
-        [Union, Intersect, Diff]
-        (label . pack . show)
-        (label . pack . show)
+setArithmeticDropdown ::
+  (WidgetModel s, WidgetEvent e, HasFileSetArithmetic s FileSetArithmetic) =>
+  WidgetNode s e
+setArithmeticDropdown =
+  dropdown
+    fileSetArithmetic
+    [Union, Intersect, Diff]
+    (label . pack . show)
+    (label . pack . show)
 
-    commitQueryButton ::
-      (WidgetModel s) => WidgetNode s TaggerEvent
-    commitQueryButton = styledButton FileSelectionCommitQuery "Query"
+commitQueryButton ::
+  (WidgetModel s) => WidgetNode s TaggerEvent
+commitQueryButton = styledButton FileSelectionCommitQuery "Query"
 
 shellCmdWidget :: (WidgetModel s, HasShellCmd s Text) => WidgetNode s TaggerEvent
 shellCmdWidget =
