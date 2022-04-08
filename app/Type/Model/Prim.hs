@@ -25,12 +25,13 @@ data TaggerModel = TaggerModel
     _taggerDescriptorDb :: ![Descriptor],
     _taggerDescriptorTree :: !DescriptorTree,
     _taggerDoSoloTag :: !Bool,
+    _taggerExtern :: !(),
     _taggerConnectionString :: !String
   }
   deriving (Show, Eq)
 
 emptyTaggerModel :: String -> TaggerModel
-emptyTaggerModel = TaggerModel [] Union ByTag "" Nothing [] NullTree False
+emptyTaggerModel = TaggerModel [] Union ByTag "" Nothing [] NullTree False ()
 
 data FileSetArithmetic
   = Union
@@ -91,4 +92,8 @@ data TaggerEvent
     ToggleDoSoloTag
   | -- Like DescriptorTreePut but looks up a descriptorTree from text
     RequestDescriptorTree !Text
+  | -- Run the text as shell cmd
+    ShellCmd !Text
+  | -- Receives nothing and does nothing
+    PutExtern !()
   deriving (Show, Eq)

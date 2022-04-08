@@ -25,6 +25,7 @@ import Event.Task
 import Monomer
 import Monomer.Common.Lens
 import Node.Application
+import System.Process
 import Type.Model
 
 doSetAction :: Eq a => FileSetArithmetic -> [a] -> [a] -> [a]
@@ -95,6 +96,15 @@ taggerEventHandler wenv node model event =
               <$> (lookupInfraDescriptorTree (model ^. connectionString) (unpack s))
           )
       ]
+    ShellCmd t ->
+      [ Task
+          ( PutExtern
+              <$> do
+                p <- createProcess (proc "feh" ["-xd.", "-g800x800", unpack t])
+                return ()
+          )
+      ]
+    PutExtern _ -> []
 
 taggerApplicationUI ::
   WidgetEnv TaggerModel TaggerEvent ->
