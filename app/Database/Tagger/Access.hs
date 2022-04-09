@@ -13,6 +13,7 @@ module Database.Tagger.Access
     addDescriptor,
     safeAddFile,
     lookupDescriptorAutoKey,
+    lookupFileAutoKey,
     getFileWithTags,
     getDescriptor,
     fetchInfraTree,
@@ -57,6 +58,7 @@ import Database.Tagger.Type
     Field
       ( DescriptorField,
         DescriptorTagIdField,
+        FilePathField,
         FileTagIdField,
         InfraDescriptorIdField,
         MetaDescriptorIdField
@@ -216,6 +218,12 @@ fetchAllIndexedDescriptors :: Result [Descriptor]
 fetchAllIndexedDescriptors = do
   allDescriptor <- lookupDescriptorAutoKey "#ALL#"
   maybe (return []) (fmap flattenTree . fetchInfraTree) allDescriptor
+
+lookupFileAutoKey :: String -> Result (Maybe FileAutoKey)
+lookupFileAutoKey =
+  fmap head'
+    . Sqlite.project Sqlite.AutoKeyField
+    . Sqlite.like FilePathField
 
 fetchFilesWithTag :: DescriptorAutoKey -> Result [FileAutoKey]
 fetchFilesWithTag = Sqlite.project FileTagIdField . (==.) DescriptorTagIdField

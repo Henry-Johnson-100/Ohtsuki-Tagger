@@ -14,6 +14,7 @@ module Type.Model
     fileSelectionQuery,
     doSoloTag,
     shellCmd,
+    tagsString,
     HasFileSingle,
     HasDoSoloTag,
     HasFileSetArithmetic,
@@ -21,6 +22,7 @@ module Type.Model
     HasQueryCriteria,
     HasFileSelectionQuery,
     HasShellCmd,
+    HasTagsString,
   )
 where
 

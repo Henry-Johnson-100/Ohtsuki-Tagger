@@ -57,7 +57,8 @@ configPanel ::
     HasFileSetArithmetic s FileSetArithmetic,
     HasQueryCriteria s QueryCriteria,
     HasFileSelectionQuery s Text,
-    HasShellCmd s Text
+    HasShellCmd s Text,
+    HasTagsString s Text
   ) =>
   WidgetNode s TaggerEvent
 configPanel =
@@ -217,3 +218,13 @@ queryWidget =
         box_ [] $
           hstack_ [] [setQueryCriteriaDropdown, setArithmeticDropdown]
       ]
+
+tagCommitWidget ::
+  ( WidgetModel s,
+    HasTagsString s Text
+  ) =>
+  WidgetNode s TaggerEvent
+tagCommitWidget =
+  keystroke [("Enter", TagCommitTagsString)]
+    . hstack_ []
+    $ [tagCommitButton, tagsStringTextField]

@@ -27,7 +27,8 @@ data TaggerModel = TaggerModel
     _taggerDoSoloTag :: !Bool,
     _taggerShellCmd :: !Text,
     _taggerExtern :: !(),
-    _taggerConnectionString :: !String
+    _taggerConnectionString :: !String,
+    _taggerTagsString :: !Text
   }
   deriving (Show, Eq)
 
@@ -44,7 +45,8 @@ emptyTaggerModel s =
       _taggerDoSoloTag = False,
       _taggerShellCmd = "feh -D120 -zx. -g800x800 -Bwhite",
       _taggerExtern = (),
-      _taggerConnectionString = s
+      _taggerConnectionString = s,
+      _taggerTagsString = ""
     }
 
 data FileSetArithmetic
@@ -73,6 +75,8 @@ data TaggerEvent
     TaggerInit
   | -- Update current selection
     FileSelectionUpdate ![FileWithTags]
+  | -- Like FileSelectionUpdate but does not rely on FileSetArithmetic
+    FileSelectionSet ![FileWithTags]
   | -- Set model _taggerFileSelectionQuery to the argument.
     FileSelectionStageQuery !Text
   | -- Appends some text to the current query, separated by a space.
@@ -88,6 +92,8 @@ data TaggerEvent
     FileSetQueryCriteria !QueryCriteria
   | -- Display an image preview
     FileSinglePut !FileWithTags
+  | -- For indeterminate IO
+    FileSingleMaybePut !(Maybe FileWithTags)
   | -- If there is an image in the preview, get it
     FileSingleGet
   | -- Clear the image preview
@@ -110,4 +116,6 @@ data TaggerEvent
     ShellCmd
   | -- Receives nothing and does nothing
     PutExtern !()
+  | -- Tag the selection with the current tagsString
+    TagCommitTagsString
   deriving (Show, Eq)

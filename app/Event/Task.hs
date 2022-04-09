@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Use lambda-case" #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Event.Task where
 
@@ -14,6 +14,20 @@ import Database.Tagger.Type
 import Type.Model
 
 type ConnString = String
+
+tagSelection :: ConnString -> [FileWithTags] -> [String] -> IO ()
+tagSelection cs fwts ds = connectThenRun cs $ do
+  faks <- fmap catMaybes . mapM (lookupFileAutoKey . filePath . file) $ fwts
+  daks <- fmap catMaybes . mapM lookupDescriptorAutoKey $ ds
+  mapM_ tag $ Tag <$> faks <*> daks
+
+tagThenGetRefresh :: ConnString -> [FileWithTags] -> [String] -> IO [FileWithTags]
+tagThenGetRefresh cs fwts ds = connectThenRun cs $ do
+  faks <- fmap catMaybes . mapM (lookupFileAutoKey . filePath . file) $ fwts
+  daks <- fmap catMaybes . mapM lookupDescriptorAutoKey $ ds
+  mapM_ tag $ Tag <$> faks <*> daks
+  refreshedFwts <- fmap catMaybes . mapM getFileWithTags $ faks
+  liftIO . return $ refreshedFwts
 
 queryByTag :: ConnString -> [String] -> IO [FileWithTags]
 queryByTag cs ts =

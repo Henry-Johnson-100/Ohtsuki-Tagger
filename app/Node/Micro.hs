@@ -28,6 +28,14 @@ queryTextField ::
   (WidgetModel s, HasFileSelectionQuery s Text) => WidgetNode s TaggerEvent
 queryTextField = textField_ fileSelectionQuery []
 
+tagsStringTextField ::
+  (WidgetModel s, HasTagsString s Text) => WidgetNode s TaggerEvent
+tagsStringTextField = textField_ tagsString []
+
+tagCommitButton ::
+  (WidgetModel s) => WidgetNode s TaggerEvent
+tagCommitButton = button_ "Tag With" TagCommitTagsString []
+
 setQueryCriteriaDropdown ::
   (WidgetModel s, WidgetEvent e, HasQueryCriteria s QueryCriteria) =>
   WidgetNode s e

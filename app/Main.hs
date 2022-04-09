@@ -54,6 +54,7 @@ taggerEventHandler wenv node model event =
               .~ (Just (FileWithTags (File "/home/monax/Pictures/dog.jpg") []))
       ]
     FileSinglePut i -> [Model $ model & fileSingle .~ (Just i)]
+    FileSingleMaybePut mi -> [Model $ model & fileSingle .~ mi]
     FileSetArithmetic a -> [Model $ model & fileSetArithmetic .~ a]
     FileSetQueryCriteria q -> [Model $ model & queryCriteria .~ q]
     FileSelectionUpdate ts ->
@@ -61,6 +62,7 @@ taggerEventHandler wenv node model event =
           model & fileSelection
             .~ (doSetAction (model ^. fileSetArithmetic) (model ^. fileSelection) ts)
       ]
+    FileSelectionSet fwts -> [Model $ model & fileSelection .~ fwts]
     FileSelectionStageQuery t -> [Model $ model & fileSelectionQuery .~ t]
     FileSelectionAppendQuery t ->
       [ Model $
@@ -114,6 +116,34 @@ taggerEventHandler wenv node model event =
           )
       ]
     PutExtern _ -> []
+    TagCommitTagsString ->
+      [ Task
+          ( let cs = model ^. connectionString
+                ds = Data.List.words . unpack $ model ^. tagsString
+             in if (model ^. doSoloTag)
+                  then
+                    FileSingleMaybePut
+                      <$> ( fmap
+                              head'
+                              ( tagThenGetRefresh
+                                  cs
+                                  (maybeToList (model ^. fileSingle))
+                                  ds
+                              )
+                          )
+                  else
+                    FileSelectionSet
+                      <$> ( tagThenGetRefresh
+                              cs
+                              (model ^. fileSelection)
+                              ds
+                          )
+          )
+      ]
+
+head' :: [a] -> Maybe a
+head' [] = Nothing
+head' (x : _) = Just x
 
 -- | Replaces "${file} in the first list with the entirety of the second."
 putFileArgs :: [String] -> [String] -> [String]
