@@ -37,10 +37,6 @@ executable tagger
                       ,lens
                       ,text
                       ,transformers
-                      ,unordered-containers
-                      ,hashable
-                      ,transformers
-                      ,monad-control
                       ,directory
                       ,process
                       ,sqlite-simple == 0.4.18.0
