@@ -42,7 +42,7 @@ setQueryCriteriaDropdown ::
 setQueryCriteriaDropdown =
   dropdown
     queryCriteria
-    [ByTag, ByRelation, ByPattern]
+    [ByTag, ByRelation, ByPattern, ByUntagged]
     (label . pack . show)
     (label . pack . show)
 
