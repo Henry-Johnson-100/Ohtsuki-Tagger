@@ -5,7 +5,25 @@
 
 {-# HLINT ignore "Redundant return" #-}
 
-module Database.TaggerNew.Access () where
+module Database.TaggerNew.Access
+  ( addFile,
+    addDescriptor,
+    tagFileWithDescriptor,
+    relate,
+    deleteRelation,
+    fetchInfraTree,
+    fetchMetaDescriptors,
+    fetchInfraDescriptors,
+    getDescriptor,
+    getFile,
+    getUntaggedFileWithTags,
+    lookupFileWithTagsByRelation,
+    lookupFileWithTagsByFilePattern,
+    lookupFileWithTagByTagId,
+    lookupFileWithTagsByFileId,
+    lookupDescriptorPattern,
+  )
+where
 
 import Control.Monad
 import Control.Monad.Trans.Class
@@ -42,6 +60,23 @@ tagFileWithDescriptor c f d =
     "INSERT INTO Tag (fileTagId, descriptorTagId) VALUES (?,?)"
     (fileId f, descriptorId d)
 
+getUnrelatedDescriptor :: Connection -> MaybeT IO Descriptor
+getUnrelatedDescriptor =
+  lift . flip lookupDescriptorPattern "#UNRELATED#" >=> hoistMaybe . head'
+
+-- | Create new descriptor and relate it to #UNRELATED#
+addDescriptor :: Connection -> T.Text -> MaybeT IO Descriptor
+addDescriptor c dT = do
+  unrelatedDescriptor <- getUnrelatedDescriptor c
+  lift
+    . execute
+      c
+      "INSERT INTO Descriptor (descriptor) VALUES (?)"
+    $ [dT]
+  newDId <- fmap fromIntegral . lift . lastInsertRowId $ c
+  relate c (MetaDescriptor (descriptorId unrelatedDescriptor) newDId)
+  return . Descriptor newDId $dT
+
 -- | Creates a relation iff these criteria are met:
 --
 -- - The InfraDescriptor is not present in the tree that is meta to the MetaDescriptor.
@@ -61,10 +96,7 @@ relate c md =
       unless
         (infraDescriptor `descriptorTreeElem` treeMetaToParent)
         ( do
-            unrelatedMetaDescriptor <-
-              hoistMaybe . head'
-                <=< lift . lookupDescriptorPattern c
-                $ "#UNRELATED#"
+            unrelatedMetaDescriptor <- getUnrelatedDescriptor c
             let unrelatedRelation =
                   MetaDescriptor (descriptorId unrelatedMetaDescriptor) infraDK
             isRelatedToUnrelated <-
