@@ -25,15 +25,34 @@ module Database.TaggerNew.Access
   )
 where
 
-import Control.Monad
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Maybe
-import Data.List
+import Control.Monad (unless, when, (>=>))
+import Control.Monad.Trans.Class (MonadTrans (lift))
+import Control.Monad.Trans.Maybe (MaybeT (..))
+import Data.List (foldl')
 import Data.Maybe (catMaybes)
 import qualified Data.Text as T
 import Database.SQLite.Simple
-import Database.SQLite.Simple.ToField
+  ( Connection,
+    Only,
+    execute,
+    lastInsertRowId,
+    query,
+    query_,
+  )
+import Database.SQLite.Simple.ToField (ToField)
 import Database.TaggerNew.Type
+  ( Descriptor (Descriptor, descriptorId),
+    DescriptorTree (Infra),
+    File (File, fileId),
+    FileWithTags (FileWithTags, tags),
+    MetaDescriptor (MetaDescriptor),
+    descriptorTreeElem,
+    flattenTree,
+    fwtFileEqual,
+    insertIntoDescriptorTree,
+    pushTag,
+    validatePath,
+  )
 
 type FileKey = Int
 
