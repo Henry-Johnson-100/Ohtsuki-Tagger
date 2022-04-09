@@ -166,8 +166,8 @@ lookupFilePattern conn p = do
     query
       conn
       "SELECT id, filePath \
-      \FROM File\
-      \ WHERE filePath LIKE ?"
+      \FROM File \
+      \WHERE filePath LIKE ?"
       [p]
   return . map mapQToFile $ r
 
