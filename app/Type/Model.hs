@@ -8,7 +8,7 @@ module Type.Model
     fileSingle,
     descriptorDb,
     descriptorTree,
-    connectionString,
+    dbConn,
     fileSetArithmetic,
     queryCriteria,
     fileSelectionQuery,

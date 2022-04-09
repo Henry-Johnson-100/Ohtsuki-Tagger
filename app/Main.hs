@@ -19,8 +19,11 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import Data.Text hiding (head, map, take)
+import Database.SQLite.Simple (close, open)
 import Database.Tagger.Access
 import Database.Tagger.Type
+import qualified Database.TaggerNew.Access as TaggerNew.Access
+import qualified Database.TaggerNew.Type as TaggerNew.Type
 import Event.Task
 import Monomer
 import Monomer.Common.Lens
@@ -46,12 +49,17 @@ taggerEventHandler wenv node model event =
     TaggerInit ->
       [ Task
           ( DescriptorTreePut
-              <$> (lookupInfraDescriptorTree (model ^. connectionString) "#ALL#")
+              <$> (getALLInfraTree (model ^. dbConn))
           ),
         Model $
           model
             & fileSingle
-              .~ (Just (FileWithTags (File "/home/monax/Pictures/dog.jpg") []))
+              .~ ( Just
+                     ( TaggerNew.Type.FileWithTags
+                         (TaggerNew.Type.File (-1) "/home/monax/Pictures/dog.jpg")
+                         []
+                     )
+                 )
       ]
     FileSinglePut i -> [Model $ model & fileSingle .~ (Just i)]
     FileSingleMaybePut mi -> [Model $ model & fileSingle .~ mi]
@@ -72,10 +80,10 @@ taggerEventHandler wenv node model event =
     FileSelectionCommitQuery ->
       [ Task
           ( FileSelectionUpdate
-              <$> ( doQueryWithCriteria
+              <$> ( doQueryWithCriteriaNew
                       (model ^. queryCriteria)
-                      (model ^. connectionString)
-                      (map unpack . Data.Text.words $ (model ^. fileSelectionQuery))
+                      (model ^. dbConn)
+                      (Data.Text.words (model ^. fileSelectionQuery))
                   )
           )
       ]
@@ -84,8 +92,8 @@ taggerEventHandler wenv node model event =
     DescriptorTreePutParent ->
       [ Task
           ( DescriptorTreePut
-              <$> ( getParentDescriptorTree
-                      (model ^. connectionString)
+              <$> ( getParentDescriptorTreeNew
+                      (model ^. dbConn)
                       (model ^. descriptorTree)
                   )
           )
@@ -95,7 +103,7 @@ taggerEventHandler wenv node model event =
     RequestDescriptorTree s ->
       [ Task
           ( DescriptorTreePut
-              <$> (lookupInfraDescriptorTree (model ^. connectionString) (unpack s))
+              <$> (lookupInfraDescriptorTreeNew (model ^. dbConn) s)
           )
       ]
     ShellCmd ->
@@ -110,7 +118,11 @@ taggerEventHandler wenv node model event =
                       $ Data.List.unwords
                         . putFileArgs
                           (map unpack procArgs)
-                        . map (filePath . file)
+                        . map
+                          ( Data.Text.unpack
+                              . TaggerNew.Type.filePath
+                              . TaggerNew.Type.file
+                          )
                         $ (model ^. fileSelection)
                   putStrLn $ "Running " ++ unpack (model ^. shellCmd)
           )
@@ -118,14 +130,14 @@ taggerEventHandler wenv node model event =
     PutExtern _ -> []
     TagCommitTagsString ->
       [ Task
-          ( let cs = model ^. connectionString
-                ds = Data.List.words . unpack $ model ^. tagsString
+          ( let cs = model ^. dbConn
+                ds = Data.Text.words $ model ^. tagsString
              in if (model ^. doSoloTag)
                   then
                     FileSingleMaybePut
                       <$> ( fmap
                               head'
-                              ( tagThenGetRefresh
+                              ( tagThenGetRefreshNew
                                   cs
                                   (maybeToList (model ^. fileSingle))
                                   ds
@@ -133,7 +145,7 @@ taggerEventHandler wenv node model event =
                           )
                   else
                     FileSelectionSet
-                      <$> ( tagThenGetRefresh
+                      <$> ( tagThenGetRefreshNew
                               cs
                               (model ^. fileSelection)
                               ds
@@ -174,13 +186,16 @@ taggerApplicationConfig =
   ]
     ++ themeConfig
 
-runTaggerWindow :: IO ()
-runTaggerWindow =
+runTaggerWindow :: TaggerNew.Access.Connection -> IO ()
+runTaggerWindow c =
   startApp
-    (emptyTaggerModel "/home/monax/Repo/Haskell/tagger/images.db")
+    (emptyTaggerModel c)
     taggerEventHandler
     taggerApplicationUI
     taggerApplicationConfig
 
 main :: IO ()
-main = runTaggerWindow
+main = do
+  dbConn <- open "/home/monax/Repo/Haskell/tagger/images.db"
+  runTaggerWindow dbConn
+  close dbConn

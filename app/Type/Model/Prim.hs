@@ -15,25 +15,33 @@ import Database.Tagger.Type
     DescriptorTree (NullTree),
     FileWithTags,
   )
+import qualified Database.TaggerNew.Access as TaggerNew.Access
+import qualified Database.TaggerNew.Type as TaggerNew.Type
+
+instance Show TaggerNew.Access.Connection where
+  show _ = "Sqlite Connection"
+
+instance Eq TaggerNew.Access.Connection where
+  x == y = True
 
 data TaggerModel = TaggerModel
-  { _taggerFileSelection :: ![FileWithTags],
+  { _taggerFileSelection :: ![TaggerNew.Type.FileWithTags],
     _taggerFileSetArithmetic :: !FileSetArithmetic,
     _taggerQueryCriteria :: !QueryCriteria,
     _taggerFileSelectionQuery :: !Text,
-    _taggerFileSingle :: !(Maybe FileWithTags),
-    _taggerDescriptorDb :: ![Descriptor],
-    _taggerDescriptorTree :: !DescriptorTree,
+    _taggerFileSingle :: !(Maybe TaggerNew.Type.FileWithTags),
+    _taggerDescriptorDb :: ![TaggerNew.Type.Descriptor],
+    _taggerDescriptorTree :: !TaggerNew.Type.DescriptorTree,
     _taggerDoSoloTag :: !Bool,
     _taggerShellCmd :: !Text,
     _taggerExtern :: !(),
-    _taggerConnectionString :: !String,
+    _taggerDbConn :: !TaggerNew.Access.Connection,
     _taggerTagsString :: !Text
   }
   deriving (Show, Eq)
 
-emptyTaggerModel :: String -> TaggerModel
-emptyTaggerModel s =
+emptyTaggerModel :: TaggerNew.Access.Connection -> TaggerModel
+emptyTaggerModel c =
   TaggerModel
     { _taggerFileSelection = [],
       _taggerFileSetArithmetic = Union,
@@ -41,11 +49,11 @@ emptyTaggerModel s =
       _taggerFileSelectionQuery = "",
       _taggerFileSingle = Nothing,
       _taggerDescriptorDb = [],
-      _taggerDescriptorTree = NullTree,
+      _taggerDescriptorTree = TaggerNew.Type.NullTree,
       _taggerDoSoloTag = False,
       _taggerShellCmd = "feh -D120 -zx. -g800x800 -Bwhite",
       _taggerExtern = (),
-      _taggerConnectionString = s,
+      _taggerDbConn = c,
       _taggerTagsString = ""
     }
 
@@ -74,9 +82,9 @@ data TaggerEvent
   = -- Open DB Connection, populate FileDb, DescriptorDb and DescriptorTree with #ALL#
     TaggerInit
   | -- Update current selection
-    FileSelectionUpdate ![FileWithTags]
+    FileSelectionUpdate ![TaggerNew.Type.FileWithTags]
   | -- Like FileSelectionUpdate but does not rely on FileSetArithmetic
-    FileSelectionSet ![FileWithTags]
+    FileSelectionSet ![TaggerNew.Type.FileWithTags]
   | -- Set model _taggerFileSelectionQuery to the argument.
     FileSelectionStageQuery !Text
   | -- Appends some text to the current query, separated by a space.
@@ -91,17 +99,17 @@ data TaggerEvent
   | -- | Set the query critera which is how files will be queried
     FileSetQueryCriteria !QueryCriteria
   | -- Display an image preview
-    FileSinglePut !FileWithTags
+    FileSinglePut !TaggerNew.Type.FileWithTags
   | -- For indeterminate IO
-    FileSingleMaybePut !(Maybe FileWithTags)
+    FileSingleMaybePut !(Maybe TaggerNew.Type.FileWithTags)
   | -- If there is an image in the preview, get it
     FileSingleGet
   | -- Clear the image preview
     FileSingleClear
   | -- Refresh Descriptor DB with argument
-    DescriptorDbUpdate ![Descriptor]
+    DescriptorDbUpdate ![TaggerNew.Type.Descriptor]
   | -- Put the InfraTree of a descriptor
-    DescriptorTreePut !DescriptorTree
+    DescriptorTreePut !TaggerNew.Type.DescriptorTree
   | -- Put the parent meta tree of the current tree in the model
     DescriptorTreePutParent
   | -- Get a flattened descriptor tree
