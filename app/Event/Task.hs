@@ -20,12 +20,12 @@ import Type.Model
 
 type ConnString = String
 
-tagThenGetRefreshNew ::
+tagThenGetRefresh ::
   Connection ->
   [FileWithTags] ->
   [T.Text] ->
   IO [FileWithTags]
-tagThenGetRefreshNew c fwts dds = do
+tagThenGetRefresh c fwts dds = do
   tagWithDescriptors <-
     fmap concat . mapM (lookupDescriptorPattern c) $ dds
   let newTags =
@@ -41,17 +41,17 @@ tagThenGetRefreshNew c fwts dds = do
       fwts
   return . concat $ newFwts
 
-queryByTagNew ::
+queryByTag ::
   Connection ->
   [T.Text] ->
   IO [FileWithTags]
-queryByTagNew c ts = do
+queryByTag c ts = do
   fwts <- mapM (lookupFileWithTagsByTagPattern c) ts
   return . concat $ fwts
 
-queryUntaggedNew ::
+queryUntagged ::
   Connection -> [T.Text] -> IO [FileWithTags]
-queryUntaggedNew c ns = do
+queryUntagged c ns = do
   untaggedFwts <- getUntaggedFileWithTags c
   case ns of
     [] -> return untaggedFwts
@@ -60,9 +60,9 @@ queryUntaggedNew c ns = do
         then return . take (read . T.unpack $ n) $ untaggedFwts
         else return untaggedFwts
 
-queryRelationNew ::
+queryRelation ::
   Connection -> [T.Text] -> IO [FileWithTags]
-queryRelationNew c rs = do
+queryRelation c rs = do
   ds <- fmap concat . mapM (lookupDescriptorPattern c) $ rs
   fmap concat
     . mapM
@@ -71,20 +71,20 @@ queryRelationNew c rs = do
       )
     $ ds
 
-doQueryWithCriteriaNew ::
+doQueryWithCriteria ::
   QueryCriteria ->
   Connection ->
   [T.Text] ->
   IO [FileWithTags]
-doQueryWithCriteriaNew qc =
+doQueryWithCriteria qc =
   case qc of
-    ByTag -> queryByTagNew
-    ByRelation -> queryRelationNew
-    ByUntagged -> queryUntaggedNew
+    ByTag -> queryByTag
+    ByRelation -> queryRelation
+    ByUntagged -> queryUntagged
 
-lookupInfraDescriptorTreeNew ::
+lookupInfraDescriptorTree ::
   Connection -> T.Text -> IO DescriptorTree
-lookupInfraDescriptorTreeNew c dT = do
+lookupInfraDescriptorTree c dT = do
   result <-
     runMaybeT
       ( do
@@ -111,11 +111,11 @@ getALLInfraTree c = do
       )
   return . fromMaybe NullTree $ result
 
-getParentDescriptorTreeNew ::
+getParentDescriptorTree ::
   Connection ->
   DescriptorTree ->
   IO DescriptorTree
-getParentDescriptorTreeNew c tr = do
+getParentDescriptorTree c tr = do
   result <-
     runMaybeT
       ( do

@@ -78,7 +78,7 @@ taggerEventHandler wenv node model event =
     FileSelectionCommitQuery ->
       [ Task
           ( FileSelectionUpdate
-              <$> ( doQueryWithCriteriaNew
+              <$> ( doQueryWithCriteria
                       (model ^. queryCriteria)
                       (model ^. dbConn)
                       (Data.Text.words (model ^. fileSelectionQuery))
@@ -90,7 +90,7 @@ taggerEventHandler wenv node model event =
     DescriptorTreePutParent ->
       [ Task
           ( DescriptorTreePut
-              <$> ( getParentDescriptorTreeNew
+              <$> ( getParentDescriptorTree
                       (model ^. dbConn)
                       (model ^. descriptorTree)
                   )
@@ -101,7 +101,7 @@ taggerEventHandler wenv node model event =
     RequestDescriptorTree s ->
       [ Task
           ( DescriptorTreePut
-              <$> (lookupInfraDescriptorTreeNew (model ^. dbConn) s)
+              <$> (lookupInfraDescriptorTree (model ^. dbConn) s)
           )
       ]
     ShellCmd ->
@@ -135,7 +135,7 @@ taggerEventHandler wenv node model event =
                     FileSingleMaybePut
                       <$> ( fmap
                               head'
-                              ( tagThenGetRefreshNew
+                              ( tagThenGetRefresh
                                   cs
                                   (maybeToList (model ^. fileSingle))
                                   ds
@@ -143,7 +143,7 @@ taggerEventHandler wenv node model event =
                           )
                   else
                     FileSelectionSet
-                      <$> ( tagThenGetRefreshNew
+                      <$> ( tagThenGetRefresh
                               cs
                               (model ^. fileSelection)
                               ds
