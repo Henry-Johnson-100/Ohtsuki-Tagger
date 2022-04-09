@@ -10,6 +10,19 @@ import Database.SQLite.Simple
 import Database.SQLite.Simple.ToField
 import Database.TaggerNew.Type
 
+getUntaggedFileWithTags :: Connection -> IO [FileWithTags]
+getUntaggedFileWithTags c = do
+  r <-
+    query_
+      c
+      "SELECT f.id, f.filePath \
+      \FROM File f \
+      \  LEFT JOIN Tag t \
+      \    ON f.id = t.fileTagId \
+      \WHERE t.descriptorTagId IS NULL"
+  let files = map mapQToFile r
+  return . map (`FileWithTags` []) $ files
+
 lookupFileWithTagByTag :: (ToField a) => Connection -> a -> IO [FileWithTags]
 lookupFileWithTagByTag conn t = do
   r <-
