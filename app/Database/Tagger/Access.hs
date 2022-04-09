@@ -260,7 +260,7 @@ lookupFileWithTagsByRelation c did = do
 lookupFileWithTagsByFilePattern :: Connection -> T.Text -> IO [FileWithTags]
 lookupFileWithTagsByFilePattern c p = do
   fs <- lookupFilePattern c p
-  fmap concat . mapM (lookupFileWithTagByTagId c . fileId) $ fs
+  fmap concat . mapM (lookupFileWithTagsByFileId c . fileId) $ fs
 
 lookupFileWithTagsByTagPattern :: Connection -> T.Text -> IO [FileWithTags]
 lookupFileWithTagsByTagPattern c p = do
@@ -295,34 +295,6 @@ lookupFileWithTagByTagId conn t = do
       [t]
   return . groupRFWT [] $ r
 
-lookupFileWithTagByTagId' :: Connection -> DescriptorKey -> IO [TestFWT]
-lookupFileWithTagByTagId' conn t = do
-  r <-
-    query
-      conn
-      "SELECT \
-      \f1.id, \
-      \f1.filePath, \
-      \d.id, \
-      \d.descriptor \
-      \FROM \
-      \Tag t \
-      \JOIN Descriptor d ON t.descriptorTagId = d.id \
-      \JOIN ( \
-      \SELECT \
-      \f.* \
-      \FROM \
-      \File f \
-      \JOIN Tag t ON f.id = t.fileTagId \
-      \JOIN Descriptor d ON t.descriptorTagId = d.id \
-      \WHERE \
-      \d.id = ? \
-      \) as f1 ON t.fileTagId = f1.id \
-      \ORDER BY \
-      \f1.filePath;"
-      [t]
-  return . map tmap $ r
-
 lookupFileWithTagsByFileId :: Connection -> FileKey -> IO [FileWithTags]
 lookupFileWithTagsByFileId c fid = do
   r <-
@@ -349,7 +321,7 @@ lookupDescriptorPattern conn p = do
       [p]
   return . map mapQToDescriptor $ r
 
-lookupFilePattern :: ToField a => Connection -> a -> IO [File]
+lookupFilePattern :: Connection -> T.Text -> IO [File]
 lookupFilePattern conn p = do
   r <-
     query

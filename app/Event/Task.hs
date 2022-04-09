@@ -14,8 +14,8 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import qualified Data.Text as T
-import Database.Tagger.Access 
-import Database.Tagger.Type 
+import Database.Tagger.Access
+import Database.Tagger.Type
 import Type.Model
 
 type ConnString = String
@@ -71,6 +71,12 @@ queryRelation c rs = do
       )
     $ ds
 
+queryFilePattern ::
+  Connection -> [T.Text] -> IO [FileWithTags]
+queryFilePattern c ps = do
+  fwts <- mapM (lookupFileWithTagsByFilePattern c) ps
+  return . concat $ fwts
+
 doQueryWithCriteria ::
   QueryCriteria ->
   Connection ->
@@ -81,6 +87,7 @@ doQueryWithCriteria qc =
     ByTag -> queryByTag
     ByRelation -> queryRelation
     ByUntagged -> queryUntagged
+    ByPattern -> queryFilePattern
 
 lookupInfraDescriptorTree ::
   Connection -> T.Text -> IO DescriptorTree
