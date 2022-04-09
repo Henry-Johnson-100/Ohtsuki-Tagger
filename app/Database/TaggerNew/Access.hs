@@ -272,15 +272,56 @@ lookupFileWithTagByTagId conn t = do
   r <-
     query
       conn
-      "SELECT f.id, f.filePath, d.id, d.descriptor \
-      \FROM Tag t \
-      \  JOIN File f \
-      \    ON t.fileTagId = f.id \
-      \  JOIN Descriptor d \
-      \    ON t.descriptorTagId = d.id \
-      \WHERE t.descriptorTagId = ?"
+      "SELECT \
+      \f1.id, \
+      \f1.filePath, \
+      \d.id, \
+      \d.descriptor \
+      \FROM \
+      \Tag t \
+      \JOIN Descriptor d ON t.descriptorTagId = d.id \
+      \JOIN ( \
+      \SELECT \
+      \f.* \
+      \FROM \
+      \File f \
+      \JOIN Tag t ON f.id = t.fileTagId \
+      \JOIN Descriptor d ON t.descriptorTagId = d.id \
+      \WHERE \
+      \d.id = ? \
+      \) as f1 ON t.fileTagId = f1.id \
+      \ORDER BY \
+      \f1.filePath;"
       [t]
   return . groupRFWT [] $ r
+
+lookupFileWithTagByTagId' :: Connection -> DescriptorKey -> IO [TestFWT]
+lookupFileWithTagByTagId' conn t = do
+  r <-
+    query
+      conn
+      "SELECT \
+      \f1.id, \
+      \f1.filePath, \
+      \d.id, \
+      \d.descriptor \
+      \FROM \
+      \Tag t \
+      \JOIN Descriptor d ON t.descriptorTagId = d.id \
+      \JOIN ( \
+      \SELECT \
+      \f.* \
+      \FROM \
+      \File f \
+      \JOIN Tag t ON f.id = t.fileTagId \
+      \JOIN Descriptor d ON t.descriptorTagId = d.id \
+      \WHERE \
+      \d.id = ? \
+      \) as f1 ON t.fileTagId = f1.id \
+      \ORDER BY \
+      \f1.filePath;"
+      [t]
+  return . map tmap $ r
 
 lookupFileWithTagsByFileId :: Connection -> FileKey -> IO [FileWithTags]
 lookupFileWithTagsByFileId c fid = do
@@ -336,6 +377,10 @@ groupRFWT (old : past) (r : rs) =
 
 mapQToFWT :: (Int, T.Text, Int, T.Text) -> FileWithTags
 mapQToFWT (fid, fp, dids, dds) = FileWithTags (File fid fp) [Descriptor dids dds]
+
+data TestFWT = T Int T.Text Int T.Text deriving (Show, Eq)
+
+tmap (fid, fp, dids, dds) = T fid fp dids dds
 
 head' :: [a] -> Maybe a
 head' [] = Nothing
