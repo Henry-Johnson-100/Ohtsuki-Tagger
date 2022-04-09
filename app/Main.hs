@@ -20,8 +20,8 @@ import Data.List
 import Data.Maybe
 import Data.Text hiding (head, map, take)
 import Database.SQLite.Simple (close, open)
-import qualified Database.Tagger.Access as TaggerNew.Access
-import qualified Database.Tagger.Type as TaggerNew.Type
+import Database.Tagger.Access
+import Database.Tagger.Type
 import Event.Task
 import Monomer
 import Monomer.Common.Lens
@@ -53,8 +53,8 @@ taggerEventHandler wenv node model event =
           model
             & fileSingle
               .~ ( Just
-                     ( TaggerNew.Type.FileWithTags
-                         (TaggerNew.Type.File (-1) "/home/monax/Pictures/dog.jpg")
+                     ( FileWithTags
+                         (File (-1) "/home/monax/Pictures/dog.jpg")
                          []
                      )
                  )
@@ -118,8 +118,8 @@ taggerEventHandler wenv node model event =
                           (map unpack procArgs)
                         . map
                           ( Data.Text.unpack
-                              . TaggerNew.Type.filePath
-                              . TaggerNew.Type.file
+                              . filePath
+                              . file
                           )
                         $ (model ^. fileSelection)
                   putStrLn $ "Running " ++ unpack (model ^. shellCmd)
@@ -184,7 +184,7 @@ taggerApplicationConfig =
   ]
     ++ themeConfig
 
-runTaggerWindow :: TaggerNew.Access.Connection -> IO ()
+runTaggerWindow :: Connection -> IO ()
 runTaggerWindow c =
   startApp
     (emptyTaggerModel c)

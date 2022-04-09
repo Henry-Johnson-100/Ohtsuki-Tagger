@@ -14,45 +14,45 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import qualified Data.Text as T
-import qualified Database.Tagger.Access as TaggerNew.Access
-import qualified Database.Tagger.Type as TaggerNew.Type
+import Database.Tagger.Access 
+import Database.Tagger.Type 
 import Type.Model
 
 type ConnString = String
 
 tagThenGetRefreshNew ::
-  TaggerNew.Access.Connection ->
-  [TaggerNew.Type.FileWithTags] ->
+  Connection ->
+  [FileWithTags] ->
   [T.Text] ->
-  IO [TaggerNew.Type.FileWithTags]
+  IO [FileWithTags]
 tagThenGetRefreshNew c fwts dds = do
   tagWithDescriptors <-
-    fmap concat . mapM (TaggerNew.Access.lookupDescriptorPattern c) $ dds
+    fmap concat . mapM (lookupDescriptorPattern c) $ dds
   let newTags =
-        TaggerNew.Type.Tag
-          <$> map (TaggerNew.Type.fileId . TaggerNew.Type.file) fwts
-            <*> map TaggerNew.Type.descriptorId tagWithDescriptors
-  mapM_ (TaggerNew.Access.newTag c) newTags
+        Tag
+          <$> map (fileId . file) fwts
+            <*> map descriptorId tagWithDescriptors
+  mapM_ (newTag c) newTags
   newFwts <-
     mapM
-      ( TaggerNew.Access.lookupFileWithTagsByFileId c
-          . (TaggerNew.Type.fileId . TaggerNew.Type.file)
+      ( lookupFileWithTagsByFileId c
+          . (fileId . file)
       )
       fwts
   return . concat $ newFwts
 
 queryByTagNew ::
-  TaggerNew.Access.Connection ->
+  Connection ->
   [T.Text] ->
-  IO [TaggerNew.Type.FileWithTags]
+  IO [FileWithTags]
 queryByTagNew c ts = do
-  fwts <- mapM (TaggerNew.Access.lookupFileWithTagsByTagPattern c) ts
+  fwts <- mapM (lookupFileWithTagsByTagPattern c) ts
   return . concat $ fwts
 
 queryUntaggedNew ::
-  TaggerNew.Access.Connection -> [T.Text] -> IO [TaggerNew.Type.FileWithTags]
+  Connection -> [T.Text] -> IO [FileWithTags]
 queryUntaggedNew c ns = do
-  untaggedFwts <- TaggerNew.Access.getUntaggedFileWithTags c
+  untaggedFwts <- getUntaggedFileWithTags c
   case ns of
     [] -> return untaggedFwts
     (n : _) ->
@@ -61,21 +61,21 @@ queryUntaggedNew c ns = do
         else return untaggedFwts
 
 queryRelationNew ::
-  TaggerNew.Access.Connection -> [T.Text] -> IO [TaggerNew.Type.FileWithTags]
+  Connection -> [T.Text] -> IO [FileWithTags]
 queryRelationNew c rs = do
-  ds <- fmap concat . mapM (TaggerNew.Access.lookupDescriptorPattern c) $ rs
+  ds <- fmap concat . mapM (lookupDescriptorPattern c) $ rs
   fmap concat
     . mapM
-      ( TaggerNew.Access.lookupFileWithTagsByRelation c
-          . TaggerNew.Type.descriptorId
+      ( lookupFileWithTagsByRelation c
+          . descriptorId
       )
     $ ds
 
 doQueryWithCriteriaNew ::
   QueryCriteria ->
-  TaggerNew.Access.Connection ->
+  Connection ->
   [T.Text] ->
-  IO [TaggerNew.Type.FileWithTags]
+  IO [FileWithTags]
 doQueryWithCriteriaNew qc =
   case qc of
     ByTag -> queryByTagNew
@@ -83,52 +83,52 @@ doQueryWithCriteriaNew qc =
     ByUntagged -> queryUntaggedNew
 
 lookupInfraDescriptorTreeNew ::
-  TaggerNew.Access.Connection -> T.Text -> IO TaggerNew.Type.DescriptorTree
+  Connection -> T.Text -> IO DescriptorTree
 lookupInfraDescriptorTreeNew c dT = do
   result <-
     runMaybeT
       ( do
           d <-
-            TaggerNew.Access.hoistMaybe . head'
-              <=< lift . TaggerNew.Access.lookupDescriptorPattern c
+            hoistMaybe . head'
+              <=< lift . lookupDescriptorPattern c
               $ dT
-          TaggerNew.Access.fetchInfraTree c . TaggerNew.Type.descriptorId $ d
+          fetchInfraTree c . descriptorId $ d
       )
-  return . fromMaybe TaggerNew.Type.NullTree $ result
+  return . fromMaybe NullTree $ result
 
 getALLInfraTree ::
-  TaggerNew.Access.Connection -> IO TaggerNew.Type.DescriptorTree
+  Connection -> IO DescriptorTree
 getALLInfraTree c = do
   result <-
     runMaybeT
       ( do
           allDescriptor <-
-            TaggerNew.Access.hoistMaybe . head'
+            hoistMaybe . head'
               <=< lift
-                . TaggerNew.Access.lookupDescriptorPattern c
+                . lookupDescriptorPattern c
               $ "#ALL#"
-          TaggerNew.Access.fetchInfraTree c . TaggerNew.Type.descriptorId $ allDescriptor
+          fetchInfraTree c . descriptorId $ allDescriptor
       )
-  return . fromMaybe TaggerNew.Type.NullTree $ result
+  return . fromMaybe NullTree $ result
 
 getParentDescriptorTreeNew ::
-  TaggerNew.Access.Connection ->
-  TaggerNew.Type.DescriptorTree ->
-  IO TaggerNew.Type.DescriptorTree
+  Connection ->
+  DescriptorTree ->
+  IO DescriptorTree
 getParentDescriptorTreeNew c tr = do
   result <-
     runMaybeT
       ( do
-          headNode <- TaggerNew.Access.hoistMaybe . TaggerNew.Type.getNode $ tr
+          headNode <- hoistMaybe . getNode $ tr
           firstMetaDescriptor <-
-            TaggerNew.Access.hoistMaybe . head'
+            hoistMaybe . head'
               <=< ( lift
-                      . TaggerNew.Access.fetchMetaDescriptors c
-                      . TaggerNew.Type.descriptorId
+                      . fetchMetaDescriptors c
+                      . descriptorId
                   )
               $ headNode
-          TaggerNew.Access.fetchInfraTree c
-            . TaggerNew.Type.descriptorId
+          fetchInfraTree c
+            . descriptorId
             $ firstMetaDescriptor
       )
   maybe (getALLInfraTree c) return result
