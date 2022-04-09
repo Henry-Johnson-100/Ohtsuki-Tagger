@@ -5,7 +5,7 @@
 
 {-# HLINT ignore "Redundant return" #-}
 
-module Database.TaggerNew.Access
+module Database.Tagger.Access
   ( Connection (..),
     FileKey (..),
     DescriptorKey (..),
@@ -46,7 +46,7 @@ import Database.SQLite.Simple
     query_,
   )
 import Database.SQLite.Simple.ToField (ToField)
-import Database.TaggerNew.Type
+import Database.Tagger.Type
   ( Descriptor (Descriptor, descriptorId),
     DescriptorTree (Infra),
     File (File, fileId),

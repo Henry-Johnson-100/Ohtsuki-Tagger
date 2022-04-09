@@ -21,7 +21,7 @@ where
 import Control.Lens ((^.))
 import Data.List (foldl', map)
 import Data.Text (Text, append, intercalate, pack, replicate)
-import qualified Database.TaggerNew.Type as TaggerNew.Type
+import qualified Database.Tagger.Type as TaggerNew.Type
 import Monomer
 import Node.Color
 import Node.Micro

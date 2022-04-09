@@ -10,8 +10,8 @@ module Type.Model.Prim
 where
 
 import Data.Text (Text)
-import qualified Database.TaggerNew.Access as TaggerNew.Access
-import qualified Database.TaggerNew.Type as TaggerNew.Type
+import qualified Database.Tagger.Access as TaggerNew.Access
+import qualified Database.Tagger.Type as TaggerNew.Type
 
 instance Show TaggerNew.Access.Connection where
   show _ = "Sqlite Connection"

@@ -1,4 +1,4 @@
-module Database.TaggerNew.Type
+module Database.Tagger.Type
   ( File (..),
     Descriptor (..),
     FileWithTags (..),

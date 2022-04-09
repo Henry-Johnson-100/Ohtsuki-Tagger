@@ -22,8 +22,8 @@ executable tagger
                       ,Event.Task
                       ,Type.Model
                       ,Type.Model.Prim
-                      ,Database.TaggerNew.Type
-                      ,Database.TaggerNew.Access
+                      ,Database.Tagger.Type
+                      ,Database.Tagger.Access
 
   other-extensions:    OverloadedStrings
                       ,TemplateHaskell

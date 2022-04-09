@@ -7,7 +7,7 @@
 module Node.Micro where
 
 import Data.Text
-import qualified Database.TaggerNew.Type as TaggerNew.Type
+import qualified Database.Tagger.Type as TaggerNew.Type
 import Monomer
 import Node.Color
 import Type.Model
