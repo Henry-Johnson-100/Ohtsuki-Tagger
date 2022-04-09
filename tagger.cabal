@@ -25,6 +25,8 @@ executable tagger
                       ,Database.Tagger.Access
                       ,Database.Tagger.Type
                       ,Database.Tagger.Schema
+                      ,Database.TaggerNew.Type
+                      ,Database.TaggerNew.Access
 
   other-extensions:    OverloadedStrings
                       ,TemplateHaskell
@@ -47,5 +49,6 @@ executable tagger
                       ,monad-control
                       ,directory
                       ,process
+                      ,sqlite-simple == 0.4.18.0
   hs-source-dirs:      app
   default-language:    Haskell2010

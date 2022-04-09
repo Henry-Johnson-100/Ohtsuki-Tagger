@@ -29,3 +29,9 @@ cradle:
 
     - path: "app/Database/Tagger/Schema.hs"
       component: "tagger:exe:tagger"
+
+    - path: "app/Database/TaggerNew/Type.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/Database/TaggerNew/Access.hs"
+      component: "tagger:exe:tagger"
