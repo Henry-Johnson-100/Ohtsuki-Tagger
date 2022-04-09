@@ -29,12 +29,25 @@ import Node.Application
 import System.Process
 import Type.Model
 
-doSetAction :: Eq a => FileSetArithmetic -> [a] -> [a] -> [a]
+fwtUnion :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]
+fwtUnion = Data.List.unionBy fwtFileEqual
+
+fwtIntersect :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]
+fwtIntersect = Data.List.intersectBy fwtFileEqual
+
+fwtDiff :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]
+fwtDiff = Data.List.deleteFirstsBy fwtFileEqual
+
+doSetAction ::
+  FileSetArithmetic ->
+  [FileWithTags] ->
+  [FileWithTags] ->
+  [FileWithTags]
 doSetAction a s o =
   case a of
-    Union -> s `union` o
-    Intersect -> s `intersect` o
-    Diff -> s \\ o
+    Union -> s `fwtUnion` o
+    Intersect -> s `fwtIntersect` o
+    Diff -> s `fwtDiff` o
 
 taggerEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -69,17 +82,7 @@ taggerEventHandler wenv node model event =
             .~ (doSetAction (model ^. fileSetArithmetic) (model ^. fileSelection) ts)
       ]
     FileSelectionPut fwts ->
-      -- These two model updates are a workaround to get the GUI to update after tagging.
-      -- The GUI updates based on Eq and since FileWithTags has a custom Eq instance that
-      -- ignores its tags, adding tags to the same [FileWithTags] currently in the model
-      -- does not trigger an update.
-      --
-      -- So first I have to create an alternate state where model.fileSelection
-      -- cannot possible be equal to the [FileWithTags] received as an argument.
-      --
-      --I can fix this once I implement HashSets or HashMaps in this project.
-      [ Model $ model & fileSelection .~ (maybeToList . head' $ model ^. fileSelection),
-        Model $ model & fileSelection .~ fwts
+      [ Model $ model & fileSelection .~ fwts
       ]
     FileSelectionStageQuery t -> [Model $ model & fileSelectionQuery .~ t]
     FileSelectionAppendQuery t ->

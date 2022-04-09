@@ -42,7 +42,7 @@ data MetaDescriptor = MetaDescriptor
   }
   deriving (Show, Eq)
 
-data FileWithTags = FileWithTags {file :: File, tags :: [Descriptor]}
+data FileWithTags = FileWithTags {file :: File, tags :: [Descriptor]} deriving (Eq)
 
 fwtFileEqual :: FileWithTags -> FileWithTags -> Bool
 (FileWithTags fx _) `fwtFileEqual` (FileWithTags fy _) = fx == fy
@@ -50,8 +50,8 @@ fwtFileEqual :: FileWithTags -> FileWithTags -> Bool
 pushTag :: FileWithTags -> Descriptor -> FileWithTags
 pushTag (FileWithTags f ds) d = FileWithTags f (d : ds)
 
-instance Eq FileWithTags where
-  (FileWithTags fx _) == (FileWithTags fy _) = fx == fy
+-- instance Eq FileWithTags where
+--   (FileWithTags fx _) == (FileWithTags fy _) = fx == fy
 
 instance Show FileWithTags where
   show =
