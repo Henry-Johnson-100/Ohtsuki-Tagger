@@ -19,7 +19,7 @@ module Node.Application
 where
 
 import Control.Lens ((^.))
-import Data.List (foldl', map)
+import Data.List (foldl', intersperse, map)
 import Data.Text (Text, append, intercalate, pack, replicate, unwords)
 import Database.Tagger.Type
 import Monomer
@@ -27,18 +27,6 @@ import Node.Color
 import Node.Micro
 import Type.Model
 import Prelude hiding (concat, replicate, unlines, unwords)
-
-class GetPlainText g where
-  getPlainText :: g -> Text
-
-instance GetPlainText File where
-  getPlainText = filePath
-
-instance GetPlainText Descriptor where
-  getPlainText = descriptor
-
-instance GetPlainText FileWithTags where
-  getPlainText = getPlainText . file
 
 themeConfig :: [AppConfig e]
 themeConfig =
@@ -187,8 +175,21 @@ fileSinglePreviewWidget = imageZone
               (label "No Preview")
               (flip image_ [alignBottom, fitEither] . getPlainText)
               (m' ^. fileSingle)
-        singleFileTags :: (WidgetModel s, WidgetEvent e, HasFileSingle s (Maybe FileWithTags)) => WidgetNode s e
-        singleFileTags = maybe spacer (label . Data.Text.unwords . map getPlainText . tags) (model ^. fileSingle)
+        singleFileTags ::
+          ( WidgetModel s,
+            WidgetEvent e,
+            HasFileSingle s (Maybe FileWithTags)
+          ) =>
+          WidgetNode s e
+        singleFileTags =
+          maybe
+            spacer
+            ( hstack
+                . Data.List.intersperse spacer
+                . map draggableDescriptorWidget
+                . tags
+            )
+            (model ^. fileSingle)
         doSoloTagCheckBox ::
           (WidgetModel s, HasDoSoloTag s Bool) => WidgetNode s TaggerEvent
         doSoloTagCheckBox =

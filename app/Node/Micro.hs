@@ -12,6 +12,18 @@ import Monomer
 import Node.Color
 import Type.Model
 
+class GetPlainText g where
+  getPlainText :: g -> Text
+
+instance GetPlainText File where
+  getPlainText = filePath
+
+instance GetPlainText Descriptor where
+  getPlainText = descriptor
+
+instance GetPlainText FileWithTags where
+  getPlainText = getPlainText . file
+
 stdDelayTooltip :: Text -> WidgetNode s e -> WidgetNode s e
 stdDelayTooltip = flip tooltip_ [tooltipDelay 750]
 
@@ -98,3 +110,8 @@ clearSelectionButton = styledButton FileSelectionClear "CS"
 
 appendToQueryButton :: WidgetModel s => Text -> WidgetNode s TaggerEvent
 appendToQueryButton t = styledButton (FileSelectionAppendQuery t) "Add"
+
+draggableDescriptorWidget ::
+  (WidgetModel s, WidgetEvent e) => Descriptor -> WidgetNode s e
+draggableDescriptorWidget d =
+  draggable d . flip styleBasic [textColor textBlue] . label . getPlainText $ d
