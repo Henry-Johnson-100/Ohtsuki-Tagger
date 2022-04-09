@@ -1,6 +1,7 @@
 module Database.TaggerNew.Type
   ( File (..),
     Descriptor (..),
+    FileWithTags (..),
     Tag (..),
     MetaDescriptor (..),
     DescriptorTree (..),
@@ -10,6 +11,8 @@ module Database.TaggerNew.Type
     descriptorTreeChildren,
     dbFile,
     getNode,
+    pushTag,
+    fwtFileEqual,
   )
 where
 
@@ -40,6 +43,12 @@ data MetaDescriptor = MetaDescriptor
   deriving (Show, Eq)
 
 data FileWithTags = FileWithTags {file :: File, tags :: [Descriptor]}
+
+fwtFileEqual :: FileWithTags -> FileWithTags -> Bool
+(FileWithTags fx _) `fwtFileEqual` (FileWithTags fy _) = fx == fy
+
+pushTag :: FileWithTags -> Descriptor -> FileWithTags
+pushTag (FileWithTags f ds) d = FileWithTags f (d : ds)
 
 instance Eq FileWithTags where
   (FileWithTags fx _) == (FileWithTags fy _) = fx == fy
