@@ -14,6 +14,10 @@ import Database.SQLite.Simple
 import Database.SQLite.Simple.ToField
 import Database.TaggerNew.Type
 
+type FileKey = Int
+
+type DescriptorKey = Int
+
 -- | Attempts to add a new file to db
 -- Should do nothing if the file is not valid
 addFile :: Connection -> T.Text -> MaybeT IO File
@@ -28,7 +32,7 @@ addFile c f = do
   insertedId <- lift . lastInsertRowId $ c
   return . File (fromIntegral insertedId) $ validatedPath
 
-fetchMetaTree :: Connection -> Int -> MaybeT IO DescriptorTree
+fetchMetaTree :: Connection -> DescriptorKey -> MaybeT IO DescriptorTree
 fetchMetaTree c pid = do
   did <- getDescriptor c pid
   let parentTree = Infra did
@@ -36,7 +40,7 @@ fetchMetaTree c pid = do
     (lift . fetchMetaDescriptors c >=> mapM (fetchMetaTree c . descriptorId)) pid
   return . foldl' insertIntoDescriptorTree parentTree $ childrenTrees
 
-fetchInfraTree :: Connection -> Int -> MaybeT IO DescriptorTree
+fetchInfraTree :: Connection -> DescriptorKey -> MaybeT IO DescriptorTree
 fetchInfraTree c pid = do
   did <- getDescriptor c pid
   let parentTree = Infra did
@@ -60,7 +64,7 @@ fetchMetaDescriptors c did = do
       [did]
   return . map mapQToDescriptor $ r
 
-fetchInfraDescriptors :: Connection -> Int -> IO [Descriptor]
+fetchInfraDescriptors :: Connection -> DescriptorKey -> IO [Descriptor]
 fetchInfraDescriptors c did = do
   r <-
     query
@@ -76,7 +80,7 @@ fetchInfraDescriptors c did = do
 hoistMaybe :: Monad m => Maybe a -> MaybeT m a
 hoistMaybe = MaybeT . return
 
-getDescriptor :: Connection -> Int -> MaybeT IO Descriptor
+getDescriptor :: Connection -> DescriptorKey -> MaybeT IO Descriptor
 getDescriptor c did = do
   r <-
     lift $
@@ -86,7 +90,7 @@ getDescriptor c did = do
         [did]
   hoistMaybe . fmap mapQToDescriptor . head' $ r
 
-getFile :: Connection -> Int -> MaybeT IO File
+getFile :: Connection -> FileKey -> MaybeT IO File
 getFile c fid = do
   r <- lift $ query c "SELECT id, filePath FROM File WHERE id = ?" [fid]
   hoistMaybe . fmap mapQToFile . head' $ r
@@ -104,7 +108,7 @@ getUntaggedFileWithTags c = do
   let files = map mapQToFile r
   return . map (`FileWithTags` []) $ files
 
-lookupFileWithTagsByRelation :: Connection -> Int -> IO [FileWithTags]
+lookupFileWithTagsByRelation :: Connection -> DescriptorKey -> IO [FileWithTags]
 lookupFileWithTagsByRelation c did = do
   relationTree <- runMaybeT . fetchInfraTree c $ did
   let maybeTags = map descriptorId . maybe [] flattenTree $ relationTree
@@ -115,7 +119,7 @@ lookupFileWithTagsByFilePattern c p = do
   fs <- lookupFilePattern c p
   fmap concat . mapM (lookupFileWithTagByTagId c . fileId) $ fs
 
-lookupFileWithTagByTagId :: Connection -> Int -> IO [FileWithTags]
+lookupFileWithTagByTagId :: Connection -> DescriptorKey -> IO [FileWithTags]
 lookupFileWithTagByTagId conn t = do
   r <-
     query
@@ -130,7 +134,7 @@ lookupFileWithTagByTagId conn t = do
       [t]
   return . groupRFWT [] $ r
 
-lookupFileWithTagsByFileId :: Connection -> Int -> IO [FileWithTags]
+lookupFileWithTagsByFileId :: Connection -> FileKey -> IO [FileWithTags]
 lookupFileWithTagsByFileId c fid = do
   r <-
     query
