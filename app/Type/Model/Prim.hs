@@ -79,7 +79,7 @@ data TaggerEvent
   | -- Update current selection
     FileSelectionUpdate ![FileWithTags]
   | -- Like FileSelectionUpdate but does not rely on FileSetArithmetic
-    FileSelectionSet ![FileWithTags]
+    FileSelectionPut ![FileWithTags]
   | -- Set model _taggerFileSelectionQuery to the argument.
     FileSelectionStageQuery !Text
   | -- Appends some text to the current query, separated by a space.

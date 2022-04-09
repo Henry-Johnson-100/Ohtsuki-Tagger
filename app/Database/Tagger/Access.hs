@@ -306,7 +306,8 @@ lookupFileWithTagsByFileId c fid = do
       \    ON t.fileTagId = f.id \
       \  JOIN Descriptor d \
       \    ON t.descriptorTagId = d.id \
-      \WHERE t.fileTagId = ?"
+      \WHERE t.fileTagId = ? \
+      \ORDER BY f.filePath"
       [fid]
   return . groupRFWT [] $ r
 

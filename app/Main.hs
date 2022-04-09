@@ -68,7 +68,7 @@ taggerEventHandler wenv node model event =
           model & fileSelection
             .~ (doSetAction (model ^. fileSetArithmetic) (model ^. fileSelection) ts)
       ]
-    FileSelectionSet fwts -> [Model $ model & fileSelection .~ fwts]
+    FileSelectionPut fwts -> [Model $ model & fileSelection .~ fwts]
     FileSelectionStageQuery t -> [Model $ model & fileSelectionQuery .~ t]
     FileSelectionAppendQuery t ->
       [ Model $
@@ -142,7 +142,7 @@ taggerEventHandler wenv node model event =
                               )
                           )
                   else
-                    FileSelectionSet
+                    FileSelectionPut
                       <$> ( tagThenGetRefresh
                               cs
                               (model ^. fileSelection)

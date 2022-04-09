@@ -7,7 +7,7 @@
 module Node.Micro where
 
 import Data.Text
-import Database.Tagger.Type 
+import Database.Tagger.Type
 import Monomer
 import Node.Color
 import Type.Model
@@ -34,7 +34,7 @@ tagsStringTextField = textField_ tagsString []
 
 tagCommitButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
-tagCommitButton = button_ "Tag With" TagCommitTagsString []
+tagCommitButton = styledButton TagCommitTagsString "Tag With"
 
 setQueryCriteriaDropdown ::
   (WidgetModel s, WidgetEvent e, HasQueryCriteria s QueryCriteria) =>

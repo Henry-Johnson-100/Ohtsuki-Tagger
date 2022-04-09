@@ -21,7 +21,7 @@ where
 import Control.Lens ((^.))
 import Data.List (foldl', map)
 import Data.Text (Text, append, intercalate, pack, replicate)
-import Database.Tagger.Type 
+import Database.Tagger.Type
 import Monomer
 import Node.Color
 import Node.Micro
@@ -63,7 +63,8 @@ configPanel ::
   WidgetNode s TaggerEvent
 configPanel =
   box . vgrid $
-    [ shellCmdWidget
+    [ shellCmdWidget,
+      tagCommitWidget
     ]
 
 descriptorTreeWidget ::
