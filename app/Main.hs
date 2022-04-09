@@ -141,10 +141,6 @@ taggerEventHandler wenv node model event =
           )
       ]
 
-head' :: [a] -> Maybe a
-head' [] = Nothing
-head' (x : _) = Just x
-
 -- | Replaces "${file} in the first list with the entirety of the second."
 putFileArgs :: [String] -> [String] -> [String]
 putFileArgs args files =

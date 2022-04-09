@@ -6,12 +6,16 @@
 {-# HLINT ignore "Redundant return" #-}
 
 module Database.TaggerNew.Access
-  ( addFile,
+  ( Connection (..),
+    FileKey (..),
+    DescriptorKey (..),
+    addFile,
     addDescriptor,
-    tagFileWithDescriptor,
+    newTag,
     relate,
     deleteRelation,
     fetchInfraTree,
+    fetchMetaTree,
     fetchMetaDescriptors,
     fetchInfraDescriptors,
     getDescriptor,
@@ -19,9 +23,11 @@ module Database.TaggerNew.Access
     getUntaggedFileWithTags,
     lookupFileWithTagsByRelation,
     lookupFileWithTagsByFilePattern,
+    lookupFileWithTagsByTagPattern,
     lookupFileWithTagByTagId,
     lookupFileWithTagsByFileId,
     lookupDescriptorPattern,
+    hoistMaybe,
   )
 where
 
@@ -46,6 +52,7 @@ import Database.TaggerNew.Type
     File (File, fileId),
     FileWithTags (FileWithTags, tags),
     MetaDescriptor (MetaDescriptor),
+    Tag (..),
     descriptorTreeElem,
     flattenTree,
     fwtFileEqual,
@@ -72,12 +79,12 @@ addFile c f = do
   insertedId <- lift . lastInsertRowId $ c
   return . File (fromIntegral insertedId) $ validatedPath
 
-tagFileWithDescriptor :: Connection -> File -> Descriptor -> IO ()
-tagFileWithDescriptor c f d =
+newTag :: Connection -> Tag -> IO ()
+newTag c (Tag f d) =
   execute
     c
     "INSERT INTO Tag (fileTagId, descriptorTagId) VALUES (?,?)"
-    (fileId f, descriptorId d)
+    (f, d)
 
 getUnrelatedDescriptor :: Connection -> MaybeT IO Descriptor
 getUnrelatedDescriptor =
@@ -187,7 +194,7 @@ fetchInfraTree c pid = do
       pid
   return . foldl' insertIntoDescriptorTree parentTree $ childrenTrees
 
-fetchMetaDescriptors :: ToField a => Connection -> a -> IO [Descriptor]
+fetchMetaDescriptors :: Connection -> DescriptorKey -> IO [Descriptor]
 fetchMetaDescriptors c did = do
   r <-
     query
@@ -254,6 +261,11 @@ lookupFileWithTagsByFilePattern :: Connection -> T.Text -> IO [FileWithTags]
 lookupFileWithTagsByFilePattern c p = do
   fs <- lookupFilePattern c p
   fmap concat . mapM (lookupFileWithTagByTagId c . fileId) $ fs
+
+lookupFileWithTagsByTagPattern :: Connection -> T.Text -> IO [FileWithTags]
+lookupFileWithTagsByTagPattern c p = do
+  ds <- lookupDescriptorPattern c p
+  fmap concat . mapM (lookupFileWithTagByTagId c . descriptorId) $ ds
 
 lookupFileWithTagByTagId :: Connection -> DescriptorKey -> IO [FileWithTags]
 lookupFileWithTagByTagId conn t = do
