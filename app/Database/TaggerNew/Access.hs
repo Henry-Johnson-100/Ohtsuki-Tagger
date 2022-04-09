@@ -4,11 +4,78 @@
 
 module Database.TaggerNew.Access () where
 
+import Control.Monad
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Maybe
 import Data.List
+import Data.Maybe (catMaybes)
 import qualified Data.Text as T
 import Database.SQLite.Simple
 import Database.SQLite.Simple.ToField
 import Database.TaggerNew.Type
+
+fetchMetaTree :: Connection -> Int -> MaybeT IO DescriptorTree
+fetchMetaTree c pid = do
+  did <- getDescriptor c pid
+  let parentTree = Infra did
+  childrenTrees <-
+    (lift . fetchMetaDescriptors c >=> mapM (fetchMetaTree c . descriptorId)) pid
+  return . foldl' insertIntoDescriptorTree parentTree $ childrenTrees
+
+fetchInfraTree :: Connection -> Int -> MaybeT IO DescriptorTree
+fetchInfraTree c pid = do
+  did <- getDescriptor c pid
+  let parentTree = Infra did
+  childrenTrees <-
+    ( lift . fetchInfraDescriptors c
+        >=> mapM (fetchInfraTree c . descriptorId)
+      )
+      pid
+  return . foldl' insertIntoDescriptorTree parentTree $ childrenTrees
+
+fetchMetaDescriptors :: ToField a => Connection -> a -> IO [Descriptor]
+fetchMetaDescriptors c did = do
+  r <-
+    query
+      c
+      "SELECT d.id, d.descriptor \
+      \FROM MetaDescriptor md \
+      \  JOIN Descriptor d \
+      \    ON md.metaDescriptorId = d.id \
+      \WHERE md.infraDescriptorId = ?"
+      [did]
+  return . map mapQToDescriptor $ r
+
+fetchInfraDescriptors :: Connection -> Int -> IO [Descriptor]
+fetchInfraDescriptors c did = do
+  r <-
+    query
+      c
+      "SELECT d.id, d.descriptor \
+      \FROM MetaDescriptor md \
+      \  JOIN Descriptor d \
+      \    ON md.infraDescriptorId = d.id \
+      \WHERE md.metaDescriptorId = ?"
+      [did]
+  return . map mapQToDescriptor $ r
+
+hoistMaybe :: Monad m => Maybe a -> MaybeT m a
+hoistMaybe = MaybeT . return
+
+getDescriptor :: Connection -> Int -> MaybeT IO Descriptor
+getDescriptor c did = do
+  r <-
+    lift $
+      query
+        c
+        "SELECT id , descriptor FROM Descriptor WHERE id = ?"
+        [did]
+  hoistMaybe . fmap mapQToDescriptor . head' $ r
+
+getFile :: Connection -> Int -> MaybeT IO File
+getFile c fid = do
+  r <- lift $ query c "SELECT id, filePath FROM File WHERE id = ?" [fid]
+  hoistMaybe . fmap mapQToFile . head' $ r
 
 getUntaggedFileWithTags :: Connection -> IO [FileWithTags]
 getUntaggedFileWithTags c = do
@@ -77,3 +144,7 @@ groupRFWT (old : past) (r : rs) =
 
 mapQToFWT :: (Int, T.Text, Int, T.Text) -> FileWithTags
 mapQToFWT (fid, fp, dids, dds) = FileWithTags (File fid fp) [Descriptor dids dds]
+
+head' :: [a] -> Maybe a
+head' [] = Nothing
+head' (x : _) = Just x
