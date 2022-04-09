@@ -20,7 +20,7 @@ where
 
 import Control.Lens ((^.))
 import Data.List (foldl', map)
-import Data.Text (Text, append, intercalate, pack, replicate)
+import Data.Text (Text, append, intercalate, pack, replicate, unwords)
 import Database.Tagger.Type
 import Monomer
 import Node.Color
@@ -174,7 +174,7 @@ fileSinglePreviewWidget = imageZone
     imageZone model =
       box_ [onClick ToggleDoSoloTag]
         . vsplit_ []
-        $ (imagePreview model, doSoloTagCheckBox)
+        $ (imagePreview model, vstack [singleFileTags, doSoloTagCheckBox])
       where
         imagePreview ::
           (WidgetModel s, WidgetEvent e, HasFileSingle s (Maybe FileWithTags)) =>
@@ -187,6 +187,8 @@ fileSinglePreviewWidget = imageZone
               (label "No Preview")
               (flip image_ [alignBottom, fitEither] . getPlainText)
               (m' ^. fileSingle)
+        singleFileTags :: (WidgetModel s, WidgetEvent e, HasFileSingle s (Maybe FileWithTags)) => WidgetNode s e
+        singleFileTags = maybe spacer (label . Data.Text.unwords . map getPlainText . tags) (model ^. fileSingle)
         doSoloTagCheckBox ::
           (WidgetModel s, HasDoSoloTag s Bool) => WidgetNode s TaggerEvent
         doSoloTagCheckBox =
