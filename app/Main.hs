@@ -20,8 +20,6 @@ import Data.List
 import Data.Maybe
 import Data.Text hiding (head, map, take)
 import Database.SQLite.Simple (close, open)
-import Database.Tagger.Access
-import Database.Tagger.Type
 import qualified Database.TaggerNew.Access as TaggerNew.Access
 import qualified Database.TaggerNew.Type as TaggerNew.Type
 import Event.Task

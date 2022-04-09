@@ -10,11 +10,6 @@ module Type.Model.Prim
 where
 
 import Data.Text (Text)
-import Database.Tagger.Type
-  ( Descriptor,
-    DescriptorTree (NullTree),
-    FileWithTags,
-  )
 import qualified Database.TaggerNew.Access as TaggerNew.Access
 import qualified Database.TaggerNew.Type as TaggerNew.Type
 

@@ -22,9 +22,6 @@ executable tagger
                       ,Event.Task
                       ,Type.Model
                       ,Type.Model.Prim
-                      ,Database.Tagger.Access
-                      ,Database.Tagger.Type
-                      ,Database.Tagger.Schema
                       ,Database.TaggerNew.Type
                       ,Database.TaggerNew.Access
 
@@ -40,9 +37,6 @@ executable tagger
                       ,lens
                       ,text
                       ,transformers
-                      ,groundhog-sqlite
-                      ,groundhog-th == 0.12
-                      ,groundhog
                       ,unordered-containers
                       ,hashable
                       ,transformers
