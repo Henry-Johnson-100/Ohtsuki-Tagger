@@ -71,20 +71,6 @@ doQueryWithCriteria qc =
     ByRelation -> queryRelation
     ByUntagged -> queryUntagged
 
-getAllFilesIO :: ConnString -> IO [FileWithTags]
-getAllFilesIO =
-  flip
-    connectThenRun
-    (fetchAllFiles >>= fmap catMaybes . mapM getFileWithTags >>= liftIO . return)
-
-getAllIndexedDescriptorsIO :: ConnString -> IO [Descriptor]
-getAllIndexedDescriptorsIO =
-  flip
-    connectThenRun
-    ( fetchAllIndexedDescriptors
-        >>= liftIO . return
-    )
-
 lookupDescriptorTreeDir ::
   ConnString ->
   (DescriptorAutoKey -> Result DescriptorTree) ->

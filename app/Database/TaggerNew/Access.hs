@@ -14,6 +14,20 @@ import Database.SQLite.Simple
 import Database.SQLite.Simple.ToField
 import Database.TaggerNew.Type
 
+-- | Attempts to add a new file to db
+-- Should do nothing if the file is not valid
+addFile :: Connection -> T.Text -> MaybeT IO File
+addFile c f = do
+  validatedPath <- validatePath f
+  r <-
+    lift $
+      execute
+        c
+        "INSERT INTO File (filePath) VALUES (?)"
+        [validatedPath]
+  insertedId <- lift . lastInsertRowId $ c
+  return . File (fromIntegral insertedId) $ validatedPath
+
 fetchMetaTree :: Connection -> Int -> MaybeT IO DescriptorTree
 fetchMetaTree c pid = do
   did <- getDescriptor c pid

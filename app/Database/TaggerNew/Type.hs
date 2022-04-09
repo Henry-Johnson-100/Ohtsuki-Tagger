@@ -9,7 +9,7 @@ module Database.TaggerNew.Type
     descriptorTreeElem,
     flattenTree,
     descriptorTreeChildren,
-    dbFile,
+    validatePath,
     getNode,
     pushTag,
     fwtFileEqual,
@@ -20,15 +20,15 @@ import qualified Control.Monad
 import qualified Control.Monad.Trans.Class as Trans
 import Control.Monad.Trans.Maybe (MaybeT (MaybeT))
 import qualified Data.List
-import qualified Data.Text
+import qualified Data.Text as T
 import qualified System.Directory as SysDir
 
-data File = File {fileId :: Int, filePath :: Data.Text.Text} deriving (Show, Eq)
+data File = File {fileId :: Int, filePath :: T.Text} deriving (Show, Eq)
 
 instance Ord File where
   compare (File _ px) (File _ py) = compare px py
 
-data Descriptor = Descriptor {descriptorId :: Int, descriptor :: Data.Text.Text}
+data Descriptor = Descriptor {descriptorId :: Int, descriptor :: T.Text}
   deriving (Show, Eq)
 
 instance Ord Descriptor where
@@ -108,20 +108,20 @@ flattenTree = flattenTree' []
 -- | A system safe constructor for a File from a string.
 -- If the file exists, returns it with its absolute path.
 -- Resolves symbolic links
-dbFile :: File -> MaybeT IO File
-dbFile rawFile = do
-  existsFile <- fileExists rawFile
+validatePath :: T.Text -> MaybeT IO T.Text
+validatePath rawPath = do
+  existsFile <- fileExists rawPath
   resolve existsFile
   where
-    fileExists :: File -> MaybeT IO File
+    fileExists :: T.Text -> MaybeT IO T.Text
     fileExists f' = do
-      exists <- Trans.lift . SysDir.doesFileExist . Data.Text.unpack . filePath $ f'
+      exists <- Trans.lift . SysDir.doesFileExist . T.unpack $ f'
       if exists then return f' else (MaybeT . pure) Nothing
-    resolve :: File -> MaybeT IO File
-    resolve (File fid fp') = do
-      let fp = Data.Text.unpack fp'
+    resolve :: T.Text -> MaybeT IO T.Text
+    resolve fp' = do
+      let fp = T.unpack fp'
       isSymlink <- Trans.lift . SysDir.pathIsSymbolicLink $ fp
       resolved <-
         if isSymlink then (Trans.lift . SysDir.getSymbolicLinkTarget) fp else return fp
       absPath <- Trans.lift . SysDir.makeAbsolute $ resolved
-      return . File fid . Data.Text.pack $ absPath
+      return . T.pack $ absPath
