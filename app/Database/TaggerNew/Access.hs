@@ -90,8 +90,19 @@ getUntaggedFileWithTags c = do
   let files = map mapQToFile r
   return . map (`FileWithTags` []) $ files
 
-lookupFileWithTagByTag :: (ToField a) => Connection -> a -> IO [FileWithTags]
-lookupFileWithTagByTag conn t = do
+lookupFileWithTagsByRelation :: Connection -> Int -> IO [FileWithTags]
+lookupFileWithTagsByRelation c did = do
+  relationTree <- runMaybeT . fetchInfraTree c $ did
+  let maybeTags = map descriptorId . maybe [] flattenTree $ relationTree
+  fmap concat . mapM (lookupFileWithTagByTagId c) $maybeTags
+
+lookupFileWithTagsByFilePattern :: Connection -> T.Text -> IO [FileWithTags]
+lookupFileWithTagsByFilePattern c p = do
+  fs <- lookupFilePattern c p
+  fmap concat . mapM (lookupFileWithTagByTagId c . fileId) $ fs
+
+lookupFileWithTagByTagId :: Connection -> Int -> IO [FileWithTags]
+lookupFileWithTagByTagId conn t = do
   r <-
     query
       conn
@@ -103,6 +114,21 @@ lookupFileWithTagByTag conn t = do
       \    ON t.descriptorTagId = d.id \
       \WHERE t.descriptorTagId = ?"
       [t]
+  return . groupRFWT [] $ r
+
+lookupFileWithTagsByFileId :: Connection -> Int -> IO [FileWithTags]
+lookupFileWithTagsByFileId c fid = do
+  r <-
+    query
+      c
+      "SELECT f.id, f.filePath, d.id, d.descriptor \
+      \FROM Tag t \
+      \  JOIN File f \
+      \    ON t.fileTagId = f.id \
+      \  JOIN Descriptor d \
+      \    ON t.descriptorTagId = d.id \
+      \WHERE t.fileTagId = ?"
+      [fid]
   return . groupRFWT [] $ r
 
 lookupDescriptorPattern :: (ToField a) => Connection -> a -> IO [Descriptor]
