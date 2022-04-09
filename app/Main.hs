@@ -150,6 +150,7 @@ taggerEventHandler wenv node model event =
                           )
           )
       ]
+    DebugPrintSelection -> [Task (PutExtern <$> print (model ^. fileSelection))]
 
 -- | Replaces "${file} in the first list with the entirety of the second."
 putFileArgs :: [String] -> [String] -> [String]
@@ -173,7 +174,7 @@ taggerApplicationUI wenv model = widgetTree
               vstack [queryWidget, descriptorTreeWidget model]
             ],
           vgrid
-            [ configPanel,
+            [ vstack [configPanel, button "print selection" DebugPrintSelection],
               (fileSinglePreviewWidget model)
             ]
         ]

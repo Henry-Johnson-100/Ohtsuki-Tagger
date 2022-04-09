@@ -10,8 +10,8 @@ module Type.Model.Prim
 where
 
 import Data.Text (Text)
-import Database.Tagger.Access 
-import Database.Tagger.Type 
+import Database.Tagger.Access
+import Database.Tagger.Type
 
 instance Show Connection where
   show _ = "Sqlite Connection"
@@ -121,4 +121,5 @@ data TaggerEvent
     PutExtern !()
   | -- Tag the selection with the current tagsString
     TagCommitTagsString
+  | DebugPrintSelection
   deriving (Show, Eq)
