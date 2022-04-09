@@ -22,6 +22,7 @@ import Control.Lens ((^.))
 import Data.List (foldl', map)
 import Data.Text (Text, append, intercalate, pack, replicate)
 import Database.Tagger.Type
+import qualified Database.TaggerNew.Type as TaggerNew.Type
 import Monomer
 import Node.Color
 import Node.Micro
@@ -31,14 +32,14 @@ import Prelude hiding (concat, replicate, unlines, unwords)
 class GetPlainText g where
   getPlainText :: g -> Text
 
-instance GetPlainText File where
-  getPlainText = pack . filePath
+instance GetPlainText TaggerNew.Type.File where
+  getPlainText = TaggerNew.Type.filePath
 
-instance GetPlainText Descriptor where
-  getPlainText = pack . descriptor
+instance GetPlainText TaggerNew.Type.Descriptor where
+  getPlainText = TaggerNew.Type.descriptor
 
-instance GetPlainText FileWithTags where
-  getPlainText = getPlainText . file
+instance GetPlainText TaggerNew.Type.FileWithTags where
+  getPlainText = getPlainText . TaggerNew.Type.file
 
 themeConfig :: [AppConfig e]
 themeConfig =
@@ -67,34 +68,34 @@ configPanel =
     ]
 
 descriptorTreeWidget ::
-  (WidgetModel s, HasDescriptorTree s DescriptorTree) => s -> WidgetNode s TaggerEvent
+  (WidgetModel s, HasDescriptorTree s TaggerNew.Type.DescriptorTree) => s -> WidgetNode s TaggerEvent
 descriptorTreeWidget model =
   box . stdScroll . flip styleBasic [textFont "Regular"] $
     vstack [resetDescriptorTreeButton, buildTreeWidget (model ^. descriptorTree)]
   where
-    buildTreeWidget :: (WidgetModel s) => DescriptorTree -> WidgetNode s TaggerEvent
+    buildTreeWidget :: (WidgetModel s) => TaggerNew.Type.DescriptorTree -> WidgetNode s TaggerEvent
     buildTreeWidget = buildTreeWidgetAccum 0 (vstack [])
       where
         buildTreeWidgetAccum ::
           (WidgetModel s) =>
           Int ->
           WidgetNode s TaggerEvent ->
-          DescriptorTree ->
+          TaggerNew.Type.DescriptorTree ->
           WidgetNode s TaggerEvent
         buildTreeWidgetAccum l acc tr =
           case tr of
-            NullTree -> acc
-            Infra d -> vstack [acc, makeDepthWidget textBlack l d]
-            Meta d cs ->
+            TaggerNew.Type.NullTree -> acc
+            TaggerNew.Type.Infra d -> vstack [acc, makeDepthWidget textBlack l d]
+            TaggerNew.Type.Meta d cs ->
               appendVStack
                 (vstack [acc, hstack [makeDepthWidget textBlue l d]])
                 ( vstack $
                     map
                       ( \c ->
                           case c of
-                            Infra d' -> makeDepthWidget textBlack (l + 1) d'
-                            Meta d' _ -> makeDepthWidget textBlue (l + 1) d'
-                            NullTree ->
+                            TaggerNew.Type.Infra d' -> makeDepthWidget textBlack (l + 1) d'
+                            TaggerNew.Type.Meta d' _ -> makeDepthWidget textBlue (l + 1) d'
+                            TaggerNew.Type.NullTree ->
                               spacer
                                 `styleBasic` [padding 0, border 0 bgDefault]
                       )
@@ -109,19 +110,18 @@ descriptorTreeWidget model =
                                border 0 bgDefault
                              ]
                 `styleHover` [bgColor bgLightGray],
-              appendToQueryButton (pack . descriptor $ d')
+              appendToQueryButton (TaggerNew.Type.descriptor d')
             ]
     appendVStack x y = vstack [x, y]
-    dButton :: (WidgetModel s) => Descriptor -> WidgetNode s TaggerEvent
+    dButton :: (WidgetModel s) => TaggerNew.Type.Descriptor -> WidgetNode s TaggerEvent
     dButton d =
       flip styleBasic [padding 0, bgColor bgDefault, border 0 bgDefault]
-        . flip styledButton (pack . descriptor $ d)
+        . flip styledButton (TaggerNew.Type.descriptor d)
         . RequestDescriptorTree
-        . pack
-        . descriptor
+        . TaggerNew.Type.descriptor
         $ d
 
-fileSelectionWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent
+fileSelectionWidget :: (WidgetModel s) => [TaggerNew.Type.FileWithTags] -> WidgetNode s TaggerEvent
 fileSelectionWidget fwts =
   let fileWithTagsZone =
         map
@@ -134,19 +134,19 @@ fileSelectionWidget fwts =
     fileWithTagWidget ::
       (WidgetModel s) =>
       [WidgetNode s TaggerEvent] ->
-      FileWithTags ->
+      TaggerNew.Type.FileWithTags ->
       WidgetNode s TaggerEvent
     fileWithTagWidget bs fwt =
       let _temp x = const . label $ ""
           buttonGridNode bs' =
             box_ [alignLeft] $ hstack_ [] bs'
-          fileNode f' = box_ [alignLeft] $ flip label_ [ellipsis] (pack . filePath $ f')
+          fileNode f' = box_ [alignLeft] $ flip label_ [ellipsis] (TaggerNew.Type.filePath $ f')
           tagsNode ts' =
             box_ [alignTop, alignLeft] $
               flip
                 label_
                 []
-                (intercalate ", " . map (pack . descriptor) $ ts')
+                (intercalate ", " . map TaggerNew.Type.descriptor $ ts')
                 `styleBasic` [textColor textBlue]
           fwtSplitNode (fn', tn') =
             box_ [alignLeft] $ vsplit_ [] $ (stdScroll fn', stdScroll tn')
@@ -156,19 +156,19 @@ fileSelectionWidget fwts =
               []
               [ hstack_ [] $
                   [ buttonGridNode bs,
-                    fwtSplitNode (fileNode . file $ fwt, tagsNode . tags $ fwt)
+                    fwtSplitNode (fileNode . TaggerNew.Type.file $ fwt, tagsNode . TaggerNew.Type.tags $ fwt)
                   ],
                 separatorLine
               ]
 
 fileSinglePreviewWidget ::
-  (WidgetModel s, HasFileSingle s (Maybe FileWithTags), HasDoSoloTag s Bool) =>
+  (WidgetModel s, HasFileSingle s (Maybe TaggerNew.Type.FileWithTags), HasDoSoloTag s Bool) =>
   s ->
   WidgetNode s TaggerEvent
 fileSinglePreviewWidget = imageZone
   where
     imageZone ::
-      (WidgetModel s, HasFileSingle s (Maybe FileWithTags), HasDoSoloTag s Bool) =>
+      (WidgetModel s, HasFileSingle s (Maybe TaggerNew.Type.FileWithTags), HasDoSoloTag s Bool) =>
       s ->
       WidgetNode s TaggerEvent
     imageZone model =
@@ -177,7 +177,7 @@ fileSinglePreviewWidget = imageZone
         $ (imagePreview model, doSoloTagCheckBox)
       where
         imagePreview ::
-          (WidgetModel s, WidgetEvent e, HasFileSingle s (Maybe FileWithTags)) =>
+          (WidgetModel s, WidgetEvent e, HasFileSingle s (Maybe TaggerNew.Type.FileWithTags)) =>
           s ->
           WidgetNode s e
         imagePreview m' =
@@ -185,7 +185,7 @@ fileSinglePreviewWidget = imageZone
             []
             $ maybe
               (label "No Preview")
-              (flip image_ [alignBottom, fitEither] . pack . filePath . file)
+              (flip image_ [alignBottom, fitEither] . getPlainText)
               (m' ^. fileSingle)
         doSoloTagCheckBox ::
           (WidgetModel s, HasDoSoloTag s Bool) => WidgetNode s TaggerEvent

@@ -8,6 +8,7 @@ module Node.Micro where
 
 import Data.Text
 import Database.Tagger.Type
+import qualified Database.TaggerNew.Type as TaggerNew.Type
 import Monomer
 import Node.Color
 import Type.Model
@@ -81,13 +82,13 @@ resetDescriptorTreeButton = styledButton (RequestDescriptorTree "#ALL#") "Top"
 
 selectButton ::
   (WidgetModel s) =>
-  FileWithTags ->
+  TaggerNew.Type.FileWithTags ->
   WidgetNode s TaggerEvent
 selectButton = flip styledButton "Select" . FileSelectionUpdate . (: [])
 
 previewButton ::
   (WidgetModel s) =>
-  FileWithTags ->
+  TaggerNew.Type.FileWithTags ->
   WidgetNode s TaggerEvent
 previewButton = flip styledButton "Preview" . FileSinglePut
 
