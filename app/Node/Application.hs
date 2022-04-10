@@ -170,12 +170,18 @@ tagCommitWidget =
 explorableDescriptorTreeWidget ::
   (WidgetModel s) => DescriptorTree -> WidgetNode s TaggerEvent
 explorableDescriptorTreeWidget tr =
-  box_ [alignTop, alignLeft] $
-    vstack_
+  flip styleBasic [border 1 textBlack]
+    . box_ [alignTop, alignLeft]
+    $ hstack_
       []
-      [ hsplit
-          ( hstack_ [] [parentDescriptorTreeButton, resetDescriptorTreeButton],
+      [ vsplit
+          ( vstack_
+              []
+              [ resetDescriptorTreeButton,
+                parentDescriptorTreeButton
+              ],
             spacer
           ),
+        separatorLine,
         descriptorTreeWidget tr
       ]

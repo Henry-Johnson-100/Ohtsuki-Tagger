@@ -97,11 +97,11 @@ doShellCmdButton = styledButton ShellCmd "Cmd"
 resetDescriptorTreeButton ::
   (WidgetModel s) =>
   WidgetNode s TaggerEvent
-resetDescriptorTreeButton = styledButton (RequestDescriptorTree "#ALL#") "Top"
+resetDescriptorTreeButton = styledButton (RequestDescriptorTree "#ALL#") "↺"
 
 parentDescriptorTreeButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
-parentDescriptorTreeButton = styledButton DescriptorTreePutParent "Up"
+parentDescriptorTreeButton = styledButton DescriptorTreePutParent "↑"
 
 selectButton ::
   (WidgetModel s) =>
