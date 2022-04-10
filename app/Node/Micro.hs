@@ -127,6 +127,13 @@ clearSelectionButton = styledButton FileSelectionClear "CS"
 appendToQueryButton :: WidgetModel s => Text -> WidgetNode s TaggerEvent
 appendToQueryButton t = styledButton (FileSelectionAppendQuery t) "Add"
 
+treeLeafButtonRequestDescriptorTree ::
+  WidgetModel s =>
+  Descriptor ->
+  WidgetNode s TaggerEvent
+treeLeafButtonRequestDescriptorTree d =
+  styledButton (RequestDescriptorTree . descriptor $ d) (descriptor d)
+
 draggableDescriptorListWidget ::
   (WidgetModel s, WidgetEvent e) => [Descriptor] -> WidgetNode s e
 draggableDescriptorListWidget =
@@ -149,14 +156,15 @@ generalDescriptorTreeWidget ::
   WidgetModel s =>
   DescriptorTree ->
   [WidgetNode s TaggerEvent] ->
+  (Descriptor -> WidgetNode s TaggerEvent) ->
   WidgetNode s TaggerEvent
-generalDescriptorTreeWidget tr bs =
+generalDescriptorTreeWidget tr bs dAction =
   flip styleBasic [border 1 textBlack] . box_ [alignTop, alignLeft] $
     hstack_
       []
       [ vsplit (vstack_ [] bs, spacer),
         separatorLine,
-        descriptorTreeWidget tr
+        descriptorTreeWidget tr dAction
       ]
 
 explorableDescriptorTreeWidget ::
@@ -167,25 +175,30 @@ explorableDescriptorTreeWidget tr =
   generalDescriptorTreeWidget
     tr
     [resetDescriptorTreeToButton "#ALL#", parentDescriptorTreeButton]
+    treeLeafButtonRequestDescriptorTree
 
 unrelatedDescriptorTreeWidget ::
   WidgetModel s =>
   DescriptorTree ->
   WidgetNode s TaggerEvent
 unrelatedDescriptorTreeWidget tr =
-  generalDescriptorTreeWidget tr [resetUnrelatedDescriptorTree]
+  generalDescriptorTreeWidget
+    tr
+    [resetUnrelatedDescriptorTree]
+    treeLeafButtonRequestDescriptorTree -- #TODO change this
 
 treeLeafDescriptorWidget ::
   WidgetModel s =>
   Color ->
   Int ->
   Descriptor ->
+  (Descriptor -> WidgetNode s TaggerEvent) ->
   WidgetNode s TaggerEvent
-treeLeafDescriptorWidget tc l d =
+treeLeafDescriptorWidget tc l d a =
   hstack_ [] $
     [ label (Data.Text.replicate l "--" !++ "|"),
       draggable d $
-        styledButton (RequestDescriptorTree . descriptor $ d) (descriptor d)
+        a d
           `styleBasic` [ textColor tc,
                          bgColor bgDefault,
                          border 0 bgDefault,
@@ -195,32 +208,68 @@ treeLeafDescriptorWidget tc l d =
     ]
 
 descriptorTreeWidget ::
-  (WidgetModel s) => DescriptorTree -> WidgetNode s TaggerEvent
-descriptorTreeWidget tr =
-  box . stdScroll . flip styleBasic [textFont "Regular"] . buildTreeWidget $ tr
+  (WidgetModel s) =>
+  DescriptorTree ->
+  (Descriptor -> WidgetNode s TaggerEvent) ->
+  WidgetNode s TaggerEvent
+descriptorTreeWidget tr dAction =
+  box . stdScroll . flip styleBasic [textFont "Regular"] . buildTreeWidget dAction $ tr
   where
-    buildTreeWidget :: (WidgetModel s) => DescriptorTree -> WidgetNode s TaggerEvent
-    buildTreeWidget = buildTreeWidgetAccum 0 (vstack [])
+    buildTreeWidget ::
+      (WidgetModel s) =>
+      (Descriptor -> WidgetNode s TaggerEvent) ->
+      DescriptorTree ->
+      WidgetNode s TaggerEvent
+    buildTreeWidget action = buildTreeWidgetAccum 0 (vstack []) action
       where
         buildTreeWidgetAccum ::
           (WidgetModel s) =>
           Int ->
           WidgetNode s TaggerEvent ->
+          (Descriptor -> WidgetNode s TaggerEvent) ->
           DescriptorTree ->
           WidgetNode s TaggerEvent
-        buildTreeWidgetAccum l acc tr =
+        buildTreeWidgetAccum l acc action tr =
           case tr of
             NullTree -> acc
-            Infra d -> vstack [acc, treeLeafDescriptorWidget textBlack l d]
+            Infra d ->
+              vstack
+                [ acc,
+                  treeLeafDescriptorWidget
+                    textBlack
+                    l
+                    d
+                    action
+                ]
             Meta d cs ->
               appendVStack
-                (vstack [acc, hstack [treeLeafDescriptorWidget textBlue l d]])
+                ( vstack
+                    [ acc,
+                      hstack
+                        [ treeLeafDescriptorWidget
+                            textBlue
+                            l
+                            d
+                            action
+                        ]
+                    ]
+                )
                 ( vstack $
                     map
                       ( \c ->
                           case c of
-                            Infra d' -> treeLeafDescriptorWidget textBlack (l + 1) d'
-                            Meta d' _ -> treeLeafDescriptorWidget textBlue (l + 1) d'
+                            Infra d' ->
+                              treeLeafDescriptorWidget
+                                textBlack
+                                (l + 1)
+                                d'
+                                action
+                            Meta d' _ ->
+                              treeLeafDescriptorWidget
+                                textBlue
+                                (l + 1)
+                                d'
+                                action
                             NullTree ->
                               spacer
                                 `styleBasic` [padding 0, border 0 bgDefault]
