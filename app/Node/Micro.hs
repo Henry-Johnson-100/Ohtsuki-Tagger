@@ -42,11 +42,14 @@ styledButton a t =
 
 queryTextField ::
   (WidgetModel s, HasFileSelectionQuery s Text) => WidgetNode s TaggerEvent
-queryTextField = textField_ fileSelectionQuery []
+queryTextField =
+  dropTarget (FileSelectionAppendQuery . descriptor) $
+    textField_ fileSelectionQuery []
 
 tagsStringTextField ::
   (WidgetModel s, HasTagsString s Text) => WidgetNode s TaggerEvent
-tagsStringTextField = textField_ tagsString []
+tagsStringTextField =
+  dropTarget (TagsStringAppend . descriptor) $ textField_ tagsString []
 
 tagCommitButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent

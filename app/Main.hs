@@ -90,6 +90,11 @@ taggerEventHandler wenv node model event =
           model & fileSelectionQuery
             .~ (Data.Text.unwords [model ^. fileSelectionQuery, t])
       ]
+    TagsStringAppend t ->
+      [ Model $
+          model
+            & tagsString .~ (Data.Text.unwords [model ^. tagsString, t])
+      ]
     FileSelectionCommitQuery ->
       [ Task
           ( FileSelectionUpdate

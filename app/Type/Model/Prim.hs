@@ -121,5 +121,7 @@ data TaggerEvent
     PutExtern !()
   | -- Tag the selection with the current tagsString
     TagCommitTagsString
+  | -- Append Text to the TagsString
+    TagsStringAppend !Text
   | DebugPrintSelection
   deriving (Show, Eq)
