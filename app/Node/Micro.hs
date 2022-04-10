@@ -3,6 +3,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Redundant $" #-}
+{-# HLINT ignore "Use lambda-case" #-}
 
 module Node.Micro where
 
@@ -98,6 +99,10 @@ resetDescriptorTreeButton ::
   WidgetNode s TaggerEvent
 resetDescriptorTreeButton = styledButton (RequestDescriptorTree "#ALL#") "Top"
 
+parentDescriptorTreeButton ::
+  (WidgetModel s) => WidgetNode s TaggerEvent
+parentDescriptorTreeButton = styledButton DescriptorTreePutParent "Up"
+
 selectButton ::
   (WidgetModel s) =>
   FileWithTags ->
@@ -152,6 +157,40 @@ treeLeafDescriptorWidget tc l d =
                          border 0 bgDefault,
                          padding 0
                        ]
-          `styleHover` [bgColor bgLightGray],
-      styledButton (FileSelectionAppendQuery . descriptor $ d) "A"
+          `styleHover` [bgColor bgLightGray]
     ]
+
+descriptorTreeWidget ::
+  (WidgetModel s) => DescriptorTree -> WidgetNode s TaggerEvent
+descriptorTreeWidget tr =
+  box . stdScroll . flip styleBasic [textFont "Regular"] . buildTreeWidget $ tr
+  where
+    buildTreeWidget :: (WidgetModel s) => DescriptorTree -> WidgetNode s TaggerEvent
+    buildTreeWidget = buildTreeWidgetAccum 0 (vstack [])
+      where
+        buildTreeWidgetAccum ::
+          (WidgetModel s) =>
+          Int ->
+          WidgetNode s TaggerEvent ->
+          DescriptorTree ->
+          WidgetNode s TaggerEvent
+        buildTreeWidgetAccum l acc tr =
+          case tr of
+            NullTree -> acc
+            Infra d -> vstack [acc, treeLeafDescriptorWidget textBlack l d]
+            Meta d cs ->
+              appendVStack
+                (vstack [acc, hstack [treeLeafDescriptorWidget textBlue l d]])
+                ( vstack $
+                    map
+                      ( \c ->
+                          case c of
+                            Infra d' -> treeLeafDescriptorWidget textBlack (l + 1) d'
+                            Meta d' _ -> treeLeafDescriptorWidget textBlue (l + 1) d'
+                            NullTree ->
+                              spacer
+                                `styleBasic` [padding 0, border 0 bgDefault]
+                      )
+                      cs
+                )
+    appendVStack x y = vstack [x, y]

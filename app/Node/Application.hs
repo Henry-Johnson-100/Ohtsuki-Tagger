@@ -12,7 +12,7 @@ module Node.Application
   ( themeConfig,
     fileSelectionWidget,
     fileSinglePreviewWidget,
-    descriptorTreeWidget,
+    explorableDescriptorTreeWidget,
     configPanel,
     queryWidget,
   )
@@ -51,42 +51,6 @@ configPanel =
     [ shellCmdWidget,
       tagCommitWidget
     ]
-
-descriptorTreeWidget ::
-  (WidgetModel s, HasDescriptorTree s DescriptorTree) => s -> WidgetNode s TaggerEvent
-descriptorTreeWidget model =
-  box . stdScroll . flip styleBasic [textFont "Regular"] $
-    vstack [resetDescriptorTreeButton, buildTreeWidget (model ^. descriptorTree)]
-  where
-    buildTreeWidget :: (WidgetModel s) => DescriptorTree -> WidgetNode s TaggerEvent
-    buildTreeWidget = buildTreeWidgetAccum 0 (vstack [])
-      where
-        buildTreeWidgetAccum ::
-          (WidgetModel s) =>
-          Int ->
-          WidgetNode s TaggerEvent ->
-          DescriptorTree ->
-          WidgetNode s TaggerEvent
-        buildTreeWidgetAccum l acc tr =
-          case tr of
-            NullTree -> acc
-            Infra d -> vstack [acc, treeLeafDescriptorWidget textBlack l d]
-            Meta d cs ->
-              appendVStack
-                (vstack [acc, hstack [treeLeafDescriptorWidget textBlue l d]])
-                ( vstack $
-                    map
-                      ( \c ->
-                          case c of
-                            Infra d' -> treeLeafDescriptorWidget textBlack (l + 1) d'
-                            Meta d' _ -> treeLeafDescriptorWidget textBlue (l + 1) d'
-                            NullTree ->
-                              spacer
-                                `styleBasic` [padding 0, border 0 bgDefault]
-                      )
-                      cs
-                )
-    appendVStack x y = vstack [x, y]
 
 fileSelectionWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent
 fileSelectionWidget fwts =
@@ -202,3 +166,16 @@ tagCommitWidget =
   keystroke [("Enter", TagCommitTagsString)]
     . hstack_ []
     $ [tagCommitButton, tagsStringTextField]
+
+explorableDescriptorTreeWidget ::
+  (WidgetModel s) => DescriptorTree -> WidgetNode s TaggerEvent
+explorableDescriptorTreeWidget tr =
+  box_ [alignTop, alignLeft] $
+    vstack_
+      []
+      [ hsplit
+          ( hstack_ [] [parentDescriptorTreeButton, resetDescriptorTreeButton],
+            spacer
+          ),
+        descriptorTreeWidget tr
+      ]

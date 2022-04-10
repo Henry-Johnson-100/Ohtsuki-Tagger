@@ -204,7 +204,10 @@ taggerApplicationUI wenv model = widgetTree
       hgrid
         [ vgrid
             [ fileSelectionWidget (model ^. fileSelection),
-              vstack [queryWidget, descriptorTreeWidget model]
+              vstack
+                [ queryWidget,
+                  explorableDescriptorTreeWidget (model ^. descriptorTree)
+                ]
             ],
           vgrid
             [ vstack [configPanel, button "print selection" DebugPrintSelection],
