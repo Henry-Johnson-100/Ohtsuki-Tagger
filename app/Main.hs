@@ -8,6 +8,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use lambda-case" #-}
+{-# HLINT ignore "Redundant <$>" #-}
 
 module Main where
 
@@ -107,6 +108,8 @@ taggerEventHandler wenv node model event =
       ]
     FileSelectionClear -> [Model $ model & fileSelection .~ []]
     DescriptorTreePut tr -> [Model $ model & descriptorTree .~ tr]
+    UnrelatedDescriptorTreePut tr -> [Model $ model & unrelatedDescriptorTree .~ tr]
+    -- #TODO no widget for this currently
     DescriptorTreePutParent ->
       [ Task
           ( DescriptorTreePut
@@ -116,6 +119,13 @@ taggerEventHandler wenv node model event =
                   )
           )
       ]
+    DescriptorCreateRelation ms is ->
+      [ Task (PutExtern <$> relateTo (model ^. dbConn) ms is),
+        Task
+          ( RequestDescriptorTree
+              <$> return (maybe "#ALL#" (descriptor) (getNode (model ^. descriptorTree)))
+          )
+      ]
     ToggleDoSoloTag ->
       [Model $ model & (doSoloTag .~ (not (model ^. doSoloTag)))]
     RequestDescriptorTree s ->
@@ -123,6 +133,9 @@ taggerEventHandler wenv node model event =
           ( DescriptorTreePut
               <$> (lookupInfraDescriptorTree (model ^. dbConn) s)
           )
+      ]
+    RefreshUnrelatedDescriptorTree ->
+      [ Task (UnrelatedDescriptorTreePut <$> getUnrelatedInfraTree (model ^. dbConn))
       ]
     ShellCmd ->
       [ Task

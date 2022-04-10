@@ -27,6 +27,7 @@ data TaggerModel = TaggerModel
     _taggerFileSingle :: !(Maybe FileWithTags),
     _taggerDescriptorDb :: ![Descriptor],
     _taggerDescriptorTree :: !DescriptorTree,
+    _taggerUnrelatedDescriptorTree :: !DescriptorTree,
     _taggerDoSoloTag :: !Bool,
     _taggerShellCmd :: !Text,
     _taggerExtern :: !(),
@@ -49,7 +50,8 @@ emptyTaggerModel c =
       _taggerShellCmd = "feh -D120 -zx. -g800x800 -Bwhite",
       _taggerExtern = (),
       _taggerDbConn = c,
-      _taggerTagsString = ""
+      _taggerTagsString = "",
+      _taggerUnrelatedDescriptorTree = NullTree
     }
 
 data FileSetArithmetic
@@ -105,6 +107,7 @@ data TaggerEvent
     DescriptorDbUpdate ![Descriptor]
   | -- Put the InfraTree of a descriptor
     DescriptorTreePut !DescriptorTree
+  | UnrelatedDescriptorTreePut !DescriptorTree
   | -- Put the parent meta tree of the current tree in the model
     DescriptorTreePutParent
   | -- Get a flattened descriptor tree
@@ -115,6 +118,8 @@ data TaggerEvent
     ToggleDoSoloTag
   | -- Like DescriptorTreePut but looks up a descriptorTree from text
     RequestDescriptorTree !Text
+  | RefreshUnrelatedDescriptorTree
+  | DescriptorCreateRelation ![Descriptor] ![Descriptor]
   | -- Run the text as shell cmd
     ShellCmd
   | -- Receives nothing and does nothing

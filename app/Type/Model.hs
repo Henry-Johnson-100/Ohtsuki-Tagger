@@ -15,6 +15,7 @@ module Type.Model
     doSoloTag,
     shellCmd,
     tagsString,
+    unrelatedDescriptorTree,
     HasFileSingle,
     HasDoSoloTag,
     HasFileSetArithmetic,

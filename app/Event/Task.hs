@@ -41,6 +41,12 @@ tagThenGetRefresh c fwts dds = do
       fwts
   return . concat $ newFwts
 
+relateTo :: Connection -> [Descriptor] -> [Descriptor] -> IO ()
+relateTo c m i = do
+  let metaDescriptors = MetaDescriptor <$> (descriptorId <$> m) <*> (descriptorId <$> i)
+  _x <- runMaybeT . mapM_ (relate c) $ metaDescriptors
+  return ()
+
 queryByTag ::
   Connection ->
   [T.Text] ->
@@ -115,6 +121,17 @@ getALLInfraTree c = do
                 . lookupDescriptorPattern c
               $ "#ALL#"
           fetchInfraTree c . descriptorId $ allDescriptor
+      )
+  return . fromMaybe NullTree $ result
+
+getUnrelatedInfraTree :: Connection -> IO DescriptorTree
+getUnrelatedInfraTree c = do
+  result <-
+    runMaybeT
+      ( do
+          unrelatedDescriptor <-
+            hoistMaybe . head' <=< lift . lookupDescriptorPattern c $ "#UNRELATED#"
+          fetchInfraTree c . descriptorId $ unrelatedDescriptor
       )
   return . fromMaybe NullTree $ result
 
