@@ -37,9 +37,6 @@ themeConfig =
     appFontDef "Bold" "/usr/local/share/fonts/i/iosevka_bold.ttf"
   ]
 
-(!++) :: Text -> Text -> Text
-(!++) = Data.Text.append
-
 configPanel ::
   ( WidgetModel s,
     HasFileSetArithmetic s FileSetArithmetic,
@@ -73,41 +70,23 @@ descriptorTreeWidget model =
         buildTreeWidgetAccum l acc tr =
           case tr of
             NullTree -> acc
-            Infra d -> vstack [acc, makeDepthWidget textBlack l d]
+            Infra d -> vstack [acc, treeLeafDescriptorWidget textBlack l d]
             Meta d cs ->
               appendVStack
-                (vstack [acc, hstack [makeDepthWidget textBlue l d]])
+                (vstack [acc, hstack [treeLeafDescriptorWidget textBlue l d]])
                 ( vstack $
                     map
                       ( \c ->
                           case c of
-                            Infra d' -> makeDepthWidget textBlack (l + 1) d'
-                            Meta d' _ -> makeDepthWidget textBlue (l + 1) d'
+                            Infra d' -> treeLeafDescriptorWidget textBlack (l + 1) d'
+                            Meta d' _ -> treeLeafDescriptorWidget textBlue (l + 1) d'
                             NullTree ->
                               spacer
                                 `styleBasic` [padding 0, border 0 bgDefault]
                       )
                       cs
                 )
-        makeDepthWidget textColor' l' d' =
-          hstack
-            [ label (replicate l' "--" !++ "|"),
-              dButton d'
-                `styleBasic` [ textColor textColor',
-                               bgColor bgDefault,
-                               border 0 bgDefault
-                             ]
-                `styleHover` [bgColor bgLightGray],
-              appendToQueryButton (descriptor d')
-            ]
     appendVStack x y = vstack [x, y]
-    dButton :: (WidgetModel s) => Descriptor -> WidgetNode s TaggerEvent
-    dButton d =
-      flip styleBasic [padding 0, bgColor bgDefault, border 0 bgDefault]
-        . flip styledButton (descriptor d)
-        . RequestDescriptorTree
-        . descriptor
-        $ d
 
 fileSelectionWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent
 fileSelectionWidget fwts =
@@ -129,13 +108,7 @@ fileSelectionWidget fwts =
           buttonGridNode bs' =
             box_ [alignLeft] $ hstack_ [] bs'
           fileNode f' = box_ [alignLeft] $ flip label_ [ellipsis] (filePath $ f')
-          tagsNode ts' =
-            box_ [alignTop, alignLeft] $
-              flip
-                label_
-                []
-                (intercalate ", " . map descriptor $ ts')
-                `styleBasic` [textColor textBlue]
+          tagsNode ts' = draggableDescriptorListWidget ts'
           fwtSplitNode (fn', tn') =
             box_ [alignLeft] $ vsplit_ [] $ (stdScroll fn', stdScroll tn')
        in box_

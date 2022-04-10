@@ -13,6 +13,9 @@ import Monomer
 import Node.Color
 import Type.Model
 
+(!++) :: Text -> Text -> Text
+(!++) = Data.Text.append
+
 class GetPlainText g where
   getPlainText :: g -> Text
 
@@ -129,3 +132,23 @@ draggableDescriptorWidget d =
     . flip label_ [ellipsis]
     . getPlainText
     $ d
+
+treeLeafDescriptorWidget ::
+  WidgetModel s =>
+  Color ->
+  Int ->
+  Descriptor ->
+  WidgetNode s TaggerEvent
+treeLeafDescriptorWidget tc l d =
+  hstack_ [] $
+    [ label (Data.Text.replicate l "--" !++ "|"),
+      draggable d $
+        styledButton (RequestDescriptorTree . descriptor $ d) (descriptor d)
+          `styleBasic` [ textColor tc,
+                         bgColor bgDefault,
+                         border 0 bgDefault,
+                         padding 0
+                       ]
+          `styleHover` [bgColor bgLightGray],
+      styledButton (FileSelectionAppendQuery . descriptor $ d) "A"
+    ]
