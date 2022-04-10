@@ -63,6 +63,8 @@ taggerEventHandler wenv node model event =
           ( DescriptorTreePut
               <$> (getALLInfraTree (model ^. dbConn))
           ),
+        ( Task (UnrelatedDescriptorTreePut <$> getUnrelatedInfraTree (model ^. dbConn))
+        ),
         Model $
           model
             & fileSingle
@@ -206,7 +208,9 @@ taggerApplicationUI wenv model = widgetTree
             [ fileSelectionWidget (model ^. fileSelection),
               vstack
                 [ queryWidget,
-                  explorableDescriptorTreeWidget (model ^. descriptorTree)
+                  descriptorTreeQuadrantWidget
+                    (model ^. descriptorTree)
+                    (model ^. unrelatedDescriptorTree)
                 ]
             ],
           vgrid

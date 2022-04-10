@@ -12,7 +12,7 @@ module Node.Application
   ( themeConfig,
     fileSelectionWidget,
     fileSinglePreviewWidget,
-    explorableDescriptorTreeWidget,
+    descriptorTreeQuadrantWidget,
     configPanel,
     queryWidget,
   )
@@ -167,21 +167,7 @@ tagCommitWidget =
     . hstack_ []
     $ [tagCommitButton, tagsStringTextField]
 
-explorableDescriptorTreeWidget ::
-  (WidgetModel s) => DescriptorTree -> WidgetNode s TaggerEvent
-explorableDescriptorTreeWidget tr =
-  flip styleBasic [border 1 textBlack]
-    . box_ [alignTop, alignLeft]
-    $ hstack_
-      []
-      [ vsplit
-          ( vstack_
-              []
-              [ resetDescriptorTreeButton,
-                parentDescriptorTreeButton
-              ],
-            spacer
-          ),
-        separatorLine,
-        descriptorTreeWidget tr
-      ]
+descriptorTreeQuadrantWidget :: (WidgetModel s) => DescriptorTree -> DescriptorTree -> WidgetNode s TaggerEvent
+descriptorTreeQuadrantWidget atr utr =
+  flip styleBasic [border 1 textBlack] . box_ [alignTop, alignLeft] $
+    hsplit (explorableDescriptorTreeWidget atr, unrelatedDescriptorTreeWidget utr)

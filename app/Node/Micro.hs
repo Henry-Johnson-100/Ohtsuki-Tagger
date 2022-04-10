@@ -94,10 +94,14 @@ doShellCmdButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
 doShellCmdButton = styledButton ShellCmd "Cmd"
 
-resetDescriptorTreeButton ::
+resetDescriptorTreeToButton ::
   (WidgetModel s) =>
+  Text ->
   WidgetNode s TaggerEvent
-resetDescriptorTreeButton = styledButton (RequestDescriptorTree "#ALL#") "↺"
+resetDescriptorTreeToButton t = styledButton (RequestDescriptorTree t) "↺"
+
+resetUnrelatedDescriptorTree :: (WidgetModel s) => WidgetNode s TaggerEvent
+resetUnrelatedDescriptorTree = styledButton RefreshUnrelatedDescriptorTree "↺"
 
 parentDescriptorTreeButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
@@ -140,6 +144,36 @@ draggableDescriptorWidget d =
     . flip label_ [ellipsis]
     . getPlainText
     $ d
+
+generalDescriptorTreeWidget ::
+  WidgetModel s =>
+  DescriptorTree ->
+  [WidgetNode s TaggerEvent] ->
+  WidgetNode s TaggerEvent
+generalDescriptorTreeWidget tr bs =
+  flip styleBasic [border 1 textBlack] . box_ [alignTop, alignLeft] $
+    hstack_
+      []
+      [ vsplit (vstack_ [] bs, spacer),
+        separatorLine,
+        descriptorTreeWidget tr
+      ]
+
+explorableDescriptorTreeWidget ::
+  WidgetModel s =>
+  DescriptorTree ->
+  WidgetNode s TaggerEvent
+explorableDescriptorTreeWidget tr =
+  generalDescriptorTreeWidget
+    tr
+    [resetDescriptorTreeToButton "#ALL#", parentDescriptorTreeButton]
+
+unrelatedDescriptorTreeWidget ::
+  WidgetModel s =>
+  DescriptorTree ->
+  WidgetNode s TaggerEvent
+unrelatedDescriptorTreeWidget tr =
+  generalDescriptorTreeWidget tr [resetUnrelatedDescriptorTree]
 
 treeLeafDescriptorWidget ::
   WidgetModel s =>
