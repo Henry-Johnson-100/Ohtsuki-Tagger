@@ -184,9 +184,7 @@ fileSinglePreviewWidget = imageZone
         singleFileTags =
           maybe
             spacer
-            ( hstack
-                . Data.List.intersperse spacer
-                . map draggableDescriptorWidget
+            ( draggableDescriptorListWidget
                 . tags
             )
             (model ^. fileSingle)

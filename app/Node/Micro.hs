@@ -6,7 +6,8 @@
 
 module Node.Micro where
 
-import Data.Text
+import Data.List
+import Data.Text hiding (foldl', intersperse, map)
 import Database.Tagger.Type
 import Monomer
 import Node.Color
@@ -111,7 +112,20 @@ clearSelectionButton = styledButton FileSelectionClear "CS"
 appendToQueryButton :: WidgetModel s => Text -> WidgetNode s TaggerEvent
 appendToQueryButton t = styledButton (FileSelectionAppendQuery t) "Add"
 
+draggableDescriptorListWidget ::
+  (WidgetModel s, WidgetEvent e) => [Descriptor] -> WidgetNode s e
+draggableDescriptorListWidget =
+  box_ [alignLeft]
+    . hstack
+    . intersperse spacer
+    . foldl' (\ws d -> ws ++ [draggableDescriptorWidget d]) []
+
 draggableDescriptorWidget ::
   (WidgetModel s, WidgetEvent e) => Descriptor -> WidgetNode s e
 draggableDescriptorWidget d =
-  draggable d . flip styleBasic [textColor textBlue] . label . getPlainText $ d
+  box_ [alignLeft]
+    . draggable d
+    . flip styleBasic [textColor textBlue]
+    . flip label_ [ellipsis]
+    . getPlainText
+    $ d
