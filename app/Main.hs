@@ -121,7 +121,12 @@ taggerEventHandler wenv node model event =
           )
       ]
     DescriptorCommitNewDescriptorText ->
-      [ Task (PutExtern <$> createNewDescriptors (model ^. dbConn) (Data.Text.words (model ^. newDescriptorText))),
+      [ Task
+          ( PutExtern
+              <$> createNewDescriptors
+                (model ^. dbConn)
+                (Data.Text.words (model ^. newDescriptorText))
+          ),
         Task (RefreshBothDescriptorTrees <$ pure ())
       ]
     DescriptorDelete d ->
