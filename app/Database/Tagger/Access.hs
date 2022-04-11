@@ -103,7 +103,7 @@ addDescriptor c dT = do
     $ [dT]
   newDId <- fmap fromIntegral . lift . lastInsertRowId $ c
   relate c (MetaDescriptor (descriptorId unrelatedDescriptor) newDId)
-  return . Descriptor newDId $dT
+  return . Descriptor newDId $ dT
 
 -- | Delete a descriptor from Descriptor.
 -- Operates on (descriptorId :: Descriptor -> DescriptorKey)
@@ -111,14 +111,21 @@ addDescriptor c dT = do
 -- The deletion in the Descriptor table should cascade to Tag and MetaDescriptor.
 --
 -- This function does a quick delete in those two tables anyways.
-deleteDescriptor :: Connection -> Descriptor -> IO ()
+--
+-- First unrelates any tags that are infra to the given descriptor.
+-- So there are no null related descriptors left over.
+deleteDescriptor :: Connection -> Descriptor -> MaybeT IO ()
 deleteDescriptor c d = do
-  execute c "DELETE FROM Descriptor WHERE descriptorId = ?" [descriptorId d]
-  execute c "DELETE FROM Tag WHERE descriptorTagId = ?" [descriptorId d]
-  execute
-    c
-    "DELETE FROM MetaDescriptor WHERE metaDescriptorId = ? OR infraDescriptorId = ?"
-    (descriptorId d, descriptorId d)
+  unrelatedDescriptor <- getUnrelatedDescriptor c
+  infraRelations <- lift . fetchInfraDescriptors c . descriptorId $ d
+  mapM_ (unrelate c . descriptorId) infraRelations
+  lift $ do
+    execute c "DELETE FROM Descriptor WHERE id = ?" [descriptorId d]
+    execute c "DELETE FROM Tag WHERE descriptorTagId = ?" [descriptorId d]
+    execute
+      c
+      "DELETE FROM MetaDescriptor WHERE metaDescriptorId = ? OR infraDescriptorId = ?"
+      (descriptorId d, descriptorId d)
 
 -- | Creates a relation iff these criteria are met:
 --
