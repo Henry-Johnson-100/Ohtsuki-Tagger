@@ -13,6 +13,7 @@ module Database.Tagger.Access
     addDescriptor,
     newTag,
     relate,
+    unrelate,
     deleteRelation,
     fetchInfraTree,
     fetchMetaTree,
@@ -51,7 +52,7 @@ import Database.Tagger.Type
     DescriptorTree (Infra),
     File (File, fileId),
     FileWithTags (FileWithTags, tags),
-    MetaDescriptor (MetaDescriptor),
+    MetaDescriptor (..),
     Tag (..),
     descriptorTreeElem,
     flattenTree,
@@ -172,8 +173,16 @@ deleteRelation c (MetaDescriptor mdk idk) =
   execute
     c
     "DELETE FROM MetaDescriptor \
-    \metaDescriptorId = ? AND infraDescriptorId = ?"
+    \WHERE metaDescriptorId = ? AND infraDescriptorId = ?"
     (mdk, idk)
+
+-- | Delete all relations where a given key appears as infra (should only be 1)
+-- And relate it to #UNRELATED#
+unrelate :: Connection -> DescriptorKey -> MaybeT IO ()
+unrelate c dk = do
+  unrelatedDescriptor <- getUnrelatedDescriptor c
+  result <- lift $ execute c "DELETE FROM MetaDescriptor WHERE infraDescriptorId = ?" [dk]
+  relate c (MetaDescriptor (descriptorId unrelatedDescriptor) dk)
 
 fetchMetaTree :: Connection -> DescriptorKey -> MaybeT IO DescriptorTree
 fetchMetaTree c pid = do

@@ -21,7 +21,7 @@ import Data.List
 import Data.Maybe
 import Data.Text hiding (head, map, take)
 import Database.SQLite.Simple (close, open)
-import Database.Tagger.Access
+import Database.Tagger.Access (Connection)
 import Database.Tagger.Type
 import Event.Task
 import Monomer
@@ -127,6 +127,11 @@ taggerEventHandler wenv node model event =
           ( RequestDescriptorTree
               <$> return (maybe "#ALL#" (descriptor) (getNode (model ^. descriptorTree)))
           ),
+        Task (UnrelatedDescriptorTreePut <$> getUnrelatedInfraTree (model ^. dbConn))
+      ]
+    DescriptorUnrelate is ->
+      [ Task (PutExtern <$> unrelate (model ^. dbConn) is),
+        Task (RequestDescriptorTree <$> return (maybe "#ALL#" (descriptor) (getNode (model ^. descriptorTree)))),
         Task (UnrelatedDescriptorTreePut <$> getUnrelatedInfraTree (model ^. dbConn))
       ]
     ToggleDoSoloTag ->

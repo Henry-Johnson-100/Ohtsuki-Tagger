@@ -172,20 +172,28 @@ explorableDescriptorTreeWidget ::
   DescriptorTree ->
   WidgetNode s TaggerEvent
 explorableDescriptorTreeWidget tr =
-  generalDescriptorTreeWidget
-    tr
-    [resetDescriptorTreeToButton "#ALL#", parentDescriptorTreeButton]
-    treeLeafButtonRequestDescriptorTree
+  dropTarget
+    ( \d' ->
+        maybe
+          (PutExtern ())
+          (\m' -> DescriptorCreateRelation [m'] [d'])
+          (getNode tr)
+    )
+    $ generalDescriptorTreeWidget
+      tr
+      [resetDescriptorTreeToButton "#ALL#", parentDescriptorTreeButton]
+      treeLeafButtonRequestDescriptorTree
 
 unrelatedDescriptorTreeWidget ::
   WidgetModel s =>
   DescriptorTree ->
   WidgetNode s TaggerEvent
 unrelatedDescriptorTreeWidget tr =
-  generalDescriptorTreeWidget
-    tr
-    [resetUnrelatedDescriptorTree]
-    treeLeafButtonRequestDescriptorTree -- #TODO change this
+  dropTarget (\d' -> DescriptorUnrelate [d']) $
+    generalDescriptorTreeWidget
+      tr
+      [resetUnrelatedDescriptorTree]
+      treeLeafButtonRequestDescriptorTree -- #TODO change this
 
 treeLeafDescriptorWidget ::
   WidgetModel s =>

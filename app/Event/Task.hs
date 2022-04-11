@@ -47,6 +47,11 @@ relateTo c m i = do
   _x <- runMaybeT . mapM_ (relate c) $ metaDescriptors
   return ()
 
+unrelate :: Connection -> [Descriptor] -> IO ()
+unrelate c i = do
+  _x <- runMaybeT . mapM_ (Database.Tagger.Access.unrelate c . descriptorId) $ i
+  return ()
+
 queryByTag ::
   Connection ->
   [T.Text] ->

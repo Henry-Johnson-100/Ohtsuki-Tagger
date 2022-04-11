@@ -120,6 +120,7 @@ data TaggerEvent
     RequestDescriptorTree !Text
   | RefreshUnrelatedDescriptorTree
   | DescriptorCreateRelation ![Descriptor] ![Descriptor]
+  | DescriptorUnrelate ![Descriptor]
   | -- Run the text as shell cmd
     ShellCmd
   | -- Receives nothing and does nothing
