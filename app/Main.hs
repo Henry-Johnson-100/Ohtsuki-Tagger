@@ -127,12 +127,15 @@ taggerEventHandler wenv node model event =
           ( RequestDescriptorTree
               <$> return (maybe "#ALL#" (descriptor) (getNode (model ^. descriptorTree)))
           ),
-        Task (UnrelatedDescriptorTreePut <$> getUnrelatedInfraTree (model ^. dbConn))
+        Task (RefreshUnrelatedDescriptorTree <$ pure ())
       ]
     DescriptorUnrelate is ->
       [ Task (PutExtern <$> unrelate (model ^. dbConn) is),
-        Task (RequestDescriptorTree <$> return (maybe "#ALL#" (descriptor) (getNode (model ^. descriptorTree)))),
-        Task (UnrelatedDescriptorTreePut <$> getUnrelatedInfraTree (model ^. dbConn))
+        Task
+          ( RequestDescriptorTree
+              <$> return (maybe "#ALL#" (descriptor) (getNode (model ^. descriptorTree)))
+          ),
+        Task (RefreshUnrelatedDescriptorTree <$ pure ())
       ]
     ToggleDoSoloTag ->
       [Model $ model & (doSoloTag .~ (not (model ^. doSoloTag)))]
