@@ -29,6 +29,7 @@ executable tagger
                       ,TemplateHaskell
                       ,FlexibleInstances
                       ,FunctionalDependencies
+                      ,MagicHash
 
   ghc-options:         -threaded
 

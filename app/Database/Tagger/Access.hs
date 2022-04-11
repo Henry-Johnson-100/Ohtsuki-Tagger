@@ -1,3 +1,4 @@
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
@@ -36,12 +37,13 @@ where
 import Control.Monad (unless, when, (>=>))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Maybe (MaybeT (..))
-import Data.List (foldl')
+import Data.List (foldl', isPrefixOf, isSuffixOf)
 import Data.Maybe (catMaybes)
 import qualified Data.Text as T
 import Database.SQLite.Simple
   ( Connection,
-    Only,
+    FromRow,
+    Only (Only),
     execute,
     lastInsertRowId,
     query,
@@ -49,7 +51,7 @@ import Database.SQLite.Simple
   )
 import Database.SQLite.Simple.ToField (ToField)
 import Database.Tagger.Type
-  ( Descriptor (Descriptor, descriptorId),
+  ( Descriptor (Descriptor, descriptor, descriptorId),
     DescriptorTree (Infra),
     File (File, fileId),
     FileWithTags (FileWithTags, tags),
@@ -62,6 +64,13 @@ import Database.Tagger.Type
     pushTag,
     validatePath,
   )
+import System.IO (hPutStrLn, stderr)
+
+debug# :: Bool
+debug# = True
+
+errout# :: String -> IO ()
+errout# = when debug# . hPutStrLn stderr
 
 type FileKey = Int
 
@@ -95,14 +104,21 @@ getUnrelatedDescriptor =
 -- | Create new descriptor and relate it to #UNRELATED#
 addDescriptor :: Connection -> T.Text -> MaybeT IO Descriptor
 addDescriptor c dT = do
+  lift . errout# $ "in addDescriptor: "
   unrelatedDescriptor <- getUnrelatedDescriptor c
+  lift . errout# $ "in addDescriptor: found unrelated: " ++ show unrelatedDescriptor
   lift
     . execute
       c
       "INSERT INTO Descriptor (descriptor) VALUES (?)"
     $ [dT]
+  lift . errout# $ "in addDescriptor: Inserted new descriptor: " ++ T.unpack dT
   newDId <- fmap fromIntegral . lift . lastInsertRowId $ c
+  lift . errout# $ "in addDescriptor: Got new Id: " ++ show newDId
   relate c (MetaDescriptor (descriptorId unrelatedDescriptor) newDId)
+  lift . errout# $
+    "in addDescriptor: Created new unrelated Relation"
+      ++ show (MetaDescriptor (descriptorId unrelatedDescriptor) newDId)
   return . Descriptor newDId $ dT
 
 -- | Delete a descriptor from Descriptor.
@@ -114,18 +130,30 @@ addDescriptor c dT = do
 --
 -- First unrelates any tags that are infra to the given descriptor.
 -- So there are no null related descriptors left over.
+--
+-- Does nothing if the given descriptor is bookended by the char '#'
 deleteDescriptor :: Connection -> Descriptor -> MaybeT IO ()
 deleteDescriptor c d = do
-  unrelatedDescriptor <- getUnrelatedDescriptor c
-  infraRelations <- lift . fetchInfraDescriptors c . descriptorId $ d
-  mapM_ (unrelate c . descriptorId) infraRelations
-  lift $ do
-    execute c "DELETE FROM Descriptor WHERE id = ?" [descriptorId d]
-    execute c "DELETE FROM Tag WHERE descriptorTagId = ?" [descriptorId d]
-    execute
-      c
-      "DELETE FROM MetaDescriptor WHERE metaDescriptorId = ? OR infraDescriptorId = ?"
-      (descriptorId d, descriptorId d)
+  let dstr = (T.unpack . descriptor) d
+  unless ("#" `isPrefixOf` dstr && "#" `isSuffixOf` dstr) $ do
+    lift . errout# $ "in deleteDescriptor: "
+    lift . errout# $ "in deleteDescriptor: trying deleting descriptor: " ++ show d
+    unrelatedDescriptor <- getUnrelatedDescriptor c
+    lift . errout# $ "in deleteDescriptor: found unrelated " ++ show unrelatedDescriptor
+    infraRelations <- lift . fetchInfraDescriptors c . descriptorId $ d
+    lift . errout# $ "in deleteDescriptor: found infra relations: " ++ show infraRelations
+    mapM_ (unrelate c . descriptorId) infraRelations
+    lift . errout# $ "in deleteDescriptor: unrelated infra relations"
+    lift $ do
+      execute c "DELETE FROM Descriptor WHERE id = ?" [descriptorId d]
+      errout# "in deleteDescriptor: deleted from Descriptor"
+      execute c "DELETE FROM Tag WHERE descriptorTagId = ?" [descriptorId d]
+      errout# "in deleteDescriptor: deleted tags"
+      execute
+        c
+        "DELETE FROM MetaDescriptor WHERE metaDescriptorId = ? OR infraDescriptorId = ?"
+        (descriptorId d, descriptorId d)
+      errout# "in deleteDescriptor: deleted all relations"
 
 -- | Creates a relation iff these criteria are met:
 --
@@ -141,47 +169,72 @@ relate :: Connection -> MetaDescriptor -> MaybeT IO ()
 relate c md =
   case md of
     MetaDescriptor metaDK infraDK -> do
+      let dmsg# s = lift . errout# $ "in relate: " ++ s
+      dmsg# ""
+      dmsg# $ "relating: " ++ show md
       treeMetaToParent <- fetchMetaTree c metaDK
+      dmsg# $ "found treeMetaToParent: " ++ show treeMetaToParent
       infraDescriptor <- getDescriptor c infraDK
+      dmsg# $ "found infraDescriptor from key: " ++ show infraDescriptor
       unless
         (infraDescriptor `descriptorTreeElem` treeMetaToParent)
         ( do
+            dmsg# "infraDescriptor not in treeMetaToParent. Proceeding."
             unrelatedMetaDescriptor <- getUnrelatedDescriptor c
+            dmsg# $ "Found unrelated descriptor: " ++ show unrelatedMetaDescriptor
             let unrelatedRelation =
                   MetaDescriptor (descriptorId unrelatedMetaDescriptor) infraDK
             isRelatedToUnrelated <-
               lift
                 . hasSpecificRelation c
                 $ unrelatedRelation
+            dmsg# $ "is related to #UNRELATED#: " ++ show isRelatedToUnrelated
             when
               isRelatedToUnrelated
-              (lift . deleteRelation c $ unrelatedRelation)
+              ( do
+                  lift . deleteRelation c $ unrelatedRelation
+                  dmsg# "Deleted #UNRELATED# relation"
+              )
             hasAnyAdditionalRelations <- lift . isInfraToAny c $ infraDK
+            dmsg# $ "Has additional relations: " ++ show hasAnyAdditionalRelations
             unless
               hasAnyAdditionalRelations
-              ( lift
-                  . execute
-                    c
-                    "INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId) \
-                    \VALUES (?,?)"
-                  $ (metaDK, infraDK)
+              ( do
+                  lift
+                    . execute
+                      c
+                      "INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId) \
+                      \VALUES (?,?)"
+                    $ (metaDK, infraDK)
+                  dmsg# "Successfully inserted new relation."
               )
         )
       return ()
 
+-- deleteWhereIsInfraRelated :: Connection -> DescriptorKey ->
+deleteWhereIsInfraRelated c =
+  execute c "DELETE FROM MetaDescriptor WHERE infraDescriptorId = ?" . Only
+
 isInfraToAny :: Connection -> DescriptorKey -> IO Bool
 isInfraToAny c k = do
+  let dmsg# = errout# . (++) "in isInfraToAny: "
+  dmsg# ""
+  dmsg# $ "Checking if descriptorKey, " ++ show k ++ " is Infra to any."
   r <-
     query
       c
-      "SELECT * FROM MetaDescriptor \
+      "SELECT metaDescriptorId FROM MetaDescriptor \
       \WHERE infraDescriptorId = ?"
-      [k] ::
+      (Only k) ::
       IO [Only Int]
+  dmsg# $ "Found the following infra relationships: " ++ show r
   return . not . null $ r
 
 hasSpecificRelation :: Connection -> MetaDescriptor -> IO Bool
 hasSpecificRelation c (MetaDescriptor mdk idk) = do
+  let dmsg# = errout# . (++) "In hasSpecificRelation: "
+  dmsg# ""
+  dmsg# $ "Looking for relation: " ++ show (MetaDescriptor mdk idk)
   r <-
     query
       c
@@ -189,6 +242,7 @@ hasSpecificRelation c (MetaDescriptor mdk idk) = do
       \WHERE metaDescriptorId = ? AND infraDescriptorId = ?"
       (mdk, idk) ::
       IO [(Int, Int)]
+  dmsg# $ "Found relations: " ++ show r
   return . not . null $ r
 
 deleteRelation :: Connection -> MetaDescriptor -> IO ()
