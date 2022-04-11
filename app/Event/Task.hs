@@ -168,7 +168,11 @@ createNewDescriptors c ts = do
   return ()
 
 deleteDescriptor :: Connection -> Descriptor -> IO ()
-deleteDescriptor = Database.Tagger.Access.deleteDescriptor
+deleteDescriptor c d = do
+  result <- runMaybeT . Database.Tagger.Access.deleteDescriptor c $ d
+  pure ()
+
+-- const (pure . pure $ ()) . runMaybeT . Database.Tagger.Access.deleteDescriptor
 
 head' :: [a] -> Maybe a
 head' [] = Nothing

@@ -51,7 +51,8 @@ configPanel =
   box . vgrid $
     [ shellCmdWidget,
       tagCommitWidget,
-      descriptorNewWidget
+      descriptorNewWidget,
+      descriptorDeleteWidget
     ]
 
 fileSelectionWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent

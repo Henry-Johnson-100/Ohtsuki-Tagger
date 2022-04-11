@@ -65,6 +65,9 @@ descriptorNewCommitButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
 descriptorNewCommitButton = styledButton DescriptorCommitNewDescriptorText "New Descriptor"
 
+descriptorDeleteWidget :: WidgetModel s => WidgetNode s TaggerEvent
+descriptorDeleteWidget = box_ [] . dropTarget DescriptorDelete . flip label_ [] $ "Delete Descriptor"
+
 setQueryCriteriaDropdown ::
   (WidgetModel s, WidgetEvent e, HasQueryCriteria s QueryCriteria) =>
   WidgetNode s e
