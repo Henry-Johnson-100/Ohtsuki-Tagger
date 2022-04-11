@@ -111,7 +111,6 @@ taggerEventHandler wenv node model event =
     FileSelectionClear -> [Model $ model & fileSelection .~ []]
     DescriptorTreePut tr -> [Model $ model & descriptorTree .~ tr]
     UnrelatedDescriptorTreePut tr -> [Model $ model & unrelatedDescriptorTree .~ tr]
-    -- #TODO no widget for this currently
     DescriptorTreePutParent ->
       [ Task
           ( DescriptorTreePut
@@ -204,7 +203,7 @@ taggerEventHandler wenv node model event =
       ]
     DebugPrintSelection -> [Task (PutExtern <$> print (model ^. fileSelection))]
 
--- | Replaces "${file} in the first list with the entirety of the second."
+-- | Replaces "%file" in the first list with the entirety of the second.
 putFileArgs :: [String] -> [String] -> [String]
 putFileArgs args files =
   let atFileArg = Data.List.break (== "%file") args

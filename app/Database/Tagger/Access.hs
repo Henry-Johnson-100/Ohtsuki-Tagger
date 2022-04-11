@@ -104,6 +104,21 @@ addDescriptor c dT = do
   relate c (MetaDescriptor (descriptorId unrelatedDescriptor) newDId)
   return . Descriptor newDId $dT
 
+-- | Delete a descriptor from Descriptor.
+-- Operates on (descriptorId :: Descriptor -> DescriptorKey)
+--
+-- The deletion in the Descriptor table should cascade to Tag and MetaDescriptor.
+--
+-- This function does a quick delete in those two tables anyways.
+deleteDescriptor :: Connection -> Descriptor -> IO ()
+deleteDescriptor c d = do
+  execute c "DELETE FROM Descriptor WHERE descriptorId = ?" [descriptorId d]
+  execute c "DELETE FROM Tag WHERE descriptorTagId = ?" [descriptorId d]
+  execute
+    c
+    "DELETE FROM MetaDescriptor WHERE metaDescriptorId = ? OR infraDescriptorId = ?"
+    (descriptorId d, descriptorId d)
+
 -- | Creates a relation iff these criteria are met:
 --
 -- - The InfraDescriptor is not present in the tree that is meta to the MetaDescriptor.
