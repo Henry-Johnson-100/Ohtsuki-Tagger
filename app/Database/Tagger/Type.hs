@@ -13,6 +13,7 @@ module Database.Tagger.Type
     getNode,
     pushTag,
     fwtFileEqual,
+    sortChildren,
   )
 where
 
@@ -65,6 +66,28 @@ data DescriptorTree
   | Meta Descriptor [DescriptorTree]
   | NullTree
   deriving (Show, Eq)
+
+instance Ord DescriptorTree where
+  (<=) NullTree _ = True
+  (<=) (Infra d) trb =
+    case trb of
+      NullTree -> False
+      Infra db -> d <= db
+      Meta db xs -> not (null xs) || (d <= db)
+  (<=) (Meta d cs) trb =
+    case trb of
+      NullTree -> False
+      Infra db -> null cs && (d <= db)
+      Meta db csb ->
+        if null cs
+          then not (null csb) || (d <= db)
+          else not (null csb) && (length cs <= length csb)
+
+sortChildren :: DescriptorTree -> DescriptorTree
+sortChildren tr =
+  case tr of
+    Meta d cs -> Meta d (Data.List.sort cs)
+    _ -> tr
 
 insertIntoDescriptorTree :: DescriptorTree -> DescriptorTree -> DescriptorTree
 insertIntoDescriptorTree mt it =

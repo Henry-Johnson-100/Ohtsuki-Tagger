@@ -164,7 +164,7 @@ generalDescriptorTreeWidget tr bs dAction =
       []
       [ vsplit (vstack_ [] bs, spacer),
         separatorLine,
-        descriptorTreeWidget tr dAction
+        descriptorTreeWidget (sortChildren tr) dAction
       ]
 
 explorableDescriptorTreeWidget ::
