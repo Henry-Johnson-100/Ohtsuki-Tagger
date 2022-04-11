@@ -67,7 +67,7 @@ import Database.Tagger.Type
 import System.IO (hPutStrLn, stderr)
 
 debug# :: Bool
-debug# = True
+debug# = False
 
 errout# :: String -> IO ()
 errout# = when debug# . hPutStrLn stderr
