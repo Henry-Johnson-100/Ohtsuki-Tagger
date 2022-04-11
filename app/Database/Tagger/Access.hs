@@ -155,16 +155,6 @@ deleteDescriptor c d = do
         (descriptorId d, descriptorId d)
       errout# "in deleteDescriptor: deleted all relations"
 
--- | Creates a relation iff these criteria are met:
---
--- - The InfraDescriptor is not present in the tree that is meta to the MetaDescriptor.
---  To avoid recursive relations
---
--- - The InfraDescriptor is not Infra to any other Descriptor
---
--- With the exception of being Infra to \#UNRELATED\#
---  - If it is related to \#UNRELATED\# This relationship is deleted before checking for
--- any other relationships.
 relate :: Connection -> MetaDescriptor -> MaybeT IO ()
 relate c md =
   case md of
@@ -179,22 +169,6 @@ relate c md =
       unless
         (infraDescriptor `descriptorTreeElem` treeMetaToParent)
         ( do
-            dmsg# "infraDescriptor not in treeMetaToParent. Proceeding."
-            unrelatedMetaDescriptor <- getUnrelatedDescriptor c
-            dmsg# $ "Found unrelated descriptor: " ++ show unrelatedMetaDescriptor
-            let unrelatedRelation =
-                  MetaDescriptor (descriptorId unrelatedMetaDescriptor) infraDK
-            isRelatedToUnrelated <-
-              lift
-                . hasSpecificRelation c
-                $ unrelatedRelation
-            dmsg# $ "is related to #UNRELATED#: " ++ show isRelatedToUnrelated
-            when
-              isRelatedToUnrelated
-              ( do
-                  lift . deleteRelation c $ unrelatedRelation
-                  dmsg# "Deleted #UNRELATED# relation"
-              )
             lift . deleteWhereIsInfraRelated c $ infraDK
             dmsg# $
               "Deleted all relations where, "
