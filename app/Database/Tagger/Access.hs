@@ -195,19 +195,18 @@ relate c md =
                   lift . deleteRelation c $ unrelatedRelation
                   dmsg# "Deleted #UNRELATED# relation"
               )
-            hasAnyAdditionalRelations <- lift . isInfraToAny c $ infraDK
-            dmsg# $ "Has additional relations: " ++ show hasAnyAdditionalRelations
-            unless
-              hasAnyAdditionalRelations
-              ( do
-                  lift
-                    . execute
-                      c
-                      "INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId) \
-                      \VALUES (?,?)"
-                    $ (metaDK, infraDK)
-                  dmsg# "Successfully inserted new relation."
-              )
+            lift . deleteWhereIsInfraRelated c $ infraDK
+            dmsg# $
+              "Deleted all relations where, "
+                ++ show infraDescriptor
+                ++ ", was infra"
+            lift
+              . execute
+                c
+                "INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId) \
+                \VALUES (?,?)"
+              $ (metaDK, infraDK)
+            dmsg# "Successfully inserted new relation."
         )
       return ()
 
