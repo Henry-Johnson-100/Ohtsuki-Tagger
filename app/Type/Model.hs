@@ -16,6 +16,7 @@ module Type.Model
     shellCmd,
     tagsString,
     unrelatedDescriptorTree,
+    newDescriptorText,
     HasFileSingle,
     HasDoSoloTag,
     HasFileSetArithmetic,
@@ -24,6 +25,7 @@ module Type.Model
     HasFileSelectionQuery,
     HasShellCmd,
     HasTagsString,
+    HasNewDescriptorText,
   )
 where
 

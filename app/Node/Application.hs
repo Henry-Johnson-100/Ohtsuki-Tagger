@@ -43,13 +43,15 @@ configPanel ::
     HasQueryCriteria s QueryCriteria,
     HasFileSelectionQuery s Text,
     HasShellCmd s Text,
-    HasTagsString s Text
+    HasTagsString s Text,
+    HasNewDescriptorText s Text
   ) =>
   WidgetNode s TaggerEvent
 configPanel =
   box . vgrid $
     [ shellCmdWidget,
-      tagCommitWidget
+      tagCommitWidget,
+      descriptorNewWidget
     ]
 
 fileSelectionWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent
@@ -166,6 +168,9 @@ tagCommitWidget =
   keystroke [("Enter", TagCommitTagsString)]
     . hstack_ []
     $ [tagCommitButton, tagsStringTextField]
+
+descriptorNewWidget :: (WidgetModel s, HasNewDescriptorText s Text) => WidgetNode s TaggerEvent
+descriptorNewWidget = keystroke [("Enter", DescriptorCommitNewDescriptorText)] . hstack_ [] $ [descriptorNewCommitButton, descriptorNewTextField]
 
 descriptorTreeQuadrantWidget :: (WidgetModel s) => DescriptorTree -> DescriptorTree -> WidgetNode s TaggerEvent
 descriptorTreeQuadrantWidget atr utr =

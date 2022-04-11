@@ -162,6 +162,11 @@ getParentDescriptorTree c tr = do
       )
   maybe (getALLInfraTree c) return result
 
+createNewDescriptors :: Connection -> [T.Text] -> IO ()
+createNewDescriptors c ts = do
+  _x <- mapM (runMaybeT . addDescriptor c) ts
+  return ()
+
 head' :: [a] -> Maybe a
 head' [] = Nothing
 head' (x : _) = Just x

@@ -32,7 +32,8 @@ data TaggerModel = TaggerModel
     _taggerShellCmd :: !Text,
     _taggerExtern :: !(),
     _taggerDbConn :: !Connection,
-    _taggerTagsString :: !Text
+    _taggerTagsString :: !Text,
+    _taggerNewDescriptorText :: !Text
   }
   deriving (Show, Eq)
 
@@ -51,7 +52,8 @@ emptyTaggerModel c =
       _taggerExtern = (),
       _taggerDbConn = c,
       _taggerTagsString = "",
-      _taggerUnrelatedDescriptorTree = NullTree
+      _taggerUnrelatedDescriptorTree = NullTree,
+      _taggerNewDescriptorText = ""
     }
 
 data FileSetArithmetic
@@ -129,5 +131,6 @@ data TaggerEvent
     TagCommitTagsString
   | -- Append Text to the TagsString
     TagsStringAppend !Text
+  | DescriptorCommitNewDescriptorText
   | DebugPrintSelection
   deriving (Show, Eq)

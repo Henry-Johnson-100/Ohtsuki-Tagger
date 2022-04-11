@@ -47,6 +47,11 @@ queryTextField =
   dropTarget (FileSelectionAppendQuery . descriptor) $
     textField_ fileSelectionQuery []
 
+descriptorNewTextField ::
+  (WidgetModel s, HasNewDescriptorText s Text) => WidgetNode s TaggerEvent
+descriptorNewTextField =
+  textField_ newDescriptorText []
+
 tagsStringTextField ::
   (WidgetModel s, HasTagsString s Text) => WidgetNode s TaggerEvent
 tagsStringTextField =
@@ -55,6 +60,10 @@ tagsStringTextField =
 tagCommitButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
 tagCommitButton = styledButton TagCommitTagsString "Tag With"
+
+descriptorNewCommitButton ::
+  (WidgetModel s) => WidgetNode s TaggerEvent
+descriptorNewCommitButton = styledButton DescriptorCommitNewDescriptorText "New Descriptor"
 
 setQueryCriteriaDropdown ::
   (WidgetModel s, WidgetEvent e, HasQueryCriteria s QueryCriteria) =>
