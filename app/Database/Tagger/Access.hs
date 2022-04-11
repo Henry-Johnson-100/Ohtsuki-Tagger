@@ -132,28 +132,27 @@ addDescriptor c dT = do
 -- So there are no null related descriptors left over.
 --
 -- Does nothing if the given descriptor is bookended by the char '#'
-deleteDescriptor :: Connection -> Descriptor -> MaybeT IO ()
+deleteDescriptor :: Connection -> Descriptor -> IO ()
 deleteDescriptor c d = do
   let dstr = (T.unpack . descriptor) d
   unless ("#" `isPrefixOf` dstr && "#" `isSuffixOf` dstr) $ do
-    lift . errout# $ "in deleteDescriptor: "
-    lift . errout# $ "in deleteDescriptor: trying deleting descriptor: " ++ show d
-    unrelatedDescriptor <- getUnrelatedDescriptor c
-    lift . errout# $ "in deleteDescriptor: found unrelated " ++ show unrelatedDescriptor
-    infraRelations <- lift . fetchInfraDescriptors c . descriptorId $ d
-    lift . errout# $ "in deleteDescriptor: found infra relations: " ++ show infraRelations
-    mapM_ (unrelate c . descriptorId) infraRelations
-    lift . errout# $ "in deleteDescriptor: unrelated infra relations"
-    lift $ do
-      execute c "DELETE FROM Descriptor WHERE id = ?" [descriptorId d]
-      errout# "in deleteDescriptor: deleted from Descriptor"
-      execute c "DELETE FROM Tag WHERE descriptorTagId = ?" [descriptorId d]
-      errout# "in deleteDescriptor: deleted tags"
-      execute
-        c
-        "DELETE FROM MetaDescriptor WHERE metaDescriptorId = ? OR infraDescriptorId = ?"
-        (descriptorId d, descriptorId d)
-      errout# "in deleteDescriptor: deleted all relations"
+    errout# "in deleteDescriptor: "
+    errout# $ "in deleteDescriptor: trying deleting descriptor: " ++ show d
+    unrelatedDescriptor <- runMaybeT . getUnrelatedDescriptor $ c
+    errout# $ "in deleteDescriptor: found unrelated " ++ show unrelatedDescriptor
+    infraRelations <- fetchInfraDescriptors c . descriptorId $ d
+    errout# $ "in deleteDescriptor: found infra relations: " ++ show infraRelations
+    runMaybeT . mapM_ (unrelate c . descriptorId) $ infraRelations
+    errout# "in deleteDescriptor: unrelated infra relations"
+    execute c "DELETE FROM Descriptor WHERE id = ?" [descriptorId d]
+    errout# "in deleteDescriptor: deleted from Descriptor"
+    execute c "DELETE FROM Tag WHERE descriptorTagId = ?" [descriptorId d]
+    errout# "in deleteDescriptor: deleted tags"
+    execute
+      c
+      "DELETE FROM MetaDescriptor WHERE metaDescriptorId = ? OR infraDescriptorId = ?"
+      (descriptorId d, descriptorId d)
+    errout# "in deleteDescriptor: deleted all relations"
 
 relate :: Connection -> MetaDescriptor -> MaybeT IO ()
 relate c md =

@@ -168,9 +168,7 @@ createNewDescriptors c ts = do
   return ()
 
 deleteDescriptor :: Connection -> Descriptor -> IO ()
-deleteDescriptor c d = do
-  result <- runMaybeT . Database.Tagger.Access.deleteDescriptor c $ d
-  pure ()
+deleteDescriptor = Database.Tagger.Access.deleteDescriptor
 
 -- const (pure . pure $ ()) . runMaybeT . Database.Tagger.Access.deleteDescriptor
 
