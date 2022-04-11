@@ -68,20 +68,20 @@ data DescriptorTree
   deriving (Show, Eq)
 
 instance Ord DescriptorTree where
-  (<=) NullTree _ = True
+  (<=) NullTree _ = False
   (<=) (Infra d) trb =
     case trb of
-      NullTree -> False
+      NullTree -> True
       Infra db -> d <= db
-      Meta db xs -> not (null xs) || (d <= db)
+      Meta db xs -> null xs && (d <= db)
   (<=) (Meta d cs) trb =
     case trb of
-      NullTree -> False
-      Infra db -> null cs && (d <= db)
+      NullTree -> True
+      Infra db -> (not . null) cs || d <= db
       Meta db csb ->
         if null cs
-          then not (null csb) || (d <= db)
-          else not (null csb) && (length cs <= length csb)
+          then null csb && (d <= db)
+          else null csb || (length cs >= length csb)
 
 sortChildren :: DescriptorTree -> DescriptorTree
 sortChildren tr =
