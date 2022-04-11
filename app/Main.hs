@@ -122,27 +122,19 @@ taggerEventHandler wenv node model event =
       ]
     DescriptorCommitNewDescriptorText ->
       [ Task (PutExtern <$> createNewDescriptors (model ^. dbConn) (Data.Text.words (model ^. newDescriptorText))),
-        Task
-          ( RequestDescriptorTree
-              <$> return (maybe "#ALL#" (descriptor) (getNode (model ^. descriptorTree)))
-          ),
-        Task (RefreshUnrelatedDescriptorTree <$ pure ())
+        Task (RefreshBothDescriptorTrees <$ pure ())
+      ]
+    DescriptorDelete d ->
+      [ Task (PutExtern <$> deleteDescriptor (model ^. dbConn) d),
+        Task (RefreshBothDescriptorTrees <$ pure ())
       ]
     DescriptorCreateRelation ms is ->
       [ Task (PutExtern <$> relateTo (model ^. dbConn) ms is),
-        Task
-          ( RequestDescriptorTree
-              <$> return (maybe "#ALL#" (descriptor) (getNode (model ^. descriptorTree)))
-          ),
-        Task (RefreshUnrelatedDescriptorTree <$ pure ())
+        Task (RefreshBothDescriptorTrees <$ pure ())
       ]
     DescriptorUnrelate is ->
       [ Task (PutExtern <$> unrelate (model ^. dbConn) is),
-        Task
-          ( RequestDescriptorTree
-              <$> return (maybe "#ALL#" (descriptor) (getNode (model ^. descriptorTree)))
-          ),
-        Task (RefreshUnrelatedDescriptorTree <$ pure ())
+        Task (RefreshBothDescriptorTrees <$ pure ())
       ]
     ToggleDoSoloTag ->
       [Model $ model & (doSoloTag .~ (not (model ^. doSoloTag)))]
@@ -154,6 +146,13 @@ taggerEventHandler wenv node model event =
       ]
     RefreshUnrelatedDescriptorTree ->
       [ Task (UnrelatedDescriptorTreePut <$> getUnrelatedInfraTree (model ^. dbConn))
+      ]
+    RefreshBothDescriptorTrees ->
+      [ Task
+          ( RequestDescriptorTree
+              <$> (return . maybe "#ALL#" descriptor . getNode $ model ^. descriptorTree)
+          ),
+        Task (RefreshUnrelatedDescriptorTree <$ pure ())
       ]
     ShellCmd ->
       [ Task

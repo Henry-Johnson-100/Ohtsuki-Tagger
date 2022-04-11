@@ -167,6 +167,9 @@ createNewDescriptors c ts = do
   _x <- mapM (runMaybeT . addDescriptor c) ts
   return ()
 
+deleteDescriptor :: Connection -> Descriptor -> IO ()
+deleteDescriptor = Database.Tagger.Access.deleteDescriptor
+
 head' :: [a] -> Maybe a
 head' [] = Nothing
 head' (x : _) = Just x

@@ -121,6 +121,7 @@ data TaggerEvent
   | -- Like DescriptorTreePut but looks up a descriptorTree from text
     RequestDescriptorTree !Text
   | RefreshUnrelatedDescriptorTree
+  | RefreshBothDescriptorTrees
   | DescriptorCreateRelation ![Descriptor] ![Descriptor]
   | DescriptorUnrelate ![Descriptor]
   | -- Run the text as shell cmd
@@ -132,5 +133,6 @@ data TaggerEvent
   | -- Append Text to the TagsString
     TagsStringAppend !Text
   | DescriptorCommitNewDescriptorText
+  | DescriptorDelete !Descriptor
   | DebugPrintSelection
   deriving (Show, Eq)

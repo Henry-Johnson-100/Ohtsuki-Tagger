@@ -11,6 +11,7 @@ module Database.Tagger.Access
     DescriptorKey (..),
     addFile,
     addDescriptor,
+    deleteDescriptor,
     newTag,
     relate,
     unrelate,
