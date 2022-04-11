@@ -63,10 +63,15 @@ tagCommitButton = styledButton TagCommitTagsString "Tag With"
 
 descriptorNewCommitButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
-descriptorNewCommitButton = styledButton DescriptorCommitNewDescriptorText "New Descriptor"
+descriptorNewCommitButton =
+  styledButton DescriptorCommitNewDescriptorText "New Descriptor"
 
 descriptorDeleteWidget :: WidgetModel s => WidgetNode s TaggerEvent
-descriptorDeleteWidget = box_ [] . dropTarget DescriptorDelete . flip label_ [] $ "Delete Descriptor"
+descriptorDeleteWidget =
+  box_ []
+    . dropTarget DescriptorDelete
+    . styledButton (PutExtern ())
+    $ "X"
 
 setQueryCriteriaDropdown ::
   (WidgetModel s, WidgetEvent e, HasQueryCriteria s QueryCriteria) =>
@@ -193,7 +198,7 @@ explorableDescriptorTreeWidget tr =
     )
     $ generalDescriptorTreeWidget
       tr
-      [resetDescriptorTreeToButton "#ALL#", parentDescriptorTreeButton]
+      [resetDescriptorTreeToButton "#ALL#", parentDescriptorTreeButton, descriptorDeleteWidget]
       treeLeafButtonRequestDescriptorTree
 
 unrelatedDescriptorTreeWidget ::
