@@ -12,9 +12,9 @@
 
 module Main where
 
-import Control.Lens
-import Database.SQLite.Simple
-import Event.Handler
+import Control.Lens ((^.))
+import Database.SQLite.Simple (Connection, close, execute_, open)
+import Event.Handler (taggerEventHandler)
 import Monomer
 import Node.Application
 import Type.Model
