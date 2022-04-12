@@ -24,32 +24,6 @@ import Node.Micro.Prim
 import Node.Micro.TextField
 import Type.Model
 
-setQueryCriteriaDropdown ::
-  (WidgetModel s, WidgetEvent e, HasQueryCriteria s QueryCriteria) =>
-  WidgetNode s e
-setQueryCriteriaDropdown =
-  dropdown
-    queryCriteria
-    [ByTag, ByRelation, ByPattern, ByUntagged]
-    (label . pack . show)
-    (label . pack . show)
-
-setArithmeticDropdown ::
-  (WidgetModel s, WidgetEvent e, HasFileSetArithmetic s FileSetArithmetic) =>
-  WidgetNode s e
-setArithmeticDropdown =
-  dropdown
-    fileSetArithmetic
-    [Union, Intersect, Diff]
-    (label . pack . show)
-    (label . pack . show)
-
-shellCmdWidget :: (WidgetModel s, HasShellCmd s Text) => WidgetNode s TaggerEvent
-shellCmdWidget =
-  keystroke [("Enter", ShellCmd)]
-    . hstack
-    $ [shellCmdTextField, shellCmdButton]
-
 draggableDescriptorListWidget ::
   (WidgetModel s, WidgetEvent e) => [Descriptor] -> WidgetNode s e
 draggableDescriptorListWidget =
@@ -57,16 +31,16 @@ draggableDescriptorListWidget =
     . hstack
     . intersperse spacer
     . foldl' (\ws d -> ws ++ [draggableDescriptorWidget d]) []
-
-draggableDescriptorWidget ::
-  (WidgetModel s, WidgetEvent e) => Descriptor -> WidgetNode s e
-draggableDescriptorWidget d =
-  box_ [alignLeft]
-    . draggable d
-    . flip styleBasic [textColor textBlue]
-    . flip label_ [ellipsis]
-    . getPlainText
-    $ d
+  where
+    draggableDescriptorWidget ::
+      (WidgetModel s, WidgetEvent e) => Descriptor -> WidgetNode s e
+    draggableDescriptorWidget d =
+      box_ [alignLeft]
+        . draggable d
+        . flip styleBasic [textColor textBlue]
+        . flip label_ [ellipsis]
+        . getPlainText
+        $ d
 
 -- | Strictly evaluates an image preview widget.
 imagePreview ::

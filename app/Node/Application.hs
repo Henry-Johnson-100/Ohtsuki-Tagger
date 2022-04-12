@@ -52,8 +52,8 @@ configPanel ::
 configPanel =
   box . vgrid $
     [ shellCmdWidget,
-      tagCommitWidget,
-      descriptorNewWidget
+      tagCommitTagsStringWidget,
+      newDescriptorWidget
     ]
 
 fileSelectionWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent
@@ -144,35 +144,6 @@ fileSinglePreviewWidget = imageZone
                              border 0 bgDefault,
                              radius 0
                            ]
-
-queryWidget ::
-  ( WidgetModel s,
-    HasFileSelectionQuery s Text,
-    HasQueryCriteria s QueryCriteria,
-    HasFileSetArithmetic s FileSetArithmetic
-  ) =>
-  WidgetNode s TaggerEvent
-queryWidget =
-  keystroke [("Enter", FileSelectionCommitQuery)] $
-    hgrid_
-      []
-      [ box_ [] . hstack_ [] $ [fileSelectionClearButton, fileSelectionCommitQueryButton, fileSelectionQueryTextField],
-        box_ [] $
-          hstack_ [] [setQueryCriteriaDropdown, setArithmeticDropdown]
-      ]
-
-tagCommitWidget ::
-  ( WidgetModel s,
-    HasTagsString s Text
-  ) =>
-  WidgetNode s TaggerEvent
-tagCommitWidget =
-  keystroke [("Enter", TagCommitTagsString)]
-    . hstack_ []
-    $ [tagCommitTagsStringButton, tagsStringTextField]
-
-descriptorNewWidget :: (WidgetModel s, HasNewDescriptorText s Text) => WidgetNode s TaggerEvent
-descriptorNewWidget = keystroke [("Enter", DescriptorCommitNewDescriptorText)] . hstack_ [] $ [descriptorCommitNewDescriptorTextButton, newDescriptorTextTextField]
 
 descriptorTreeQuadrantWidget :: (WidgetModel s) => DescriptorTree -> DescriptorTree -> WidgetNode s TaggerEvent
 descriptorTreeQuadrantWidget atr utr =

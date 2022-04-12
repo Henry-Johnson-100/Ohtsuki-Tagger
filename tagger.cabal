@@ -21,6 +21,7 @@ executable tagger
                       ,Node.Micro.Prim
                       ,Node.Micro.Core
                       ,Node.Micro.Button
+                      ,Node.Micro.EntryWidget
                       ,Node.Micro.TextField
                       ,Node.Micro.Colors
                       ,Node.Micro.ImagePreview

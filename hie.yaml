@@ -18,6 +18,9 @@ cradle:
     - path: "app/Node/Micro/Button.hs"
       component: "tagger:exe:tagger"
 
+    - path: "app/Node/Micro/EntryWidget.hs"
+      component: "tagger:exe:tagger"
+
     - path: "app/Node/Micro/TextField.hs"
       component: "tagger:exe:tagger"
 
