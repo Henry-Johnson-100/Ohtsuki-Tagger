@@ -41,6 +41,12 @@ tagThenGetRefresh c fwts dds = do
       fwts
   return . concat $ newFwts
 
+getRefreshedFWTs :: Connection -> [FileWithTags] -> IO [FileWithTags]
+getRefreshedFWTs c fwts = do
+  let fids = map (fileId . file) fwts
+  refreshedFWTs <- mapM (lookupFileWithTagsByFileId c) fids
+  return . concat $ refreshedFWTs
+
 -- #TODO no assigned event
 untagWith :: Connection -> [Tag] -> IO ()
 untagWith = untag

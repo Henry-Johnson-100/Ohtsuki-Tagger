@@ -84,8 +84,9 @@ data TaggerEvent
     FileSelectionUpdate ![FileWithTags]
   | -- Like FileSelectionUpdate but does not rely on FileSetArithmetic
     FileSelectionPut ![FileWithTags]
-  | -- Set model _taggerFileSelectionQuery to the argument.
-    FileSelectionStageQuery !Text
+    -- Refetch table data for files in selection.
+    -- #TODO also refresh the sngle file if there is one
+  | FileSelectionRefresh_
   | -- Appends some text to the current query, separated by a space.
     FileSelectionAppendQuery !Text
   | -- Send a query to the db, uses _TaggerQueryCriteria to match query type
@@ -130,6 +131,8 @@ data TaggerEvent
     PutExtern !()
   | -- Tag the selection with the current tagsString
     TagCommitTagsString
+  | TagCommitTagsStringDoSolo
+  | TagCommitTagsStringDoSelection
   | -- Append Text to the TagsString
     TagsStringAppend !Text
   | DescriptorCommitNewDescriptorText

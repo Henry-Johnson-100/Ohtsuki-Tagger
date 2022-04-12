@@ -1,9 +1,9 @@
 {-# HLINT ignore "Use ?~" #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Redundant <$>" #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Event.Handler
   ( taggerEventHandler,
@@ -81,7 +81,19 @@ taggerEventHandler wenv node model event =
     FileSelectionPut fwts ->
       [ Model $ model & fileSelection .~ fwts
       ]
-    FileSelectionStageQuery t -> [Model $ model & fileSelectionQuery .~ t]
+    FileSelectionRefresh_ ->
+      [ Task $
+          FileSelectionPut
+            <$> getRefreshedFWTs (model ^. dbConn) (model ^. fileSelection),
+        Task $
+          FileSingleMaybePut <$> do
+            mrefreshed <-
+              M.maybe
+                (return [])
+                (getRefreshedFWTs (model ^. dbConn) . (: []))
+                (model ^. fileSingle)
+            return . head' $ mrefreshed
+      ]
     FileSelectionAppendQuery t ->
       [ Model $
           model & fileSelectionQuery
@@ -195,6 +207,8 @@ taggerEventHandler wenv node model event =
                         ds
           )
       ]
+    TagCommitTagsStringDoSolo -> []
+    TagCommitTagsStringDoSelection -> []
     DebugPrintSelection -> [Task (PutExtern <$> print (model ^. fileSelection))]
 
 -- | Replaces "%file" in the first list with the entirety of the second.
