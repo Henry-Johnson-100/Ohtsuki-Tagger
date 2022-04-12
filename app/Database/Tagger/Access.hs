@@ -74,6 +74,12 @@ debug# = False
 errout# :: String -> IO ()
 errout# = when debug# . hPutStrLn stderr
 
+erroutConcat# :: String -> String -> IO ()
+erroutConcat# loc msg = errout# $ loc ++ msg
+
+liftErroutConcat# :: MonadTrans t => String -> String -> t IO ()
+liftErroutConcat# loc msg = lift . errout# $ loc ++ msg
+
 type FileKey = Int
 
 type DescriptorKey = Int
@@ -114,21 +120,21 @@ getUnrelatedDescriptor =
 -- | Create new descriptor and relate it to #UNRELATED#
 addDescriptor :: Connection -> T.Text -> MaybeT IO Descriptor
 addDescriptor c dT = do
-  lift . errout# $ "in addDescriptor: "
+  let x #*# y = liftErroutConcat# "in Database.Tagger.Access.addDescriptor: " (x ++ y)
+  "" #*# ""
   unrelatedDescriptor <- getUnrelatedDescriptor c
-  lift . errout# $ "in addDescriptor: found unrelated: " ++ show unrelatedDescriptor
+  "found unrelated: " #*# show unrelatedDescriptor
   lift
     . execute
       c
       "INSERT INTO Descriptor (descriptor) VALUES (?)"
     $ [dT]
-  lift . errout# $ "in addDescriptor: Inserted new descriptor: " ++ T.unpack dT
+  "Inserted new descriptor: " #*# T.unpack dT
   newDId <- fmap fromIntegral . lift . lastInsertRowId $ c
-  lift . errout# $ "in addDescriptor: Got new Id: " ++ show newDId
+  "Got new Id: " #*# show newDId
   relate c (MetaDescriptor (descriptorId unrelatedDescriptor) newDId)
-  lift . errout# $
-    "in addDescriptor: Created new unrelated Relation"
-      ++ show (MetaDescriptor (descriptorId unrelatedDescriptor) newDId)
+  "Created new unrelated Relation"
+    #*# show (MetaDescriptor (descriptorId unrelatedDescriptor) newDId)
   return . Descriptor newDId $ dT
 
 -- #TODO no task or event assigned
@@ -153,28 +159,30 @@ renameDescriptor c d n =
 deleteDescriptor :: Connection -> Descriptor -> IO ()
 deleteDescriptor c d = do
   let dstr = (T.unpack . descriptor) d
+      (*#) = errout# . (++) "in Database.Tagger.Access.deleteDescriptor: "
+  (*#) ""
   unless ("#" `isPrefixOf` dstr && "#" `isSuffixOf` dstr) $ do
-    errout# "in deleteDescriptor: "
-    errout# $ "in deleteDescriptor: trying deleting descriptor: " ++ show d
+    (*#) "in deleteDescriptor: "
+    (*#) $ "in deleteDescriptor: trying deleting descriptor: " ++ show d
     unrelatedDescriptor <- runMaybeT . getUnrelatedDescriptor $ c
-    errout# $ "in deleteDescriptor: found unrelated " ++ show unrelatedDescriptor
+    (*#) $ "in deleteDescriptor: found unrelated " ++ show unrelatedDescriptor
     infraRelations <- fetchInfraDescriptors c . descriptorId $ d
-    errout# $ "in deleteDescriptor: found infra relations: " ++ show infraRelations
+    (*#) $ "in deleteDescriptor: found infra relations: " ++ show infraRelations
     runMaybeT . mapM_ (unrelate c . descriptorId) $ infraRelations
-    errout# "in deleteDescriptor: unrelated infra relations"
+    (*#) "in deleteDescriptor: unrelated infra relations"
     execute c "DELETE FROM Descriptor WHERE id = ?" [descriptorId d]
 
 relate :: Connection -> MetaDescriptor -> MaybeT IO ()
 relate c md =
   case md of
     MetaDescriptor metaDK infraDK -> do
-      let dmsg# s = lift . errout# $ "in relate: " ++ s
-      dmsg# ""
-      dmsg# $ "relating: " ++ show md
+      let (*#) s = lift . errout# $ "in relate: " ++ s
+      (*#) ""
+      (*#) $ "relating: " ++ show md
       treeMetaToParent <- fetchMetaTree c metaDK
-      dmsg# $ "found treeMetaToParent: " ++ show treeMetaToParent
+      (*#) $ "found treeMetaToParent: " ++ show treeMetaToParent
       infraDescriptor <- getDescriptor c infraDK
-      dmsg# $ "found infraDescriptor from key: " ++ show infraDescriptor
+      (*#) $ "found infraDescriptor from key: " ++ show infraDescriptor
       unless
         (infraDescriptor `descriptorTreeElem` treeMetaToParent)
         ( do
@@ -184,7 +192,7 @@ relate c md =
                 "INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId) \
                 \VALUES (?,?)"
               $ (metaDK, infraDK)
-            dmsg# "Successfully inserted new relation."
+            (*#) "Successfully inserted new relation."
         )
       return ()
 
