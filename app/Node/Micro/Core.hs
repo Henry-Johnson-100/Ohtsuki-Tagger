@@ -17,6 +17,7 @@ import Data.List
 import Data.Text hiding (foldl', intersperse, map)
 import Database.Tagger.Type
 import Monomer
+import Node.Micro.Button
 import Node.Micro.Colors
 import Node.Micro.DescriptorTree
 import Node.Micro.Prim
@@ -38,15 +39,6 @@ tagsStringTextField ::
 tagsStringTextField =
   dropTarget (TagsStringAppend . descriptor) $ textField_ tagsString []
 
-tagCommitButton ::
-  (WidgetModel s) => WidgetNode s TaggerEvent
-tagCommitButton = styledButton TagCommitTagsString "Tag With"
-
-descriptorNewCommitButton ::
-  (WidgetModel s) => WidgetNode s TaggerEvent
-descriptorNewCommitButton =
-  styledButton DescriptorCommitNewDescriptorText "New Descriptor"
-
 setQueryCriteriaDropdown ::
   (WidgetModel s, WidgetEvent e, HasQueryCriteria s QueryCriteria) =>
   WidgetNode s e
@@ -67,43 +59,15 @@ setArithmeticDropdown =
     (label . pack . show)
     (label . pack . show)
 
-commitQueryButton ::
-  (WidgetModel s) => WidgetNode s TaggerEvent
-commitQueryButton = styledButton FileSelectionCommitQuery "Query"
-
 shellCmdWidget :: (WidgetModel s, HasShellCmd s Text) => WidgetNode s TaggerEvent
 shellCmdWidget =
   keystroke [("Enter", ShellCmd)]
     . hstack
-    $ [shellCmdTextField, doShellCmdButton]
+    $ [shellCmdTextField, shellCmdButton]
 
 shellCmdTextField ::
   (WidgetModel s, HasShellCmd s Text) => WidgetNode s TaggerEvent
 shellCmdTextField = textField_ shellCmd []
-
-doShellCmdButton ::
-  (WidgetModel s) => WidgetNode s TaggerEvent
-doShellCmdButton = styledButton ShellCmd "Cmd"
-
-selectButton ::
-  (WidgetModel s) =>
-  FileWithTags ->
-  WidgetNode s TaggerEvent
-selectButton = flip styledButton "Select" . FileSelectionUpdate . (: [])
-
-previewButton ::
-  (WidgetModel s) =>
-  FileWithTags ->
-  WidgetNode s TaggerEvent
-previewButton = flip styledButton "Preview" . FileSinglePut
-
-clearSelectionButton ::
-  (WidgetModel s) =>
-  WidgetNode s TaggerEvent
-clearSelectionButton = styledButton FileSelectionClear "CS"
-
-appendToQueryButton :: WidgetModel s => Text -> WidgetNode s TaggerEvent
-appendToQueryButton t = styledButton (FileSelectionAppendQuery t) "Add"
 
 draggableDescriptorListWidget ::
   (WidgetModel s, WidgetEvent e) => [Descriptor] -> WidgetNode s e

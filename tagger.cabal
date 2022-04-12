@@ -20,6 +20,7 @@ executable tagger
                       ,Node.Micro
                       ,Node.Micro.Prim
                       ,Node.Micro.Core
+                      ,Node.Micro.Button
                       ,Node.Micro.Colors
                       ,Node.Micro.ImagePreview
                       ,Node.Micro.DescriptorTree

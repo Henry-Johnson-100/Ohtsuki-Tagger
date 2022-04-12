@@ -24,6 +24,7 @@ import Data.Text (Text, append, intercalate, pack, replicate, unwords)
 import Database.Tagger.Type
 import Monomer
 import Node.Micro
+import Node.Micro.Button
 import Node.Micro.Colors
 import Type.Model
 import Prelude hiding (concat, replicate, unlines, unwords)
@@ -58,7 +59,7 @@ fileSelectionWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerE
 fileSelectionWidget fwts =
   let fileWithTagsZone =
         map
-          (\fwt -> fileWithTagWidget [previewButton fwt, selectButton fwt] fwt)
+          (\fwt -> fileWithTagWidget [fileSinglePutButton fwt, fileSelectionUpdateButton fwt] fwt)
       fileWithTagsStack = stdScroll $ box_ [] . vstack . fileWithTagsZone $ fwts
    in fileWithTagsStack
   where
@@ -154,7 +155,7 @@ queryWidget =
   keystroke [("Enter", FileSelectionCommitQuery)] $
     hgrid_
       []
-      [ box_ [] . hstack_ [] $ [clearSelectionButton, commitQueryButton, queryTextField],
+      [ box_ [] . hstack_ [] $ [fileSelectionClearButton, fileSelectionCommitQueryButton, queryTextField],
         box_ [] $
           hstack_ [] [setQueryCriteriaDropdown, setArithmeticDropdown]
       ]
@@ -167,10 +168,10 @@ tagCommitWidget ::
 tagCommitWidget =
   keystroke [("Enter", TagCommitTagsString)]
     . hstack_ []
-    $ [tagCommitButton, tagsStringTextField]
+    $ [tagCommitTagsStringButton, tagsStringTextField]
 
 descriptorNewWidget :: (WidgetModel s, HasNewDescriptorText s Text) => WidgetNode s TaggerEvent
-descriptorNewWidget = keystroke [("Enter", DescriptorCommitNewDescriptorText)] . hstack_ [] $ [descriptorNewCommitButton, descriptorNewTextField]
+descriptorNewWidget = keystroke [("Enter", DescriptorCommitNewDescriptorText)] . hstack_ [] $ [descriptorCommitNewDescriptorTextButton, descriptorNewTextField]
 
 descriptorTreeQuadrantWidget :: (WidgetModel s) => DescriptorTree -> DescriptorTree -> WidgetNode s TaggerEvent
 descriptorTreeQuadrantWidget atr utr =

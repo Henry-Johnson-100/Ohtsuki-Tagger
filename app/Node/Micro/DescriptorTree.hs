@@ -9,29 +9,10 @@ import qualified Data.List as L
 import qualified Data.Text as T
 import Database.Tagger.Type
 import Monomer
+import Node.Micro.Button
 import Node.Micro.Colors
 import Node.Micro.Prim
 import Type.Model
-
-resetDescriptorTreeToButton ::
-  (WidgetModel s) =>
-  T.Text ->
-  WidgetNode s TaggerEvent
-resetDescriptorTreeToButton t = styledButton (RequestDescriptorTree t) "↺"
-
-resetUnrelatedDescriptorTree :: (WidgetModel s) => WidgetNode s TaggerEvent
-resetUnrelatedDescriptorTree = styledButton RefreshUnrelatedDescriptorTree "↺"
-
-parentDescriptorTreeButton ::
-  (WidgetModel s) => WidgetNode s TaggerEvent
-parentDescriptorTreeButton = styledButton DescriptorTreePutParent "↑"
-
-treeLeafButtonRequestDescriptorTree ::
-  WidgetModel s =>
-  Descriptor ->
-  WidgetNode s TaggerEvent
-treeLeafButtonRequestDescriptorTree d =
-  styledButton (RequestDescriptorTree . descriptor $ d) (descriptor d)
 
 generalDescriptorTreeWidget ::
   WidgetModel s =>
@@ -62,11 +43,11 @@ explorableDescriptorTreeWidget tr =
     )
     $ generalDescriptorTreeWidget
       tr
-      [ resetDescriptorTreeToButton "#ALL#",
-        parentDescriptorTreeButton,
-        descriptorDeleteWidget
+      [ requestDescriptorTreeButton "#ALL#",
+        descriptorTreePutParentButton,
+        descriptorDeleteDroppableButton
       ]
-      treeLeafButtonRequestDescriptorTree
+      requestDescriptorTreeButtonForTreeLeaf
 
 unrelatedDescriptorTreeWidget ::
   WidgetModel s =>
@@ -76,8 +57,8 @@ unrelatedDescriptorTreeWidget tr =
   dropTarget (\d' -> DescriptorUnrelate [d']) $
     generalDescriptorTreeWidget
       tr
-      [resetUnrelatedDescriptorTree]
-      treeLeafButtonRequestDescriptorTree -- #TODO change this
+      [refreshUnrelatedDescriptorTreeButton]
+      requestDescriptorTreeButtonForTreeLeaf -- #TODO change this
 
 treeLeafDescriptorWidget ::
   WidgetModel s =>
