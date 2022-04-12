@@ -1,4 +1,5 @@
 dist-newstyle/
 .vscode/
 *.db
+*.db.backup
 scratch/
