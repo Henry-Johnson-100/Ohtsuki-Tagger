@@ -16,7 +16,6 @@ module Database.Tagger.Access
     newTag,
     relate,
     unrelate,
-    deleteRelation,
     fetchInfraTree,
     fetchMetaTree,
     fetchMetaDescriptors,
@@ -145,14 +144,6 @@ deleteDescriptor c d = do
     runMaybeT . mapM_ (unrelate c . descriptorId) $ infraRelations
     errout# "in deleteDescriptor: unrelated infra relations"
     execute c "DELETE FROM Descriptor WHERE id = ?" [descriptorId d]
-    errout# "in deleteDescriptor: deleted from Descriptor"
-    execute c "DELETE FROM Tag WHERE descriptorTagId = ?" [descriptorId d]
-    errout# "in deleteDescriptor: deleted tags"
-    execute
-      c
-      "DELETE FROM MetaDescriptor WHERE metaDescriptorId = ? OR infraDescriptorId = ?"
-      (descriptorId d, descriptorId d)
-    errout# "in deleteDescriptor: deleted all relations"
 
 relate :: Connection -> MetaDescriptor -> MaybeT IO ()
 relate c md =
@@ -168,11 +159,6 @@ relate c md =
       unless
         (infraDescriptor `descriptorTreeElem` treeMetaToParent)
         ( do
-            lift . deleteWhereIsInfraRelated c $ infraDK
-            dmsg# $
-              "Deleted all relations where, "
-                ++ show infraDescriptor
-                ++ ", was infra"
             lift
               . execute
                 c
@@ -183,47 +169,9 @@ relate c md =
         )
       return ()
 
--- deleteWhereIsInfraRelated :: Connection -> DescriptorKey ->
+deleteWhereIsInfraRelated :: Connection -> DescriptorKey -> IO ()
 deleteWhereIsInfraRelated c =
   execute c "DELETE FROM MetaDescriptor WHERE infraDescriptorId = ?" . Only
-
-isInfraToAny :: Connection -> DescriptorKey -> IO Bool
-isInfraToAny c k = do
-  let dmsg# = errout# . (++) "in isInfraToAny: "
-  dmsg# ""
-  dmsg# $ "Checking if descriptorKey, " ++ show k ++ " is Infra to any."
-  r <-
-    query
-      c
-      "SELECT metaDescriptorId FROM MetaDescriptor \
-      \WHERE infraDescriptorId = ?"
-      (Only k) ::
-      IO [Only Int]
-  dmsg# $ "Found the following infra relationships: " ++ show r
-  return . not . null $ r
-
-hasSpecificRelation :: Connection -> MetaDescriptor -> IO Bool
-hasSpecificRelation c (MetaDescriptor mdk idk) = do
-  let dmsg# = errout# . (++) "In hasSpecificRelation: "
-  dmsg# ""
-  dmsg# $ "Looking for relation: " ++ show (MetaDescriptor mdk idk)
-  r <-
-    query
-      c
-      "SELECT * FROM MetaDescriptor \
-      \WHERE metaDescriptorId = ? AND infraDescriptorId = ?"
-      (mdk, idk) ::
-      IO [(Int, Int)]
-  dmsg# $ "Found relations: " ++ show r
-  return . not . null $ r
-
-deleteRelation :: Connection -> MetaDescriptor -> IO ()
-deleteRelation c (MetaDescriptor mdk idk) =
-  execute
-    c
-    "DELETE FROM MetaDescriptor \
-    \WHERE metaDescriptorId = ? AND infraDescriptorId = ?"
-    (mdk, idk)
 
 -- | Delete all relations where a given key appears as infra (should only be 1)
 -- And relate it to #UNRELATED#

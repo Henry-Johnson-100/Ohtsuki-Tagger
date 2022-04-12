@@ -257,10 +257,5 @@ main :: IO ()
 main = do
   dbConn <- open "/home/monax/Repo/Haskell/tagger/images.db"
   execute_ dbConn "PRAGMA foreign_keys = on"
-  pfk <- query_ dbConn "PRAGMA foreign_keys" :: IO [Only Int]
-  mapM_ print pfk
   runTaggerWindow dbConn
-  pfk <- query_ dbConn "PRAGMA foreign_keys" :: IO [Only Int]
   close dbConn
-  where
-    g (Only y) = print y
