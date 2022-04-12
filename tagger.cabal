@@ -27,6 +27,7 @@ executable tagger
                       ,Node.Micro.ImagePreview
                       ,Node.Micro.DescriptorTree
                       ,Event.Task
+                      ,Event.Handler
                       ,Type.Model
                       ,Type.Model.Prim
                       ,Database.Tagger.Type

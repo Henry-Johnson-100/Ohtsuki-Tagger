@@ -42,12 +42,3 @@ draggableDescriptorListWidget =
         . getPlainText
         $ d
 
--- | Strictly evaluates an image preview widget.
-imagePreview ::
-  (WidgetModel s, WidgetEvent e) =>
-  Text ->
-  WidgetNode s e
-imagePreview fp =
-  let !imagePreviewWidget =
-        box_ [alignBottom] . flip image_ [alignBottom, fitEither] $ fp
-   in imagePreviewWidget
