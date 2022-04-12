@@ -12,6 +12,7 @@ module Database.Tagger.Access
     DescriptorKey (..),
     addFile,
     addDescriptor,
+    renameDescriptor,
     deleteDescriptor,
     newTag,
     untag,
@@ -129,6 +130,14 @@ addDescriptor c dT = do
     "in addDescriptor: Created new unrelated Relation"
       ++ show (MetaDescriptor (descriptorId unrelatedDescriptor) newDId)
   return . Descriptor newDId $ dT
+
+-- #TODO no task or event assigned
+renameDescriptor :: Connection -> Descriptor -> T.Text -> IO ()
+renameDescriptor c d n =
+  execute
+    c
+    "UPDATE Descriptor SET descriptor = ? WHERE id = ?"
+    (n, descriptorId d)
 
 -- | Delete a descriptor from Descriptor.
 -- Operates on (descriptorId :: Descriptor -> DescriptorKey)
