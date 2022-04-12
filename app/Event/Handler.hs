@@ -1,5 +1,4 @@
 {-# HLINT ignore "Use ?~" #-}
-{-# HLINT ignore "Redundant bracket" #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -11,25 +10,30 @@ module Event.Handler
   )
 where
 
-import Control.Lens
-import Control.Monad
-import qualified Data.List
-import Data.Maybe
-import qualified Data.Text
+import Control.Lens ((&), (.~), (^.))
+import qualified Control.Monad as CM
+import qualified Data.List as L
+import qualified Data.Maybe as M
+import qualified Data.Text as T
 import Database.Tagger.Type
 import Event.Task
 import Monomer
-import System.Process
+  ( AppEventResponse,
+    EventResponse (Model, Task),
+    WidgetEnv,
+    WidgetNode,
+  )
+import System.Process (createProcess, shell)
 import Type.Model
 
 fwtUnion :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]
-fwtUnion = Data.List.unionBy fwtFileEqual
+fwtUnion = L.unionBy fwtFileEqual
 
 fwtIntersect :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]
-fwtIntersect = Data.List.intersectBy fwtFileEqual
+fwtIntersect = L.intersectBy fwtFileEqual
 
 fwtDiff :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]
-fwtDiff = Data.List.deleteFirstsBy fwtFileEqual
+fwtDiff = L.deleteFirstsBy fwtFileEqual
 
 doSetAction ::
   FileSetArithmetic ->
@@ -53,28 +57,26 @@ taggerEventHandler wenv node model event =
     TaggerInit ->
       [ Task
           ( DescriptorTreePut
-              <$> (getALLInfraTree (model ^. dbConn))
+              <$> getALLInfraTree (model ^. dbConn)
           ),
-        ( Task (UnrelatedDescriptorTreePut <$> getUnrelatedInfraTree (model ^. dbConn))
-        ),
+        Task (UnrelatedDescriptorTreePut <$> getUnrelatedInfraTree (model ^. dbConn)),
         Model $
           model
             & fileSingle
-              .~ ( Just
-                     ( FileWithTags
-                         (File (-1) "/home/monax/Pictures/dog.jpg")
-                         []
-                     )
-                 )
+              .~ Just
+                ( FileWithTags
+                    (File (-1) "/home/monax/Pictures/dog.jpg")
+                    []
+                )
       ]
-    FileSinglePut i -> [Model $ model & fileSingle .~ (Just i)]
+    FileSinglePut i -> [Model $ model & fileSingle .~ Just i]
     FileSingleMaybePut mi -> [Model $ model & fileSingle .~ mi]
     FileSetArithmetic a -> [Model $ model & fileSetArithmetic .~ a]
     FileSetQueryCriteria q -> [Model $ model & queryCriteria .~ q]
     FileSelectionUpdate ts ->
       [ Model $
           model & fileSelection
-            .~ (doSetAction (model ^. fileSetArithmetic) (model ^. fileSelection) ts)
+            .~ doSetAction (model ^. fileSetArithmetic) (model ^. fileSelection) ts
       ]
     FileSelectionPut fwts ->
       [ Model $ model & fileSelection .~ fwts
@@ -83,21 +85,20 @@ taggerEventHandler wenv node model event =
     FileSelectionAppendQuery t ->
       [ Model $
           model & fileSelectionQuery
-            .~ (Data.Text.unwords [model ^. fileSelectionQuery, t])
+            .~ T.unwords [model ^. fileSelectionQuery, t]
       ]
     TagsStringAppend t ->
       [ Model $
           model
-            & tagsString .~ (Data.Text.unwords [model ^. tagsString, t])
+            & tagsString .~ T.unwords [model ^. tagsString, t]
       ]
     FileSelectionCommitQuery ->
       [ Task
           ( FileSelectionUpdate
-              <$> ( doQueryWithCriteria
-                      (model ^. queryCriteria)
-                      (model ^. dbConn)
-                      (Data.Text.words (model ^. fileSelectionQuery))
-                  )
+              <$> doQueryWithCriteria
+                (model ^. queryCriteria)
+                (model ^. dbConn)
+                (T.words (model ^. fileSelectionQuery))
           )
       ]
     FileSelectionClear -> [Model $ model & fileSelection .~ []]
@@ -106,10 +107,9 @@ taggerEventHandler wenv node model event =
     DescriptorTreePutParent ->
       [ Task
           ( DescriptorTreePut
-              <$> ( getParentDescriptorTree
-                      (model ^. dbConn)
-                      (model ^. descriptorTree)
-                  )
+              <$> getParentDescriptorTree
+                (model ^. dbConn)
+                (model ^. descriptorTree)
           )
       ]
     DescriptorCommitNewDescriptorText ->
@@ -117,7 +117,7 @@ taggerEventHandler wenv node model event =
           ( PutExtern
               <$> createNewDescriptors
                 (model ^. dbConn)
-                (Data.Text.words (model ^. newDescriptorText))
+                (T.words (model ^. newDescriptorText))
           ),
         Task (RefreshBothDescriptorTrees <$ pure ())
       ]
@@ -134,11 +134,11 @@ taggerEventHandler wenv node model event =
         Task (RefreshBothDescriptorTrees <$ pure ())
       ]
     ToggleDoSoloTag ->
-      [Model $ model & (doSoloTag .~ (not (model ^. doSoloTag)))]
+      [Model $ model & (doSoloTag .~ not (model ^. doSoloTag))]
     RequestDescriptorTree s ->
       [ Task
           ( DescriptorTreePut
-              <$> (lookupInfraDescriptorTree (model ^. dbConn) s)
+              <$> lookupInfraDescriptorTree (model ^. dbConn) s
           )
       ]
     RefreshUnrelatedDescriptorTree ->
@@ -155,46 +155,44 @@ taggerEventHandler wenv node model event =
       [ Task
           ( PutExtern
               <$> do
-                unless (Data.Text.null (model ^. shellCmd)) $ do
-                  let procArgs = Data.Text.words (model ^. shellCmd)
+                CM.unless (T.null (model ^. shellCmd)) $ do
+                  let procArgs = T.words (model ^. shellCmd)
                   p <-
                     createProcess
                       . shell
-                      $ Data.List.unwords
+                      $ L.unwords
                         . putFileArgs
-                          (map Data.Text.unpack procArgs)
+                          (map T.unpack procArgs)
                         . map
-                          ( Data.Text.unpack
+                          ( T.unpack
                               . filePath
                               . file
                           )
                         $ (model ^. fileSelection)
-                  putStrLn $ "Running " ++ Data.Text.unpack (model ^. shellCmd)
+                  putStrLn $ "Running " ++ T.unpack (model ^. shellCmd)
           )
       ]
     PutExtern _ -> []
     TagCommitTagsString ->
       [ Task
           ( let cs = model ^. dbConn
-                ds = Data.Text.words $ model ^. tagsString
-             in if (model ^. doSoloTag)
+                ds = T.words $ model ^. tagsString
+             in if model ^. doSoloTag
                   then
                     FileSingleMaybePut
-                      <$> ( fmap
-                              head'
-                              ( tagThenGetRefresh
-                                  cs
-                                  (maybeToList (model ^. fileSingle))
-                                  ds
-                              )
-                          )
+                      <$> fmap
+                        head'
+                        ( tagThenGetRefresh
+                            cs
+                            (M.maybeToList (model ^. fileSingle))
+                            ds
+                        )
                   else
                     FileSelectionPut
-                      <$> ( tagThenGetRefresh
-                              cs
-                              (model ^. fileSelection)
-                              ds
-                          )
+                      <$> tagThenGetRefresh
+                        cs
+                        (model ^. fileSelection)
+                        ds
           )
       ]
     DebugPrintSelection -> [Task (PutExtern <$> print (model ^. fileSelection))]
@@ -202,8 +200,8 @@ taggerEventHandler wenv node model event =
 -- | Replaces "%file" in the first list with the entirety of the second.
 putFileArgs :: [String] -> [String] -> [String]
 putFileArgs args files =
-  let atFileArg = Data.List.break (== "%file") args
-   in (fst atFileArg) ++ files ++ (tail' . snd $ atFileArg)
+  let atFileArg = L.break (== "%file") args
+   in fst atFileArg ++ files ++ (tail' . snd $ atFileArg)
   where
     tail' [] = []
     tail' (_ : xs) = xs
