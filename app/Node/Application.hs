@@ -26,6 +26,7 @@ import Monomer
 import Node.Micro
 import Node.Micro.Button
 import Node.Micro.Colors
+import Node.Micro.TextField
 import Type.Model
 import Prelude hiding (concat, replicate, unlines, unwords)
 
@@ -155,7 +156,7 @@ queryWidget =
   keystroke [("Enter", FileSelectionCommitQuery)] $
     hgrid_
       []
-      [ box_ [] . hstack_ [] $ [fileSelectionClearButton, fileSelectionCommitQueryButton, queryTextField],
+      [ box_ [] . hstack_ [] $ [fileSelectionClearButton, fileSelectionCommitQueryButton, fileSelectionQueryTextField],
         box_ [] $
           hstack_ [] [setQueryCriteriaDropdown, setArithmeticDropdown]
       ]
@@ -171,7 +172,7 @@ tagCommitWidget =
     $ [tagCommitTagsStringButton, tagsStringTextField]
 
 descriptorNewWidget :: (WidgetModel s, HasNewDescriptorText s Text) => WidgetNode s TaggerEvent
-descriptorNewWidget = keystroke [("Enter", DescriptorCommitNewDescriptorText)] . hstack_ [] $ [descriptorCommitNewDescriptorTextButton, descriptorNewTextField]
+descriptorNewWidget = keystroke [("Enter", DescriptorCommitNewDescriptorText)] . hstack_ [] $ [descriptorCommitNewDescriptorTextButton, newDescriptorTextTextField]
 
 descriptorTreeQuadrantWidget :: (WidgetModel s) => DescriptorTree -> DescriptorTree -> WidgetNode s TaggerEvent
 descriptorTreeQuadrantWidget atr utr =

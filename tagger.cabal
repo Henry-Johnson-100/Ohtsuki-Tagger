@@ -21,6 +21,7 @@ executable tagger
                       ,Node.Micro.Prim
                       ,Node.Micro.Core
                       ,Node.Micro.Button
+                      ,Node.Micro.TextField
                       ,Node.Micro.Colors
                       ,Node.Micro.ImagePreview
                       ,Node.Micro.DescriptorTree
@@ -33,6 +34,7 @@ executable tagger
   other-extensions:    OverloadedStrings
                       ,TemplateHaskell
                       ,FlexibleInstances
+                      ,FlexibleContexts
                       ,FunctionalDependencies
                       ,MagicHash
 

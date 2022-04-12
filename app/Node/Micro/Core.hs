@@ -21,23 +21,8 @@ import Node.Micro.Button
 import Node.Micro.Colors
 import Node.Micro.DescriptorTree
 import Node.Micro.Prim
+import Node.Micro.TextField
 import Type.Model
-
-queryTextField ::
-  (WidgetModel s, HasFileSelectionQuery s Text) => WidgetNode s TaggerEvent
-queryTextField =
-  dropTarget (FileSelectionAppendQuery . descriptor) $
-    textField_ fileSelectionQuery []
-
-descriptorNewTextField ::
-  (WidgetModel s, HasNewDescriptorText s Text) => WidgetNode s TaggerEvent
-descriptorNewTextField =
-  textField_ newDescriptorText []
-
-tagsStringTextField ::
-  (WidgetModel s, HasTagsString s Text) => WidgetNode s TaggerEvent
-tagsStringTextField =
-  dropTarget (TagsStringAppend . descriptor) $ textField_ tagsString []
 
 setQueryCriteriaDropdown ::
   (WidgetModel s, WidgetEvent e, HasQueryCriteria s QueryCriteria) =>
@@ -64,10 +49,6 @@ shellCmdWidget =
   keystroke [("Enter", ShellCmd)]
     . hstack
     $ [shellCmdTextField, shellCmdButton]
-
-shellCmdTextField ::
-  (WidgetModel s, HasShellCmd s Text) => WidgetNode s TaggerEvent
-shellCmdTextField = textField_ shellCmd []
 
 draggableDescriptorListWidget ::
   (WidgetModel s, WidgetEvent e) => [Descriptor] -> WidgetNode s e
