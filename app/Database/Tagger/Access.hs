@@ -14,6 +14,7 @@ module Database.Tagger.Access
     addDescriptor,
     deleteDescriptor,
     newTag,
+    untag,
     relate,
     unrelate,
     fetchInfraTree,
@@ -44,6 +45,7 @@ import Database.SQLite.Simple
     FromRow,
     Only (Only),
     execute,
+    executeMany,
     lastInsertRowId,
     query,
     query_,
@@ -95,6 +97,14 @@ newTag c (Tag f d) =
     c
     "INSERT INTO Tag (fileTagId, descriptorTagId) VALUES (?,?)"
     (f, d)
+
+untag :: Connection -> [Tag] -> IO ()
+untag c =
+  executeMany c "DELETE FROM Tag WHERE fileTagId = ? AND descriptorTagId = ?"
+    . map encurryTag
+  where
+    encurryTag :: Tag -> (FileKey, DescriptorKey)
+    encurryTag (Tag fk dk) = (fk, dk)
 
 getUnrelatedDescriptor :: Connection -> MaybeT IO Descriptor
 getUnrelatedDescriptor =

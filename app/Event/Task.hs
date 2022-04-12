@@ -41,6 +41,10 @@ tagThenGetRefresh c fwts dds = do
       fwts
   return . concat $ newFwts
 
+-- #TODO no assigned event
+untagWith :: Connection -> [Tag] -> IO ()
+untagWith = untag
+
 relateTo :: Connection -> [Descriptor] -> [Descriptor] -> IO ()
 relateTo c m i = do
   let metaDescriptors = MetaDescriptor <$> (descriptorId <$> m) <*> (descriptorId <$> i)
