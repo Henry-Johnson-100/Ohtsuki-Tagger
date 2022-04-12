@@ -6,16 +6,22 @@ cradle:
     - path: "app/Node/Application.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/Node/Color.hs"
+    - path: "app/Node/Micro.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/Node/Micro.hs"
+    - path: "app/Node/Micro/Prim.hs"
       component: "tagger:exe:tagger"
 
     - path: "app/Node/Micro/Core.hs"
       component: "tagger:exe:tagger"
 
+    - path: "app/Node/Micro/Colors.hs"
+      component: "tagger:exe:tagger"
+
     - path: "app/Node/Micro/ImagePreview.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/Node/Micro/DescriptorTree.hs"
       component: "tagger:exe:tagger"
 
     - path: "app/Event/Task.hs"

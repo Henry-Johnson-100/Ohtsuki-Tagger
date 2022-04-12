@@ -1,6 +1,6 @@
-module Node.Color where
+module Node.Micro.Colors where
 
-import Monomer (Color (Color))
+import Monomer (Color (..))
 
 bgDefault :: Color
 bgDefault = Color 0 0 0 0

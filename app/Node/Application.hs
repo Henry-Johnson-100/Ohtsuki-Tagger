@@ -23,8 +23,8 @@ import Data.List (foldl', intersperse, map)
 import Data.Text (Text, append, intercalate, pack, replicate, unwords)
 import Database.Tagger.Type
 import Monomer
-import Node.Color
 import Node.Micro
+import Node.Micro.Colors
 import Type.Model
 import Prelude hiding (concat, replicate, unlines, unwords)
 
@@ -60,7 +60,7 @@ fileSelectionWidget fwts =
         map
           (\fwt -> fileWithTagWidget [previewButton fwt, selectButton fwt] fwt)
       fileWithTagsStack = stdScroll $ box_ [] . vstack . fileWithTagsZone $ fwts
-   in stdDelayTooltip "File Database" fileWithTagsStack
+   in fileWithTagsStack
   where
     -- A widget that shows a FileWithTags, an arbitrary number of buttons
     -- and sizes appropriately to the parent container
