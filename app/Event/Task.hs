@@ -20,26 +20,11 @@ import Type.Model
 
 type ConnString = String
 
-tagThenGetRefresh ::
-  Connection ->
-  [FileWithTags] ->
-  [T.Text] ->
-  IO [FileWithTags]
-tagThenGetRefresh c fwts dds = do
-  tagWithDescriptors <-
-    fmap concat . mapM (lookupDescriptorPattern c) $ dds
-  let newTags =
-        Tag
-          <$> map (fileId . file) fwts
-            <*> map descriptorId tagWithDescriptors
+tag :: Connection -> [FileWithTags] -> [T.Text] -> IO ()
+tag c fwts dds = do
+  withDescriptors <- fmap concat . mapM (lookupDescriptorPattern c) $ dds
+  let newTags = Tag . (fileId . file) <$> fwts <*> map descriptorId withDescriptors
   mapM_ (newTag c) newTags
-  newFwts <-
-    mapM
-      ( lookupFileWithTagsByFileId c
-          . (fileId . file)
-      )
-      fwts
-  return . concat $ newFwts
 
 getRefreshedFWTs :: Connection -> [FileWithTags] -> IO [FileWithTags]
 getRefreshedFWTs c fwts = do

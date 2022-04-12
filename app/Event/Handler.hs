@@ -82,17 +82,19 @@ taggerEventHandler wenv node model event =
       [ Model $ model & fileSelection .~ fwts
       ]
     FileSelectionRefresh_ ->
-      [ Task $
-          FileSelectionPut
-            <$> getRefreshedFWTs (model ^. dbConn) (model ^. fileSelection),
-        Task $
-          FileSingleMaybePut <$> do
-            mrefreshed <-
-              M.maybe
-                (return [])
-                (getRefreshedFWTs (model ^. dbConn) . (: []))
-                (model ^. fileSingle)
-            return . head' $ mrefreshed
+      [ Task
+          ( FileSelectionPut
+              <$> getRefreshedFWTs (model ^. dbConn) (model ^. fileSelection)
+          ),
+        Task
+          ( FileSingleMaybePut <$> do
+              mrefreshed <-
+                M.maybe
+                  (return [])
+                  (getRefreshedFWTs (model ^. dbConn) . (: []))
+                  (model ^. fileSingle)
+              return . head' $ mrefreshed
+          )
       ]
     FileSelectionAppendQuery t ->
       [ Model $
@@ -187,28 +189,33 @@ taggerEventHandler wenv node model event =
     PutExtern _ -> []
     TagCommitTagsString ->
       [ Task
-          ( let cs = model ^. dbConn
-                ds = T.words $ model ^. tagsString
-             in if model ^. doSoloTag
-                  then
-                    FileSingleMaybePut
-                      <$> fmap
-                        head'
-                        ( tagThenGetRefresh
-                            cs
-                            (M.maybeToList (model ^. fileSingle))
-                            ds
-                        )
-                  else
-                    FileSelectionPut
-                      <$> tagThenGetRefresh
-                        cs
-                        (model ^. fileSelection)
-                        ds
+          ( ( if model ^. doSoloTag
+                then TagCommitTagsStringDoSolo
+                else TagCommitTagsStringDoSelection
+            )
+              <$ pure ()
           )
       ]
-    TagCommitTagsStringDoSolo -> []
-    TagCommitTagsStringDoSelection -> []
+    TagCommitTagsStringDoSolo ->
+      [ Task
+          ( PutExtern
+              <$> tag
+                (model ^. dbConn)
+                (M.maybeToList (model ^. fileSingle))
+                (T.words $ model ^. tagsString)
+          ),
+        Task (FileSelectionRefresh_ <$ pure ())
+      ]
+    TagCommitTagsStringDoSelection ->
+      [ Task
+          ( PutExtern
+              <$> tag
+                (model ^. dbConn)
+                (model ^. fileSelection)
+                (T.words $ model ^. tagsString)
+          ),
+        Task (FileSelectionRefresh_ <$ pure ())
+      ]
     DebugPrintSelection -> [Task (PutExtern <$> print (model ^. fileSelection))]
 
 -- | Replaces "%file" in the first list with the entirety of the second.
