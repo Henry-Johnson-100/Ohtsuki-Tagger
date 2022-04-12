@@ -2,12 +2,12 @@ PRAGMA foreign_keys = on;
 CREATE TABLE "Descriptor" (
   "id" INTEGER PRIMARY KEY NOT NULL,
   "descriptor" VARCHAR NOT NULL,
-  CONSTRAINT "DescriptorName" UNIQUE("descriptor")
+  CONSTRAINT "DescriptorName" UNIQUE("descriptor") ON CONFLICT IGNORE
 );
 CREATE TABLE "File" (
   "id" INTEGER PRIMARY KEY NOT NULL,
   "filePath" VARCHAR NOT NULL,
-  CONSTRAINT "FilePath" UNIQUE("filePath")
+  CONSTRAINT "FilePath" UNIQUE("filePath") ON CONFLICT IGNORE
 );
 CREATE TABLE "MetaDescriptor" (
   "metaDescriptorId" INTEGER NOT NULL,
@@ -19,7 +19,7 @@ CREATE TABLE "MetaDescriptor" (
 CREATE TABLE "Tag" (
   "fileTagId" INTEGER NOT NULL,
   "descriptorTagId" INTEGER NOT NULL,
-  CONSTRAINT "TagKey" UNIQUE("fileTagId", "descriptorTagId"),
+  CONSTRAINT "TagKey" UNIQUE("fileTagId", "descriptorTagId") ON CONFLICT IGNORE,
   FOREIGN KEY("fileTagId") REFERENCES "File"("id") ON DELETE CASCADE,
   FOREIGN KEY("descriptorTagId") REFERENCES "Descriptor"("id") ON DELETE CASCADE
 );

@@ -20,7 +20,7 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import Data.Text hiding (head, map, take)
-import Database.SQLite.Simple (close, open)
+import Database.SQLite.Simple (Only (Only), close, execute_, open, query_)
 import Database.Tagger.Access (Connection)
 import Database.Tagger.Type
 import Event.Task
@@ -256,5 +256,11 @@ runTaggerWindow c =
 main :: IO ()
 main = do
   dbConn <- open "/home/monax/Repo/Haskell/tagger/images.db"
+  execute_ dbConn "PRAGMA foreign_keys = on"
+  pfk <- query_ dbConn "PRAGMA foreign_keys" :: IO [Only Int]
+  mapM_ print pfk
   runTaggerWindow dbConn
+  pfk <- query_ dbConn "PRAGMA foreign_keys" :: IO [Only Int]
   close dbConn
+  where
+    g (Only y) = print y
