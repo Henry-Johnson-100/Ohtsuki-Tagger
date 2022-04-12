@@ -11,13 +11,18 @@ module Event.Handler
 where
 
 import Control.Lens
-import Control.Monad
-import qualified Data.List
-import Data.Maybe
-import qualified Data.Text
+import Control.Monad (unless)
+import qualified Data.List as L
+import qualified Data.Maybe as M
+import qualified Data.Text as T
 import Database.Tagger.Type
 import Event.Task
 import Monomer
+  ( AppEventResponse,
+    EventResponse (Model, Task),
+    WidgetEnv,
+    WidgetNode,
+  )
 import System.Process
 import Type.Model
 
@@ -62,12 +67,12 @@ taggerEventHandler wenv node model event =
     FileSelectionAppendQuery t ->
       [ Model $
           model & fileSelectionQuery
-            .~ (Data.Text.unwords [model ^. fileSelectionQuery, t])
+            .~ (T.unwords [model ^. fileSelectionQuery, t])
       ]
     TagsStringAppend t ->
       [ Model $
           model
-            & tagsString .~ (Data.Text.unwords [model ^. tagsString, t])
+            & tagsString .~ (T.unwords [model ^. tagsString, t])
       ]
     FileSelectionCommitQuery ->
       [ Task
@@ -75,7 +80,7 @@ taggerEventHandler wenv node model event =
               <$> ( doQueryWithCriteria
                       (model ^. queryCriteria)
                       (model ^. dbConn)
-                      (Data.Text.words (model ^. fileSelectionQuery))
+                      (T.words (model ^. fileSelectionQuery))
                   )
           )
       ]
@@ -96,7 +101,7 @@ taggerEventHandler wenv node model event =
           ( PutExtern
               <$> createNewDescriptors
                 (model ^. dbConn)
-                (Data.Text.words (model ^. newDescriptorText))
+                (T.words (model ^. newDescriptorText))
           ),
         Task (RefreshBothDescriptorTrees <$ pure ())
       ]
@@ -134,28 +139,28 @@ taggerEventHandler wenv node model event =
       [ Task
           ( PutExtern
               <$> do
-                unless (Data.Text.null (model ^. shellCmd)) $ do
-                  let procArgs = Data.Text.words (model ^. shellCmd)
+                unless (T.null (model ^. shellCmd)) $ do
+                  let procArgs = T.words (model ^. shellCmd)
                   p <-
                     createProcess
                       . shell
-                      $ Data.List.unwords
+                      $ L.unwords
                         . putFileArgs
-                          (map Data.Text.unpack procArgs)
+                          (map T.unpack procArgs)
                         . map
-                          ( Data.Text.unpack
+                          ( T.unpack
                               . filePath
                               . file
                           )
                         $ (model ^. fileSelection)
-                  putStrLn $ "Running " ++ Data.Text.unpack (model ^. shellCmd)
+                  putStrLn $ "Running " ++ T.unpack (model ^. shellCmd)
           )
       ]
     PutExtern _ -> []
     TagCommitTagsString ->
       [ Task
           ( let cs = model ^. dbConn
-                ds = Data.Text.words $ model ^. tagsString
+                ds = T.words $ model ^. tagsString
              in if (model ^. doSoloTag)
                   then
                     FileSingleMaybePut
@@ -163,7 +168,7 @@ taggerEventHandler wenv node model event =
                               head'
                               ( tagThenGetRefresh
                                   cs
-                                  (maybeToList (model ^. fileSingle))
+                                  (M.maybeToList (model ^. fileSingle))
                                   ds
                               )
                           )
@@ -181,20 +186,11 @@ taggerEventHandler wenv node model event =
 -- | Replaces "%file" in the first list with the entirety of the second.
 putFileArgs :: [String] -> [String] -> [String]
 putFileArgs args files =
-  let atFileArg = Data.List.break (== "%file") args
+  let atFileArg = L.break (== "%file") args
    in (fst atFileArg) ++ files ++ (tail' . snd $ atFileArg)
   where
     tail' [] = []
     tail' (_ : xs) = xs
-
-fwtUnion :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]
-fwtUnion = Data.List.unionBy fwtFileEqual
-
-fwtIntersect :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]
-fwtIntersect = Data.List.intersectBy fwtFileEqual
-
-fwtDiff :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]
-fwtDiff = Data.List.deleteFirstsBy fwtFileEqual
 
 doSetAction ::
   FileSetArithmetic ->
@@ -206,3 +202,7 @@ doSetAction a s o =
     Union -> s `fwtUnion` o
     Intersect -> s `fwtIntersect` o
     Diff -> s `fwtDiff` o
+  where
+    fwtUnion = L.unionBy fwtFileEqual
+    fwtIntersect = L.intersectBy fwtFileEqual
+    fwtDiff = L.deleteFirstsBy fwtFileEqual
