@@ -19,6 +19,8 @@ executable tagger
   other-modules:       Node.Application
                       ,Node.Color
                       ,Node.Micro
+                      ,Node.Micro.Core
+                      ,Node.Micro.ImagePreview
                       ,Event.Task
                       ,Type.Model
                       ,Type.Model.Prim

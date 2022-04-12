@@ -12,6 +12,12 @@ cradle:
     - path: "app/Node/Micro.hs"
       component: "tagger:exe:tagger"
 
+    - path: "app/Node/Micro/Core.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/Node/Micro/ImagePreview.hs"
+      component: "tagger:exe:tagger"
+
     - path: "app/Event/Task.hs"
       component: "tagger:exe:tagger"
 

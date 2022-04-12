@@ -112,7 +112,7 @@ fileSinglePreviewWidget = imageZone
             []
             $ maybe
               (label "No Preview")
-              (flip image_ [alignBottom, fitEither] . getPlainText)
+              (Node.Micro.imagePreview . filePath . file)
               (m' ^. fileSingle)
         singleFileTags ::
           ( WidgetModel s,
