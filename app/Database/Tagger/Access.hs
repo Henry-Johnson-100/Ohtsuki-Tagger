@@ -39,7 +39,7 @@ import Control.Monad (unless, when, (>=>))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Maybe (MaybeT (..))
 import Data.List (foldl', isPrefixOf, isSuffixOf)
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromJust, fromMaybe)
 import qualified Data.Text as T
 import Database.SQLite.Simple
   ( Connection,
@@ -334,15 +334,15 @@ lookupFileWithTagsByFileId c fid = do
     query
       c
       "SELECT f.id, f.filePath, d.id, d.descriptor \
-      \FROM Tag t \
-      \  JOIN File f \
-      \    ON t.fileTagId = f.id \
-      \  JOIN Descriptor d \
+      \FROM File f \
+      \  LEFT JOIN Tag t \
+      \    ON f.id = t.fileTagId \
+      \  LEFT JOIN Descriptor d \
       \    ON t.descriptorTagId = d.id \
-      \WHERE t.fileTagId = ? \
+      \WHERE f.id = ? \
       \ORDER BY f.filePath"
       [fid]
-  return . groupRFWT [] $ r
+  return . groupRFWMT [] $ r
 
 lookupDescriptorPattern :: Connection -> T.Text -> IO [Descriptor]
 lookupDescriptorPattern conn p = do
@@ -380,6 +380,20 @@ groupRFWT (old : past) (r : rs) =
    in if new `fwtFileEqual` old
         then groupRFWT (foldl' pushTag old (tags new) : past) rs
         else groupRFWT (new : old : past) rs
+
+-- | For grouping FWTs that have Maybe Tags
+groupRFWMT :: [FileWithTags] -> [(Int, T.Text, Maybe Int, Maybe T.Text)] -> [FileWithTags]
+groupRFWMT accum [] = accum
+groupRFWMT [] (r : rs) = groupRFWMT [mapQToFWMT r] rs
+groupRFWMT (old : past) (r : rs) =
+  let new = mapQToFWMT r
+   in if new `fwtFileEqual` old
+        then groupRFWMT (foldl' pushTag old (tags new) : past) rs
+        else groupRFWMT (new : old : past) rs
+
+mapQToFWMT :: (Int, T.Text, Maybe Int, Maybe T.Text) -> FileWithTags
+mapQToFWMT (fid, fp, dids, dds) =
+  FileWithTags (File fid fp) (maybe [] (\d -> [Descriptor (fromJust dids) d]) dds)
 
 mapQToFWT :: (Int, T.Text, Int, T.Text) -> FileWithTags
 mapQToFWT (fid, fp, dids, dds) = FileWithTags (File fid fp) [Descriptor dids dds]
