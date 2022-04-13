@@ -212,23 +212,24 @@ taggerEventHandler wenv node model event =
           )
       ]
     TagCommitTagsStringDoSolo ->
-      [ Task
-          ( PutExtern
-              <$> tag
-                (model ^. dbConn)
-                (M.maybeToList (model ^. fileSingle))
-                (T.words $ model ^. tagsString)
-          ),
+      [ let dds = T.words $ model ^. tagsString
+            conn = model ^. dbConn
+            sf = M.maybeToList $ model ^. fileSingle
+            tm = model ^. taggingMode
+         in Task
+              ( PutExtern <$> (if isUntagMode tm then untagWith else tag) conn sf dds
+              ),
         Task (FileSelectionRefresh_ <$ pure ())
       ]
     TagCommitTagsStringDoSelection ->
-      [ Task
-          ( PutExtern
-              <$> tag
-                (model ^. dbConn)
-                (model ^. fileSelection)
-                (T.words $ model ^. tagsString)
-          ),
+      [ let dds = T.words $ model ^. tagsString
+            conn = model ^. dbConn
+            fs = model ^. fileSelection
+            tm = model ^. taggingMode
+         in Task
+              ( PutExtern
+                  <$> (if isUntagMode tm then untagWith else tag) conn fs dds
+              ),
         Task (FileSelectionRefresh_ <$ pure ())
       ]
     DebugPrintSelection -> [Task (PutExtern <$> print (model ^. fileSelection))]

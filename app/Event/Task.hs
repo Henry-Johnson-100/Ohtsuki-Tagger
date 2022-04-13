@@ -33,8 +33,14 @@ getRefreshedFWTs c fwts = do
   return . concat $ refreshedFWTs
 
 -- #TODO no assigned event
-untagWith :: Connection -> [Tag] -> IO ()
-untagWith = untag
+-- untagWith :: Connection -> [Tag] -> IO ()
+-- untagWith = untag
+untagWith :: Connection -> [FileWithTags] -> [T.Text] -> IO ()
+untagWith c fwts dds = do
+  let fids = map (fileId . file) fwts
+  ds <- fmap (map descriptorId . concat) . mapM (lookupDescriptorPattern c) $ dds
+  let tags = Tag <$> fids <*> ds
+  untag c tags
 
 relateTo :: Connection -> [Descriptor] -> [Descriptor] -> IO ()
 relateTo c m i = do

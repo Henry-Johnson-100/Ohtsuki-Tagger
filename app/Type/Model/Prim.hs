@@ -9,6 +9,7 @@ module Type.Model.Prim
     TaggingMode (..),
     Cyclic (..),
     emptyTaggerModel,
+    isUntagMode,
   )
 where
 
@@ -71,6 +72,10 @@ data TaggingMode
   = TagMode
   | UntagMode
   deriving (Eq, Read, Enum, Bounded, Cyclic)
+
+isUntagMode :: TaggingMode -> Bool
+isUntagMode UntagMode = True
+isUntagMode _ = False
 
 instance Show TaggingMode where
   show TagMode = "Tag"
