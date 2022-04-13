@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# HLINT ignore "Use ?~" #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
@@ -131,6 +132,11 @@ taggerEventHandler wenv node model event =
         Task (FileSelectionQueryClear <$ pure ())
       ]
     FileSelectionQueryClear -> [Model $ model & fileSelectionQuery .~ ""]
+    FileSelectionPopSingleFile ->
+      let !mi = head' (model ^. fileSelection)
+          !ps = popCycleList (model ^. fileSelection)
+       in [ Model . (fileSelection .~ ps) . (fileSingle .~ mi) $ model
+          ]
     DescriptorTreePut tr -> [Model $ model & descriptorTree .~ tr]
     UnrelatedDescriptorTreePut tr -> [Model $ model & unrelatedDescriptorTree .~ tr]
     DescriptorTreePutParent ->
@@ -239,6 +245,11 @@ putFileArgs :: [String] -> [String] -> [String]
 putFileArgs args files =
   let atFileArg = L.break (== "%file") args
    in fst atFileArg ++ files ++ (tail' . snd $ atFileArg)
-  where
-    tail' [] = []
-    tail' (_ : xs) = xs
+
+tail' :: [a] -> [a]
+tail' [] = []
+tail' (_ : xs) = xs
+
+popCycleList :: [a] -> [a]
+popCycleList [] = []
+popCycleList (x : xs) = xs ++ [x]

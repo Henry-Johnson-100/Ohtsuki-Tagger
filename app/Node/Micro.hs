@@ -142,6 +142,10 @@ previewButton ::
   WidgetNode s TaggerEvent
 previewButton = flip styledButton "Preview" . FileSinglePut
 
+fileSelectionPopSingleFileButton ::
+  (WidgetModel s) => WidgetNode s TaggerEvent
+fileSelectionPopSingleFileButton = styledButton FileSelectionPopSingleFile "Cycle"
+
 clearSelectionButton ::
   (WidgetModel s) =>
   WidgetNode s TaggerEvent

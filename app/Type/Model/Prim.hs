@@ -120,6 +120,7 @@ data TaggerEvent
   | -- Clear current selection
     FileSelectionClear
   | FileSelectionQueryClear
+  | FileSelectionPopSingleFile
   | -- | Set querying set arithmetic to Union, Intersect, or Diff
     FileSetArithmetic !FileSetArithmetic
   | FileSetArithmeticNext
