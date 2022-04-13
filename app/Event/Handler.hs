@@ -135,12 +135,21 @@ taggerEventHandler wenv node model event =
     FileSingleNextFromFileSelection ->
       let !ps = popCycleList (model ^. fileSelection)
           !mi = head' ps
-       in [ Model . (fileSelection .~ ps) . (fileSingle .~ mi) $ model
+       in [ Model
+              . (fileSelection .~ ps)
+              . (fileSingle .~ mi)
+              . (doSoloTag .~ True)
+              $ model
           ]
     FileSinglePrevFromFileSelection ->
       let !ps = dequeueCycleList (model ^. fileSelection)
           !mi = head' ps
-       in [Model . (fileSelection .~ ps) . (fileSingle .~ mi) $ model]
+       in [ Model
+              . (fileSelection .~ ps)
+              . (fileSingle .~ mi)
+              . (doSoloTag .~ True)
+              $ model
+          ]
     DescriptorTreePut tr -> [Model $ model & descriptorTree .~ tr]
     UnrelatedDescriptorTreePut tr -> [Model $ model & unrelatedDescriptorTree .~ tr]
     DescriptorTreePutParent ->
