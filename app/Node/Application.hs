@@ -52,9 +52,7 @@ configPanel =
   box . vgrid $
     [ shellCmdWidget,
       tagCommitWidget,
-      descriptorNewWidget,
-      fileSingleNextFromFileSelectionButton,
-      fileSinglePrevFromFileSelectionButton
+      descriptorNewWidget
     ]
 
 fileSelectionWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent
@@ -178,9 +176,17 @@ tagCommitWidget =
   box_ [alignLeft]
     . hstack_ []
     $ [ taggingModeDropdown,
-        keystroke [("Enter", TagCommitTagsString)]
+        keystroke
+          [ ("Enter", TagCommitTagsString),
+            ("Ctrl-j", FileSinglePrevFromFileSelection),
+            ("Ctrl-k", FileSingleNextFromFileSelection)
+          ]
           . hstack_ []
-          $ [tagCommitButton, tagsStringTextField]
+          $ [ tagCommitButton,
+              stdDelayTooltip "Ctrl-j" fileSinglePrevFromFileSelectionButton,
+              stdDelayTooltip "Ctrl-k" fileSingleNextFromFileSelectionButton,
+              tagsStringTextField
+            ]
       ]
 
 descriptorNewWidget :: (WidgetModel s, HasNewDescriptorText s Text) => WidgetNode s TaggerEvent
