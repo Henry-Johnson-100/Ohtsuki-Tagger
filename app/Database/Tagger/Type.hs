@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-typed-holes #-}
+
 module Database.Tagger.Type
   ( File (..),
     Descriptor (..),
@@ -10,6 +12,7 @@ module Database.Tagger.Type
     flattenTree,
     descriptorTreeChildren,
     validatePath,
+    getPathsToAdd,
     getNode,
     pushTag,
     fwtFileEqual,
@@ -18,8 +21,9 @@ module Database.Tagger.Type
 where
 
 import qualified Control.Monad
+import Control.Monad.Trans.Class
 import qualified Control.Monad.Trans.Class as Trans
-import Control.Monad.Trans.Maybe (MaybeT (MaybeT))
+import Control.Monad.Trans.Maybe (MaybeT (MaybeT, runMaybeT))
 import qualified Data.List
 import qualified Data.Text as T
 import qualified System.Directory as SysDir
@@ -128,17 +132,40 @@ flattenTree = flattenTree' []
         Meta d cs -> Data.List.foldl' flattenTree' (d : xs) cs
         NullTree -> []
 
+-- | Validates paths and expands directories
+-- Use in Event.Task and not Database.Tagger.Access
+getPathsToAdd :: T.Text -> IO [T.Text]
+getPathsToAdd p = do
+  validated <- runMaybeT . fmap T.unpack . validatePath $ p
+  maybe
+    (return [])
+    ( \f -> do
+        isDir <- SysDir.doesDirectoryExist f
+        (if isDir then returnDirContents else return . (: []) . T.pack) f
+    )
+    validated
+  where
+    returnDirContents :: String -> IO [T.Text]
+    returnDirContents p = do
+      cwd <- SysDir.getCurrentDirectory
+      SysDir.setCurrentDirectory p
+      dirContents <- SysDir.listDirectory p
+      validatedPaths <- mapM (getPathsToAdd . T.pack) dirContents
+      SysDir.setCurrentDirectory cwd
+      return . concat $ validatedPaths
+
 -- | A system safe constructor for a File from a string.
--- If the file exists, returns it with its absolute path.
+-- If the path exists, returns it with its absolute path.
 -- Resolves symbolic links
+-- Works for paths or directories
 validatePath :: T.Text -> MaybeT IO T.Text
 validatePath rawPath = do
-  existsFile <- fileExists rawPath
+  existsFile <- pathExists rawPath
   resolve existsFile
   where
-    fileExists :: T.Text -> MaybeT IO T.Text
-    fileExists f' = do
-      exists <- Trans.lift . SysDir.doesFileExist . T.unpack $ f'
+    pathExists :: T.Text -> MaybeT IO T.Text
+    pathExists f' = do
+      exists <- Trans.lift . SysDir.doesPathExist . T.unpack $ f'
       if exists then return f' else (MaybeT . pure) Nothing
     resolve :: T.Text -> MaybeT IO T.Text
     resolve fp' = do

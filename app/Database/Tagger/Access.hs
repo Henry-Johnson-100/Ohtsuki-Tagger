@@ -85,18 +85,16 @@ type FileKey = Int
 type DescriptorKey = Int
 
 -- | Attempts to add a new file to db
--- Should do nothing if the file is not valid
-addFile :: Connection -> T.Text -> MaybeT IO File
+-- Performs no checking of the validity of a path.
+addFile :: Connection -> T.Text -> IO File
 addFile c f = do
-  validatedPath <- validatePath f
   r <-
-    lift $
-      execute
-        c
-        "INSERT INTO File (filePath) VALUES (?)"
-        [validatedPath]
-  insertedId <- lift . lastInsertRowId $ c
-  return . File (fromIntegral insertedId) $ validatedPath
+    execute
+      c
+      "INSERT INTO File (filePath) VALUES (?)"
+      [f]
+  insertedId <- lastInsertRowId c
+  return . File (fromIntegral insertedId) $ f
 
 newTag :: Connection -> Tag -> IO ()
 newTag c (Tag f d) =
