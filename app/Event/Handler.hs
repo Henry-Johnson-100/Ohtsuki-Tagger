@@ -125,11 +125,11 @@ taggerEventHandler wenv node model event =
                 (model ^. dbConn)
                 (T.words (model ^. fileSelectionQuery))
           ),
-        Task (FileSelectionQueryClear <$ pure ())
+        asyncEvent FileSelectionQueryClear
       ]
     FileSelectionClear ->
       [ Model $ model & fileSelection .~ [],
-        Task (FileSelectionQueryClear <$ pure ())
+        asyncEvent FileSelectionQueryClear
       ]
     FileSelectionQueryClear -> [Model $ model & fileSelectionQuery .~ ""]
     FileSelectionPopSingleFile ->
@@ -154,19 +154,19 @@ taggerEventHandler wenv node model event =
                 (model ^. dbConn)
                 (T.words (model ^. newDescriptorText))
           ),
-        Task (RefreshBothDescriptorTrees <$ pure ())
+        asyncEvent RefreshBothDescriptorTrees
       ]
     DescriptorDelete d ->
       [ Task (PutExtern <$> deleteDescriptor (model ^. dbConn) d),
-        Task (RefreshBothDescriptorTrees <$ pure ())
+        asyncEvent RefreshBothDescriptorTrees
       ]
     DescriptorCreateRelation ms is ->
       [ Task (PutExtern <$> relateTo (model ^. dbConn) ms is),
-        Task (RefreshBothDescriptorTrees <$ pure ())
+        asyncEvent RefreshBothDescriptorTrees
       ]
     DescriptorUnrelate is ->
       [ Task (PutExtern <$> unrelate (model ^. dbConn) is),
-        Task (RefreshBothDescriptorTrees <$ pure ())
+        asyncEvent RefreshBothDescriptorTrees
       ]
     ToggleDoSoloTag ->
       [Model $ model & (doSoloTag .~ not (model ^. doSoloTag))]
@@ -184,7 +184,7 @@ taggerEventHandler wenv node model event =
           ( RequestDescriptorTree
               <$> (return . maybe "#ALL#" descriptor . getNode $ model ^. descriptorTree)
           ),
-        Task (RefreshUnrelatedDescriptorTree <$ pure ())
+        asyncEvent RefreshUnrelatedDescriptorTree
       ]
     ShellCmd ->
       [ Task
@@ -225,7 +225,7 @@ taggerEventHandler wenv node model event =
          in Task
               ( PutExtern <$> (if isUntagMode tm then untagWith else tag) conn sf dds
               ),
-        Task (FileSelectionRefresh_ <$ pure ())
+        asyncEvent FileSelectionRefresh_
       ]
     TagCommitTagsStringDoSelection ->
       [ let dds = T.words $ model ^. tagsString
@@ -236,7 +236,7 @@ taggerEventHandler wenv node model event =
               ( PutExtern
                   <$> (if isUntagMode tm then untagWith else tag) conn fs dds
               ),
-        Task (FileSelectionRefresh_ <$ pure ())
+        asyncEvent FileSelectionRefresh_
       ]
     DebugPrintSelection -> [Task (PutExtern <$> print (model ^. fileSelection))]
 
@@ -253,3 +253,8 @@ tail' (_ : xs) = xs
 popCycleList :: [a] -> [a]
 popCycleList [] = []
 popCycleList (x : xs) = xs ++ [x]
+
+asyncEvent :: e -> EventResponse s e sp ep
+asyncEvent = Task . flip (<$) emptyM
+  where
+    emptyM = pure ()
