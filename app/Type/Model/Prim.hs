@@ -5,6 +5,7 @@ module Type.Model.Prim
     TaggerEvent (..),
     FileSetArithmetic (..),
     QueryCriteria (..),
+    TaggingMode (..),
     emptyTaggerModel,
   )
 where
@@ -33,6 +34,7 @@ data TaggerModel = TaggerModel
     _taggerExtern :: !(),
     _taggerDbConn :: !Connection,
     _taggerTagsString :: !Text,
+    _taggerTaggingMode :: !TaggingMode,
     _taggerNewDescriptorText :: !Text
   }
   deriving (Show, Eq)
@@ -53,8 +55,18 @@ emptyTaggerModel c =
       _taggerDbConn = c,
       _taggerTagsString = "",
       _taggerUnrelatedDescriptorTree = NullTree,
-      _taggerNewDescriptorText = ""
+      _taggerNewDescriptorText = "",
+      _taggerTaggingMode = TagMode
     }
+
+data TaggingMode
+  = TagMode
+  | UntagMode
+  deriving (Eq, Read)
+
+instance Show TaggingMode where
+  show TagMode = "Tag"
+  show _ = "Untag"
 
 data FileSetArithmetic
   = Union
@@ -84,9 +96,9 @@ data TaggerEvent
     FileSelectionUpdate ![FileWithTags]
   | -- Like FileSelectionUpdate but does not rely on FileSetArithmetic
     FileSelectionPut ![FileWithTags]
-    -- Refetch table data for files in selection.
+  | -- Refetch table data for files in selection.
     -- #TODO also refresh the sngle file if there is one
-  | FileSelectionRefresh_
+    FileSelectionRefresh_
   | -- Appends some text to the current query, separated by a space.
     FileSelectionAppendQuery !Text
   | -- Send a query to the db, uses _TaggerQueryCriteria to match query type

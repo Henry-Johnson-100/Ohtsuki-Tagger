@@ -44,7 +44,8 @@ configPanel ::
     HasFileSelectionQuery s Text,
     HasShellCmd s Text,
     HasTagsString s Text,
-    HasNewDescriptorText s Text
+    HasNewDescriptorText s Text,
+    HasTaggingMode s TaggingMode
   ) =>
   WidgetNode s TaggerEvent
 configPanel =
@@ -161,13 +162,18 @@ queryWidget =
 
 tagCommitWidget ::
   ( WidgetModel s,
-    HasTagsString s Text
+    HasTagsString s Text,
+    HasTaggingMode s TaggingMode
   ) =>
   WidgetNode s TaggerEvent
 tagCommitWidget =
-  keystroke [("Enter", TagCommitTagsString)]
+  box_ [alignLeft]
     . hstack_ []
-    $ [tagCommitButton, tagsStringTextField]
+    $ [ taggingModeDropdown,
+        keystroke [("Enter", TagCommitTagsString)]
+          . hstack_ []
+          $ [tagCommitButton, tagsStringTextField]
+      ]
 
 descriptorNewWidget :: (WidgetModel s, HasNewDescriptorText s Text) => WidgetNode s TaggerEvent
 descriptorNewWidget = keystroke [("Enter", DescriptorCommitNewDescriptorText)] . hstack_ [] $ [descriptorNewCommitButton, descriptorNewTextField]

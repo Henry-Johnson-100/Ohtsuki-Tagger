@@ -59,7 +59,7 @@ tagsStringTextField =
 
 tagCommitButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
-tagCommitButton = styledButton TagCommitTagsString "Tag With"
+tagCommitButton = styledButton TagCommitTagsString "with"
 
 descriptorNewCommitButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
@@ -92,6 +92,12 @@ setArithmeticDropdown =
     [Union, Intersect, Diff]
     (label . pack . show)
     (label . pack . show)
+
+taggingModeDropdown ::
+  (WidgetModel s, WidgetEvent e, HasTaggingMode s TaggingMode) =>
+  WidgetNode s e
+taggingModeDropdown =
+  dropdown taggingMode [TagMode, UntagMode] (label . pack . show) (label . pack . show)
 
 commitQueryButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent

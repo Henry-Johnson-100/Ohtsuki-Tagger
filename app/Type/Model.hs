@@ -17,6 +17,7 @@ module Type.Model
     tagsString,
     unrelatedDescriptorTree,
     newDescriptorText,
+    taggingMode,
     HasFileSingle,
     HasDoSoloTag,
     HasFileSetArithmetic,
@@ -26,6 +27,7 @@ module Type.Model
     HasShellCmd,
     HasTagsString,
     HasNewDescriptorText,
+    HasTaggingMode,
   )
 where
 
