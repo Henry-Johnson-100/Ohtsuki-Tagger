@@ -165,6 +165,7 @@ data TaggerEvent
   | TagCommitTagsStringDoSelection
   | -- Append Text to the TagsString
     TagsStringAppend !Text
+  | TagsStringClear
   | DescriptorCommitNewDescriptorText
   | DescriptorDelete !Descriptor
   | DebugPrintSelection

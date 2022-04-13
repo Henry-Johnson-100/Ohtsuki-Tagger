@@ -117,6 +117,7 @@ taggerEventHandler wenv node model event =
           model
             & tagsString .~ T.unwords [model ^. tagsString, t]
       ]
+    TagsStringClear -> [Model $ model & tagsString .~ ""]
     FileSelectionCommitQuery ->
       [ Task
           ( FileSelectionUpdate
@@ -225,7 +226,8 @@ taggerEventHandler wenv node model event =
       [ asyncEvent $
           if model ^. doSoloTag
             then TagCommitTagsStringDoSolo
-            else TagCommitTagsStringDoSelection
+            else TagCommitTagsStringDoSelection,
+        asyncEvent TagsStringClear
       ]
     TagCommitTagsStringDoSolo ->
       [ let dds = T.words $ model ^. tagsString
