@@ -152,7 +152,12 @@ queryWidget ::
   ) =>
   WidgetNode s TaggerEvent
 queryWidget =
-  box_ []
+  keystroke_
+    [ ("Ctrl-c", FileSetQueryCriteriaNext),
+      ("Ctrl-s", FileSetArithmeticNext)
+    ]
+    [ignoreChildrenEvts]
+    . box_ []
     . hstack_ []
     $ [ clearSelectionButton,
         setArithmeticDropdown,

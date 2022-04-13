@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Type.Model.Prim
@@ -6,6 +7,7 @@ module Type.Model.Prim
     FileSetArithmetic (..),
     QueryCriteria (..),
     TaggingMode (..),
+    Cyclic (..),
     emptyTaggerModel,
   )
 where
@@ -59,10 +61,16 @@ emptyTaggerModel c =
       _taggerTaggingMode = TagMode
     }
 
+class (Enum a, Bounded a, Eq a) => Cyclic a where
+  next :: a -> a
+  next x = if x == maxBound then minBound else succ x
+  prev :: a -> a
+  prev x = if x == minBound then maxBound else pred x
+
 data TaggingMode
   = TagMode
   | UntagMode
-  deriving (Eq, Read)
+  deriving (Eq, Read, Enum, Bounded, Cyclic)
 
 instance Show TaggingMode where
   show TagMode = "Tag"
@@ -72,14 +80,14 @@ data FileSetArithmetic
   = Union
   | Intersect
   | Diff
-  deriving (Show, Eq)
+  deriving (Show, Eq, Enum, Read, Bounded, Cyclic)
 
 data QueryCriteria
   = ByTag
   | ByPattern
   | ByRelation
   | ByUntagged
-  deriving (Eq)
+  deriving (Eq, Enum, Read, Bounded, Cyclic)
 
 instance Show QueryCriteria where
   show q =
@@ -109,8 +117,10 @@ data TaggerEvent
   | FileSelectionQueryClear
   | -- | Set querying set arithmetic to Union, Intersect, or Diff
     FileSetArithmetic !FileSetArithmetic
+  | FileSetArithmeticNext
   | -- | Set the query critera which is how files will be queried
     FileSetQueryCriteria !QueryCriteria
+  | FileSetQueryCriteriaNext
   | -- Display an image preview
     FileSinglePut !FileWithTags
   | -- For indeterminate IO
