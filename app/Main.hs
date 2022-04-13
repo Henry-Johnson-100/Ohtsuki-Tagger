@@ -23,7 +23,7 @@ import Node.Application
     descriptorTreeQuadrantWidget,
     fileSelectionWidget,
     fileSinglePreviewWidget,
-    queryWidget,
+    queryAndTagEntryWidget,
     themeConfig,
   )
 import Type.Model
@@ -46,7 +46,7 @@ taggerApplicationUI wenv model = widgetTree
         [ vgrid
             [ fileSelectionWidget (model ^. fileSelection),
               vstack
-                [ queryWidget,
+                [ queryAndTagEntryWidget,
                   descriptorTreeQuadrantWidget
                     (model ^. descriptorTree)
                     (model ^. unrelatedDescriptorTree)

@@ -14,7 +14,7 @@ module Node.Application
     fileSinglePreviewWidget,
     descriptorTreeQuadrantWidget,
     configPanel,
-    queryWidget,
+    queryAndTagEntryWidget,
   )
 where
 
@@ -51,7 +51,6 @@ configPanel ::
 configPanel =
   box . vgrid $
     [ shellCmdWidget,
-      tagCommitWidget,
       descriptorNewWidget
     ]
 
@@ -188,6 +187,17 @@ tagCommitWidget =
               tagsStringTextField
             ]
       ]
+
+queryAndTagEntryWidget ::
+  ( WidgetModel s,
+    HasTagsString s Text,
+    HasTaggingMode s TaggingMode,
+    HasFileSelectionQuery s Text,
+    HasQueryCriteria s QueryCriteria,
+    HasFileSetArithmetic s FileSetArithmetic
+  ) =>
+  WidgetNode s TaggerEvent
+queryAndTagEntryWidget = vstack [queryWidget, tagCommitWidget]
 
 descriptorNewWidget :: (WidgetModel s, HasNewDescriptorText s Text) => WidgetNode s TaggerEvent
 descriptorNewWidget = keystroke [("Enter", DescriptorCommitNewDescriptorText)] . hstack_ [] $ [descriptorNewCommitButton, descriptorNewTextField]
