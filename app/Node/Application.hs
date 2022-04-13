@@ -53,7 +53,8 @@ configPanel =
     [ shellCmdWidget,
       tagCommitWidget,
       descriptorNewWidget,
-      fileSelectionPopSingleFileButton
+      fileSingleNextFromFileSelectionButton,
+      fileSinglePrevFromFileSelectionButton
     ]
 
 fileSelectionWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent

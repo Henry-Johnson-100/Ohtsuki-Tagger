@@ -132,11 +132,15 @@ taggerEventHandler wenv node model event =
         asyncEvent FileSelectionQueryClear
       ]
     FileSelectionQueryClear -> [Model $ model & fileSelectionQuery .~ ""]
-    FileSelectionPopSingleFile ->
-      let !mi = head' (model ^. fileSelection)
-          !ps = popCycleList (model ^. fileSelection)
+    FileSingleNextFromFileSelection ->
+      let !ps = popCycleList (model ^. fileSelection)
+          !mi = head' ps
        in [ Model . (fileSelection .~ ps) . (fileSingle .~ mi) $ model
           ]
+    FileSinglePrevFromFileSelection ->
+      let !ps = dequeueCycleList (model ^. fileSelection)
+          !mi = head' ps
+       in [Model . (fileSelection .~ ps) . (fileSingle .~ mi) $ model]
     DescriptorTreePut tr -> [Model $ model & descriptorTree .~ tr]
     UnrelatedDescriptorTreePut tr -> [Model $ model & unrelatedDescriptorTree .~ tr]
     DescriptorTreePutParent ->
@@ -247,9 +251,23 @@ tail' :: [a] -> [a]
 tail' [] = []
 tail' (_ : xs) = xs
 
+last' :: [a] -> Maybe a
+last' [] = Nothing
+last' xs = Just . last $ xs
+
+init' :: [a] -> [a]
+init' [] = []
+init' xs = init xs
+
+-- | Take the first item and put it on the end
 popCycleList :: [a] -> [a]
 popCycleList [] = []
 popCycleList (x : xs) = xs ++ [x]
+
+-- | Take the last item and put it on the front
+dequeueCycleList :: [a] -> [a]
+dequeueCycleList [] = []
+dequeueCycleList xs = last xs : init xs
 
 asyncEvent :: e -> EventResponse s e sp ep
 asyncEvent = Task . flip (<$) emptyM
