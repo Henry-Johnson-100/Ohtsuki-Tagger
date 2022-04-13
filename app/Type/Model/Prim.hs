@@ -106,6 +106,7 @@ data TaggerEvent
     FileSelectionCommitQuery
   | -- Clear current selection
     FileSelectionClear
+  | FileSelectionQueryClear
   | -- | Set querying set arithmetic to Union, Intersect, or Diff
     FileSetArithmetic !FileSetArithmetic
   | -- | Set the query critera which is how files will be queried

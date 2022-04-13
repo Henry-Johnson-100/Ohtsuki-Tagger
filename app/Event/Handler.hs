@@ -113,9 +113,14 @@ taggerEventHandler wenv node model event =
                 (model ^. queryCriteria)
                 (model ^. dbConn)
                 (T.words (model ^. fileSelectionQuery))
-          )
+          ),
+        Task (FileSelectionQueryClear <$ pure ())
       ]
-    FileSelectionClear -> [Model $ model & fileSelection .~ []]
+    FileSelectionClear ->
+      [ Model $ model & fileSelection .~ [],
+        Task (FileSelectionQueryClear <$ pure ())
+      ]
+    FileSelectionQueryClear -> [Model $ model & fileSelectionQuery .~ ""]
     DescriptorTreePut tr -> [Model $ model & descriptorTree .~ tr]
     UnrelatedDescriptorTreePut tr -> [Model $ model & unrelatedDescriptorTree .~ tr]
     DescriptorTreePutParent ->

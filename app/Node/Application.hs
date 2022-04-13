@@ -152,12 +152,13 @@ queryWidget ::
   ) =>
   WidgetNode s TaggerEvent
 queryWidget =
-  keystroke [("Enter", FileSelectionCommitQuery)] $
-    hgrid_
-      []
-      [ box_ [] . hstack_ [] $ [clearSelectionButton, commitQueryButton, queryTextField],
-        box_ [] $
-          hstack_ [] [setQueryCriteriaDropdown, setArithmeticDropdown]
+  box_ []
+    . hstack_ []
+    $ [ clearSelectionButton,
+        setArithmeticDropdown,
+        commitQueryButton,
+        keystroke [("Enter", FileSelectionCommitQuery)] queryTextField,
+        setQueryCriteriaDropdown
       ]
 
 tagCommitWidget ::

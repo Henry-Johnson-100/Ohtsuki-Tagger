@@ -101,7 +101,7 @@ taggingModeDropdown =
 
 commitQueryButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
-commitQueryButton = styledButton FileSelectionCommitQuery "Query"
+commitQueryButton = styledButton FileSelectionCommitQuery "with"
 
 shellCmdWidget :: (WidgetModel s, HasShellCmd s Text) => WidgetNode s TaggerEvent
 shellCmdWidget =
@@ -145,7 +145,7 @@ previewButton = flip styledButton "Preview" . FileSinglePut
 clearSelectionButton ::
   (WidgetModel s) =>
   WidgetNode s TaggerEvent
-clearSelectionButton = styledButton FileSelectionClear "CS"
+clearSelectionButton = styledButton FileSelectionClear "Clear"
 
 appendToQueryButton :: WidgetModel s => Text -> WidgetNode s TaggerEvent
 appendToQueryButton t = styledButton (FileSelectionAppendQuery t) "Add"
