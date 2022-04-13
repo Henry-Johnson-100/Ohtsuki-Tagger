@@ -209,13 +209,10 @@ taggerEventHandler wenv node model event =
       ]
     PutExtern _ -> []
     TagCommitTagsString ->
-      [ Task
-          ( ( if model ^. doSoloTag
-                then TagCommitTagsStringDoSolo
-                else TagCommitTagsStringDoSelection
-            )
-              <$ pure ()
-          )
+      [ asyncEvent $
+          if model ^. doSoloTag
+            then TagCommitTagsStringDoSolo
+            else TagCommitTagsStringDoSelection
       ]
     TagCommitTagsStringDoSolo ->
       [ let dds = T.words $ model ^. tagsString
