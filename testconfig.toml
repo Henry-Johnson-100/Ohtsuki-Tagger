@@ -1,0 +1,13 @@
+[database]
+  [database.path]
+    directory = "/home/monax/Repo/Haskell/tagger/"
+    database = "images.db"
+    backup = "images.db.backup"
+    script = "taggerSchemaDef.sql"
+
+[style]
+  [style.font]
+    directory = "/usr/local/share/fonts/i/"
+    thin = "iosevka_thin.ttf"
+    regular = "iosevka_light.ttf"
+    bold = "iosevka_bold.ttf"

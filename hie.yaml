@@ -24,6 +24,9 @@ cradle:
     - path: "app/Type/Model/Prim.hs"
       component: "tagger:exe:tagger"
 
+    - path: "app/Type/Config.hs"
+      component: "tagger:exe:tagger"
+
     - path: "app/Database/Tagger/Type.hs"
       component: "tagger:exe:tagger"
 
