@@ -18,6 +18,7 @@ module Type.Model
     unrelatedDescriptorTree,
     newDescriptorText,
     taggingMode,
+    newFileText,
     HasFileSingle,
     HasDoSoloTag,
     HasFileSetArithmetic,
@@ -28,6 +29,7 @@ module Type.Model
     HasTagsString,
     HasNewDescriptorText,
     HasTaggingMode,
+    HasNewFileText,
   )
 where
 

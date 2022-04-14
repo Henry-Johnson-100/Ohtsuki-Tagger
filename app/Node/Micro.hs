@@ -52,6 +52,14 @@ descriptorNewTextField ::
 descriptorNewTextField =
   textField_ newDescriptorText []
 
+newFileTextField ::
+  (WidgetModel s, HasNewFileText s Text) => WidgetNode s TaggerEvent
+newFileTextField = textField newFileText
+
+newFileTextCommitButton ::
+  (WidgetModel s) => WidgetNode s TaggerEvent
+newFileTextCommitButton = styledButton NewFileTextCommit "Add Path"
+
 tagsStringTextField ::
   (WidgetModel s, HasTagsString s Text) => WidgetNode s TaggerEvent
 tagsStringTextField =

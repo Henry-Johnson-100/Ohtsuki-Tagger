@@ -45,13 +45,15 @@ configPanel ::
     HasShellCmd s Text,
     HasTagsString s Text,
     HasNewDescriptorText s Text,
-    HasTaggingMode s TaggingMode
+    HasTaggingMode s TaggingMode,
+    HasNewFileText s Text
   ) =>
   WidgetNode s TaggerEvent
 configPanel =
   box . vgrid $
     [ shellCmdWidget,
-      descriptorNewWidget
+      descriptorNewWidget,
+      hstack [newFileTextField, newFileTextCommitButton]
     ]
 
 fileSelectionWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent

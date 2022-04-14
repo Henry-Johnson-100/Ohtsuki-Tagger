@@ -38,7 +38,8 @@ data TaggerModel = TaggerModel
     _taggerDbConn :: !Connection,
     _taggerTagsString :: !Text,
     _taggerTaggingMode :: !TaggingMode,
-    _taggerNewDescriptorText :: !Text
+    _taggerNewDescriptorText :: !Text,
+    _taggerNewFileText :: !Text
   }
   deriving (Show, Eq)
 
@@ -59,7 +60,8 @@ emptyTaggerModel c =
       _taggerTagsString = "",
       _taggerUnrelatedDescriptorTree = NullTree,
       _taggerNewDescriptorText = "",
-      _taggerTaggingMode = TagMode
+      _taggerTaggingMode = TagMode,
+      _taggerNewFileText = ""
     }
 
 class (Enum a, Bounded a, Eq a) => Cyclic a where
@@ -168,5 +170,6 @@ data TaggerEvent
   | TagsStringClear
   | DescriptorCommitNewDescriptorText
   | DescriptorDelete !Descriptor
+  | NewFileTextCommit
   | DebugPrintSelection
   deriving (Show, Eq)

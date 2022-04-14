@@ -250,6 +250,10 @@ taggerEventHandler wenv node model event =
               ),
         asyncEvent FileSelectionRefresh_
       ]
+    NewFileTextCommit ->
+      [ Task (FileSelectionPut <$> addPath (model ^. dbConn) (model ^. newFileText)),
+        Model $ model & newFileText .~ ""
+      ]
     DebugPrintSelection -> [Task (PutExtern <$> print (model ^. fileSelection))]
 
 -- | Replaces "%file" in the first list with the entirety of the second.

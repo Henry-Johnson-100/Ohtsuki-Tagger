@@ -20,6 +20,12 @@ import Type.Model
 
 type ConnString = String
 
+addPath :: Connection -> T.Text -> IO [FileWithTags]
+addPath c p = do
+  pathsToAdd <- getPathsToAdd p
+  addedFiles <- mapM (addFile c) pathsToAdd
+  return $ FileWithTags <$> addedFiles <*> []
+
 tag :: Connection -> [FileWithTags] -> [T.Text] -> IO ()
 tag c fwts dds = do
   withDescriptors <- fmap concat . mapM (lookupDescriptorPattern c) $ dds
