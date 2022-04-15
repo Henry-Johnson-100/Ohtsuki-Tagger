@@ -1,10 +1,16 @@
+{-# HLINT ignore "Use newtype instead of data" #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Use newtype instead of data" #-}
-
 module Type.Config
   ( TaggerConfig (..),
+    OptAbsPath (..),
+    TaggerDatabaseConfig (..),
+    TaggerDatabasePathConfig (..),
+    TaggerStyleConfig (..),
+    TaggerStyleFontConfig (..),
+    taggerConfigCodec,
   )
 where
 
@@ -41,7 +47,7 @@ data TaggerConfig = TaggerConfig
   { databaseConfig :: !TaggerDatabaseConfig,
     styleConfig :: !TaggerStyleConfig
   }
-  deriving (Show, Eq)
+  deriving (Show, Eq, OptAbsPath)
 
 taggerConfigCodec :: Toml.TomlCodec TaggerConfig
 taggerConfigCodec =
@@ -52,7 +58,7 @@ taggerConfigCodec =
 data TaggerStyleConfig = TaggerStyleConfig
   { styleFontConfig :: !TaggerStyleFontConfig
   }
-  deriving (Show, Eq)
+  deriving (Show, Eq, OptAbsPath)
 
 taggerStyleConfigCodec :: Toml.TomlCodec TaggerStyleConfig
 taggerStyleConfigCodec =
@@ -67,6 +73,9 @@ data TaggerStyleFontConfig = TaggerStyleFontConfig
   }
   deriving (Show, Eq)
 
+instance OptAbsPath TaggerStyleFontConfig where
+  getResolvedPath pf c = maybe (pf c) (T.append (pf c)) (fontDirectory c)
+
 taggerStyleFontConfigCodec :: Toml.TomlCodec TaggerStyleFontConfig
 taggerStyleFontConfigCodec =
   TaggerStyleFontConfig
@@ -78,7 +87,7 @@ taggerStyleFontConfigCodec =
 data TaggerDatabaseConfig = TaggerDatabaseConfig
   { databasePathConfig :: !TaggerDatabasePathConfig
   }
-  deriving (Show, Eq)
+  deriving (Show, Eq, OptAbsPath)
 
 taggerDatabaseConfigCodec :: Toml.TomlCodec TaggerDatabaseConfig
 taggerDatabaseConfigCodec =
@@ -93,6 +102,9 @@ data TaggerDatabasePathConfig = TaggerDatabasePathConfig
   }
   deriving (Show, Eq)
 
+instance OptAbsPath TaggerDatabasePathConfig where
+  getResolvedPath pf c = maybe (pf c) (T.append (pf c)) (databasePathDirectory c)
+
 taggerDatabasePathConfigCodec :: Toml.TomlCodec TaggerDatabasePathConfig
 taggerDatabasePathConfigCodec =
   TaggerDatabasePathConfig
@@ -100,3 +112,7 @@ taggerDatabasePathConfigCodec =
     <*> Toml.text "database" .= databasePathDatabase
     <*> Toml.text "backup" .= databasePathBackup
     <*> Toml.text "script" .= databasePathScript
+
+class OptAbsPath a where
+  getResolvedPath :: (a -> T.Text) -> a -> T.Text
+  getResolvedPath pf c = pf c
