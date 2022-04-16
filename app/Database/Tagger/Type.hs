@@ -11,7 +11,7 @@ module Database.Tagger.Type
     descriptorTreeElem,
     flattenTree,
     descriptorTreeChildren,
-    validatePath,
+    constructValidDbPath,
     getPathsToAdd,
     getNode,
     pushTag,
@@ -21,12 +21,11 @@ module Database.Tagger.Type
 where
 
 import qualified Control.Monad
-import Control.Monad.Trans.Class
 import qualified Control.Monad.Trans.Class as Trans
 import Control.Monad.Trans.Maybe (MaybeT (MaybeT, runMaybeT))
 import qualified Data.List
 import qualified Data.Text as T
-import qualified System.Directory as SysDir
+import qualified IO
 
 data File = File {fileId :: Int, filePath :: T.Text} deriving (Show, Eq)
 
@@ -136,42 +135,42 @@ flattenTree = flattenTree' []
 -- Use in Event.Task and not Database.Tagger.Access
 getPathsToAdd :: T.Text -> IO [T.Text]
 getPathsToAdd p = do
-  validated <- runMaybeT . fmap T.unpack . validatePath $ p
+  validated <- runMaybeT . fmap T.unpack . constructValidDbPath $ p
   maybe
     (return [])
     ( \f -> do
-        isDir <- SysDir.doesDirectoryExist f
+        isDir <- IO.doesDirectoryExist f
         (if isDir then returnDirContents else return . (: []) . T.pack) f
     )
     validated
   where
     returnDirContents :: String -> IO [T.Text]
     returnDirContents p = do
-      cwd <- SysDir.getCurrentDirectory
-      SysDir.setCurrentDirectory p
-      dirContents <- SysDir.listDirectory p
+      cwd <- IO.getCurrentDirectory
+      IO.setCurrentDirectory p
+      dirContents <- IO.listDirectory p
       validatedPaths <- mapM (getPathsToAdd . T.pack) dirContents
-      SysDir.setCurrentDirectory cwd
+      IO.setCurrentDirectory cwd
       return . concat $ validatedPaths
 
 -- | A system safe constructor for a File from a string.
 -- If the path exists, returns it with its absolute path.
 -- Resolves symbolic links
 -- Works for paths or directories
-validatePath :: T.Text -> MaybeT IO T.Text
-validatePath rawPath = do
+constructValidDbPath :: T.Text -> MaybeT IO T.Text
+constructValidDbPath rawPath = do
   existsFile <- pathExists rawPath
   resolve existsFile
   where
     pathExists :: T.Text -> MaybeT IO T.Text
     pathExists f' = do
-      exists <- Trans.lift . SysDir.doesPathExist . T.unpack $ f'
+      exists <- Trans.lift . IO.doesPathExist . T.unpack $ f'
       if exists then return f' else (MaybeT . pure) Nothing
     resolve :: T.Text -> MaybeT IO T.Text
     resolve fp' = do
       let fp = T.unpack fp'
-      isSymlink <- Trans.lift . SysDir.pathIsSymbolicLink $ fp
+      isSymlink <- Trans.lift . IO.pathIsSymbolicLink $ fp
       resolved <-
-        if isSymlink then (Trans.lift . SysDir.getSymbolicLinkTarget) fp else return fp
-      absPath <- Trans.lift . SysDir.makeAbsolute $ resolved
+        if isSymlink then (Trans.lift . IO.getSymbolicLinkTarget) fp else return fp
+      absPath <- Trans.lift . IO.makeAbsolute $ resolved
       return . T.pack $ absPath

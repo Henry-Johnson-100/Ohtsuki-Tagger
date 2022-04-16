@@ -32,3 +32,6 @@ cradle:
 
     - path: "app/Database/Tagger/Access.hs"
       component: "tagger:exe:tagger"
+
+    - path: "app/IO.hs"
+      component: "tagger:exe:tagger"

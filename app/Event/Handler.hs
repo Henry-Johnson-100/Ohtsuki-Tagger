@@ -18,13 +18,13 @@ import qualified Data.Maybe as M
 import qualified Data.Text as T
 import Database.Tagger.Type
 import Event.Task
+import IO
 import Monomer
   ( AppEventResponse,
     EventResponse (Model, Task),
     WidgetEnv,
     WidgetNode,
   )
-import System.Process (createProcess, shell)
 import Type.Model
 
 fwtUnion :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]

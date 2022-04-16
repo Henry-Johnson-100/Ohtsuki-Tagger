@@ -26,6 +26,7 @@ executable tagger
                       ,Type.Config
                       ,Database.Tagger.Type
                       ,Database.Tagger.Access
+                      ,IO
 
   other-extensions:    OverloadedStrings
                       ,TemplateHaskell

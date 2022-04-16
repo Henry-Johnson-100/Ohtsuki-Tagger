@@ -67,9 +67,8 @@ import Database.Tagger.Type
     fwtFileEqual,
     insertIntoDescriptorTree,
     pushTag,
-    validatePath,
   )
-import System.IO (hPutStrLn, stderr)
+import IO (hPutStrLn, stderr)
 
 debug# :: Bool
 debug# = False

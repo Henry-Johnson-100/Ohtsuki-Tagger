@@ -7,11 +7,9 @@
 module Event.Task where
 
 import Control.Monad
-import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe
 import Data.Char
-import Data.List
 import Data.Maybe
 import qualified Data.Text as T
 import Database.Tagger.Access
