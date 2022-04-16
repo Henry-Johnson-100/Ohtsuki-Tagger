@@ -17,6 +17,7 @@ where
 import Data.Text (Text)
 import Database.Tagger.Access
 import Database.Tagger.Type
+import Type.Config
 
 instance Show Connection where
   show _ = "Sqlite Connection"
@@ -54,12 +55,13 @@ data TaggerModel = TaggerModel
     _taggerTagsString :: !Text,
     _taggerTaggingMode :: !TaggingMode,
     _taggerNewDescriptorText :: !Text,
-    _taggerNewFileText :: !Text
+    _taggerNewFileText :: !Text,
+    _taggerProgramConfig :: !TaggerConfig
   }
   deriving (Show, Eq)
 
-emptyTaggerModel :: TaggedConnection -> TaggerModel
-emptyTaggerModel c =
+emptyTaggerModel :: TaggedConnection -> TaggerConfig -> TaggerModel
+emptyTaggerModel c cfg =
   TaggerModel
     { _taggerFileSelection = [],
       _taggerFileSetArithmetic = Union,
@@ -76,7 +78,8 @@ emptyTaggerModel c =
       _taggerUnrelatedDescriptorTree = NullTree,
       _taggerNewDescriptorText = "",
       _taggerTaggingMode = TagMode,
-      _taggerNewFileText = ""
+      _taggerNewFileText = "",
+      _taggerProgramConfig = cfg
     }
 
 class (Enum a, Bounded a, Eq a) => Cyclic a where
@@ -186,5 +189,6 @@ data TaggerEvent
   | DescriptorCommitNewDescriptorText
   | DescriptorDelete !Descriptor
   | NewFileTextCommit
+  | InitializeDatabase
   | DebugPrintSelection
   deriving (Show, Eq)

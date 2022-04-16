@@ -71,10 +71,10 @@ taggerApplicationConfig :: [AppConfig TaggerEvent]
 taggerApplicationConfig =
   appInitEvent TaggerInit : themeConfig
 
-runTaggerWindow :: TaggedConnection -> IO ()
-runTaggerWindow c =
+runTaggerWindow :: TaggedConnection -> TaggerConfig -> IO ()
+runTaggerWindow c cfg =
   startApp
-    (emptyTaggerModel c)
+    (emptyTaggerModel c cfg)
     taggerEventHandler
     taggerApplicationUI
     taggerApplicationConfig
@@ -100,7 +100,7 @@ main = do
           $ config
       -- activateForeignKeyPragma dbConn
       maybe (pure ()) activateForeignKeyPragma . connInstance $ dbConn
-      runTaggerWindow dbConn
+      runTaggerWindow dbConn config
       closeTaggedConnection dbConn
   where
     putEx = hPutStrLn stderr

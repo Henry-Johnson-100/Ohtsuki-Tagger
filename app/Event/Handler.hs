@@ -28,6 +28,7 @@ import Monomer
     WidgetEnv,
     WidgetNode,
   )
+import Type.Config
 import Type.Model
 
 fwtUnion :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]
@@ -170,8 +171,7 @@ taggerEventHandler wenv node model event =
           (model ^. dbConn)
       ]
     DescriptorCommitNewDescriptorText ->
-      [ -- I think this could also just be an asyncEvent
-        dbConnTask
+      [ dbConnTask
           PutExtern
           (flip createNewDescriptors (T.words (model ^. newDescriptorText)))
           (model ^. dbConn),
@@ -262,6 +262,12 @@ taggerEventHandler wenv node model event =
       [ dbConnTask FileSelectionPut (flip addPath (model ^. newFileText)) $
           model ^. dbConn,
         Model $ model & newFileText .~ ""
+      ]
+    InitializeDatabase ->
+      [ dbConnTask
+          PutExtern
+          (runInitScript (T.unpack . dbInit $ model ^. programConfig))
+          (model ^. dbConn)
       ]
     DebugPrintSelection -> [Task (PutExtern <$> print (model ^. fileSelection))]
 

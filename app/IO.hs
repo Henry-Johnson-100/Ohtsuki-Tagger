@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module IO
   ( module IO,
@@ -48,27 +49,35 @@ getConfigDbConn =
     ("Configuration error when opening database connection:\n" ++)
     . validateFilePath
 
-initializeDatabase :: FilePath -> FilePath -> p -> IO ()
-initializeDatabase scriptLoc dbLoc backupLoc = do
-  memConn <- open ":memory:"
-  let memConnHandle = connectionHandle memConn
-  scriptHandle <- openFile scriptLoc ReadMode
-  scriptContents <- hGetContents scriptHandle
-  newDbConn <- do
-    touch dbLoc
-    open dbLoc
-  DirectSqlite.exec memConnHandle . T.pack $ scriptContents
-  hClose scriptHandle
-  newDbSave <-
-    DirectSqlite.backupInit
-      (connectionHandle newDbConn)
-      "main"
-      memConnHandle
-      "main"
-  DirectSqlite.backupStep newDbSave (-1)
-  DirectSqlite.backupFinish newDbSave
-  close memConn
-  close newDbConn
+runInitScript :: FilePath -> Connection -> IO ()
+runInitScript pathToScript c = do
+  let cHandle = connectionHandle c
+  initHandle <- openFile pathToScript ReadMode
+  initContents <- hGetContents initHandle
+  DirectSqlite.exec cHandle . T.pack $ initContents
+  hClose initHandle
+
+-- initializeDatabase :: FilePath -> FilePath -> p -> IO ()
+-- initializeDatabase scriptLoc dbLoc backupLoc = do
+--   memConn <- open ":memory:"
+--   let memConnHandle = connectionHandle memConn
+--   scriptHandle <- openFile scriptLoc ReadMode
+--   scriptContents <- hGetContents scriptHandle
+--   newDbConn <- do
+--     touch dbLoc
+--     open dbLoc
+--   DirectSqlite.exec memConnHandle . T.pack $ scriptContents
+--   hClose scriptHandle
+--   newDbSave <-
+--     DirectSqlite.backupInit
+--       (connectionHandle newDbConn)
+--       "main"
+--       memConnHandle
+--       "main"
+--   DirectSqlite.backupStep newDbSave (-1)
+--   DirectSqlite.backupFinish newDbSave
+--   close memConn
+--   close newDbConn
 
 touch :: FilePath -> IO ()
 touch = hClose <=< flip openFile WriteMode

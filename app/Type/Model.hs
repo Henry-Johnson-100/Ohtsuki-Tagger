@@ -19,6 +19,7 @@ module Type.Model
     newDescriptorText,
     taggingMode,
     newFileText,
+    programConfig,
     HasFileSingle,
     HasDoSoloTag,
     HasFileSetArithmetic,
