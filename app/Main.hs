@@ -18,7 +18,7 @@ import Event.Handler (taggerEventHandler)
 import IO (getConfig, getEnv, hPutStrLn, stderr)
 import Monomer
 import Node.Application
-import Type.Config (TaggerConfig (dbPath))
+import Type.Config
 import Type.Model
 
 taggerApplicationUI ::
@@ -78,7 +78,7 @@ main = do
       dbConn <-
         getTaggedConnection
           . T.unpack
-          . dbPath
+          . _dbPath
           $ config
       -- activateForeignKeyPragma dbConn
       maybe (pure ()) activateForeignKeyPragma . connInstance $ dbConn

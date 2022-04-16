@@ -21,17 +21,17 @@ database.auto_connect = false
 -}
 
 data TaggerConfig = TaggerConfig
-  { dbPath :: !T.Text,
-    dbBackup :: !T.Text,
-    dbInit :: !T.Text,
-    dbAutoConnect :: !Bool
+  { _dbPath :: !T.Text,
+    _dbBackup :: !T.Text,
+    _dbInit :: !T.Text,
+    _dbAutoConnect :: !Bool
   }
   deriving (Show, Eq)
 
 taggerConfigCodec :: Toml.TomlCodec TaggerConfig
 taggerConfigCodec =
   TaggerConfig
-    <$> Toml.text "database.path" .= dbPath
-    <*> Toml.text "database.backup" .= dbBackup
-    <*> Toml.text "database.init" .= dbInit
-    <*> Toml.bool "database.auto_connect" .= dbAutoConnect
+    <$> Toml.text "database.path" .= _dbPath
+    <*> Toml.text "database.backup" .= _dbBackup
+    <*> Toml.text "database.init" .= _dbInit
+    <*> Toml.bool "database.auto_connect" .= _dbAutoConnect

@@ -266,7 +266,7 @@ taggerEventHandler wenv node model event =
     InitializeDatabase ->
       [ dbConnTask
           PutExtern
-          (runInitScript (T.unpack . dbInit $ model ^. programConfig))
+          (runInitScript (T.unpack . _dbInit $ model ^. programConfig))
           (model ^. dbConn)
       ]
     ToggleVisibilityMode vm ->

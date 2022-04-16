@@ -27,6 +27,7 @@ import Database.Tagger.Type
 import Monomer
 import Node.Color
 import Node.Micro
+import Type.Config
 import Type.Model
 import Prelude hiding (concat, replicate, unlines, unwords)
 
@@ -67,14 +68,18 @@ configureZone ::
     HasTagsString s Text,
     HasNewDescriptorText s Text,
     HasTaggingMode s TaggingMode,
-    HasNewFileText s Text
+    HasNewFileText s Text,
+    HasProgramConfig s TaggerConfig
   ) =>
   WidgetNode s TaggerEvent
 configureZone =
   box . vgrid $
     [ shellCmdWidget,
       descriptorNewWidget,
-      hstack [newFileTextField, newFileTextCommitButton]
+      hstack [newFileTextField, newFileTextCommitButton],
+      dbPathTextField,
+      dbBackupTextField,
+      dbAutoConnectCheckBox
     ]
 
 fileSelectionWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent

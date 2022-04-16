@@ -21,6 +21,10 @@ module Type.Model
     newFileText,
     programConfig,
     programVisibility,
+    dbPath,
+    dbBackup,
+    dbInit,
+    dbAutoConnect,
     HasFileSingle,
     HasDoSoloTag,
     HasFileSetArithmetic,
@@ -33,10 +37,14 @@ module Type.Model
     HasTaggingMode,
     HasNewFileText,
     HasProgramVisibility,
+    HasProgramConfig,
   )
 where
 
-import Control.Lens (abbreviatedFields, makeLensesWith)
+import Control.Lens
+import Type.Config
 import Type.Model.Prim
 
 makeLensesWith abbreviatedFields ''TaggerModel
+
+makeLenses ''TaggerConfig

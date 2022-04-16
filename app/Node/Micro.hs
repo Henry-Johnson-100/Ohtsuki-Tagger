@@ -7,11 +7,13 @@
 
 module Node.Micro where
 
+import Control.Lens
 import Data.List
 import Data.Text hiding (foldl', intersperse, map)
 import Database.Tagger.Type
 import Monomer
 import Node.Color
+import Type.Config
 import Type.Model
 
 (!++) :: Text -> Text -> Text
@@ -46,6 +48,18 @@ buttonStylingBasic = [bgColor bgDefault, border 0 bgDefault]
 
 buttonStylingHover :: [StyleState]
 buttonStylingHover = [bgColor bgLightGray]
+
+dbPathTextField ::
+  (WidgetModel s, HasProgramConfig s TaggerConfig) =>
+  WidgetNode s TaggerEvent
+dbPathTextField = textField (programConfig . dbPath)
+
+dbBackupTextField ::
+  (WidgetModel s, HasProgramConfig s TaggerConfig) => WidgetNode s TaggerEvent
+dbBackupTextField = textField (programConfig . dbBackup)
+
+dbAutoConnectCheckBox :: (WidgetModel s, HasProgramConfig s TaggerConfig) => WidgetNode s TaggerEvent
+dbAutoConnectCheckBox = labeledCheckbox "Auto-Connect" (programConfig . dbAutoConnect)
 
 queryTextField ::
   (WidgetModel s, HasFileSelectionQuery s Text) => WidgetNode s TaggerEvent
