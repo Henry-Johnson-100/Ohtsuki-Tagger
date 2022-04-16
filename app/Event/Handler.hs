@@ -269,6 +269,10 @@ taggerEventHandler wenv node model event =
           (runInitScript (T.unpack . dbInit $ model ^. programConfig))
           (model ^. dbConn)
       ]
+    ToggleConfigMode ->
+      [ let cm = model ^. configMode
+         in Model $ model & configMode .~ not cm
+      ]
     DebugPrintSelection -> [Task (PutExtern <$> print (model ^. fileSelection))]
 
 -- | Replaces "%file" in the first list with the entirety of the second.

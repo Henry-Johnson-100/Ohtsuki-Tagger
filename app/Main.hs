@@ -21,9 +21,12 @@ import Monomer
     appInitEvent,
     button,
     hgrid,
+    label,
+    nodeVisible,
     startApp,
     vgrid,
     vstack,
+    zstack_,
   )
 import Node.Application
   ( configPanel,
@@ -32,6 +35,7 @@ import Node.Application
     fileSinglePreviewWidget,
     queryAndTagEntryWidget,
     themeConfig,
+    toggleConfigModeButton,
   )
 import Type.Config (TaggerConfig (dbPath))
 import Type.Model
@@ -39,6 +43,7 @@ import Type.Model
     TaggedConnection (..),
     TaggerEvent (DebugPrintSelection, TaggerInit),
     TaggerModel,
+    configMode,
     emptyTaggerModel,
     fileSelection,
     unrelatedDescriptorTree,
@@ -51,19 +56,27 @@ taggerApplicationUI ::
 taggerApplicationUI wenv model = widgetTree
   where
     widgetTree =
-      hgrid
-        [ vgrid
-            [ fileSelectionWidget (model ^. fileSelection),
-              vstack
-                [ queryAndTagEntryWidget,
-                  descriptorTreeQuadrantWidget
-                    (model ^. descriptorTree)
-                    (model ^. unrelatedDescriptorTree)
+      vstack
+        [ toggleConfigModeButton,
+          zstack_
+            []
+            [ hgrid
+                [ vgrid
+                    [ fileSelectionWidget (model ^. fileSelection),
+                      vstack
+                        [ queryAndTagEntryWidget,
+                          descriptorTreeQuadrantWidget
+                            (model ^. descriptorTree)
+                            (model ^. unrelatedDescriptorTree)
+                        ]
+                    ],
+                  vgrid
+                    [ vstack [configPanel, button "print selection" DebugPrintSelection],
+                      fileSinglePreviewWidget model
+                    ]
                 ]
-            ],
-          vgrid
-            [ vstack [configPanel, button "print selection" DebugPrintSelection],
-              fileSinglePreviewWidget model
+                `nodeVisible` not (model ^. configMode),
+              label "Future config zone" `nodeVisible` (model ^. configMode)
             ]
         ]
 

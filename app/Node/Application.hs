@@ -15,6 +15,7 @@ module Node.Application
     descriptorTreeQuadrantWidget,
     configPanel,
     queryAndTagEntryWidget,
+    toggleConfigModeButton,
   )
 where
 

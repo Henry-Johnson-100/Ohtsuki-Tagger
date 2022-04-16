@@ -20,6 +20,7 @@ module Type.Model
     taggingMode,
     newFileText,
     programConfig,
+    configMode,
     HasFileSingle,
     HasDoSoloTag,
     HasFileSetArithmetic,

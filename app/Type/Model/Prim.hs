@@ -56,7 +56,8 @@ data TaggerModel = TaggerModel
     _taggerTaggingMode :: !TaggingMode,
     _taggerNewDescriptorText :: !Text,
     _taggerNewFileText :: !Text,
-    _taggerProgramConfig :: !TaggerConfig
+    _taggerProgramConfig :: !TaggerConfig,
+    _taggerConfigMode :: !Bool
   }
   deriving (Show, Eq)
 
@@ -79,7 +80,8 @@ emptyTaggerModel c cfg =
       _taggerNewDescriptorText = "",
       _taggerTaggingMode = TagMode,
       _taggerNewFileText = "",
-      _taggerProgramConfig = cfg
+      _taggerProgramConfig = cfg,
+      _taggerConfigMode = False
     }
 
 class (Enum a, Bounded a, Eq a) => Cyclic a where
@@ -190,5 +192,6 @@ data TaggerEvent
   | DescriptorDelete !Descriptor
   | NewFileTextCommit
   | InitializeDatabase
+  | ToggleConfigMode
   | DebugPrintSelection
   deriving (Show, Eq)
