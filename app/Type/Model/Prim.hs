@@ -8,6 +8,7 @@ module Type.Model.Prim
     FileSetArithmetic (..),
     QueryCriteria (..),
     TaggingMode (..),
+    ProgramVisibility (..),
     Cyclic (..),
     emptyTaggerModel,
     isUntagMode,
@@ -57,7 +58,7 @@ data TaggerModel = TaggerModel
     _taggerNewDescriptorText :: !Text,
     _taggerNewFileText :: !Text,
     _taggerProgramConfig :: !TaggerConfig,
-    _taggerConfigMode :: !Bool
+    _taggerProgramVisibility :: !ProgramVisibility
   }
   deriving (Show, Eq)
 
@@ -81,7 +82,7 @@ emptyTaggerModel c cfg =
       _taggerTaggingMode = TagMode,
       _taggerNewFileText = "",
       _taggerProgramConfig = cfg,
-      _taggerConfigMode = False
+      _taggerProgramVisibility = Main
     }
 
 class (Enum a, Bounded a, Eq a) => Cyclic a where
@@ -123,6 +124,11 @@ instance Show QueryCriteria where
       ByPattern -> "Pattern"
       ByRelation -> "Relation"
       ByUntagged -> "Untagged"
+
+data ProgramVisibility
+  = Main
+  | Configure
+  deriving (Eq, Show, Enum, Bounded, Cyclic)
 
 data TaggerEvent
   = -- Open DB Connection, populate FileDb, DescriptorDb and DescriptorTree with #ALL#
@@ -192,6 +198,6 @@ data TaggerEvent
   | DescriptorDelete !Descriptor
   | NewFileTextCommit
   | InitializeDatabase
-  | ToggleConfigMode
+  | ToggleVisibilityMode !ProgramVisibility
   | DebugPrintSelection
   deriving (Show, Eq)

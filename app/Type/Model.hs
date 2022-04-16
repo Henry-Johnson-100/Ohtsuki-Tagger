@@ -20,7 +20,7 @@ module Type.Model
     taggingMode,
     newFileText,
     programConfig,
-    configMode,
+    programVisibility,
     HasFileSingle,
     HasDoSoloTag,
     HasFileSetArithmetic,
@@ -32,6 +32,7 @@ module Type.Model
     HasNewDescriptorText,
     HasTaggingMode,
     HasNewFileText,
+    HasProgramVisibility,
   )
 where
 

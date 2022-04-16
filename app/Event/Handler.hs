@@ -269,9 +269,9 @@ taggerEventHandler wenv node model event =
           (runInitScript (T.unpack . dbInit $ model ^. programConfig))
           (model ^. dbConn)
       ]
-    ToggleConfigMode ->
-      [ let cm = model ^. configMode
-         in Model $ model & configMode .~ not cm
+    ToggleVisibilityMode vm ->
+      [ let currentVM = model ^. programVisibility
+         in Model $ model & programVisibility .~ (if currentVM == vm then Main else vm)
       ]
     DebugPrintSelection -> [Task (PutExtern <$> print (model ^. fileSelection))]
 

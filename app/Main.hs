@@ -1,9 +1,11 @@
+{-# HLINT ignore "Redundant return" #-}
+{-# HLINT ignore "Use <&>" #-}
+{-# HLINT ignore "Redundant flip" #-}
+{-# HLINT ignore "Redundant $" #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Redundant return" #-}
-{-# HLINT ignore "Use <&>" #-}
 
 module Main where
 
@@ -15,62 +17,37 @@ import Database.Tagger.Access (activateForeignKeyPragma)
 import Event.Handler (taggerEventHandler)
 import IO (getConfig, getEnv, hPutStrLn, stderr)
 import Monomer
-  ( AppConfig,
-    WidgetEnv,
-    WidgetNode,
-    appInitEvent,
-    button,
-    hgrid,
-    label,
-    nodeVisible,
-    startApp,
-    vgrid,
-    vstack,
-    zstack_,
-  )
 import Node.Application
 import Type.Config (TaggerConfig (dbPath))
 import Type.Model
-  ( HasDescriptorTree (descriptorTree),
-    TaggedConnection (..),
-    TaggerEvent (DebugPrintSelection, TaggerInit),
-    TaggerModel,
-    configMode,
-    emptyTaggerModel,
-    fileSelection,
-    unrelatedDescriptorTree,
-  )
 
 taggerApplicationUI ::
   WidgetEnv TaggerModel TaggerEvent ->
   TaggerModel ->
   WidgetNode TaggerModel TaggerEvent
-taggerApplicationUI wenv model = widgetTree
+taggerApplicationUI wenv model' = widgetTree
   where
     widgetTree =
-      vstack
-        [ menubar,
-          zstack_
-            []
-            [ hgrid
-                [ vgrid
-                    [ fileSelectionWidget (model ^. fileSelection),
-                      vstack
-                        [ queryAndTagEntryWidget,
-                          descriptorTreeQuadrantWidget
-                            (model ^. descriptorTree)
-                            (model ^. unrelatedDescriptorTree)
-                        ]
-                    ],
-                  vgrid
-                    [ vstack [configPanel, button "print selection" DebugPrintSelection],
-                      fileSinglePreviewWidget model
-                    ]
+      let !model = model'
+       in vstack
+            [ menubar,
+              zstack
+                [ visibility model Configure configureZone,
+                  visibility model Main
+                    . vgrid
+                    $ [ box_ [alignMiddle] . fileSinglePreviewWidget $ model,
+                        hgrid
+                          [ vstack
+                              [ queryAndTagEntryWidget,
+                                descriptorTreeQuadrantWidget
+                                  (model ^. descriptorTree)
+                                  (model ^. unrelatedDescriptorTree)
+                              ],
+                            fileSelectionWidget (model ^. fileSelection)
+                          ]
+                      ]
                 ]
-                `nodeVisible` not (model ^. configMode),
-              label "Future config zone" `nodeVisible` (model ^. configMode)
             ]
-        ]
 
 taggerApplicationConfig :: [AppConfig TaggerEvent]
 taggerApplicationConfig =

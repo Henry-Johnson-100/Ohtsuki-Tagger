@@ -84,7 +84,7 @@ initializeDatabaseButton :: (WidgetModel s) => WidgetNode s TaggerEvent
 initializeDatabaseButton = styledButton InitializeDatabase "Initialize Database" `styleBasic` [bgColor (Color 212 0 0 0.83)]
 
 toggleConfigModeButton :: (WidgetModel s) => WidgetNode s TaggerEvent
-toggleConfigModeButton = styledButton ToggleConfigMode "Configure"
+toggleConfigModeButton = styledButton (ToggleVisibilityMode Configure) "Configure"
 
 descriptorDeleteWidget :: WidgetModel s => WidgetNode s TaggerEvent
 descriptorDeleteWidget =

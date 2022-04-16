@@ -13,9 +13,10 @@ module Node.Application
     fileSelectionWidget,
     fileSinglePreviewWidget,
     descriptorTreeQuadrantWidget,
-    configPanel,
+    configureZone,
     queryAndTagEntryWidget,
     menubar,
+    visibility,
   )
 where
 
@@ -28,6 +29,14 @@ import Node.Color
 import Node.Micro
 import Type.Model
 import Prelude hiding (concat, replicate, unlines, unwords)
+
+visibility ::
+  (Eq a, HasProgramVisibility s1 a) =>
+  s1 ->
+  a ->
+  WidgetNode s2 e ->
+  WidgetNode s2 e
+visibility m vm = flip nodeVisible (vm == m ^. programVisibility)
 
 themeConfig :: [AppConfig e]
 themeConfig =
@@ -49,7 +58,7 @@ menubar =
       )
     $ [toggleConfigModeButton]
 
-configPanel ::
+configureZone ::
   ( WidgetModel s,
     HasFileSetArithmetic s FileSetArithmetic,
     HasQueryCriteria s QueryCriteria,
@@ -61,7 +70,7 @@ configPanel ::
     HasNewFileText s Text
   ) =>
   WidgetNode s TaggerEvent
-configPanel =
+configureZone =
   box . vgrid $
     [ shellCmdWidget,
       descriptorNewWidget,
@@ -113,7 +122,7 @@ fileSinglePreviewWidget = imageZone
       s ->
       WidgetNode s TaggerEvent
     imageZone model =
-      box_ [onClick ToggleDoSoloTag]
+      box_ [onClick ToggleDoSoloTag, alignMiddle]
         . vsplit_ []
         $ (imagePreview model, vstack [singleFileTags, doSoloTagCheckBox])
       where
@@ -123,10 +132,10 @@ fileSinglePreviewWidget = imageZone
           WidgetNode s e
         imagePreview m' =
           box_
-            []
+            [alignMiddle]
             $ maybe
               (label "No Preview")
-              (flip image_ [alignBottom, fitEither] . getPlainText)
+              (flip image_ [alignMiddle, fitEither] . getPlainText)
               (m' ^. fileSingle)
         singleFileTags ::
           ( WidgetModel s,
@@ -135,12 +144,13 @@ fileSinglePreviewWidget = imageZone
           ) =>
           WidgetNode s e
         singleFileTags =
-          maybe
-            spacer
-            ( draggableDescriptorListWidget
-                . tags
-            )
-            (model ^. fileSingle)
+          box_ [] $
+            maybe
+              spacer
+              ( draggableDescriptorListWidget
+                  . tags
+              )
+              (model ^. fileSingle)
         doSoloTagCheckBox ::
           (WidgetModel s, HasDoSoloTag s Bool) => WidgetNode s TaggerEvent
         doSoloTagCheckBox =
