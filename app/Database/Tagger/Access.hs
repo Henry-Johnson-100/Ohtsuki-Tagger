@@ -32,6 +32,7 @@ module Database.Tagger.Access
     lookupFileWithTagsByFileId,
     lookupDescriptorPattern,
     hoistMaybe,
+    activateForeignKeyPragma,
   )
 where
 
@@ -45,8 +46,10 @@ import Database.SQLite.Simple
   ( Connection,
     FromRow,
     Only (Only),
+    Query,
     execute,
     executeMany,
+    execute_,
     lastInsertRowId,
     query,
     query_,
@@ -83,6 +86,48 @@ liftErroutConcat# loc msg = lift . errout# $ loc ++ msg
 type FileKey = Int
 
 type DescriptorKey = Int
+
+activateForeignKeyPragma :: Connection -> IO ()
+activateForeignKeyPragma c = execute_ c "PRAGMA foreign_keys = on"
+
+-- | Check if all the required tables are present.
+-- And if the 3 required meta descriptors are set up properly.
+validateDb :: Connection -> IO Bool
+validateDb c = do
+  tables <-
+    fmap (all (onlyIntEquals 4))
+      . (query_ :: Connection -> Query -> IO [Only Int])
+        c
+      $ "SELECT COUNT(*) \
+        \FROM sqlite_master \
+        \WHERE type = 'table' \
+        \  AND tbl_name IN ('Descriptor','File','MetaDescriptor','Tag')"
+  errout# $ "has valid number of tables: " ++ show tables
+  requiredMetaDescriptors <-
+    fmap (all (onlyIntEquals 3))
+      . (query_ :: Connection -> Query -> IO [Only Int])
+        c
+      $ "SELECT COUNT(*) FROM Descriptor \
+        \WHERE descriptor IN ('#ALL#','#UNRELATED#','#META#')"
+  errout# $ "Has valid number of meta descriptors: " ++ show requiredMetaDescriptors
+  requiredRelations <-
+    fmap (all (onlyIntEquals 2))
+      . (query_ :: Connection -> Query -> IO [Only Int]) c
+      $ "SELECT COUNT(*) \
+        \FROM MetaDescriptor \
+        \WHERE (metaDescriptorId = \
+        \    (SELECT id FROM Descriptor WHERE descriptor = '#ALL#') \
+        \    AND infraDescriptorId = \
+        \      (SELECT id FROM Descriptor WHERE descriptor = '#META#')) \
+        \  OR (metaDescriptorId = \
+        \      (SELECT id FROM Descriptor WHERE descriptor = '#ALL#') \
+        \    AND infraDescriptorId = \
+        \      (SELECT id FROM Descriptor WHERE descriptor = '#UNRELATED#'))"
+  errout# $ "Has valid number of predefined relations: " ++ show requiredRelations
+  return $ tables && requiredMetaDescriptors && requiredRelations
+  where
+    onlyIntEquals :: Eq a => a -> Only a -> Bool
+    onlyIntEquals n (Only m) = n == m
 
 -- | Attempts to add a new file to db
 -- Performs no checking of the validity of a path.

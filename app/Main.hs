@@ -15,8 +15,9 @@ import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import Data.Maybe
 import qualified Data.Text as T
-import Database.SQLite.Simple (Connection, close, execute_, open)
-import Database.Tagger.Access (Connection)
+import Database.SQLite.Simple (Connection (connectionHandle), close, execute_, open)
+import qualified Database.SQLite3 as DirectSqlite
+import Database.Tagger.Access (Connection, activateForeignKeyPragma)
 import Event.Handler (taggerEventHandler)
 import Monomer
   ( AppConfig,
@@ -38,7 +39,9 @@ import Node.Application
     themeConfig,
   )
 import System.Directory
+import System.Environment
 import System.IO
+import System.Process
 import Toml
 import Type.Config
 import Type.Model
@@ -118,47 +121,51 @@ getConfigDbConn =
     ("Configuration error when opening database connection:\n" ++)
     . validatePath
 
-validateConfig :: TaggerConfig -> ExceptT ConfigException IO TaggerConfig
-validateConfig (TaggerConfig dbc sc) = do
-  validatedDatabaseConfig <- validateDatabaseConfig dbc
-  validatedStyleConfig <- validateStyleConfig sc
-  withExceptT ("Error validating the configuration file:\n" ++)
-    . return
-    $ TaggerConfig validatedDatabaseConfig validatedStyleConfig
-  where
-    validateDatabaseConfig (TaggerDatabaseConfig dbpc) =
-      validateDatabasePathConfig dbpc >>= return . TaggerDatabaseConfig
-    validateDatabasePathConfig (TaggerDatabasePathConfig d db b s) = do
-      dbDir <- maybe (return "") (validateDir . T.unpack) d
-      let inDir = fmap T.pack . validatePath . (++) dbDir . T.unpack
-      dbp <- inDir db
-      bp <- inDir b
-      sp <- inDir s
-      withExceptT ("Error validating database paths:\n" ++) . return $
-        TaggerDatabasePathConfig (Just . T.pack $ dbDir) dbp bp sp
-    validateStyleConfig (TaggerStyleConfig sfc) =
-      validateStyleFontConfig sfc >>= return . TaggerStyleConfig
-    validateStyleFontConfig (TaggerStyleFontConfig d t r b) = do
-      styleFontDir <- maybe (return "") (validateDir . T.unpack) d
-      let inDir = fmap T.pack . validatePath . (++) styleFontDir . T.unpack
-      thinPath <- inDir t
-      regPath <- inDir r
-      boldPath <- inDir b
-      withExceptT ("Error validating font paths:\n" ++) . return $
-        TaggerStyleFontConfig (Just . T.pack $ styleFontDir) thinPath regPath boldPath
+initializeDatabase :: FilePath -> FilePath -> p -> IO ()
+initializeDatabase scriptLoc dbLoc backupLoc = do
+  memConn <- open ":memory:"
+  let memConnHandle = connectionHandle memConn
+  scriptHandle <- openFile scriptLoc ReadMode
+  scriptContents <- hGetContents scriptHandle
+  newDbConn <- do
+    touch dbLoc
+    open dbLoc
+  DirectSqlite.exec memConnHandle . T.pack $ scriptContents
+  hClose scriptHandle
+  newDbSave <-
+    DirectSqlite.backupInit
+      (connectionHandle newDbConn)
+      "main"
+      memConnHandle
+      "main"
+  DirectSqlite.backupStep newDbSave (-1)
+  DirectSqlite.backupFinish newDbSave
+  close memConn
+  close newDbConn
+
+touch :: FilePath -> IO ()
+touch = hClose <=< flip openFile WriteMode
+
+backupDbConn :: Connection -> FilePath -> IO ()
+backupDbConn c backupTo = do
+  let currentHandle = connectionHandle c
+  doesFileExist backupTo >>= flip unless (touch backupTo)
+  backupHandle <- fmap connectionHandle . open $ backupTo
+  backupProcess <- DirectSqlite.backupInit backupHandle "main" currentHandle "main"
+  DirectSqlite.backupStep backupProcess (-1)
+  DirectSqlite.backupFinish backupProcess
 
 main :: IO ()
 main = do
-  try' (getConfig "/home/monax/.config/tagger_config.toml" >>= validateConfig) $
+  userHome <- getEnv "HOME"
+  try' (getConfig (userHome ++ "/.config/tagger.toml")) $
     \config -> do
       dbConn <-
         open
           . T.unpack
-          . databasePathDatabase
-          . databasePathConfig
-          . databaseConfig
+          . dbPath
           $ config
-      execute_ dbConn "PRAGMA foreign_keys = on"
+      activateForeignKeyPragma dbConn
       runTaggerWindow dbConn
       close dbConn
   where
