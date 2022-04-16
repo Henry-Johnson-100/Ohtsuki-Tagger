@@ -4,6 +4,7 @@
 module Type.Model.Prim
   ( TaggerModel (..),
     TaggerEvent (..),
+    TaggedConnection (..),
     FileSetArithmetic (..),
     QueryCriteria (..),
     TaggingMode (..),
@@ -23,6 +24,20 @@ instance Show Connection where
 instance Eq Connection where
   x == y = True
 
+data TaggedConnection = TaggedConnection
+  { connName :: !Text,
+    connInstance :: !(Maybe Connection)
+  }
+  deriving (Eq)
+
+instance Show TaggedConnection where
+  show (TaggedConnection n m) =
+    concat
+      [ show n,
+        " : ",
+        maybe "Inactive" (const "Active") m
+      ]
+
 data TaggerModel = TaggerModel
   { _taggerFileSelection :: ![FileWithTags],
     _taggerFileSetArithmetic :: !FileSetArithmetic,
@@ -35,7 +50,7 @@ data TaggerModel = TaggerModel
     _taggerDoSoloTag :: !Bool,
     _taggerShellCmd :: !Text,
     _taggerExtern :: !(),
-    _taggerDbConn :: !Connection,
+    _taggerDbConn :: !TaggedConnection,
     _taggerTagsString :: !Text,
     _taggerTaggingMode :: !TaggingMode,
     _taggerNewDescriptorText :: !Text,
@@ -43,7 +58,7 @@ data TaggerModel = TaggerModel
   }
   deriving (Show, Eq)
 
-emptyTaggerModel :: Connection -> TaggerModel
+emptyTaggerModel :: TaggedConnection -> TaggerModel
 emptyTaggerModel c =
   TaggerModel
     { _taggerFileSelection = [],

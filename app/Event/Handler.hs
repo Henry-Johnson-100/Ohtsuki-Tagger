@@ -6,6 +6,8 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
+{-# HLINT ignore "Use section" #-}
+
 module Event.Handler
   ( taggerEventHandler,
   )
@@ -16,6 +18,7 @@ import qualified Control.Monad as CM
 import qualified Data.List as L
 import qualified Data.Maybe as M
 import qualified Data.Text as T
+import Database.SQLite.Simple
 import Database.Tagger.Type
 import Event.Task
 import IO
@@ -47,6 +50,8 @@ doSetAction a s o =
     Intersect -> s `fwtIntersect` o
     Diff -> s `fwtDiff` o
 
+dbConnTask e f = maybe (Task (PutExtern <$> pure ())) (Task . fmap e . f) . connInstance
+
 taggerEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
   WidgetNode TaggerModel TaggerEvent ->
@@ -56,11 +61,8 @@ taggerEventHandler ::
 taggerEventHandler wenv node model event =
   case event of
     TaggerInit ->
-      [ Task
-          ( DescriptorTreePut
-              <$> getALLInfraTree (model ^. dbConn)
-          ),
-        Task (UnrelatedDescriptorTreePut <$> getUnrelatedInfraTree (model ^. dbConn)),
+      [ dbConnTask DescriptorTreePut getALLInfraTree (model ^. dbConn),
+        dbConnTask UnrelatedDescriptorTreePut getUnrelatedInfraTree (model ^. dbConn),
         Model $
           model
             & fileSingle
@@ -93,19 +95,22 @@ taggerEventHandler wenv node model event =
       [ Model $ model & fileSelection .~ fwts
       ]
     FileSelectionRefresh_ ->
-      [ Task
-          ( FileSelectionPut
-              <$> getRefreshedFWTs (model ^. dbConn) (model ^. fileSelection)
-          ),
-        Task
-          ( FileSingleMaybePut <$> do
-              mrefreshed <-
-                M.maybe
-                  (return [])
-                  (getRefreshedFWTs (model ^. dbConn) . (: []))
-                  (model ^. fileSingle)
-              return . head' $ mrefreshed
+      [ dbConnTask
+          FileSelectionPut
+          (flip getRefreshedFWTs (model ^. fileSelection))
+          (model ^. dbConn),
+        dbConnTask
+          FileSingleMaybePut
+          ( \activeDbConn ->
+              do
+                mrefreshed <-
+                  M.maybe
+                    (return [])
+                    (getRefreshedFWTs activeDbConn . (: []))
+                    (model ^. fileSingle)
+                return . head' $ mrefreshed
           )
+          (model ^. dbConn)
       ]
     FileSelectionAppendQuery t ->
       [ Model $
@@ -119,13 +124,15 @@ taggerEventHandler wenv node model event =
       ]
     TagsStringClear -> [Model $ model & tagsString .~ ""]
     FileSelectionCommitQuery ->
-      [ Task
-          ( FileSelectionUpdate
-              <$> doQueryWithCriteria
+      [ dbConnTask
+          FileSelectionUpdate
+          ( \activeDbConn ->
+              doQueryWithCriteria
                 (model ^. queryCriteria)
-                (model ^. dbConn)
+                activeDbConn
                 (T.words (model ^. fileSelectionQuery))
-          ),
+          )
+          (model ^. dbConn),
         asyncEvent FileSelectionQueryClear
       ]
     FileSelectionClear ->
@@ -154,45 +161,40 @@ taggerEventHandler wenv node model event =
     DescriptorTreePut tr -> [Model $ model & descriptorTree .~ tr]
     UnrelatedDescriptorTreePut tr -> [Model $ model & unrelatedDescriptorTree .~ tr]
     DescriptorTreePutParent ->
-      [ Task
-          ( DescriptorTreePut
-              <$> getParentDescriptorTree
-                (model ^. dbConn)
-                (model ^. descriptorTree)
+      [ dbConnTask
+          DescriptorTreePut
+          ( flip
+              getParentDescriptorTree
+              (model ^. descriptorTree)
           )
+          (model ^. dbConn)
       ]
     DescriptorCommitNewDescriptorText ->
-      [ Task
-          ( PutExtern
-              <$> createNewDescriptors
-                (model ^. dbConn)
-                (T.words (model ^. newDescriptorText))
-          ),
+      [ -- I think this could also just be an asyncEvent
+        dbConnTask
+          PutExtern
+          (flip createNewDescriptors (T.words (model ^. newDescriptorText)))
+          (model ^. dbConn),
         asyncEvent RefreshBothDescriptorTrees
       ]
     DescriptorDelete d ->
-      [ Task (PutExtern <$> deleteDescriptor (model ^. dbConn) d),
+      [ dbConnTask PutExtern (flip deleteDescriptor d) (model ^. dbConn),
         asyncEvent RefreshBothDescriptorTrees
       ]
     DescriptorCreateRelation ms is ->
-      [ Task (PutExtern <$> relateTo (model ^. dbConn) ms is),
+      [ dbConnTask PutExtern (\activeConn -> relateTo activeConn ms is) (model ^. dbConn),
         asyncEvent RefreshBothDescriptorTrees
       ]
     DescriptorUnrelate is ->
-      [ Task (PutExtern <$> unrelate (model ^. dbConn) is),
+      [ dbConnTask PutExtern (flip unrelate is) (model ^. dbConn),
         asyncEvent RefreshBothDescriptorTrees
       ]
     ToggleDoSoloTag ->
       [Model $ model & (doSoloTag .~ not (model ^. doSoloTag))]
     RequestDescriptorTree s ->
-      [ Task
-          ( DescriptorTreePut
-              <$> lookupInfraDescriptorTree (model ^. dbConn) s
-          )
-      ]
+      [dbConnTask DescriptorTreePut (flip lookupInfraDescriptorTree s) (model ^. dbConn)]
     RefreshUnrelatedDescriptorTree ->
-      [ Task (UnrelatedDescriptorTreePut <$> getUnrelatedInfraTree (model ^. dbConn))
-      ]
+      [dbConnTask UnrelatedDescriptorTreePut getUnrelatedInfraTree (model ^. dbConn)]
     RefreshBothDescriptorTrees ->
       [ Task
           ( RequestDescriptorTree
@@ -230,28 +232,35 @@ taggerEventHandler wenv node model event =
         asyncEvent TagsStringClear
       ]
     TagCommitTagsStringDoSolo ->
-      [ let dds = T.words $ model ^. tagsString
-            conn = model ^. dbConn
-            sf = M.maybeToList $ model ^. fileSingle
-            tm = model ^. taggingMode
-         in Task
-              ( PutExtern <$> (if isUntagMode tm then untagWith else tag) conn sf dds
-              ),
+      [ dbConnTask
+          PutExtern
+          ( \activeConn ->
+              (if isUntagMode (model ^. taggingMode) then untagWith else tag)
+                activeConn
+                (M.maybeToList $ model ^. fileSingle)
+                (T.words $ model ^. tagsString)
+          )
+          (model ^. dbConn),
         asyncEvent FileSelectionRefresh_
       ]
     TagCommitTagsStringDoSelection ->
-      [ let dds = T.words $ model ^. tagsString
-            conn = model ^. dbConn
-            fs = model ^. fileSelection
-            tm = model ^. taggingMode
-         in Task
-              ( PutExtern
-                  <$> (if isUntagMode tm then untagWith else tag) conn fs dds
-              ),
+      [ dbConnTask
+          PutExtern
+          ( \activeConn ->
+              ( if isUntagMode $ model ^. taggingMode
+                  then untagWith
+                  else tag
+              )
+                activeConn
+                (model ^. fileSelection)
+                (T.words $ model ^. tagsString)
+          )
+          (model ^. dbConn),
         asyncEvent FileSelectionRefresh_
       ]
     NewFileTextCommit ->
-      [ Task (FileSelectionPut <$> addPath (model ^. dbConn) (model ^. newFileText)),
+      [ dbConnTask FileSelectionPut (flip addPath (model ^. newFileText)) $
+          model ^. dbConn,
         Model $ model & newFileText .~ ""
       ]
     DebugPrintSelection -> [Task (PutExtern <$> print (model ^. fileSelection))]

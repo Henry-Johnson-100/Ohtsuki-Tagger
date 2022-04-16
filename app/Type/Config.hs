@@ -14,15 +14,17 @@ import Toml ((.=))
 import qualified Toml
 
 {-
-database.path
-database.backup
-database.init
+database.path = ""
+database.backup = ""
+database.init = ""
+database.auto_connect = false
 -}
 
 data TaggerConfig = TaggerConfig
   { dbPath :: !T.Text,
     dbBackup :: !T.Text,
-    dbInit :: !T.Text
+    dbInit :: !T.Text,
+    dbAutoConnect :: !Bool
   }
   deriving (Show, Eq)
 
@@ -32,3 +34,4 @@ taggerConfigCodec =
     <$> Toml.text "database.path" .= dbPath
     <*> Toml.text "database.backup" .= dbBackup
     <*> Toml.text "database.init" .= dbInit
+    <*> Toml.bool "database.auto_connect" .= dbAutoConnect

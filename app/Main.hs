@@ -36,6 +36,7 @@ import Node.Application
 import Type.Config (TaggerConfig (dbPath))
 import Type.Model
   ( HasDescriptorTree (descriptorTree),
+    TaggedConnection (..),
     TaggerEvent (DebugPrintSelection, TaggerInit),
     TaggerModel,
     emptyTaggerModel,
@@ -70,13 +71,21 @@ taggerApplicationConfig :: [AppConfig TaggerEvent]
 taggerApplicationConfig =
   appInitEvent TaggerInit : themeConfig
 
-runTaggerWindow :: Connection -> IO ()
+runTaggerWindow :: TaggedConnection -> IO ()
 runTaggerWindow c =
   startApp
     (emptyTaggerModel c)
     taggerEventHandler
     taggerApplicationUI
     taggerApplicationConfig
+
+getTaggedConnection :: FilePath -> IO TaggedConnection
+getTaggedConnection p = do
+  dbConn <- open p
+  return (TaggedConnection (T.pack p) (Just dbConn))
+
+closeTaggedConnection :: TaggedConnection -> IO ()
+closeTaggedConnection (TaggedConnection _ mc) = maybe (pure ()) close mc
 
 main :: IO ()
 main = do
@@ -85,13 +94,14 @@ main = do
   try' (getConfig configPath) $
     \config -> do
       dbConn <-
-        open
+        getTaggedConnection
           . T.unpack
           . dbPath
           $ config
-      activateForeignKeyPragma dbConn
+      -- activateForeignKeyPragma dbConn
+      maybe (pure ()) activateForeignKeyPragma . connInstance $ dbConn
       runTaggerWindow dbConn
-      close dbConn
+      closeTaggedConnection dbConn
   where
     putEx = hPutStrLn stderr
     try' e c = runExceptT e >>= either putEx c
