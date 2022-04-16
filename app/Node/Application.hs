@@ -15,7 +15,7 @@ module Node.Application
     descriptorTreeQuadrantWidget,
     configPanel,
     queryAndTagEntryWidget,
-    toggleConfigModeButton,
+    menubar,
   )
 where
 
@@ -37,6 +37,17 @@ themeConfig =
     appFontDef "Thin" "/usr/local/share/fonts/i/iosevka_thin.ttf",
     appFontDef "Bold" "/usr/local/share/fonts/i/iosevka_bold.ttf"
   ]
+
+menubar :: (WidgetModel s) => WidgetNode s TaggerEvent
+menubar =
+  box_ [alignLeft] . hstack_ []
+    . (<$>)
+      ( `styleBasic`
+          [ textSize 12
+          ]
+            <> buttonStylingBasic
+      )
+    $ [toggleConfigModeButton]
 
 configPanel ::
   ( WidgetModel s,

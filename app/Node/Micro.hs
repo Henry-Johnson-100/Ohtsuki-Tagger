@@ -41,6 +41,12 @@ styledButton a t =
     `styleBasic` [bgColor bgDefault, border 0 bgDefault]
     `styleHover` [bgColor bgLightGray]
 
+buttonStylingBasic :: [StyleState]
+buttonStylingBasic = [bgColor bgDefault, border 0 bgDefault]
+
+buttonStylingHover :: [StyleState]
+buttonStylingHover = [bgColor bgLightGray]
+
 queryTextField ::
   (WidgetModel s, HasFileSelectionQuery s Text) => WidgetNode s TaggerEvent
 queryTextField =

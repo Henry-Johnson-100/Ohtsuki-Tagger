@@ -29,14 +29,6 @@ import Monomer
     zstack_,
   )
 import Node.Application
-  ( configPanel,
-    descriptorTreeQuadrantWidget,
-    fileSelectionWidget,
-    fileSinglePreviewWidget,
-    queryAndTagEntryWidget,
-    themeConfig,
-    toggleConfigModeButton,
-  )
 import Type.Config (TaggerConfig (dbPath))
 import Type.Model
   ( HasDescriptorTree (descriptorTree),
@@ -57,7 +49,7 @@ taggerApplicationUI wenv model = widgetTree
   where
     widgetTree =
       vstack
-        [ toggleConfigModeButton,
+        [ menubar,
           zstack_
             []
             [ hgrid
