@@ -43,6 +43,7 @@ taggerApplicationUI wenv model' = widgetTree
                                   (model ^. descriptorTree)
                                   (model ^. unrelatedDescriptorTree)
                               ],
+                            operationWidget,
                             fileSelectionWidget (model ^. fileSelection)
                           ]
                       ]

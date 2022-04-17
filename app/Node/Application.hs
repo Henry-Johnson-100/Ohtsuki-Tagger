@@ -17,6 +17,7 @@ module Node.Application
     queryAndTagEntryWidget,
     menubar,
     visibility,
+    operationWidget,
   )
 where
 
@@ -197,6 +198,47 @@ queryWidget =
         keystroke [("Enter", FileSelectionCommitQuery)] queryTextField,
         setQueryCriteriaDropdown
       ]
+
+operationWidget ::
+  ( WidgetModel s,
+    HasFileSetArithmetic s FileSetArithmetic,
+    HasQueryCriteria s QueryCriteria
+  ) =>
+  WidgetNode s TaggerEvent
+operationWidget =
+  box_ []
+    . flip
+      keystroke_
+      [ignoreChildrenEvts]
+      [ ("Ctrl-j", FileSinglePrevFromFileSelection),
+        ("Ctrl-k", FileSingleNextFromFileSelection),
+        ("Ctrl-h", FileSetArithmeticNext),
+        ("Ctrl-l", FileSetQueryCriteriaNext)
+      ]
+    $ selectionOperatorWidget
+  where
+    selectionOperatorWidget ::
+      ( WidgetModel s,
+        HasFileSetArithmetic s FileSetArithmetic,
+        HasQueryCriteria s QueryCriteria
+      ) =>
+      WidgetNode s TaggerEvent
+    selectionOperatorWidget =
+      box_ []
+        . vgrid_ []
+        $ [ hgrid_
+              []
+              [ spacer,
+                stdDelayTooltip "Ctrl-j" fileSinglePrevFromFileSelectionButton,
+                spacer
+              ],
+            hgrid_
+              []
+              [ stdDelayTooltip "Ctrl-h" setArithmeticDropdown,
+                stdDelayTooltip "Ctrl-k" fileSingleNextFromFileSelectionButton,
+                stdDelayTooltip "Ctrl-l" setQueryCriteriaDropdown
+              ]
+          ]
 
 tagCommitWidget ::
   ( WidgetModel s,
