@@ -267,7 +267,7 @@ taggerEventHandler wenv node model event =
           model ^. dbConn,
         Model $ model & newFileText .~ ""
       ]
-    InitializeDatabase ->
+    DatabaseInitialize ->
       [ dbConnTask
           PutExtern
           (runInitScript (T.unpack $ model ^. (programConfig . dbInit)))
@@ -277,16 +277,30 @@ taggerEventHandler wenv node model event =
       [ let currentVM = model ^. programVisibility
          in Model $ model & programVisibility .~ (if currentVM == vm then Main else vm)
       ]
-    PutDatabaseConnection_ tc -> [Model $ model & dbConn .~ tc]
+    DatabaseConnectionPut_ tc -> [Model $ model & dbConn .~ tc]
     DatabaseConnect ->
       [ Task $
-          PutDatabaseConnection_ <$> do
+          DatabaseConnectionPut_ <$> do
             maybe (pure ()) close . connInstance $ model ^. dbConn
             let newConnTag = model ^. (programConfig . dbPath)
             newConnInstance <- open . T.unpack $ newConnTag
             activateForeignKeyPragma newConnInstance
             return . TaggedConnection newConnTag . Just $ newConnInstance,
         asyncEvent RefreshBothDescriptorTrees
+      ]
+    DatabaseBackup ->
+      [ Task
+          ( PutExtern
+              <$> ( maybe
+                      ( hPutStrLn
+                          stderr
+                          "Failed to backup, no database is currently connected."
+                      )
+                      (flip backupDbConn (T.unpack $ model ^. (programConfig . dbBackup)))
+                      . connInstance
+                      $ model ^. dbConn
+                  )
+          )
       ]
     ConfigurationExport -> [Task (PutExtern <$> exportConfig (model ^. programConfig))]
     DebugPrintSelection -> [Task (PutExtern <$> print (model ^. fileSelection))]

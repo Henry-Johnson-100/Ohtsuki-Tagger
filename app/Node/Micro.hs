@@ -94,10 +94,13 @@ descriptorNewCommitButton =
   styledButton DescriptorCommitNewDescriptorText "New Descriptor"
 
 initializeDatabaseButton :: (WidgetModel s) => WidgetNode s TaggerEvent
-initializeDatabaseButton = styledButton InitializeDatabase "Initialize Database" `styleBasic` [bgColor (Color 212 0 0 0.83)]
+initializeDatabaseButton = styledButton DatabaseInitialize "Initialize Database" `styleBasic` [bgColor (Color 212 0 0 0.83)]
 
 databaseConnectButton :: (WidgetModel s) => WidgetNode s TaggerEvent
 databaseConnectButton = styledButton DatabaseConnect "Connect"
+
+databaseBackupButton :: WidgetModel s => WidgetNode s TaggerEvent
+databaseBackupButton = styledButton DatabaseBackup "Backup"
 
 configurationExportButton :: (WidgetModel s) => WidgetNode s TaggerEvent
 configurationExportButton = styledButton ConfigurationExport "Export Config"

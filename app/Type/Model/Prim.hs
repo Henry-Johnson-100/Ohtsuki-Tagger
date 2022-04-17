@@ -197,9 +197,10 @@ data TaggerEvent
   | DescriptorCommitNewDescriptorText
   | DescriptorDelete !Descriptor
   | NewFileTextCommit
-  | InitializeDatabase
+  | DatabaseInitialize
   | DatabaseConnect
-  | PutDatabaseConnection_ !TaggedConnection
+  | DatabaseBackup
+  | DatabaseConnectionPut_ !TaggedConnection
   | ToggleVisibilityMode !ProgramVisibility
   | ConfigurationExport
   | DebugPrintSelection
