@@ -14,14 +14,13 @@ module Node.Application
     fileSinglePreviewWidget,
     descriptorTreeQuadrantWidget,
     configureZone,
-    queryAndTagEntryWidget,
     menubar,
     visibility,
     operationWidget,
   )
 where
 
-import Control.Lens ((^.))
+import Control.Lens
 import Data.List (foldl', intersperse, map)
 import Data.Text (Text, append, intercalate, pack, replicate, unwords)
 import Database.Tagger.Type
@@ -208,28 +207,6 @@ fileSinglePreviewWidget = imageZone
                              radius 0
                            ]
 
-queryWidget ::
-  ( WidgetModel s,
-    HasFileSelectionQuery s Text,
-    HasQueryCriteria s QueryCriteria,
-    HasFileSetArithmetic s FileSetArithmetic
-  ) =>
-  WidgetNode s TaggerEvent
-queryWidget =
-  keystroke_
-    [ ("Ctrl-c", FileSetQueryCriteriaNext),
-      ("Ctrl-s", FileSetArithmeticNext)
-    ]
-    [ignoreChildrenEvts]
-    . box_ []
-    . hstack_ []
-    $ [ clearSelectionButton,
-        setArithmeticDropdown,
-        commitQueryButton,
-        keystroke [("Enter", FileSelectionCommitQuery)] queryTextField,
-        setQueryCriteriaDropdown
-      ]
-
 operationWidget ::
   ( WidgetModel s,
     HasFileSetArithmetic s FileSetArithmetic,
@@ -337,43 +314,6 @@ operationWidget =
                 stdDelayTooltip "Ctrl-l" setQueryCriteriaDropdown
               ]
           ]
-
-tagCommitWidget ::
-  ( WidgetModel s,
-    HasTagsString s Text,
-    HasTaggingMode s TaggingMode
-  ) =>
-  WidgetNode s TaggerEvent
-tagCommitWidget =
-  box_ [alignLeft]
-    . hstack_ []
-    $ [ taggingModeDropdown,
-        keystroke
-          [ ("Enter", TagCommitTagsString),
-            ("Ctrl-j", FileSinglePrevFromFileSelection),
-            ("Ctrl-k", FileSingleNextFromFileSelection)
-          ]
-          . hstack_ []
-          $ [ tagCommitButton,
-              stdDelayTooltip "Ctrl-j" fileSinglePrevFromFileSelectionButton,
-              stdDelayTooltip "Ctrl-k" fileSingleNextFromFileSelectionButton,
-              tagsStringTextField
-            ]
-      ]
-
-queryAndTagEntryWidget ::
-  ( WidgetModel s,
-    HasTagsString s Text,
-    HasTaggingMode s TaggingMode,
-    HasFileSelectionQuery s Text,
-    HasQueryCriteria s QueryCriteria,
-    HasFileSetArithmetic s FileSetArithmetic
-  ) =>
-  WidgetNode s TaggerEvent
-queryAndTagEntryWidget = vstack [queryWidget, tagCommitWidget]
-
-descriptorNewWidget :: (WidgetModel s, HasNewDescriptorText s Text) => WidgetNode s TaggerEvent
-descriptorNewWidget = keystroke [("Enter", DescriptorCommitNewDescriptorText)] . hstack_ [] $ [descriptorNewCommitButton, descriptorNewTextField]
 
 descriptorTreeQuadrantWidget :: (WidgetModel s) => DescriptorTree -> DescriptorTree -> WidgetNode s TaggerEvent
 descriptorTreeQuadrantWidget atr utr =
