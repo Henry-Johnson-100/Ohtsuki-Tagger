@@ -108,9 +108,7 @@ configureZone ::
   WidgetNode s TaggerEvent
 configureZone =
   box . vgrid $
-    [ shellCmdWidget,
-      descriptorNewWidget,
-      hstack [newFileTextField, newFileTextCommitButton],
+    [ hstack [newFileTextField, newFileTextCommitButton],
       dbPathTextField,
       dbBackupTextField,
       dbAutoConnectCheckBox,
@@ -236,38 +234,91 @@ operationWidget ::
   ( WidgetModel s,
     HasFileSetArithmetic s FileSetArithmetic,
     HasQueryCriteria s QueryCriteria,
-    HasFileSelectionQuery s Text
+    HasFileSelectionQuery s Text,
+    HasTagsString s Text,
+    HasTaggingMode s TaggingMode,
+    HasNewDescriptorText s Text,
+    HasShellCmd s Text
   ) =>
   WidgetNode s TaggerEvent
 operationWidget =
   flip styleBasic [border 1 black]
-    . box_ []
+    . box_ [alignTop]
     . flip
       keystroke_
       [ignoreChildrenEvts]
-      [ ("Ctrl-j", FileSinglePrevFromFileSelection),
+      [ ("Ctrl-u", ShellCmd),
+        ("Ctrl-i", FileSinglePrevFromFileSelection),
         ("Ctrl-k", FileSingleNextFromFileSelection),
-        ("Ctrl-h", FileSetArithmeticNext),
-        ("Ctrl-l", FileSetQueryCriteriaNext)
+        ("Ctrl-j", FileSetArithmeticNext),
+        ("Ctrl-Shift-j", FileSetArithmeticPrev),
+        ("Ctrl-l", FileSetQueryCriteriaNext),
+        ("Ctrl-Shift-l", FileSetQueryCriteriaPrev),
+        ("Ctrl-o", TaggingModeNext),
+        ("Ctrl-Shift-o", TaggingModePrev)
       ]
     . vstack_ []
     $ [ selectionOperatorWidget,
-        spacer,
-        labeledQueryTextField
+        separatorLine,
+        labeledQueryTextField,
+        separatorLine,
+        labeledTagTextField,
+        separatorLine,
+        labeledNewDescriptorTextField,
+        separatorLine,
+        labeledShellCmdTextField,
+        separatorLine
       ]
   where
     labeledQueryTextField ::
       (WidgetModel s, HasFileSelectionQuery s Text) =>
       WidgetNode s TaggerEvent
     labeledQueryTextField =
-      flip keystroke_ [ignoreChildrenEvts] [("Enter", FileSelectionCommitQuery)]
+      flip
+        keystroke_
+        [ignoreChildrenEvts]
+        [("Enter", FileSelectionCommitQuery)]
         . labeledWidget "Query"
         . hstack_ []
         $ [button "→" FileSelectionCommitQuery, queryTextField]
+    labeledTagTextField ::
+      (WidgetModel s, HasTagsString s Text) =>
+      WidgetNode s TaggerEvent
+    labeledTagTextField =
+      flip
+        keystroke_
+        [ignoreChildrenEvts]
+        [("Enter", TagCommitTagsString)]
+        . labeledWidget "Tag"
+        . hstack_ []
+        $ [button "→" TagCommitTagsString, tagsStringTextField]
+    labeledNewDescriptorTextField ::
+      (WidgetModel s, HasNewDescriptorText s Text) =>
+      WidgetNode s TaggerEvent
+    labeledNewDescriptorTextField =
+      flip
+        keystroke_
+        [ignoreChildrenEvts]
+        [("Enter", DescriptorCommitNewDescriptorText)]
+        . labeledWidget "Descriptor"
+        . hstack_ []
+        $ [button "→" DescriptorCommitNewDescriptorText, descriptorNewTextField]
+    labeledShellCmdTextField ::
+      (WidgetModel s, HasShellCmd s Text) =>
+      WidgetNode s TaggerEvent
+    labeledShellCmdTextField =
+      flip
+        keystroke_
+        [ignoreChildrenEvts]
+        [("Enter", ShellCmd)]
+        . labeledWidget "Shell"
+        . hstack_ []
+        $ [button "→" ShellCmd, shellCmdTextField]
     selectionOperatorWidget ::
       ( WidgetModel s,
         HasFileSetArithmetic s FileSetArithmetic,
-        HasQueryCriteria s QueryCriteria
+        HasQueryCriteria s QueryCriteria,
+        HasTaggingMode s TaggingMode
       ) =>
       WidgetNode s TaggerEvent
     selectionOperatorWidget =
@@ -275,13 +326,13 @@ operationWidget =
         . vgrid_ []
         $ [ hgrid_
               []
-              [ spacer,
-                stdDelayTooltip "Ctrl-j" fileSinglePrevFromFileSelectionButton,
-                spacer
+              [ stdDelayTooltip "Ctrl-u" doShellCmdButton,
+                stdDelayTooltip "Ctrl-i" fileSinglePrevFromFileSelectionButton,
+                stdDelayTooltip "Ctrl-o" taggingModeDropdown
               ],
             hgrid_
               []
-              [ stdDelayTooltip "Ctrl-h" setArithmeticDropdown,
+              [ stdDelayTooltip "Ctrl-j" setArithmeticDropdown,
                 stdDelayTooltip "Ctrl-k" fileSingleNextFromFileSelectionButton,
                 stdDelayTooltip "Ctrl-l" setQueryCriteriaDropdown
               ]

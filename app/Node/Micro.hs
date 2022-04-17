@@ -39,7 +39,7 @@ labeledWidget ::
   (WidgetModel s, WidgetEvent e) => Text -> WidgetNode s e -> WidgetNode s e
 labeledWidget l w =
   box_ [alignLeft] . vstack_ [] $
-    [label l `styleBasic` [], w]
+    [label l `styleBasic` [textSize 16], w]
 
 styledButton :: (WidgetModel s) => TaggerEvent -> Text -> WidgetNode s TaggerEvent
 styledButton a t =

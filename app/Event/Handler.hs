@@ -15,7 +15,7 @@ module Event.Handler
 where
 
 import Control.Applicative
-import Control.Lens ((&), (.~), (^.))
+import Control.Lens ((%~), (&), (.~), (^.))
 import qualified Control.Monad as CM
 import qualified Data.List as L
 import qualified Data.Maybe as M
@@ -80,17 +80,11 @@ taggerEventHandler wenv node model event =
     FileSinglePut i -> [Model $ model & fileSingle .~ Just i]
     FileSingleMaybePut mi -> [Model $ model & fileSingle .~ mi]
     FileSetArithmetic a -> [Model $ model & fileSetArithmetic .~ a]
-    FileSetArithmeticNext ->
-      [ Model $
-          model
-            & fileSetArithmetic .~ next (model ^. fileSetArithmetic)
-      ]
+    FileSetArithmeticNext -> [Model $ model & fileSetArithmetic %~ next]
+    FileSetArithmeticPrev -> [Model $ model & fileSetArithmetic %~ prev]
     FileSetQueryCriteria q -> [Model $ model & queryCriteria .~ q]
-    FileSetQueryCriteriaNext ->
-      [ Model $
-          model
-            & queryCriteria .~ next (model ^. queryCriteria)
-      ]
+    FileSetQueryCriteriaNext -> [Model $ model & queryCriteria %~ next]
+    FileSetQueryCriteriaPrev -> [Model $ model & queryCriteria %~ prev]
     FileSelectionUpdate ts ->
       [ Model $
           model & fileSelection
@@ -262,6 +256,8 @@ taggerEventHandler wenv node model event =
           (model ^. dbConn),
         asyncEvent FileSelectionRefresh_
       ]
+    TaggingModeNext -> [Model $ model & taggingMode %~ next]
+    TaggingModePrev -> [Model $ model & taggingMode %~ prev]
     NewFileTextCommit ->
       [ dbConnTask FileSelectionPut (flip addPath (model ^. newFileText)) $
           model ^. dbConn,

@@ -38,8 +38,7 @@ taggerApplicationUI wenv model' = widgetTree
                     $ [ box_ [alignMiddle] . fileSinglePreviewWidget $ model,
                         hgrid
                           [ vstack
-                              [ queryAndTagEntryWidget,
-                                descriptorTreeQuadrantWidget
+                              [ descriptorTreeQuadrantWidget
                                   (model ^. descriptorTree)
                                   (model ^. unrelatedDescriptorTree)
                               ],
@@ -48,7 +47,8 @@ taggerApplicationUI wenv model' = widgetTree
                           ]
                       ]
                 ]
-            ] `styleBasic` [padding 0]
+            ]
+            `styleBasic` [padding 0]
 
 taggerApplicationConfig :: [AppConfig TaggerEvent]
 taggerApplicationConfig =

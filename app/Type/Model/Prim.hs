@@ -153,9 +153,11 @@ data TaggerEvent
   | -- | Set querying set arithmetic to Union, Intersect, or Diff
     FileSetArithmetic !FileSetArithmetic
   | FileSetArithmeticNext
+  | FileSetArithmeticPrev
   | -- | Set the query critera which is how files will be queried
     FileSetQueryCriteria !QueryCriteria
   | FileSetQueryCriteriaNext
+  | FileSetQueryCriteriaPrev
   | -- Display an image preview
     FileSinglePut !FileWithTags
   | -- For indeterminate IO
@@ -191,6 +193,8 @@ data TaggerEvent
     TagCommitTagsString
   | TagCommitTagsStringDoSolo
   | TagCommitTagsStringDoSelection
+  | TaggingModeNext
+  | TaggingModePrev
   | -- Append Text to the TagsString
     TagsStringAppend !Text
   | TagsStringClear
