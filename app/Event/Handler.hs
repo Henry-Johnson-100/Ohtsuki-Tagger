@@ -303,7 +303,6 @@ taggerEventHandler wenv node model event =
           )
       ]
     ConfigurationExport -> [Task (PutExtern <$> exportConfig (model ^. programConfig))]
-    DebugPrintSelection -> [Task (PutExtern <$> print (model ^. fileSelection))]
 
 -- | Replaces "%file" in the first list with the entirety of the second.
 putFileArgs :: [String] -> [String] -> [String]

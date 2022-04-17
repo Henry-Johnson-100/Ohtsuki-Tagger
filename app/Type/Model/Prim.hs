@@ -203,5 +203,4 @@ data TaggerEvent
   | DatabaseConnectionPut_ !TaggedConnection
   | ToggleVisibilityMode !ProgramVisibility
   | ConfigurationExport
-  | DebugPrintSelection
   deriving (Show, Eq)
