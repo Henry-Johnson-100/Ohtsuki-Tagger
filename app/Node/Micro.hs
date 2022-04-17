@@ -11,6 +11,7 @@ import Data.List
 import Data.Text hiding (foldl', intersperse, map)
 import Database.Tagger.Type
 import Monomer
+import Node.Color
 import Type.Config
 import Type.Model
 
@@ -333,7 +334,7 @@ descriptorTreeWidget tr dAction =
                     [ acc,
                       hstack
                         [ treeLeafDescriptorWidget
-                            blue
+                            yuiBlue
                             l
                             d
                             action
@@ -352,7 +353,7 @@ descriptorTreeWidget tr dAction =
                                 action
                             Meta d' _ ->
                               treeLeafDescriptorWidget
-                                blue
+                                yuiBlue
                                 (l + 1)
                                 d'
                                 action
