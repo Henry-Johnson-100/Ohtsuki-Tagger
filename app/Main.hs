@@ -61,19 +61,9 @@ runTaggerWindow cfg =
     taggerApplicationUI
     taggerApplicationConfig
 
-getTaggedConnection :: FilePath -> IO TaggedConnection
-getTaggedConnection p = do
-  dbConn <- open p
-  return (TaggedConnection (T.pack p) (Just dbConn))
-
-closeTaggedConnection :: TaggedConnection -> IO ()
-closeTaggedConnection (TaggedConnection _ mc) = maybe (pure ()) close mc
-
 main :: IO ()
 main = do
   configPath <- getConfigPath
-  try' (getConfig configPath) $
-    \config -> do
-      runTaggerWindow config
+  try' (getConfig configPath) runTaggerWindow
   where
     try' e c = runExceptT e >>= either (hPutStrLn stderr) c
