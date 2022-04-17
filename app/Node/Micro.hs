@@ -11,7 +11,6 @@ import Data.List
 import Data.Text hiding (foldl', intersperse, map)
 import Database.Tagger.Type
 import Monomer
-import Node.Color
 import Type.Config
 import Type.Model
 
@@ -36,17 +35,21 @@ stdDelayTooltip = flip tooltip_ [tooltipDelay 750]
 stdScroll :: WidgetNode s e -> WidgetNode s e
 stdScroll = scroll_ [wheelRate 50]
 
+labeledWidget ::
+  (WidgetModel s, WidgetEvent e) => Text -> WidgetNode s e -> WidgetNode s e
+labeledWidget l w =
+  box_ [alignLeft] . vstack_ [] $
+    [label l `styleBasic` [], w]
+
 styledButton :: (WidgetModel s) => TaggerEvent -> Text -> WidgetNode s TaggerEvent
 styledButton a t =
   button t a
-    `styleBasic` [bgColor bgDefault, border 0 bgDefault]
-    `styleHover` [bgColor bgLightGray]
 
 buttonStylingBasic :: [StyleState]
-buttonStylingBasic = [bgColor bgDefault, border 0 bgDefault]
+buttonStylingBasic = [bgColor white, border 0 white]
 
 buttonStylingHover :: [StyleState]
-buttonStylingHover = [bgColor bgLightGray]
+buttonStylingHover = [bgColor lightGray]
 
 dbPathTextField ::
   (WidgetModel s, HasProgramConfig s TaggerConfig) =>
@@ -222,7 +225,7 @@ draggableDescriptorWidget ::
 draggableDescriptorWidget d =
   box_ [alignLeft]
     . draggable d
-    . flip styleBasic [textColor textBlue]
+    . flip styleBasic [textColor blue]
     . flip label_ [ellipsis]
     . getPlainText
     $ d
@@ -234,7 +237,7 @@ generalDescriptorTreeWidget ::
   (Descriptor -> WidgetNode s TaggerEvent) ->
   WidgetNode s TaggerEvent
 generalDescriptorTreeWidget tr bs dAction =
-  flip styleBasic [border 1 textBlack] . box_ [alignTop, alignLeft] $
+  flip styleBasic [border 1 black] . box_ [alignTop, alignLeft] $
     hstack_
       []
       [ vsplit (vstack_ [] bs, spacer),
@@ -283,11 +286,11 @@ treeLeafDescriptorWidget tc l d a =
       draggable d $
         a d
           `styleBasic` [ textColor tc,
-                         bgColor bgDefault,
-                         border 0 bgDefault,
+                         bgColor white,
+                         border 0 white,
                          padding 0
                        ]
-          `styleHover` [bgColor bgLightGray]
+          `styleHover` [bgColor lightGray]
     ]
 
 descriptorTreeWidget ::
@@ -319,7 +322,7 @@ descriptorTreeWidget tr dAction =
               vstack
                 [ acc,
                   treeLeafDescriptorWidget
-                    textBlack
+                    black
                     l
                     d
                     action
@@ -330,7 +333,7 @@ descriptorTreeWidget tr dAction =
                     [ acc,
                       hstack
                         [ treeLeafDescriptorWidget
-                            textBlue
+                            blue
                             l
                             d
                             action
@@ -343,19 +346,19 @@ descriptorTreeWidget tr dAction =
                           case c of
                             Infra d' ->
                               treeLeafDescriptorWidget
-                                textBlack
+                                black
                                 (l + 1)
                                 d'
                                 action
                             Meta d' _ ->
                               treeLeafDescriptorWidget
-                                textBlue
+                                blue
                                 (l + 1)
                                 d'
                                 action
                             NullTree ->
                               spacer
-                                `styleBasic` [padding 0, border 0 bgDefault]
+                                `styleBasic` [padding 0, border 0 white]
                       )
                       cs
                 )

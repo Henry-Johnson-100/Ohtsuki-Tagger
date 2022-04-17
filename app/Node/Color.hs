@@ -1,15 +1,41 @@
 module Node.Color where
 
-import Monomer (Color (Color))
+import Data.Map.Strict hiding (map)
+import Monomer
 
-bgDefault :: Color
-bgDefault = Color 0 0 0 0
+-- | SHould probably only have 8 colors with the first two being black and white
+type ColorMap = Map String Color
 
-bgLightGray :: Color
-bgLightGray = Color 203 203 203 0.8
+newMap :: [Color] -> ColorMap
+newMap xs =
+  fromList [("Color_black", black), ("Color_white", white)]
+    <> (fromList . zipWith (\cix color -> ("Color_" ++ show cix, color)) [2 ..] $ xs)
 
-textBlue :: Color
-textBlue = Color 7 58 198 0.78
+yuiMap :: ColorMap
+yuiMap =
+  newMap
+    [ yuiLightPeach,
+      yuiPeach,
+      yuiYellow,
+      yuiRed,
+      yuiOrange,
+      yuiBlue
+    ]
 
-textBlack :: Color
-textBlack = Color 0 0 0 1
+yuiPeach :: Color
+yuiPeach = rgbHex "#FFECDE"
+
+yuiLightPeach :: Color
+yuiLightPeach = rgbHex "#FFF9F6"
+
+yuiYellow :: Color
+yuiYellow = rgbHex "#FFE29E"
+
+yuiRed :: Color
+yuiRed = rgbHex "#E5444A"
+
+yuiOrange :: Color
+yuiOrange = rgbHex "#FF8A44"
+
+yuiBlue :: Color
+yuiBlue = rgbHex "#3554A0"

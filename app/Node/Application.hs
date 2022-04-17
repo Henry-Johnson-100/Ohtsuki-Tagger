@@ -26,6 +26,7 @@ import Data.List (foldl', intersperse, map)
 import Data.Text (Text, append, intercalate, pack, replicate, unwords)
 import Database.Tagger.Type
 import Monomer
+import Monomer.Core.Themes.BaseTheme
 import Node.Color
 import Node.Micro
 import Type.Config
@@ -43,11 +44,43 @@ visibility m vm = flip nodeVisible (vm == m ^. programVisibility)
 themeConfig :: [AppConfig e]
 themeConfig =
   [ appWindowTitle "Tagger",
-    appTheme lightTheme,
+    appTheme yuiTheme,
     appFontDef "Regular" "/usr/local/share/fonts/i/iosevka_light.ttf",
     appFontDef "Thin" "/usr/local/share/fonts/i/iosevka_thin.ttf",
     appFontDef "Bold" "/usr/local/share/fonts/i/iosevka_bold.ttf"
   ]
+
+yuiTheme :: Theme
+yuiTheme =
+  baseTheme
+    lightThemeColors
+      { clearColor = yuiLightPeach,
+        sectionColor = yuiRed,
+        -- btn
+        btnBgBasic = yuiLightPeach,
+        btnBgFocus = yuiYellow,
+        btnFocusBorder = yuiOrange,
+        btnBgHover = yuiPeach,
+        btnBgActive = yuiOrange,
+        -- input
+        inputBgBasic = yuiLightPeach,
+        inputBgFocus = yuiYellow,
+        inputFocusBorder = yuiOrange,
+        -- input selected
+        inputSelFocus = yuiOrange,
+        inputSelBasic = yuiYellow,
+        -- dialog
+        dialogBg = yuiLightPeach,
+        -- sl and dropdowns
+        slMainBg = yuiLightPeach,
+        -- sl normal
+        slNormalBgHover = yuiYellow,
+        slNormalFocusBorder = yuiOrange,
+        -- sl selected
+        slSelectedBgBasic = yuiPeach,
+        slSelectedBgHover = yuiOrange,
+        slSelectedFocusBorder = yuiRed
+      }
 
 menubar :: (WidgetModel s) => WidgetNode s TaggerEvent
 menubar =
@@ -173,7 +206,7 @@ fileSinglePreviewWidget = imageZone
               `styleBasic` [ textFont "Thin",
                              paddingB 5,
                              paddingT 0,
-                             border 0 bgDefault,
+                             border 0 white,
                              radius 0
                            ]
 
@@ -202,11 +235,13 @@ queryWidget =
 operationWidget ::
   ( WidgetModel s,
     HasFileSetArithmetic s FileSetArithmetic,
-    HasQueryCriteria s QueryCriteria
+    HasQueryCriteria s QueryCriteria,
+    HasFileSelectionQuery s Text
   ) =>
   WidgetNode s TaggerEvent
 operationWidget =
-  box_ []
+  flip styleBasic [border 1 black]
+    . box_ []
     . flip
       keystroke_
       [ignoreChildrenEvts]
@@ -215,8 +250,20 @@ operationWidget =
         ("Ctrl-h", FileSetArithmeticNext),
         ("Ctrl-l", FileSetQueryCriteriaNext)
       ]
-    $ selectionOperatorWidget
+    . vstack_ []
+    $ [ selectionOperatorWidget,
+        spacer,
+        labeledQueryTextField
+      ]
   where
+    labeledQueryTextField ::
+      (WidgetModel s, HasFileSelectionQuery s Text) =>
+      WidgetNode s TaggerEvent
+    labeledQueryTextField =
+      flip keystroke_ [ignoreChildrenEvts] [("Enter", FileSelectionCommitQuery)]
+        . labeledWidget "Query"
+        . hstack_ []
+        $ [button "→" FileSelectionCommitQuery, queryTextField]
     selectionOperatorWidget ::
       ( WidgetModel s,
         HasFileSetArithmetic s FileSetArithmetic,
@@ -279,5 +326,5 @@ descriptorNewWidget = keystroke [("Enter", DescriptorCommitNewDescriptorText)] .
 
 descriptorTreeQuadrantWidget :: (WidgetModel s) => DescriptorTree -> DescriptorTree -> WidgetNode s TaggerEvent
 descriptorTreeQuadrantWidget atr utr =
-  flip styleBasic [border 1 textBlack] . box_ [alignTop, alignLeft] $
+  flip styleBasic [border 1 black] . box_ [alignTop, alignLeft] $
     hsplit (explorableDescriptorTreeWidget atr, unrelatedDescriptorTreeWidget utr)

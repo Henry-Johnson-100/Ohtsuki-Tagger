@@ -48,7 +48,7 @@ taggerApplicationUI wenv model' = widgetTree
                           ]
                       ]
                 ]
-            ]
+            ] `styleBasic` [padding 0]
 
 taggerApplicationConfig :: [AppConfig TaggerEvent]
 taggerApplicationConfig =
