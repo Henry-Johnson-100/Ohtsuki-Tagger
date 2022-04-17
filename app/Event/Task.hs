@@ -12,6 +12,7 @@ import Control.Monad.Trans.Maybe
 import Data.Char
 import Data.Maybe
 import qualified Data.Text as T
+import Database.SQLite.Simple
 import Database.Tagger.Access
 import Database.Tagger.Type
 import Type.Model

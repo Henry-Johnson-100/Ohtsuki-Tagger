@@ -7,18 +7,21 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use section" #-}
+{-# HLINT ignore "Use list comprehension" #-}
 
 module Event.Handler
   ( taggerEventHandler,
   )
 where
 
+import Control.Applicative
 import Control.Lens ((&), (.~), (^.))
 import qualified Control.Monad as CM
 import qualified Data.List as L
 import qualified Data.Maybe as M
 import qualified Data.Text as T
 import Database.SQLite.Simple
+import Database.Tagger.Access (activateForeignKeyPragma)
 import Database.Tagger.Type
 import Event.Task
 import IO
@@ -51,7 +54,16 @@ doSetAction a s o =
     Intersect -> s `fwtIntersect` o
     Diff -> s `fwtDiff` o
 
-dbConnTask e f = maybe (Task (PutExtern <$> pure ())) (Task . fmap e . f) . connInstance
+dbConnTask ::
+  (a -> TaggerEvent) ->
+  (Connection -> IO a) ->
+  TaggedConnection ->
+  EventResponse s TaggerEvent sp ep
+dbConnTask e f =
+  maybe
+    (Task (PutExtern <$> hPutStrLn stderr "Database connection not active."))
+    (Task . fmap e . f)
+    . connInstance
 
 taggerEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -62,17 +74,9 @@ taggerEventHandler ::
 taggerEventHandler wenv node model event =
   case event of
     TaggerInit ->
-      [ dbConnTask DescriptorTreePut getALLInfraTree (model ^. dbConn),
-        dbConnTask UnrelatedDescriptorTreePut getUnrelatedInfraTree (model ^. dbConn),
-        Model $
-          model
-            & fileSingle
-              .~ Just
-                ( FileWithTags
-                    (File (-1) "/home/monax/Pictures/dog.jpg")
-                    []
-                )
-      ]
+      if model ^. (programConfig . dbAutoConnect)
+        then [asyncEvent DatabaseConnect]
+        else []
     FileSinglePut i -> [Model $ model & fileSingle .~ Just i]
     FileSingleMaybePut mi -> [Model $ model & fileSingle .~ mi]
     FileSetArithmetic a -> [Model $ model & fileSetArithmetic .~ a]
@@ -266,12 +270,23 @@ taggerEventHandler wenv node model event =
     InitializeDatabase ->
       [ dbConnTask
           PutExtern
-          (runInitScript (T.unpack . _dbInit $ model ^. programConfig))
+          (runInitScript (T.unpack $ model ^. (programConfig . dbInit)))
           (model ^. dbConn)
       ]
     ToggleVisibilityMode vm ->
       [ let currentVM = model ^. programVisibility
          in Model $ model & programVisibility .~ (if currentVM == vm then Main else vm)
+      ]
+    PutDatabaseConnection_ tc -> [Model $ model & dbConn .~ tc]
+    DatabaseConnect ->
+      [ Task $
+          PutDatabaseConnection_ <$> do
+            maybe (pure ()) close . connInstance $ model ^. dbConn
+            let newConnTag = model ^. (programConfig . dbPath)
+            newConnInstance <- open . T.unpack $ newConnTag
+            activateForeignKeyPragma newConnInstance
+            return . TaggedConnection newConnTag . Just $ newConnInstance,
+        asyncEvent RefreshBothDescriptorTrees
       ]
     DebugPrintSelection -> [Task (PutExtern <$> print (model ^. fileSelection))]
 

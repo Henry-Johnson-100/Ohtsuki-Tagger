@@ -53,10 +53,10 @@ taggerApplicationConfig :: [AppConfig TaggerEvent]
 taggerApplicationConfig =
   appInitEvent TaggerInit : themeConfig
 
-runTaggerWindow :: TaggedConnection -> TaggerConfig -> IO ()
-runTaggerWindow c cfg =
+runTaggerWindow :: TaggerConfig -> IO ()
+runTaggerWindow cfg =
   startApp
-    (emptyTaggerModel c cfg)
+    (emptyTaggerModel cfg)
     taggerEventHandler
     taggerApplicationUI
     taggerApplicationConfig
@@ -75,15 +75,6 @@ main = do
   let configPath = userHome ++ "/.config/tagger.toml"
   try' (getConfig configPath) $
     \config -> do
-      dbConn <-
-        getTaggedConnection
-          . T.unpack
-          . _dbPath
-          $ config
-      -- activateForeignKeyPragma dbConn
-      maybe (pure ()) activateForeignKeyPragma . connInstance $ dbConn
-      runTaggerWindow dbConn config
-      closeTaggedConnection dbConn
+      runTaggerWindow config
   where
-    putEx = hPutStrLn stderr
-    try' e c = runExceptT e >>= either putEx c
+    try' e c = runExceptT e >>= either (hPutStrLn stderr) c

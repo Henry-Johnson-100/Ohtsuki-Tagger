@@ -62,8 +62,8 @@ data TaggerModel = TaggerModel
   }
   deriving (Show, Eq)
 
-emptyTaggerModel :: TaggedConnection -> TaggerConfig -> TaggerModel
-emptyTaggerModel c cfg =
+emptyTaggerModel :: TaggerConfig -> TaggerModel
+emptyTaggerModel cfg =
   TaggerModel
     { _taggerFileSelection = [],
       _taggerFileSetArithmetic = Union,
@@ -75,7 +75,7 @@ emptyTaggerModel c cfg =
       _taggerDoSoloTag = False,
       _taggerShellCmd = "feh -D120 -zx. -g800x800 -Bwhite",
       _taggerExtern = (),
-      _taggerDbConn = c,
+      _taggerDbConn = TaggedConnection ":memory:" Nothing,
       _taggerTagsString = "",
       _taggerUnrelatedDescriptorTree = NullTree,
       _taggerNewDescriptorText = "",
@@ -198,6 +198,8 @@ data TaggerEvent
   | DescriptorDelete !Descriptor
   | NewFileTextCommit
   | InitializeDatabase
+  | DatabaseConnect
+  | PutDatabaseConnection_ !TaggedConnection
   | ToggleVisibilityMode !ProgramVisibility
   | DebugPrintSelection
   deriving (Show, Eq)

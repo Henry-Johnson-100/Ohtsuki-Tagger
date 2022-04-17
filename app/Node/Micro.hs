@@ -7,7 +7,6 @@
 
 module Node.Micro where
 
-import Control.Lens
 import Data.List
 import Data.Text hiding (foldl', intersperse, map)
 import Database.Tagger.Type
@@ -96,6 +95,9 @@ descriptorNewCommitButton =
 
 initializeDatabaseButton :: (WidgetModel s) => WidgetNode s TaggerEvent
 initializeDatabaseButton = styledButton InitializeDatabase "Initialize Database" `styleBasic` [bgColor (Color 212 0 0 0.83)]
+
+databaseConnectButton :: (WidgetModel s) => WidgetNode s TaggerEvent
+databaseConnectButton = styledButton DatabaseConnect "Connect"
 
 toggleConfigModeButton :: (WidgetModel s) => WidgetNode s TaggerEvent
 toggleConfigModeButton = styledButton (ToggleVisibilityMode Configure) "Configure"

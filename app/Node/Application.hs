@@ -79,7 +79,8 @@ configureZone =
       hstack [newFileTextField, newFileTextCommitButton],
       dbPathTextField,
       dbBackupTextField,
-      dbAutoConnectCheckBox
+      dbAutoConnectCheckBox,
+      databaseConnectButton
     ]
 
 fileSelectionWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent
