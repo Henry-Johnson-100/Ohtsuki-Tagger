@@ -80,7 +80,8 @@ configureZone =
       dbPathTextField,
       dbBackupTextField,
       dbAutoConnectCheckBox,
-      databaseConnectButton
+      databaseConnectButton,
+      configurationExportButton
     ]
 
 fileSelectionWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent

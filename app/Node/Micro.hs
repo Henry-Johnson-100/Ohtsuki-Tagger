@@ -99,6 +99,9 @@ initializeDatabaseButton = styledButton InitializeDatabase "Initialize Database"
 databaseConnectButton :: (WidgetModel s) => WidgetNode s TaggerEvent
 databaseConnectButton = styledButton DatabaseConnect "Connect"
 
+configurationExportButton :: (WidgetModel s) => WidgetNode s TaggerEvent
+configurationExportButton = styledButton ConfigurationExport "Export Config"
+
 toggleConfigModeButton :: (WidgetModel s) => WidgetNode s TaggerEvent
 toggleConfigModeButton = styledButton (ToggleVisibilityMode Configure) "Configure"
 

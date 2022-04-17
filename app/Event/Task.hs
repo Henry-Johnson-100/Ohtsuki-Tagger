@@ -15,9 +15,18 @@ import qualified Data.Text as T
 import Database.SQLite.Simple
 import Database.Tagger.Access
 import Database.Tagger.Type
+import IO
+import qualified Toml
+import Type.Config
 import Type.Model
 
 type ConnString = String
+
+exportConfig :: TaggerConfig -> IO ()
+exportConfig tc = do
+  configPath <- getConfigPath
+  encodingMsg <- Toml.encodeToFile taggerConfigCodec configPath tc
+  putStrLn . T.unpack $ encodingMsg
 
 addPath :: Connection -> T.Text -> IO [FileWithTags]
 addPath c p = do

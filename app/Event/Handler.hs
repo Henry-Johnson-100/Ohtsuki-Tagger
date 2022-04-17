@@ -288,6 +288,7 @@ taggerEventHandler wenv node model event =
             return . TaggedConnection newConnTag . Just $ newConnInstance,
         asyncEvent RefreshBothDescriptorTrees
       ]
+    ConfigurationExport -> [Task (PutExtern <$> exportConfig (model ^. programConfig))]
     DebugPrintSelection -> [Task (PutExtern <$> print (model ^. fileSelection))]
 
 -- | Replaces "%file" in the first list with the entirety of the second.

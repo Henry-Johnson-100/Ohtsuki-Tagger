@@ -43,6 +43,11 @@ getConfig =
     <=< decodeFileEither taggerConfigCodec
     <=< validateFilePath
 
+getConfigPath :: IO FilePath
+getConfigPath = do
+  userHome <- getEnv "HOME"
+  return $ userHome ++ "/.config/tagger.toml"
+
 getConfigDbConn :: FilePath -> ExceptT ConfigException IO FilePath
 getConfigDbConn =
   withExceptT

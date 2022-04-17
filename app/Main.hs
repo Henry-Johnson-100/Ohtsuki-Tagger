@@ -15,7 +15,7 @@ import qualified Data.Text as T
 import Database.SQLite.Simple (Connection, close, open)
 import Database.Tagger.Access (activateForeignKeyPragma)
 import Event.Handler (taggerEventHandler)
-import IO (getConfig, getEnv, hPutStrLn, stderr)
+import IO
 import Monomer
 import Node.Application
 import Type.Config
@@ -71,8 +71,7 @@ closeTaggedConnection (TaggedConnection _ mc) = maybe (pure ()) close mc
 
 main :: IO ()
 main = do
-  userHome <- getEnv "HOME"
-  let configPath = userHome ++ "/.config/tagger.toml"
+  configPath <- getConfigPath
   try' (getConfig configPath) $
     \config -> do
       runTaggerWindow config

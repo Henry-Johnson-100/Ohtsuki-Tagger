@@ -9,7 +9,6 @@ module Type.Config
 where
 
 import qualified Data.Text as T
-import qualified Data.Text.IO as T.IO
 import Toml ((.=))
 import qualified Toml
 
