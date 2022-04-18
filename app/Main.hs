@@ -35,7 +35,7 @@ taggerApplicationUI wenv model' = widgetTree
                 [ visibility model Configure configureZone,
                   visibility model Main
                     . vsplit_ [splitIgnoreChildResize True]
-                    $ ( fileSingleWidget $ model ^. fileSingle,
+                    $ ( fileSingleWidget (model ^. doSoloTag) $ model ^. fileSingle,
                         box_ [alignBottom] . hgrid $
                           [ vstack
                               [ descriptorTreeQuadrantWidget

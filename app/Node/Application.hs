@@ -157,27 +157,55 @@ fileSelectionWidget fwts =
 
 fileSingleWidget ::
   (WidgetModel s, HasDoSoloTag s Bool) =>
+  Bool ->
   Maybe FileWithTags ->
   WidgetNode s TaggerEvent
-fileSingleWidget mfwt =
+fileSingleWidget isSoloTagMode mfwt =
   flip styleBasic [maxHeight 10000]
     . box_ [alignTop, alignMiddle]
-    . vstack_ []
-    $ [imagePreview mfwt]
+    . hsplit_ [splitIgnoreChildResize True]
+    $ ( imagePreview . fmap getPlainText $ mfwt,
+        imageDetails isSoloTagMode . maybe [] tags $ mfwt
+      )
   where
     imagePreview ::
       (WidgetModel s, HasDoSoloTag s Bool) =>
-      Maybe FileWithTags ->
+      Maybe Text ->
       WidgetNode s TaggerEvent
-    imagePreview fwt' =
+    imagePreview =
       maybe
         (label "No Preview")
         ( box_ [alignMiddle, onClick ToggleDoSoloTag]
             . flip styleBasic [paddingB 3, paddingT 3]
             . flip image_ [fitHeight, alignCenter]
-            . getPlainText
         )
-        $ fwt'
+    imageDetails ::
+      (WidgetModel s) =>
+      Bool ->
+      [Descriptor] ->
+      WidgetNode s TaggerEvent
+    imageDetails isSoloTagMode' ds' =
+      flip styleBasic [borderL 1 black, rangeWidth 160 800]
+        . box_ [alignLeft]
+        . stdScroll
+        . vstack_ []
+        $ [ label "Details:",
+            spacer,
+            label "Solo Tagging Mode"
+              `styleBasic` [textColor yuiOrange]
+              `nodeVisible` isSoloTagMode',
+            spacer,
+            label "Tags: ",
+            hstack_ [] [spacer, vstack_ [] . map imageDetailDescriptor $ ds']
+          ]
+      where
+        imageDetailDescriptor :: (WidgetModel s) => Descriptor -> WidgetNode s TaggerEvent
+        imageDetailDescriptor d =
+          draggable d
+            . flip styleBasic [textColor yuiBlue]
+            . label
+            . getPlainText
+            $ d
 
 operationWidget ::
   ( WidgetModel s,
