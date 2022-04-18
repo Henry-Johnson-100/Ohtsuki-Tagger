@@ -224,7 +224,8 @@ operationWidget =
     . flip
       keystroke_
       [ignoreChildrenEvts]
-      [ ("Ctrl-u", ShellCmd),
+      [ ("Ctrl-y", FileSelectionClear),
+        ("Ctrl-u", ShellCmd),
         ("Ctrl-i", FileSinglePrevFromFileSelection),
         ("Ctrl-k", FileSingleNextFromFileSelection),
         ("Ctrl-j", FileSetArithmeticNext),
@@ -303,7 +304,10 @@ operationWidget =
         . vgrid_ []
         $ [ hgrid_
               []
-              [ stdDelayTooltip "Ctrl-u" doShellCmdButton,
+              [ hgrid
+                  [ stdDelayTooltip "Ctrl-y" clearSelectionButton,
+                    stdDelayTooltip "Ctrl-u" doShellCmdButton
+                  ],
                 stdDelayTooltip "Ctrl-i" fileSinglePrevFromFileSelectionButton,
                 stdDelayTooltip "Ctrl-o" taggingModeDropdown
               ],
