@@ -34,9 +34,9 @@ taggerApplicationUI wenv model' = widgetTree
               zstack
                 [ visibility model Configure configureZone,
                   visibility model Main
-                    . vgrid
-                    $ [ box_ [alignMiddle] . fileSinglePreviewWidget $ model,
-                        hgrid
+                    . vsplit_ [splitIgnoreChildResize True]
+                    $ ( fileSingleWidget $ model ^. fileSingle,
+                        box_ [alignBottom] . hgrid $
                           [ vstack
                               [ descriptorTreeQuadrantWidget
                                   (model ^. descriptorTree)
@@ -45,7 +45,7 @@ taggerApplicationUI wenv model' = widgetTree
                             operationWidget,
                             fileSelectionWidget (model ^. fileSelection)
                           ]
-                      ]
+                      )
                 ]
             ]
             `styleBasic` [padding 0]

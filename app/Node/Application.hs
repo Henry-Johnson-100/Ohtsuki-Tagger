@@ -7,11 +7,12 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use lambda-case" #-}
+{-# HLINT ignore "Use list comprehension" #-}
 
 module Node.Application
   ( themeConfig,
     fileSelectionWidget,
-    fileSinglePreviewWidget,
+    fileSingleWidget,
     descriptorTreeQuadrantWidget,
     configureZone,
     menubar,
@@ -83,14 +84,17 @@ yuiTheme =
 
 menubar :: (WidgetModel s) => WidgetNode s TaggerEvent
 menubar =
-  box_ [alignLeft] . hstack_ []
-    . (<$>)
-      ( `styleBasic`
-          [ textSize 12
-          ]
-            <> buttonStylingBasic
-      )
-    $ [toggleConfigModeButton]
+  vstack_ [] $
+    [ hstack_ []
+        . (<$>)
+          ( `styleBasic`
+              [ textSize 12
+              ]
+                <> buttonStylingBasic
+          )
+        $ [toggleConfigModeButton],
+      separatorLine
+    ]
 
 configureZone ::
   ( WidgetModel s,
@@ -151,61 +155,29 @@ fileSelectionWidget fwts =
                 separatorLine
               ]
 
-fileSinglePreviewWidget ::
-  (WidgetModel s, HasFileSingle s (Maybe FileWithTags), HasDoSoloTag s Bool) =>
-  s ->
+fileSingleWidget ::
+  (WidgetModel s, HasDoSoloTag s Bool) =>
+  Maybe FileWithTags ->
   WidgetNode s TaggerEvent
-fileSinglePreviewWidget = imageZone
+fileSingleWidget mfwt =
+  flip styleBasic [maxHeight 10000]
+    . box_ [alignTop, alignMiddle]
+    . vstack_ []
+    $ [imagePreview mfwt]
   where
-    imageZone ::
-      (WidgetModel s, HasFileSingle s (Maybe FileWithTags), HasDoSoloTag s Bool) =>
-      s ->
+    imagePreview ::
+      (WidgetModel s, HasDoSoloTag s Bool) =>
+      Maybe FileWithTags ->
       WidgetNode s TaggerEvent
-    imageZone model =
-      box_ [onClick ToggleDoSoloTag, alignMiddle]
-        . vsplit_ []
-        $ (imagePreview model, vstack [singleFileTags, doSoloTagCheckBox])
-      where
-        imagePreview ::
-          (WidgetModel s, WidgetEvent e, HasFileSingle s (Maybe FileWithTags)) =>
-          s ->
-          WidgetNode s e
-        imagePreview m' =
-          box_
-            [alignMiddle]
-            $ maybe
-              (label "No Preview")
-              (flip image_ [alignMiddle, fitEither] . getPlainText)
-              (m' ^. fileSingle)
-        singleFileTags ::
-          ( WidgetModel s,
-            WidgetEvent e,
-            HasFileSingle s (Maybe FileWithTags)
-          ) =>
-          WidgetNode s e
-        singleFileTags =
-          box_ [] $
-            maybe
-              spacer
-              ( draggableDescriptorListWidget
-                  . tags
-              )
-              (model ^. fileSingle)
-        doSoloTagCheckBox ::
-          (WidgetModel s, HasDoSoloTag s Bool) => WidgetNode s TaggerEvent
-        doSoloTagCheckBox =
-          box_
-            [alignCenter]
-            $ labeledCheckbox_
-              "Solo Tagging Mode"
-              doSoloTag
-              [textRight, maxLines 1, ellipsis]
-              `styleBasic` [ textFont "Thin",
-                             paddingB 5,
-                             paddingT 0,
-                             border 0 white,
-                             radius 0
-                           ]
+    imagePreview fwt' =
+      maybe
+        (label "No Preview")
+        ( box_ [alignMiddle, onClick ToggleDoSoloTag]
+            . flip styleBasic [paddingB 3, paddingT 3]
+            . flip image_ [fitHeight, alignCenter]
+            . getPlainText
+        )
+        $ fwt'
 
 operationWidget ::
   ( WidgetModel s,
@@ -319,7 +291,13 @@ operationWidget =
               ]
           ]
 
-descriptorTreeQuadrantWidget :: (WidgetModel s) => DescriptorTree -> DescriptorTree -> WidgetNode s TaggerEvent
+descriptorTreeQuadrantWidget ::
+  (WidgetModel s) =>
+  DescriptorTree ->
+  DescriptorTree ->
+  WidgetNode s TaggerEvent
 descriptorTreeQuadrantWidget atr utr =
-  flip styleBasic [border 1 black] . box_ [alignTop, alignLeft] $
-    hsplit (explorableDescriptorTreeWidget atr, unrelatedDescriptorTreeWidget utr)
+  flip styleBasic [border 1 black] . box_ [alignTop, alignLeft]
+    . hsplit_
+      [splitIgnoreChildResize True]
+    $ (explorableDescriptorTreeWidget atr, unrelatedDescriptorTreeWidget utr)
