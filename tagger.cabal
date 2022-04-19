@@ -1,7 +1,7 @@
 cabal-version:       2.4
 
 name:                tagger
-version:             0.1.0.0
+version:             0.0.1.0
 synopsis:            A graphical front-end for a file tagging library
 -- description:
 -- bug-reports:
