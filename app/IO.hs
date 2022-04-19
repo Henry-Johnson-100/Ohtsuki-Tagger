@@ -95,3 +95,4 @@ backupDbConn c backupTo = do
   backupProcess <- DirectSqlite.backupInit backupHandle "main" currentHandle "main"
   DirectSqlite.backupStep backupProcess (-1)
   DirectSqlite.backupFinish backupProcess
+  hPutStrLn stderr "Backup complete"
