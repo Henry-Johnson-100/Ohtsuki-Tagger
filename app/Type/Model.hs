@@ -25,6 +25,7 @@ module Type.Model
     dbBackup,
     dbInit,
     dbAutoConnect,
+    selectionDisplayParents,
     singleFile,
     tagCounts,
     HasSingleFileModel,

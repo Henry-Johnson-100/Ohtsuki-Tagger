@@ -1,3 +1,6 @@
+{-# HLINT ignore "Use lambda-case" #-}
+{-# HLINT ignore "Use list comprehension" #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# HLINT ignore "Use lambda" #-}
 {-# HLINT ignore "Eta reduce" #-}
@@ -5,9 +8,6 @@
 {-# HLINT ignore "Redundant $" #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use lambda-case" #-}
-{-# HLINT ignore "Use list comprehension" #-}
 
 module Node.Application
   ( themeConfig,
@@ -23,7 +23,7 @@ where
 
 import Control.Lens
 import Data.List (foldl', intersperse, map, sort)
-import Data.Text (Text, append, intercalate, pack, replicate, unwords)
+import Data.Text hiding (drop, length, map)
 import Database.Tagger.Type
 import Monomer
 import Monomer.Core.Themes.BaseTheme
@@ -121,11 +121,11 @@ configureZone =
       initializeDatabaseButton
     ]
 
-fileSelectionWidget :: (WidgetModel s) => [FileWithTags] -> WidgetNode s TaggerEvent
-fileSelectionWidget fwts =
+fileSelectionWidget :: (WidgetModel s) => Int -> [FileWithTags] -> WidgetNode s TaggerEvent
+fileSelectionWidget dispParents fwts =
   let fileWithTagsZone =
         map
-          (\fwt -> fileWithTagWidget [previewButton fwt, selectButton fwt] fwt)
+          (\fwt -> fileWithTagWidget [previewButton fwt, selectButton fwt] dispParents fwt)
       fileWithTagsStack = stdScroll $ box_ [] . vstack . fileWithTagsZone $ fwts
    in stdDelayTooltip "File Database" fileWithTagsStack
   where
@@ -134,13 +134,15 @@ fileSelectionWidget fwts =
     fileWithTagWidget ::
       (WidgetModel s) =>
       [WidgetNode s TaggerEvent] ->
+      Int ->
       FileWithTags ->
       WidgetNode s TaggerEvent
-    fileWithTagWidget bs fwt =
-      let _temp x = const . label $ ""
-          buttonGridNode bs' =
+    fileWithTagWidget bs dispParents' fwt =
+      let buttonGridNode bs' =
             box_ [alignLeft] $ hstack_ [] bs'
-          fileNode f' = box_ [alignLeft] $ flip label_ [ellipsis] (filePath $ f')
+          fileNode f' =
+            box_ [alignLeft] . flip label_ [ellipsis] . getPathComponents dispParents' $
+              (filePath $ f')
           tagsNode ts' = draggableDescriptorListWidget ts'
           fwtSplitNode (fn', tn') =
             box_ [alignLeft] $ vsplit_ [] $ (stdScroll fn', stdScroll tn')
@@ -154,6 +156,15 @@ fileSelectionWidget fwts =
                   ],
                 separatorLine
               ]
+      where
+        getPathComponents :: Int -> Text -> Text
+        getPathComponents n p =
+          let !brokenPath = splitOn "/" p
+              !droppedDirs = length brokenPath - n
+           in (!++) ((pack . show) droppedDirs !++ ".../")
+                . intercalate "/"
+                . drop droppedDirs
+                $ brokenPath
 
 fileSingleWidget ::
   (WidgetModel s, HasDoSoloTag s Bool) =>
