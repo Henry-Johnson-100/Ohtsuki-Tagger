@@ -16,6 +16,7 @@ module Node.Application
     descriptorTreeQuadrantWidget,
     databaseConfigurePage,
     selectionConfigurePage,
+    configConfigurationPage,
     menubar,
     visibility,
     operationWidget,
@@ -93,7 +94,8 @@ menubar =
               ]
                 <> buttonStylingBasic
           )
-        $ [ toggleDatabaseConfigureVisibility,
+        $ [ toggleConfigConfigureVisibility,
+            toggleDatabaseConfigureVisibility,
             toggleSelectionConfigureVisibility
           ],
       separatorLine
@@ -113,13 +115,12 @@ databaseConfigurePage ::
   ) =>
   WidgetNode s TaggerEvent
 databaseConfigurePage =
-  box . vgrid $
+  box . flip styleBasic [padding 80] . vgrid $
     [ hstack [newFileTextField, newFileTextCommitButton],
       dbPathTextField,
       dbBackupTextField,
       dbAutoConnectCheckBox,
       databaseConnectButton,
-      configurationExportButton,
       databaseBackupButton,
       initializeDatabaseButton
     ]
@@ -127,7 +128,16 @@ databaseConfigurePage =
 selectionConfigurePage ::
   (WidgetModel s, HasProgramConfig s TaggerConfig) =>
   WidgetNode s TaggerEvent
-selectionConfigurePage = box . vgrid $ [selectionDisplayParentsNumberField]
+selectionConfigurePage =
+  box . flip styleBasic [padding 80]
+    . vgrid
+    $ [selectionDisplayParentsNumberField]
+
+configConfigurationPage :: (WidgetModel s) => WidgetNode s TaggerEvent
+configConfigurationPage =
+  box . flip styleBasic [padding 80]
+    . vgrid
+    $ [configurationExportButton]
 
 fileSelectionWidget :: (WidgetModel s) => Int -> [FileWithTags] -> WidgetNode s TaggerEvent
 fileSelectionWidget dispParents fwts =

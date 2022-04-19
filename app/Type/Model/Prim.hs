@@ -143,6 +143,7 @@ instance Show QueryCriteria where
 
 data ProgramVisibility
   = Main
+  | Config
   | Database
   | Selection
   deriving (Eq, Show, Enum, Bounded, Cyclic)

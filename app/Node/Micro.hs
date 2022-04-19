@@ -127,6 +127,9 @@ configurationExportButton :: (WidgetModel s) => WidgetNode s TaggerEvent
 configurationExportButton =
   styledButton (DoConfigurationEvent ExportAll) "Export Configuration"
 
+toggleConfigConfigureVisibility :: (WidgetModel s) => WidgetNode s TaggerEvent
+toggleConfigConfigureVisibility = styledButton (ToggleVisibilityMode Config) "Config"
+
 toggleDatabaseConfigureVisibility :: (WidgetModel s) => WidgetNode s TaggerEvent
 toggleDatabaseConfigureVisibility =
   styledButton (ToggleVisibilityMode Database) "Database"

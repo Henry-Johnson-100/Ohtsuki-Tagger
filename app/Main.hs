@@ -32,7 +32,8 @@ taggerApplicationUI wenv model' = widgetTree
        in vstack
             [ menubar,
               zstack
-                [ visibility model Database databaseConfigurePage,
+                [ visibility model Config configConfigurationPage,
+                  visibility model Database databaseConfigurePage,
                   visibility model Selection selectionConfigurePage,
                   visibility model Main
                     . vsplit_ [splitIgnoreChildResize True]
