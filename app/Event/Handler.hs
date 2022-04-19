@@ -108,6 +108,18 @@ singleFileEventHandler wenv node model event =
           (model ^. dbConn)
       ]
 
+configurationEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  ConfigurationEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+configurationEventHandler wenv node model event =
+  case event of
+    ExportAll -> [Task (PutExtern <$> exportConfig (model ^. programConfig))]
+    ExportDatabase -> []
+    ExportSelection -> []
+
 taggerEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
   WidgetNode TaggerModel TaggerEvent ->
@@ -117,10 +129,11 @@ taggerEventHandler ::
 taggerEventHandler wenv node model event =
   case event of
     TaggerInit ->
-      if model ^. (programConfig . dbAutoConnect)
+      if model ^. (programConfig . dbconf . dbconfAutoConnect)
         then [asyncEvent DatabaseConnect]
         else []
     DoSingleFileEvent evt -> singleFileEventHandler wenv node model evt
+    DoConfigurationEvent evt -> configurationEventHandler wenv node model evt
     FileSetArithmetic a -> [Model $ model & fileSetArithmetic .~ a]
     FileSetArithmeticNext -> [Model $ model & fileSetArithmetic %~ next]
     FileSetArithmeticPrev -> [Model $ model & fileSetArithmetic %~ prev]
@@ -287,7 +300,7 @@ taggerEventHandler wenv node model event =
     DatabaseInitialize ->
       [ dbConnTask
           PutExtern
-          (runInitScript (T.unpack $ model ^. (programConfig . dbInit)))
+          (runInitScript (T.unpack $ model ^. (programConfig . dbconf . dbconfInit)))
           (model ^. dbConn)
       ]
     ToggleVisibilityMode vm ->
@@ -299,7 +312,7 @@ taggerEventHandler wenv node model event =
       [ Task $
           DatabaseConnectionPut_ <$> do
             maybe (pure ()) close . connInstance $ model ^. dbConn
-            let newConnTag = model ^. (programConfig . dbPath)
+            let newConnTag = model ^. (programConfig . dbconf . dbconfPath)
             newConnInstance <- open . T.unpack $ newConnTag
             activateForeignKeyPragma newConnInstance
             return . TaggedConnection newConnTag . Just $ newConnInstance,
@@ -313,13 +326,21 @@ taggerEventHandler wenv node model event =
                           stderr
                           "Failed to backup, no database is currently connected."
                       )
-                      (flip backupDbConn (T.unpack $ model ^. (programConfig . dbBackup)))
+                      ( flip
+                          backupDbConn
+                          ( T.unpack $
+                              model
+                                ^. ( programConfig
+                                       . dbconf
+                                       . dbconfBackup
+                                   )
+                          )
+                      )
                       . connInstance
                       $ model ^. dbConn
                   )
           )
       ]
-    ConfigurationExport -> [Task (PutExtern <$> exportConfig (model ^. programConfig))]
 
 -- | Replaces "%file" in the first list with the entirety of the second.
 putFileArgs :: [String] -> [String] -> [String]

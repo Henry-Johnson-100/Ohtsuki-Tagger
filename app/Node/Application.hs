@@ -14,7 +14,8 @@ module Node.Application
     fileSelectionWidget,
     fileSingleWidget,
     descriptorTreeQuadrantWidget,
-    configureZone,
+    databaseConfigurePage,
+    selectionConfigurePage,
     menubar,
     visibility,
     operationWidget,
@@ -92,11 +93,13 @@ menubar =
               ]
                 <> buttonStylingBasic
           )
-        $ [toggleConfigModeButton],
+        $ [ toggleDatabaseConfigureVisibility,
+            toggleSelectionConfigureVisibility
+          ],
       separatorLine
     ]
 
-configureZone ::
+databaseConfigurePage ::
   ( WidgetModel s,
     HasFileSetArithmetic s FileSetArithmetic,
     HasQueryCriteria s QueryCriteria,
@@ -109,7 +112,7 @@ configureZone ::
     HasProgramConfig s TaggerConfig
   ) =>
   WidgetNode s TaggerEvent
-configureZone =
+databaseConfigurePage =
   box . vgrid $
     [ hstack [newFileTextField, newFileTextCommitButton],
       dbPathTextField,
@@ -120,6 +123,11 @@ configureZone =
       databaseBackupButton,
       initializeDatabaseButton
     ]
+
+selectionConfigurePage ::
+  (WidgetModel s, HasProgramConfig s TaggerConfig) =>
+  WidgetNode s TaggerEvent
+selectionConfigurePage = box . vgrid $ [selectionDisplayParentsNumberField]
 
 fileSelectionWidget :: (WidgetModel s) => Int -> [FileWithTags] -> WidgetNode s TaggerEvent
 fileSelectionWidget dispParents fwts =

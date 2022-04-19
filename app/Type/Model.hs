@@ -21,10 +21,12 @@ module Type.Model
     newFileText,
     programConfig,
     programVisibility,
-    dbPath,
-    dbBackup,
-    dbInit,
-    dbAutoConnect,
+    dbconf,
+    dbconfPath,
+    dbconfBackup,
+    dbconfInit,
+    dbconfAutoConnect,
+    selectionconf,
     selectionDisplayParents,
     singleFile,
     tagCounts,
@@ -40,7 +42,7 @@ module Type.Model
     HasTaggingMode,
     HasNewFileText,
     HasProgramVisibility,
-    HasProgramConfig,
+    HasProgramConfig
   )
 where
 
@@ -51,5 +53,9 @@ import Type.Model.Prim
 makeLensesWith abbreviatedFields ''TaggerModel
 
 makeLenses ''TaggerConfig
+
+makeLenses ''DatabaseConfig
+
+makeLenses ''SelectionConfig
 
 makeLensesWith abbreviatedFields ''SingleFileSelectionModel

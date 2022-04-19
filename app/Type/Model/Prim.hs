@@ -6,6 +6,7 @@ module Type.Model.Prim
     SingleFileSelectionModel (..),
     TaggerEvent (..),
     SingleFileEvent (..),
+    ConfigurationEvent (..),
     TaggedConnection (..),
     FileSetArithmetic (..),
     QueryCriteria (..),
@@ -142,7 +143,8 @@ instance Show QueryCriteria where
 
 data ProgramVisibility
   = Main
-  | Configure
+  | Database
+  | Selection
   deriving (Eq, Show, Enum, Bounded, Cyclic)
 
 data SingleFileEvent
@@ -154,10 +156,17 @@ data SingleFileEvent
   | SingleFileMaybePut !(Maybe FileWithTags)
   deriving (Show, Eq)
 
+data ConfigurationEvent
+  = ExportAll
+  | ExportDatabase
+  | ExportSelection
+  deriving (Show, Eq)
+
 data TaggerEvent
   = -- Open DB Connection, populate FileDb, DescriptorDb and DescriptorTree with #ALL#
     TaggerInit
   | DoSingleFileEvent !SingleFileEvent
+  | DoConfigurationEvent !ConfigurationEvent
   | -- Update current selection
     FileSelectionUpdate ![FileWithTags]
   | -- Like FileSelectionUpdate but does not rely on FileSetArithmetic
@@ -221,5 +230,4 @@ data TaggerEvent
   | DatabaseBackup
   | DatabaseConnectionPut_ !TaggedConnection
   | ToggleVisibilityMode !ProgramVisibility
-  | ConfigurationExport
   deriving (Show, Eq)

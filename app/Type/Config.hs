@@ -4,7 +4,11 @@
 
 module Type.Config
   ( TaggerConfig (..),
+    DatabaseConfig (..),
+    SelectionConfig (..),
     taggerConfigCodec,
+    databaseConfigCodec,
+    selectionConfigCodec,
   )
 where
 
@@ -13,27 +17,49 @@ import Toml ((.=))
 import qualified Toml
 
 {-
-database.path = ""
-database.backup = ""
-database.init = ""
-database.auto_connect = false
-selection.display_parents = 3
+[database]
+  path = ""
+  backup = ""
+  init = ""
+  auto_connect = false
+
+[selection]
+  display_parents = 3
 -}
 
 data TaggerConfig = TaggerConfig
-  { _dbPath :: !T.Text,
-    _dbBackup :: !T.Text,
-    _dbInit :: !T.Text,
-    _dbAutoConnect :: !Bool,
-    _selectionDisplayParents :: !Int
+  { _dbconf :: !DatabaseConfig,
+    _selectionconf :: !SelectionConfig
   }
   deriving (Show, Eq)
 
 taggerConfigCodec :: Toml.TomlCodec TaggerConfig
 taggerConfigCodec =
   TaggerConfig
-    <$> Toml.text "database.path" .= _dbPath
-    <*> Toml.text "database.backup" .= _dbBackup
-    <*> Toml.text "database.init" .= _dbInit
-    <*> Toml.bool "database.auto_connect" .= _dbAutoConnect
-    <*> Toml.int "selection.display_parents" .= _selectionDisplayParents
+    <$> Toml.table databaseConfigCodec "database" .= _dbconf
+    <*> Toml.table selectionConfigCodec "selection" .= _selectionconf
+
+data DatabaseConfig = DatabaseConfig
+  { _dbconfPath :: !T.Text,
+    _dbconfBackup :: !T.Text,
+    _dbconfInit :: !T.Text,
+    _dbconfAutoConnect :: !Bool
+  }
+  deriving (Show, Eq)
+
+databaseConfigCodec :: Toml.TomlCodec DatabaseConfig
+databaseConfigCodec =
+  DatabaseConfig
+    <$> Toml.text "path" .= _dbconfPath
+    <*> Toml.text "backup" .= _dbconfBackup
+    <*> Toml.text "init" .= _dbconfInit
+    <*> Toml.bool "auto_connect" .= _dbconfAutoConnect
+
+data SelectionConfig = SelectionConfig
+  { _selectionDisplayParents :: !Int
+  }
+  deriving (Show, Eq)
+
+selectionConfigCodec :: Toml.Codec SelectionConfig SelectionConfig
+selectionConfigCodec =
+  SelectionConfig <$> Toml.int "display_parents" .= _selectionDisplayParents

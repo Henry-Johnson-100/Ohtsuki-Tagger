@@ -32,7 +32,8 @@ taggerApplicationUI wenv model' = widgetTree
        in vstack
             [ menubar,
               zstack
-                [ visibility model Configure configureZone,
+                [ visibility model Database databaseConfigurePage,
+                  visibility model Selection selectionConfigurePage,
                   visibility model Main
                     . vsplit_ [splitIgnoreChildResize True]
                     $ ( fileSingleWidget
@@ -46,7 +47,7 @@ taggerApplicationUI wenv model' = widgetTree
                               ],
                             operationWidget,
                             fileSelectionWidget
-                              (model ^. (programConfig . selectionDisplayParents))
+                              (model ^. (programConfig . selectionconf . selectionDisplayParents))
                               (model ^. fileSelection)
                           ]
                       )

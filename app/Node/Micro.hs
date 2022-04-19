@@ -58,14 +58,19 @@ buttonStylingHover = [bgColor lightGray]
 dbPathTextField ::
   (WidgetModel s, HasProgramConfig s TaggerConfig) =>
   WidgetNode s TaggerEvent
-dbPathTextField = textField (programConfig . dbPath)
+dbPathTextField = textField (programConfig . dbconf . dbconfPath)
 
 dbBackupTextField ::
   (WidgetModel s, HasProgramConfig s TaggerConfig) => WidgetNode s TaggerEvent
-dbBackupTextField = textField (programConfig . dbBackup)
+dbBackupTextField = textField (programConfig . dbconf . dbconfBackup)
 
-dbAutoConnectCheckBox :: (WidgetModel s, HasProgramConfig s TaggerConfig) => WidgetNode s TaggerEvent
-dbAutoConnectCheckBox = labeledCheckbox "Auto-Connect" (programConfig . dbAutoConnect)
+dbAutoConnectCheckBox ::
+  (WidgetModel s, HasProgramConfig s TaggerConfig) =>
+  WidgetNode s TaggerEvent
+dbAutoConnectCheckBox =
+  labeledCheckbox
+    "Auto-Connect"
+    (programConfig . dbconf . dbconfAutoConnect)
 
 queryTextField ::
   (WidgetModel s, HasFileSelectionQuery s Text) => WidgetNode s TaggerEvent
@@ -81,6 +86,13 @@ descriptorNewTextField =
 newFileTextField ::
   (WidgetModel s, HasNewFileText s Text) => WidgetNode s TaggerEvent
 newFileTextField = textField newFileText
+
+selectionDisplayParentsNumberField ::
+  (WidgetModel s, HasProgramConfig s TaggerConfig) =>
+  WidgetNode s TaggerEvent
+selectionDisplayParentsNumberField =
+  numericField
+    (programConfig . selectionconf . selectionDisplayParents)
 
 newFileTextCommitButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
@@ -101,7 +113,9 @@ descriptorNewCommitButton =
   styledButton DescriptorCommitNewDescriptorText "New Descriptor"
 
 initializeDatabaseButton :: (WidgetModel s) => WidgetNode s TaggerEvent
-initializeDatabaseButton = styledButton DatabaseInitialize "Initialize Database" `styleBasic` [bgColor (Color 212 0 0 0.83)]
+initializeDatabaseButton =
+  styledButton DatabaseInitialize "Initialize Database"
+    `styleBasic` [bgColor (Color 212 0 0 0.83)]
 
 databaseConnectButton :: (WidgetModel s) => WidgetNode s TaggerEvent
 databaseConnectButton = styledButton DatabaseConnect "Connect"
@@ -110,10 +124,17 @@ databaseBackupButton :: WidgetModel s => WidgetNode s TaggerEvent
 databaseBackupButton = styledButton DatabaseBackup "Backup"
 
 configurationExportButton :: (WidgetModel s) => WidgetNode s TaggerEvent
-configurationExportButton = styledButton ConfigurationExport "Export Config"
+configurationExportButton = styledButton (DoConfigurationEvent ExportAll) "Export Config"
 
-toggleConfigModeButton :: (WidgetModel s) => WidgetNode s TaggerEvent
-toggleConfigModeButton = styledButton (ToggleVisibilityMode Configure) "Configure"
+toggleDatabaseConfigureVisibility :: (WidgetModel s) => WidgetNode s TaggerEvent
+toggleDatabaseConfigureVisibility =
+  styledButton (ToggleVisibilityMode Database) "Database"
+
+toggleSelectionConfigureVisibility :: (WidgetModel s) => WidgetNode s TaggerEvent
+toggleSelectionConfigureVisibility =
+  styledButton
+    (ToggleVisibilityMode Selection)
+    "Selection"
 
 descriptorDeleteWidget :: WidgetModel s => WidgetNode s TaggerEvent
 descriptorDeleteWidget =
