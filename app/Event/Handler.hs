@@ -72,8 +72,14 @@ singleFileEventHandler ::
   [AppEventResponse TaggerModel TaggerEvent]
 singleFileEventHandler wenv node model event =
   case event of
-    SingleFilePut fwt -> [Model $ model & (singleFileModel . singleFile) .~ Just fwt]
-    SingleFileMaybePut mfwt -> [Model $ model & (singleFileModel . singleFile) .~ mfwt]
+    SingleFilePut fwt ->
+      [ Model $ model & (singleFileModel . singleFile) .~ Just fwt,
+        asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
+      ]
+    SingleFileMaybePut mfwt ->
+      [ Model $ model & (singleFileModel . singleFile) .~ mfwt,
+        asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
+      ]
     SingleFileNextFromFileSelection ->
       let !ps = popCycleList (model ^. fileSelection)
           !mi = head' ps
@@ -81,7 +87,8 @@ singleFileEventHandler wenv node model event =
               . (fileSelection .~ ps)
               . ((singleFileModel . singleFile) .~ mi)
               . (doSoloTag .~ True)
-              $ model
+              $ model,
+            asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
           ]
     SingleFilePrevFromFileSelection ->
       let !ps = dequeueCycleList (model ^. fileSelection)
@@ -90,8 +97,16 @@ singleFileEventHandler wenv node model event =
               . (fileSelection .~ ps)
               . ((singleFileModel . singleFile) .~ mi)
               . (doSoloTag .~ True)
-              $ model
+              $ model,
+            asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
           ]
+    SingleFilePutTagCounts_ tcs -> [Model $ model & (singleFileModel . tagCounts) .~ tcs]
+    SingleFileGetTagCounts ->
+      [ dbConnTask
+          (DoSingleFileEvent . SingleFilePutTagCounts_)
+          (flip getTagCounts . maybe [] tags $ model ^. (singleFileModel . singleFile))
+          (model ^. dbConn)
+      ]
 
 taggerEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->

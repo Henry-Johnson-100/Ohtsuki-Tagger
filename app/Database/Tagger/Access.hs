@@ -450,10 +450,6 @@ mapQToFWT (fid, fp, dids, dds) = FileWithTags (File fid fp) [Descriptor dids dds
 mapQToTagCount :: Descriptor -> Only Int -> TagCount
 mapQToTagCount d (Only n) = (d, n)
 
-data TestFWT = T Int T.Text Int T.Text deriving (Show, Eq)
-
-tmap (fid, fp, dids, dds) = T fid fp dids dds
-
 head' :: [a] -> Maybe a
 head' [] = Nothing
 head' (x : _) = Just x

@@ -149,6 +149,7 @@ data SingleFileEvent
   = SingleFileNextFromFileSelection
   | SingleFilePrevFromFileSelection
   | SingleFilePut !FileWithTags
+  | SingleFilePutTagCounts_ ![TagCount]
   | SingleFileGetTagCounts
   | SingleFileMaybePut !(Maybe FileWithTags)
   deriving (Show, Eq)
