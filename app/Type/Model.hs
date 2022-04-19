@@ -5,7 +5,7 @@
 module Type.Model
   ( module Type.Model.Prim,
     fileSelection,
-    fileSingle,
+    singleFileModel,
     descriptorDb,
     descriptorTree,
     dbConn,
@@ -25,7 +25,9 @@ module Type.Model
     dbBackup,
     dbInit,
     dbAutoConnect,
-    HasFileSingle,
+    singleFile,
+    tagCounts,
+    HasSingleFileModel,
     HasDoSoloTag,
     HasFileSetArithmetic,
     HasDescriptorTree,
@@ -48,3 +50,5 @@ import Type.Model.Prim
 makeLensesWith abbreviatedFields ''TaggerModel
 
 makeLenses ''TaggerConfig
+
+makeLensesWith abbreviatedFields ''SingleFileSelectionModel

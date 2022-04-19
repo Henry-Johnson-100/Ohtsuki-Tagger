@@ -3,6 +3,7 @@
 
 module Type.Model.Prim
   ( TaggerModel (..),
+    SingleFileSelectionModel (..),
     TaggerEvent (..),
     TaggedConnection (..),
     FileSetArithmetic (..),
@@ -45,7 +46,7 @@ data TaggerModel = TaggerModel
     _taggerFileSetArithmetic :: !FileSetArithmetic,
     _taggerQueryCriteria :: !QueryCriteria,
     _taggerFileSelectionQuery :: !Text,
-    _taggerFileSingle :: !(Maybe FileWithTags),
+    _taggerSingleFileModel :: !SingleFileSelectionModel,
     _taggerDescriptorDb :: ![Descriptor],
     _taggerDescriptorTree :: !DescriptorTree,
     _taggerUnrelatedDescriptorTree :: !DescriptorTree,
@@ -62,6 +63,19 @@ data TaggerModel = TaggerModel
   }
   deriving (Show, Eq)
 
+data SingleFileSelectionModel = SingleFileSelectionModel
+  { _sfsmSingleFile :: !(Maybe FileWithTags),
+    _sfsmTagCounts :: ![TagCount]
+  }
+  deriving (Show, Eq)
+
+emptySingleFileSelectionModel :: SingleFileSelectionModel
+emptySingleFileSelectionModel =
+  SingleFileSelectionModel
+    { _sfsmSingleFile = Nothing,
+      _sfsmTagCounts = []
+    }
+
 emptyTaggerModel :: TaggerConfig -> TaggerModel
 emptyTaggerModel cfg =
   TaggerModel
@@ -69,7 +83,7 @@ emptyTaggerModel cfg =
       _taggerFileSetArithmetic = Union,
       _taggerQueryCriteria = ByTag,
       _taggerFileSelectionQuery = "",
-      _taggerFileSingle = Nothing,
+      _taggerSingleFileModel = emptySingleFileSelectionModel,
       _taggerDescriptorDb = [],
       _taggerDescriptorTree = NullTree,
       _taggerDoSoloTag = False,

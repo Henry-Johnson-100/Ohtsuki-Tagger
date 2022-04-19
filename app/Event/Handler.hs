@@ -14,7 +14,6 @@ module Event.Handler
   )
 where
 
-import Control.Applicative
 import Control.Lens ((%~), (&), (.~), (^.))
 import qualified Control.Monad as CM
 import qualified Data.List as L
@@ -77,8 +76,8 @@ taggerEventHandler wenv node model event =
       if model ^. (programConfig . dbAutoConnect)
         then [asyncEvent DatabaseConnect]
         else []
-    FileSinglePut i -> [Model $ model & fileSingle .~ Just i]
-    FileSingleMaybePut mi -> [Model $ model & fileSingle .~ mi]
+    FileSinglePut i -> [Model $ model & (singleFileModel . singleFile) .~ Just i]
+    FileSingleMaybePut mi -> [Model $ model & (singleFileModel . singleFile) .~ mi]
     FileSetArithmetic a -> [Model $ model & fileSetArithmetic .~ a]
     FileSetArithmeticNext -> [Model $ model & fileSetArithmetic %~ next]
     FileSetArithmeticPrev -> [Model $ model & fileSetArithmetic %~ prev]
@@ -106,7 +105,7 @@ taggerEventHandler wenv node model event =
                   M.maybe
                     (return [])
                     (getRefreshedFWTs activeDbConn . (: []))
-                    (model ^. fileSingle)
+                    (model ^. (singleFileModel . singleFile))
                 return . head' $ mrefreshed
           )
           (model ^. dbConn)
@@ -144,7 +143,7 @@ taggerEventHandler wenv node model event =
           !mi = head' ps
        in [ Model
               . (fileSelection .~ ps)
-              . (fileSingle .~ mi)
+              . ((singleFileModel . singleFile) .~ mi)
               . (doSoloTag .~ True)
               $ model
           ]
@@ -153,7 +152,7 @@ taggerEventHandler wenv node model event =
           !mi = head' ps
        in [ Model
               . (fileSelection .~ ps)
-              . (fileSingle .~ mi)
+              . ((singleFileModel . singleFile) .~ mi)
               . (doSoloTag .~ True)
               $ model
           ]
@@ -235,7 +234,7 @@ taggerEventHandler wenv node model event =
           ( \activeConn ->
               (if isUntagMode (model ^. taggingMode) then untagWith else tag)
                 activeConn
-                (M.maybeToList $ model ^. fileSingle)
+                (M.maybeToList $ model ^. (singleFileModel . singleFile))
                 (T.words $ model ^. tagsString)
           )
           (model ^. dbConn),
