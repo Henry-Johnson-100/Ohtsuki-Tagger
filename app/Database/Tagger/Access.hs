@@ -24,6 +24,7 @@ module Database.Tagger.Access
     fetchInfraDescriptors,
     getDescriptor,
     getFile,
+    getTagCount,
     getUntaggedFileWithTags,
     lookupFileWithTagsByRelation,
     lookupFileWithTagsByFilePattern,
@@ -62,6 +63,7 @@ import Database.Tagger.Type
     FileWithTags (FileWithTags, tags),
     MetaDescriptor (..),
     Tag (..),
+    TagCount (..),
     descriptorTreeElem,
     flattenTree,
     fwtFileEqual,
@@ -127,6 +129,11 @@ validateDb c = do
   where
     onlyIntEquals :: Eq a => a -> Only a -> Bool
     onlyIntEquals n (Only m) = n == m
+
+getTagCount :: Connection -> Descriptor -> IO TagCount
+getTagCount c d = do
+  result <- query c "SELECT COUNT(*) FROM Tag WHERE descriptorTagId = ?" [descriptorId d]
+  return . mapQToTagCount d . fromMaybe (Only 0 :: Only Int) . head' $ result
 
 -- | Attempts to add a new file to db
 -- Performs no checking of the validity of a path.
@@ -439,6 +446,9 @@ mapQToFWMT (fid, fp, dids, dds) =
 
 mapQToFWT :: (Int, T.Text, Int, T.Text) -> FileWithTags
 mapQToFWT (fid, fp, dids, dds) = FileWithTags (File fid fp) [Descriptor dids dds]
+
+mapQToTagCount :: Descriptor -> Only Int -> TagCount
+mapQToTagCount d (Only n) = TagCount (d, n)
 
 data TestFWT = T Int T.Text Int T.Text deriving (Show, Eq)
 

@@ -4,9 +4,12 @@ module Database.Tagger.Type
   ( File (..),
     Descriptor (..),
     FileWithTags (..),
+    FileWithTagCounts (..),
     Tag (..),
     MetaDescriptor (..),
     DescriptorTree (..),
+    TagCount (..),
+    TaggerFile (..),
     insertIntoDescriptorTree,
     descriptorTreeElem,
     flattenTree,
@@ -17,6 +20,7 @@ module Database.Tagger.Type
     pushTag,
     fwtFileEqual,
     sortChildren,
+    zipFWT,
   )
 where
 
@@ -27,7 +31,12 @@ import qualified Data.List
 import qualified Data.Text as T
 import qualified IO
 
+newtype TagCount = TagCount {tagCount :: (Descriptor, Int)} deriving (Show, Eq)
+
 data File = File {fileId :: Int, filePath :: T.Text} deriving (Show, Eq)
+
+instance TaggerFile File where
+  file = id
 
 instance Ord File where
   compare (File _ px) (File _ py) = compare px py
@@ -46,7 +55,29 @@ data MetaDescriptor = MetaDescriptor
   }
   deriving (Show, Eq)
 
-data FileWithTags = FileWithTags {file :: File, tags :: [Descriptor]} deriving (Eq)
+data FileWithTagCounts = FileWithTagCounts
+  { fileWithTagCountsFile :: File,
+    tagCounts :: [TagCount]
+  }
+  deriving (Show, Eq)
+
+instance TaggerFile FileWithTagCounts where
+  file (FileWithTagCounts f _) = f
+
+data FileWithTags = FileWithTags
+  { fileWithTagsFile :: File,
+    tags :: [Descriptor]
+  }
+  deriving (Eq)
+
+zipFWT :: FileWithTags -> [TagCount] -> FileWithTagCounts
+zipFWT (FileWithTags f _) = FileWithTagCounts f
+
+instance TaggerFile FileWithTags where
+  file (FileWithTags f _) = f
+
+class TaggerFile t where
+  file :: t -> File
 
 fwtFileEqual :: FileWithTags -> FileWithTags -> Bool
 (FileWithTags fx _) `fwtFileEqual` (FileWithTags fy _) = fx == fy
