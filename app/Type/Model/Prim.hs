@@ -5,6 +5,7 @@ module Type.Model.Prim
   ( TaggerModel (..),
     SingleFileSelectionModel (..),
     TaggerEvent (..),
+    SingleFileEvent (..),
     TaggedConnection (..),
     FileSetArithmetic (..),
     QueryCriteria (..),
@@ -144,9 +145,18 @@ data ProgramVisibility
   | Configure
   deriving (Eq, Show, Enum, Bounded, Cyclic)
 
+data SingleFileEvent
+  = SingleFileNextFromFileSelection
+  | SingleFilePrevFromFileSelection
+  | SingleFilePut !FileWithTags
+  | SingleFileGetTagCounts
+  | SingleFileMaybePut !(Maybe FileWithTags)
+  deriving (Show, Eq)
+
 data TaggerEvent
   = -- Open DB Connection, populate FileDb, DescriptorDb and DescriptorTree with #ALL#
     TaggerInit
+  | DoSingleFileEvent !SingleFileEvent
   | -- Update current selection
     FileSelectionUpdate ![FileWithTags]
   | -- Like FileSelectionUpdate but does not rely on FileSetArithmetic
@@ -162,8 +172,6 @@ data TaggerEvent
   | -- Clear current selection
     FileSelectionClear
   | FileSelectionQueryClear
-  | FileSingleNextFromFileSelection
-  | FileSinglePrevFromFileSelection
   | -- | Set querying set arithmetic to Union, Intersect, or Diff
     FileSetArithmetic !FileSetArithmetic
   | FileSetArithmeticNext
@@ -172,14 +180,6 @@ data TaggerEvent
     FileSetQueryCriteria !QueryCriteria
   | FileSetQueryCriteriaNext
   | FileSetQueryCriteriaPrev
-  | -- Display an image preview
-    FileSinglePut !FileWithTags
-  | -- For indeterminate IO
-    FileSingleMaybePut !(Maybe FileWithTags)
-  | -- If there is an image in the preview, get it
-    FileSingleGet
-  | -- Clear the image preview
-    FileSingleClear
   | -- Refresh Descriptor DB with argument
     DescriptorDbUpdate ![Descriptor]
   | -- Put the InfraTree of a descriptor

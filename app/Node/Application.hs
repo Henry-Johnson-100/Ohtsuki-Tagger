@@ -226,8 +226,8 @@ operationWidget =
       [ignoreChildrenEvts]
       [ ("Ctrl-y", FileSelectionClear),
         ("Ctrl-u", ShellCmd),
-        ("Ctrl-i", FileSinglePrevFromFileSelection),
-        ("Ctrl-k", FileSingleNextFromFileSelection),
+        ("Ctrl-i", DoSingleFileEvent SingleFilePrevFromFileSelection),
+        ("Ctrl-k", DoSingleFileEvent SingleFileNextFromFileSelection),
         ("Ctrl-j", FileSetArithmeticNext),
         ("Ctrl-Shift-j", FileSetArithmeticPrev),
         ("Ctrl-l", FileSetQueryCriteriaNext),

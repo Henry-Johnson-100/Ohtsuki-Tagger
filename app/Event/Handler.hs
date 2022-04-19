@@ -64,6 +64,35 @@ dbConnTask e f =
     (Task . fmap e . f)
     . connInstance
 
+singleFileEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  SingleFileEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+singleFileEventHandler wenv node model event =
+  case event of
+    SingleFilePut fwt -> [Model $ model & (singleFileModel . singleFile) .~ Just fwt]
+    SingleFileMaybePut mfwt -> [Model $ model & (singleFileModel . singleFile) .~ mfwt]
+    SingleFileNextFromFileSelection ->
+      let !ps = popCycleList (model ^. fileSelection)
+          !mi = head' ps
+       in [ Model
+              . (fileSelection .~ ps)
+              . ((singleFileModel . singleFile) .~ mi)
+              . (doSoloTag .~ True)
+              $ model
+          ]
+    SingleFilePrevFromFileSelection ->
+      let !ps = dequeueCycleList (model ^. fileSelection)
+          !mi = head' ps
+       in [ Model
+              . (fileSelection .~ ps)
+              . ((singleFileModel . singleFile) .~ mi)
+              . (doSoloTag .~ True)
+              $ model
+          ]
+
 taggerEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
   WidgetNode TaggerModel TaggerEvent ->
@@ -76,8 +105,7 @@ taggerEventHandler wenv node model event =
       if model ^. (programConfig . dbAutoConnect)
         then [asyncEvent DatabaseConnect]
         else []
-    FileSinglePut i -> [Model $ model & (singleFileModel . singleFile) .~ Just i]
-    FileSingleMaybePut mi -> [Model $ model & (singleFileModel . singleFile) .~ mi]
+    DoSingleFileEvent evt -> singleFileEventHandler wenv node model evt
     FileSetArithmetic a -> [Model $ model & fileSetArithmetic .~ a]
     FileSetArithmeticNext -> [Model $ model & fileSetArithmetic %~ next]
     FileSetArithmeticPrev -> [Model $ model & fileSetArithmetic %~ prev]
@@ -98,7 +126,7 @@ taggerEventHandler wenv node model event =
           (flip getRefreshedFWTs (model ^. fileSelection))
           (model ^. dbConn),
         dbConnTask
-          FileSingleMaybePut
+          (DoSingleFileEvent . SingleFileMaybePut)
           ( \activeDbConn ->
               do
                 mrefreshed <-
@@ -138,24 +166,6 @@ taggerEventHandler wenv node model event =
         asyncEvent FileSelectionQueryClear
       ]
     FileSelectionQueryClear -> [Model $ model & fileSelectionQuery .~ ""]
-    FileSingleNextFromFileSelection ->
-      let !ps = popCycleList (model ^. fileSelection)
-          !mi = head' ps
-       in [ Model
-              . (fileSelection .~ ps)
-              . ((singleFileModel . singleFile) .~ mi)
-              . (doSoloTag .~ True)
-              $ model
-          ]
-    FileSinglePrevFromFileSelection ->
-      let !ps = dequeueCycleList (model ^. fileSelection)
-          !mi = head' ps
-       in [ Model
-              . (fileSelection .~ ps)
-              . ((singleFileModel . singleFile) .~ mi)
-              . (doSoloTag .~ True)
-              $ model
-          ]
     DescriptorTreePut tr -> [Model $ model & descriptorTree .~ tr]
     UnrelatedDescriptorTreePut tr -> [Model $ model & unrelatedDescriptorTree .~ tr]
     DescriptorTreePutParent ->
@@ -244,10 +254,7 @@ taggerEventHandler wenv node model event =
       [ dbConnTask
           PutExtern
           ( \activeConn ->
-              ( if isUntagMode $ model ^. taggingMode
-                  then untagWith
-                  else tag
-              )
+              (if isUntagMode (model ^. taggingMode) then untagWith else tag)
                 activeConn
                 (model ^. fileSelection)
                 (T.words $ model ^. tagsString)
