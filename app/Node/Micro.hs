@@ -1,9 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Redundant $" #-}
 {-# HLINT ignore "Use lambda-case" #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Node.Micro where
 
@@ -31,7 +31,7 @@ instance GetPlainText FileWithTags where
   getPlainText = getPlainText . file
 
 instance GetPlainText TagCount where
-  getPlainText (TagCount (d, c)) = getPlainText d !++ " (" !++ (pack . show) c !++ ")"
+  getPlainText (d, n) = getPlainText d !++ " (" !++ (pack . show) n !++ ")"
 
 stdDelayTooltip :: Text -> WidgetNode s e -> WidgetNode s e
 stdDelayTooltip = flip tooltip_ [tooltipDelay 750]

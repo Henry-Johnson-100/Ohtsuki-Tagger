@@ -448,7 +448,7 @@ mapQToFWT :: (Int, T.Text, Int, T.Text) -> FileWithTags
 mapQToFWT (fid, fp, dids, dds) = FileWithTags (File fid fp) [Descriptor dids dds]
 
 mapQToTagCount :: Descriptor -> Only Int -> TagCount
-mapQToTagCount d (Only n) = TagCount (d, n)
+mapQToTagCount d (Only n) = (d, n)
 
 data TestFWT = T Int T.Text Int T.Text deriving (Show, Eq)
 
