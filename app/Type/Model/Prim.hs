@@ -158,8 +158,6 @@ data SingleFileEvent
 
 data ConfigurationEvent
   = ExportAll
-  | ExportDatabase
-  | ExportSelection
   deriving (Show, Eq)
 
 data TaggerEvent
@@ -212,7 +210,7 @@ data TaggerEvent
   | -- Run the text as shell cmd
     ShellCmd
   | -- Receives nothing and does nothing
-    PutExtern !()
+    IOEvent !()
   | -- Tag the selection with the current tagsString
     TagCommitTagsString
   | TagCommitTagsStringDoSolo

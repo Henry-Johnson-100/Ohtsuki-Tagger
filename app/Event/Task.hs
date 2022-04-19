@@ -29,12 +29,6 @@ exportConfig tc = do
   encodingMsg <- Toml.encodeToFile taggerConfigCodec configPath tc
   putStrLn . T.unpack $ encodingMsg
 
-exportDatabaseConfig :: TaggerConfig -> IO ()
-exportDatabaseConfig tc = do
-  configPath <- getConfigPath
-  encodingMsg <- Toml.encodeToFile databaseConfigCodec configPath (tc ^. dbconf)
-  putStrLn . T.unpack $ encodingMsg
-
 addPath :: Connection -> T.Text -> IO [FileWithTags]
 addPath c p = do
   pathsToAdd <- getPathsToAdd p

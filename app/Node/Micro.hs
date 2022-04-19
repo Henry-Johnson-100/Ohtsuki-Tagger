@@ -124,7 +124,8 @@ databaseBackupButton :: WidgetModel s => WidgetNode s TaggerEvent
 databaseBackupButton = styledButton DatabaseBackup "Backup"
 
 configurationExportButton :: (WidgetModel s) => WidgetNode s TaggerEvent
-configurationExportButton = styledButton (DoConfigurationEvent ExportAll) "Export Config"
+configurationExportButton =
+  styledButton (DoConfigurationEvent ExportAll) "Export Configuration"
 
 toggleDatabaseConfigureVisibility :: (WidgetModel s) => WidgetNode s TaggerEvent
 toggleDatabaseConfigureVisibility =
@@ -140,7 +141,7 @@ descriptorDeleteWidget :: WidgetModel s => WidgetNode s TaggerEvent
 descriptorDeleteWidget =
   box_ []
     . dropTarget DescriptorDelete
-    . styledButton (PutExtern ())
+    . styledButton (IOEvent ())
     $ "X"
 
 setQueryCriteriaDropdown ::
@@ -278,7 +279,7 @@ explorableDescriptorTreeWidget tr =
   dropTarget
     ( \d' ->
         maybe
-          (PutExtern ())
+          (IOEvent ())
           (\m' -> DescriptorCreateRelation [m'] [d'])
           (getNode tr)
     )

@@ -60,7 +60,7 @@ dbConnTask ::
   EventResponse s TaggerEvent sp ep
 dbConnTask e f =
   maybe
-    (Task (PutExtern <$> hPutStrLn stderr "Database connection not active."))
+    (Task (IOEvent <$> hPutStrLn stderr "Database connection not active."))
     (Task . fmap e . f)
     . connInstance
 
@@ -116,9 +116,7 @@ configurationEventHandler ::
   [AppEventResponse TaggerModel TaggerEvent]
 configurationEventHandler wenv node model event =
   case event of
-    ExportAll -> [Task (PutExtern <$> exportConfig (model ^. programConfig))]
-    ExportDatabase -> []
-    ExportSelection -> []
+    ExportAll -> [Task (IOEvent <$> exportConfig (model ^. programConfig))]
 
 taggerEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -207,21 +205,21 @@ taggerEventHandler wenv node model event =
       ]
     DescriptorCommitNewDescriptorText ->
       [ dbConnTask
-          PutExtern
+          IOEvent
           (flip createNewDescriptors (T.words (model ^. newDescriptorText)))
           (model ^. dbConn),
         asyncEvent RefreshBothDescriptorTrees
       ]
     DescriptorDelete d ->
-      [ dbConnTask PutExtern (flip deleteDescriptor d) (model ^. dbConn),
+      [ dbConnTask IOEvent (flip deleteDescriptor d) (model ^. dbConn),
         asyncEvent RefreshBothDescriptorTrees
       ]
     DescriptorCreateRelation ms is ->
-      [ dbConnTask PutExtern (\activeConn -> relateTo activeConn ms is) (model ^. dbConn),
+      [ dbConnTask IOEvent (\activeConn -> relateTo activeConn ms is) (model ^. dbConn),
         asyncEvent RefreshBothDescriptorTrees
       ]
     DescriptorUnrelate is ->
-      [ dbConnTask PutExtern (flip unrelate is) (model ^. dbConn),
+      [ dbConnTask IOEvent (flip unrelate is) (model ^. dbConn),
         asyncEvent RefreshBothDescriptorTrees
       ]
     ToggleDoSoloTag ->
@@ -239,7 +237,7 @@ taggerEventHandler wenv node model event =
       ]
     ShellCmd ->
       [ Task
-          ( PutExtern
+          ( IOEvent
               <$> do
                 CM.unless (T.null (model ^. shellCmd)) $ do
                   let procArgs = T.words (model ^. shellCmd)
@@ -258,7 +256,7 @@ taggerEventHandler wenv node model event =
                   putStrLn $ "Running " ++ T.unpack (model ^. shellCmd)
           )
       ]
-    PutExtern _ -> []
+    IOEvent _ -> []
     TagCommitTagsString ->
       [ asyncEvent $
           if model ^. doSoloTag
@@ -268,7 +266,7 @@ taggerEventHandler wenv node model event =
       ]
     TagCommitTagsStringDoSolo ->
       [ dbConnTask
-          PutExtern
+          IOEvent
           ( \activeConn ->
               (if isUntagMode (model ^. taggingMode) then untagWith else tag)
                 activeConn
@@ -280,7 +278,7 @@ taggerEventHandler wenv node model event =
       ]
     TagCommitTagsStringDoSelection ->
       [ dbConnTask
-          PutExtern
+          IOEvent
           ( \activeConn ->
               (if isUntagMode (model ^. taggingMode) then untagWith else tag)
                 activeConn
@@ -299,7 +297,7 @@ taggerEventHandler wenv node model event =
       ]
     DatabaseInitialize ->
       [ dbConnTask
-          PutExtern
+          IOEvent
           (runInitScript (T.unpack $ model ^. (programConfig . dbconf . dbconfInit)))
           (model ^. dbConn)
       ]
@@ -320,7 +318,7 @@ taggerEventHandler wenv node model event =
       ]
     DatabaseBackup ->
       [ Task
-          ( PutExtern
+          ( IOEvent
               <$> ( maybe
                       ( hPutStrLn
                           stderr
