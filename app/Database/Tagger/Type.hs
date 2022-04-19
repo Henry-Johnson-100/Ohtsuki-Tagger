@@ -18,6 +18,7 @@ module Database.Tagger.Type
     pushTag,
     fwtFileEqual,
     sortChildren,
+    fstElem,
   )
 where
 
@@ -29,6 +30,9 @@ import qualified Data.Text as T
 import qualified IO
 
 type TagCount = (Descriptor, Int)
+
+fstElem :: Eq a => a -> [(a, b)] -> Bool
+d `fstElem` tcs = d `elem` map fst tcs
 
 data File = File {fileId :: Int, filePath :: T.Text} deriving (Show, Eq)
 

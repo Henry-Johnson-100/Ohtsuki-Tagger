@@ -22,7 +22,7 @@ module Node.Application
 where
 
 import Control.Lens
-import Data.List (foldl', intersperse, map)
+import Data.List (foldl', intersperse, map, sort)
 import Data.Text (Text, append, intercalate, pack, replicate, unwords)
 import Database.Tagger.Type
 import Monomer
@@ -158,14 +158,14 @@ fileSelectionWidget fwts =
 fileSingleWidget ::
   (WidgetModel s, HasDoSoloTag s Bool) =>
   Bool ->
-  Maybe FileWithTags ->
+  SingleFileSelectionModel ->
   WidgetNode s TaggerEvent
-fileSingleWidget isSoloTagMode mfwt =
+fileSingleWidget isSoloTagMode sfModel =
   flip styleBasic [maxHeight 10000]
     . box_ [alignTop, alignMiddle]
     . hsplit_ [splitIgnoreChildResize True]
-    $ ( imagePreview . fmap getPlainText $ mfwt,
-        imageDetails isSoloTagMode . maybe [] tags $ mfwt
+    $ ( imagePreview . fmap getPlainText $ sfModel ^. singleFile,
+        imageDetails isSoloTagMode (sfModel ^. tagCounts)
       )
   where
     imagePreview ::
@@ -182,9 +182,9 @@ fileSingleWidget isSoloTagMode mfwt =
     imageDetails ::
       (WidgetModel s) =>
       Bool ->
-      [Descriptor] ->
+      [TagCount] ->
       WidgetNode s TaggerEvent
-    imageDetails isSoloTagMode' ds' =
+    imageDetails isSoloTagMode' tcs' =
       flip styleBasic [borderL 1 black, rangeWidth 160 800]
         . box_ [alignLeft]
         . stdScroll
@@ -196,16 +196,29 @@ fileSingleWidget isSoloTagMode mfwt =
               `nodeVisible` isSoloTagMode',
             spacer,
             label "Tags: ",
-            hstack_ [] [spacer, vstack_ [] . map imageDetailDescriptor $ ds']
+            hstack_ [] [spacer, vstack_ [] . map imageDetailDescriptor . sort $ tcs']
           ]
       where
-        imageDetailDescriptor :: (WidgetModel s) => Descriptor -> WidgetNode s TaggerEvent
-        imageDetailDescriptor d =
-          draggable d
-            . flip styleBasic [textColor yuiBlue]
-            . label
-            . getPlainText
-            $ d
+        imageDetailDescriptor ::
+          (WidgetModel s) =>
+          TagCount ->
+          WidgetNode s TaggerEvent
+        imageDetailDescriptor (d, c) =
+          hgrid_ [] $
+            [ draggable_ d []
+                . box_ [alignLeft]
+                . flip styleBasic [textColor yuiBlue]
+                . label
+                . getPlainText
+                $ d,
+              flip styleBasic [paddingL 15]
+                . box_ [alignLeft]
+                . flip styleBasic [textColor yuiBlue]
+                . label
+                . pack
+                . show
+                $ c
+            ]
 
 operationWidget ::
   ( WidgetModel s,
