@@ -20,7 +20,6 @@ module Node.Application
     menubar,
     visibility,
     operationWidget,
-    sumSelectionTagCounts,
   )
 where
 
@@ -35,14 +34,6 @@ import Node.Color
 import Node.Micro
 import Type.Config
 import Type.Model
-
-sumSelectionTagCounts :: [FileWithTags] -> [TagCount]
-sumSelectionTagCounts [] = []
-sumSelectionTagCounts xs =
-  tagCountUnmap
-    . L.foldl1' tagCountMapSumUnion
-    . map fileWithTagsToTagCountMap
-    $ xs
 
 visibility ::
   (Eq a, HasProgramVisibility s1 a) =>
@@ -205,15 +196,15 @@ fileSelectionWidget dispParents fwts =
 fileSingleWidget ::
   (WidgetModel s, HasDoSoloTag s Bool) =>
   Bool ->
-  [TagCount] ->
+  [FileWithTags] ->
   SingleFileSelectionModel ->
   WidgetNode s TaggerEvent
-fileSingleWidget isSoloTagMode selectionTagCounts sfModel =
+fileSingleWidget isSoloTagMode currentFileSelection sfModel =
   flip styleBasic [maxHeight 10000]
     . box_ [alignTop, alignMiddle]
     . hsplit_ [splitIgnoreChildResize True]
     $ ( imagePreview . fmap getPlainText $ sfModel ^. singleFile,
-        imageDetails isSoloTagMode selectionTagCounts (sfModel ^. tagCounts)
+        imageDetailWidget isSoloTagMode currentFileSelection (sfModel ^. tagCounts)
       )
   where
     imagePreview ::
@@ -227,76 +218,6 @@ fileSingleWidget isSoloTagMode selectionTagCounts sfModel =
             . flip styleBasic [paddingB 3, paddingT 3]
             . flip image_ [fitHeight, alignCenter]
         )
-    imageDetails ::
-      (WidgetModel s) =>
-      Bool ->
-      [TagCount] ->
-      [TagCount] ->
-      WidgetNode s TaggerEvent
-    imageDetails isSoloTagMode' selectionTagCounts' tcs' =
-      flip styleBasic [borderL 1 black, rangeWidth 160 800]
-        . box_ [alignLeft]
-        . vstack_ []
-        $ [ label "Details:",
-            spacer,
-            label "Solo Tagging Mode"
-              `styleBasic` [textColor yuiOrange]
-              `nodeVisible` isSoloTagMode',
-            spacer,
-            vsplit_
-              [splitIgnoreChildResize True]
-              ( vstack_
-                  []
-                  [ label "Tags:",
-                    hstack_
-                      []
-                      [ spacer,
-                        flip styleBasic [border 1 black]
-                          . vscroll_ [wheelRate 50]
-                          . vstack_ []
-                          . map imageDetailDescriptor
-                          . L.sort
-                          $ tcs'
-                      ]
-                  ],
-                vstack_
-                  []
-                  [ label "In Selection:",
-                    spacer,
-                    hstack_
-                      []
-                      [ spacer,
-                        flip styleBasic [border 1 black]
-                          . vscroll_ [wheelRate 50]
-                          . vstack_ []
-                          . map imageDetailDescriptor
-                          . L.sort
-                          $ selectionTagCounts'
-                      ]
-                  ]
-              )
-          ]
-      where
-        imageDetailDescriptor ::
-          (WidgetModel s) =>
-          TagCount ->
-          WidgetNode s TaggerEvent
-        imageDetailDescriptor (d, c) =
-          hgrid_ [] $
-            [ draggable_ d []
-                . box_ [alignLeft]
-                . flip styleBasic [textColor yuiBlue]
-                . label
-                . getPlainText
-                $ d,
-              flip styleBasic [paddingL 15]
-                . box_ [alignLeft]
-                . flip styleBasic [textColor yuiBlue]
-                . label
-                . T.pack
-                . show
-                $ c
-            ]
 
 operationWidget ::
   ( WidgetModel s,

@@ -7,19 +7,19 @@
 
 module Node.Micro where
 
-import Data.List
-import Data.Text hiding (foldl', intersperse, map)
+import qualified Data.List as L
+import qualified Data.Text as T
 import Database.Tagger.Type
 import Monomer
 import Node.Color
 import Type.Config
 import Type.Model
 
-(!++) :: Text -> Text -> Text
-(!++) = Data.Text.append
+(!++) :: T.Text -> T.Text -> T.Text
+(!++) = T.append
 
 class GetPlainText g where
-  getPlainText :: g -> Text
+  getPlainText :: g -> T.Text
 
 instance GetPlainText File where
   getPlainText = filePath
@@ -31,21 +31,21 @@ instance GetPlainText FileWithTags where
   getPlainText = getPlainText . file
 
 instance GetPlainText TagCount where
-  getPlainText (d, n) = getPlainText d !++ " (" !++ (pack . show) n !++ ")"
+  getPlainText (d, n) = getPlainText d !++ " (" !++ (T.pack . show) n !++ ")"
 
-stdDelayTooltip :: Text -> WidgetNode s e -> WidgetNode s e
+stdDelayTooltip :: T.Text -> WidgetNode s e -> WidgetNode s e
 stdDelayTooltip = flip tooltip_ [tooltipDelay 750]
 
 stdScroll :: WidgetNode s e -> WidgetNode s e
 stdScroll = scroll_ [wheelRate 50]
 
 labeledWidget ::
-  (WidgetModel s, WidgetEvent e) => Text -> WidgetNode s e -> WidgetNode s e
+  (WidgetModel s, WidgetEvent e) => T.Text -> WidgetNode s e -> WidgetNode s e
 labeledWidget l w =
   box_ [alignLeft] . vstack_ [] $
     [label l `styleBasic` [textSize 16], w]
 
-styledButton :: (WidgetModel s) => TaggerEvent -> Text -> WidgetNode s TaggerEvent
+styledButton :: (WidgetModel s) => TaggerEvent -> T.Text -> WidgetNode s TaggerEvent
 styledButton a t =
   button t a
 
@@ -73,18 +73,18 @@ dbAutoConnectCheckBox =
     (programConfig . dbconf . dbconfAutoConnect)
 
 queryTextField ::
-  (WidgetModel s, HasFileSelectionQuery s Text) => WidgetNode s TaggerEvent
+  (WidgetModel s, HasFileSelectionQuery s T.Text) => WidgetNode s TaggerEvent
 queryTextField =
   dropTarget (FileSelectionAppendQuery . descriptor) $
     textField_ fileSelectionQuery []
 
 descriptorNewTextField ::
-  (WidgetModel s, HasNewDescriptorText s Text) => WidgetNode s TaggerEvent
+  (WidgetModel s, HasNewDescriptorText s T.Text) => WidgetNode s TaggerEvent
 descriptorNewTextField =
   textField_ newDescriptorText []
 
 newFileTextField ::
-  (WidgetModel s, HasNewFileText s Text) => WidgetNode s TaggerEvent
+  (WidgetModel s, HasNewFileText s T.Text) => WidgetNode s TaggerEvent
 newFileTextField = textField newFileText
 
 selectionDisplayParentsNumberField ::
@@ -99,7 +99,7 @@ newFileTextCommitButton ::
 newFileTextCommitButton = styledButton NewFileTextCommit "Add Path"
 
 tagsStringTextField ::
-  (WidgetModel s, HasTagsString s Text) => WidgetNode s TaggerEvent
+  (WidgetModel s, HasTagsString s T.Text) => WidgetNode s TaggerEvent
 tagsStringTextField =
   dropTarget (TagsStringAppend . descriptor) $ textField_ tagsString []
 
@@ -154,8 +154,8 @@ setQueryCriteriaDropdown =
   dropdown
     queryCriteria
     [ByTag, ByRelation, ByPattern, ByUntagged]
-    (label . pack . show)
-    (label . pack . show)
+    (label . T.pack . show)
+    (label . T.pack . show)
 
 setArithmeticDropdown ::
   (WidgetModel s, WidgetEvent e, HasFileSetArithmetic s FileSetArithmetic) =>
@@ -164,27 +164,31 @@ setArithmeticDropdown =
   dropdown
     fileSetArithmetic
     [Union, Intersect, Diff]
-    (label . pack . show)
-    (label . pack . show)
+    (label . T.pack . show)
+    (label . T.pack . show)
 
 taggingModeDropdown ::
   (WidgetModel s, WidgetEvent e, HasTaggingMode s TaggingMode) =>
   WidgetNode s e
 taggingModeDropdown =
-  dropdown taggingMode [TagMode, UntagMode] (label . pack . show) (label . pack . show)
+  dropdown
+    taggingMode
+    [TagMode, UntagMode]
+    (label . T.pack . show)
+    (label . T.pack . show)
 
 commitQueryButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
 commitQueryButton = styledButton FileSelectionCommitQuery "with"
 
-shellCmdWidget :: (WidgetModel s, HasShellCmd s Text) => WidgetNode s TaggerEvent
+shellCmdWidget :: (WidgetModel s, HasShellCmd s T.Text) => WidgetNode s TaggerEvent
 shellCmdWidget =
   keystroke [("Enter", ShellCmd)]
     . hstack
     $ [shellCmdTextField, doShellCmdButton]
 
 shellCmdTextField ::
-  (WidgetModel s, HasShellCmd s Text) => WidgetNode s TaggerEvent
+  (WidgetModel s, HasShellCmd s T.Text) => WidgetNode s TaggerEvent
 shellCmdTextField = textField_ shellCmd []
 
 doShellCmdButton ::
@@ -193,7 +197,7 @@ doShellCmdButton = styledButton ShellCmd "Cmd"
 
 resetDescriptorTreeToButton ::
   (WidgetModel s) =>
-  Text ->
+  T.Text ->
   WidgetNode s TaggerEvent
 resetDescriptorTreeToButton t = styledButton (RequestDescriptorTree t) "↺"
 
@@ -231,7 +235,7 @@ clearSelectionButton ::
   WidgetNode s TaggerEvent
 clearSelectionButton = styledButton FileSelectionClear "Clear"
 
-appendToQueryButton :: WidgetModel s => Text -> WidgetNode s TaggerEvent
+appendToQueryButton :: WidgetModel s => T.Text -> WidgetNode s TaggerEvent
 appendToQueryButton t = styledButton (FileSelectionAppendQuery t) "Add"
 
 treeLeafButtonRequestDescriptorTree ::
@@ -246,8 +250,8 @@ draggableDescriptorListWidget ::
 draggableDescriptorListWidget =
   box_ [alignLeft]
     . hstack
-    . intersperse spacer
-    . foldl' (\ws d -> ws ++ [draggableDescriptorWidget d]) []
+    . L.intersperse spacer
+    . L.foldl' (\ws d -> ws ++ [draggableDescriptorWidget d]) []
 
 draggableDescriptorWidget ::
   (WidgetModel s, WidgetEvent e) => Descriptor -> WidgetNode s e
@@ -288,7 +292,10 @@ explorableDescriptorTreeWidget tr =
     )
     $ generalDescriptorTreeWidget
       tr
-      [resetDescriptorTreeToButton "#ALL#", parentDescriptorTreeButton, descriptorDeleteWidget]
+      [ resetDescriptorTreeToButton "#ALL#",
+        parentDescriptorTreeButton,
+        descriptorDeleteWidget
+      ]
       treeLeafButtonRequestDescriptorTree
 
 unrelatedDescriptorTreeWidget ::
@@ -301,26 +308,6 @@ unrelatedDescriptorTreeWidget tr =
       tr
       [resetUnrelatedDescriptorTree]
       treeLeafButtonRequestDescriptorTree -- #TODO change this
-
-treeLeafDescriptorWidget ::
-  WidgetModel s =>
-  Color ->
-  Int ->
-  Descriptor ->
-  (Descriptor -> WidgetNode s TaggerEvent) ->
-  WidgetNode s TaggerEvent
-treeLeafDescriptorWidget tc l d a =
-  hstack_ [] $
-    [ label (Data.Text.replicate l "--" !++ "|"),
-      draggable d $
-        a d
-          `styleBasic` [ textColor tc,
-                         bgColor white,
-                         border 0 white,
-                         padding 0
-                       ]
-          `styleHover` [bgColor lightGray]
-    ]
 
 descriptorTreeWidget ::
   (WidgetModel s) =>
@@ -392,3 +379,105 @@ descriptorTreeWidget tr dAction =
                       cs
                 )
     appendVStack x y = vstack [x, y]
+    treeLeafDescriptorWidget ::
+      WidgetModel s =>
+      Color ->
+      Int ->
+      Descriptor ->
+      (Descriptor -> WidgetNode s TaggerEvent) ->
+      WidgetNode s TaggerEvent
+    treeLeafDescriptorWidget tc l d a =
+      hstack_ [] $
+        [ label (T.replicate l "--" !++ "|"),
+          draggable d $
+            a d
+              `styleBasic` [ textColor tc,
+                             bgColor white,
+                             border 0 white,
+                             padding 0
+                           ]
+              `styleHover` [bgColor lightGray]
+        ]
+
+imageDetailWidget ::
+  (WidgetModel s) =>
+  Bool ->
+  [FileWithTags] ->
+  [TagCount] ->
+  WidgetNode s TaggerEvent
+imageDetailWidget isSoloTagMode' currentFileSelection' tcs' =
+  flip styleBasic [borderL 1 black, rangeWidth 160 800]
+    . box_ [alignLeft]
+    . vstack_ []
+    $ [ label "Details:",
+        spacer,
+        label "Solo Tagging Mode"
+          `styleBasic` [textColor yuiOrange]
+          `nodeVisible` isSoloTagMode',
+        spacer,
+        vsplit_
+          [splitIgnoreChildResize True]
+          ( vstack_
+              []
+              [ label "Tags:",
+                hstack_
+                  []
+                  [ spacer,
+                    flip styleBasic [border 1 black]
+                      . vscroll_ [wheelRate 50]
+                      . vstack_ []
+                      . map imageDetailDescriptor
+                      . L.sort
+                      $ tcs'
+                  ]
+              ],
+            vstack_
+              []
+              [ label $
+                  "In Selection: "
+                    !++ "("
+                    !++ (T.pack . show . length) currentFileSelection'
+                    !++ ")",
+                spacer,
+                hstack_
+                  []
+                  [ spacer,
+                    flip styleBasic [border 1 black]
+                      . vscroll_ [wheelRate 50]
+                      . vstack_ []
+                      . map imageDetailDescriptor
+                      . L.sort
+                      . sumSelectionTagCounts
+                      $ currentFileSelection'
+                  ]
+              ]
+          )
+      ]
+  where
+    imageDetailDescriptor ::
+      (WidgetModel s) =>
+      TagCount ->
+      WidgetNode s TaggerEvent
+    imageDetailDescriptor (d, c) =
+      hgrid_ [] $
+        [ draggable_ d []
+            . box_ [alignLeft]
+            . flip styleBasic [textColor yuiBlue]
+            . label
+            . getPlainText
+            $ d,
+          flip styleBasic [paddingL 15]
+            . box_ [alignLeft]
+            . flip styleBasic [textColor yuiBlue]
+            . label
+            . T.pack
+            . show
+            $ c
+        ]
+    sumSelectionTagCounts :: [FileWithTags] -> [TagCount]
+    sumSelectionTagCounts [] = []
+    sumSelectionTagCounts xs =
+      tagCountUnmap
+        . L.foldl1' tagCountMapSumUnion
+        . map fileWithTagsToTagCountMap
+        $ xs
