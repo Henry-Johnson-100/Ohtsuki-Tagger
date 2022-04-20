@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Database.Tagger.Type
@@ -25,8 +26,10 @@ where
 import qualified Control.Monad
 import qualified Control.Monad.Trans.Class as Trans
 import Control.Monad.Trans.Maybe (MaybeT (MaybeT, runMaybeT))
+import qualified Data.Hashable as H
 import qualified Data.List
 import qualified Data.Text as T
+import qualified GHC.Generics as Generics
 import qualified IO
 
 type TagCount = (Descriptor, Int)
@@ -34,18 +37,26 @@ type TagCount = (Descriptor, Int)
 fstElem :: Eq a => a -> [(a, b)] -> Bool
 d `fstElem` tcs = d `elem` map fst tcs
 
-data File = File {fileId :: Int, filePath :: T.Text} deriving (Show, Eq)
+data File = File {fileId :: Int, filePath :: T.Text}
+  deriving (Show, Eq, Generics.Generic)
+
+instance H.Hashable File where
+  hash (File i f) = H.hash $ show i ++ show f
 
 instance Ord File where
   compare (File _ px) (File _ py) = compare px py
 
 data Descriptor = Descriptor {descriptorId :: Int, descriptor :: T.Text}
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generics.Generic)
+
+instance H.Hashable Descriptor where
+  hash (Descriptor i d) = H.hash $ show i ++ show d
 
 instance Ord Descriptor where
   compare (Descriptor _ dx) (Descriptor _ dy) = compare dx dy
 
-data Tag = Tag {fileTagId :: Int, descriptorTagId :: Int} deriving (Show, Eq, Ord)
+data Tag = Tag {fileTagId :: Int, descriptorTagId :: Int}
+  deriving (Show, Eq, Ord)
 
 data MetaDescriptor = MetaDescriptor
   { metaDescriptorId :: Int,
@@ -57,7 +68,7 @@ data FileWithTags = FileWithTags
   { file :: File,
     tags :: [Descriptor]
   }
-  deriving (Eq)
+  deriving (Eq, Generics.Generic)
 
 fwtFileEqual :: FileWithTags -> FileWithTags -> Bool
 (FileWithTags fx _) `fwtFileEqual` (FileWithTags fy _) = fx == fy
@@ -71,6 +82,9 @@ instance Show FileWithTags where
       (++)
       (flip (++) " : " . show . file)
       (concatMap show . Data.List.sort . tags)
+
+instance H.Hashable FileWithTags where
+  hash = H.hash . file
 
 data DescriptorTree
   = Infra Descriptor
