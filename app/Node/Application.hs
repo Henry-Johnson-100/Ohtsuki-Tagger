@@ -24,8 +24,9 @@ module Node.Application
 where
 
 import Control.Lens
-import Data.List (foldl', intersperse, map, sort)
-import Data.Text hiding (drop, length, map)
+import qualified Data.HashMap.Strict as HashMap
+import qualified Data.List as L
+import qualified Data.Text as T
 import Database.Tagger.Type
 import Monomer
 import Monomer.Core.Themes.BaseTheme
@@ -33,7 +34,6 @@ import Node.Color
 import Node.Micro
 import Type.Config
 import Type.Model
-import Prelude hiding (concat, replicate, unlines, unwords)
 
 visibility ::
   (Eq a, HasProgramVisibility s1 a) =>
@@ -105,12 +105,12 @@ databaseConfigurePage ::
   ( WidgetModel s,
     HasFileSetArithmetic s FileSetArithmetic,
     HasQueryCriteria s QueryCriteria,
-    HasFileSelectionQuery s Text,
-    HasShellCmd s Text,
-    HasTagsString s Text,
-    HasNewDescriptorText s Text,
+    HasFileSelectionQuery s T.Text,
+    HasShellCmd s T.Text,
+    HasTagsString s T.Text,
+    HasNewDescriptorText s T.Text,
     HasTaggingMode s TaggingMode,
-    HasNewFileText s Text,
+    HasNewFileText s T.Text,
     HasProgramConfig s TaggerConfig
   ) =>
   WidgetNode s TaggerEvent
@@ -139,11 +139,20 @@ configConfigurationPage =
     . vgrid
     $ [configurationExportButton]
 
-fileSelectionWidget :: (WidgetModel s) => Int -> [FileWithTags] -> WidgetNode s TaggerEvent
+fileSelectionWidget ::
+  (WidgetModel s) =>
+  Int ->
+  [FileWithTags] ->
+  WidgetNode s TaggerEvent
 fileSelectionWidget dispParents fwts =
   let fileWithTagsZone =
         map
-          (\fwt -> fileWithTagWidget [previewButton fwt, selectButton fwt] dispParents fwt)
+          ( \fwt ->
+              fileWithTagWidget
+                [previewButton fwt, selectButton fwt]
+                dispParents
+                fwt
+          )
       fileWithTagsStack = stdScroll $ box_ [] . vstack . fileWithTagsZone $ fwts
    in stdDelayTooltip "File Database" fileWithTagsStack
   where
@@ -175,12 +184,12 @@ fileSelectionWidget dispParents fwts =
                 separatorLine
               ]
       where
-        getPathComponents :: Int -> Text -> Text
+        getPathComponents :: Int -> T.Text -> T.Text
         getPathComponents n p =
-          let !brokenPath = splitOn "/" p
+          let !brokenPath = T.splitOn "/" p
               !droppedDirs = length brokenPath - n
-           in (!++) ((pack . show) droppedDirs !++ ".../")
-                . intercalate "/"
+           in (!++) ((T.pack . show) droppedDirs !++ ".../")
+                . T.intercalate "/"
                 . drop droppedDirs
                 $ brokenPath
 
@@ -199,7 +208,7 @@ fileSingleWidget isSoloTagMode sfModel =
   where
     imagePreview ::
       (WidgetModel s, HasDoSoloTag s Bool) =>
-      Maybe Text ->
+      Maybe T.Text ->
       WidgetNode s TaggerEvent
     imagePreview =
       maybe
@@ -225,7 +234,7 @@ fileSingleWidget isSoloTagMode sfModel =
               `nodeVisible` isSoloTagMode',
             spacer,
             label "Tags: ",
-            hstack_ [] [spacer, vstack_ [] . map imageDetailDescriptor . sort $ tcs']
+            hstack_ [] [spacer, vstack_ [] . map imageDetailDescriptor . L.sort $ tcs']
           ]
       where
         imageDetailDescriptor ::
@@ -244,7 +253,7 @@ fileSingleWidget isSoloTagMode sfModel =
                 . box_ [alignLeft]
                 . flip styleBasic [textColor yuiBlue]
                 . label
-                . pack
+                . T.pack
                 . show
                 $ c
             ]
@@ -253,11 +262,11 @@ operationWidget ::
   ( WidgetModel s,
     HasFileSetArithmetic s FileSetArithmetic,
     HasQueryCriteria s QueryCriteria,
-    HasFileSelectionQuery s Text,
-    HasTagsString s Text,
+    HasFileSelectionQuery s T.Text,
+    HasTagsString s T.Text,
     HasTaggingMode s TaggingMode,
-    HasNewDescriptorText s Text,
-    HasShellCmd s Text
+    HasNewDescriptorText s T.Text,
+    HasShellCmd s T.Text
   ) =>
   WidgetNode s TaggerEvent
 operationWidget =
@@ -291,7 +300,7 @@ operationWidget =
       ]
   where
     labeledQueryTextField ::
-      (WidgetModel s, HasFileSelectionQuery s Text) =>
+      (WidgetModel s, HasFileSelectionQuery s T.Text) =>
       WidgetNode s TaggerEvent
     labeledQueryTextField =
       flip
@@ -302,7 +311,7 @@ operationWidget =
         . hstack_ []
         $ [button "→" FileSelectionCommitQuery, queryTextField]
     labeledTagTextField ::
-      (WidgetModel s, HasTagsString s Text) =>
+      (WidgetModel s, HasTagsString s T.Text) =>
       WidgetNode s TaggerEvent
     labeledTagTextField =
       flip
@@ -313,7 +322,7 @@ operationWidget =
         . hstack_ []
         $ [button "→" TagCommitTagsString, tagsStringTextField]
     labeledNewDescriptorTextField ::
-      (WidgetModel s, HasNewDescriptorText s Text) =>
+      (WidgetModel s, HasNewDescriptorText s T.Text) =>
       WidgetNode s TaggerEvent
     labeledNewDescriptorTextField =
       flip
@@ -324,7 +333,7 @@ operationWidget =
         . hstack_ []
         $ [button "→" DescriptorCommitNewDescriptorText, descriptorNewTextField]
     labeledShellCmdTextField ::
-      (WidgetModel s, HasShellCmd s Text) =>
+      (WidgetModel s, HasShellCmd s T.Text) =>
       WidgetNode s TaggerEvent
     labeledShellCmdTextField =
       flip
