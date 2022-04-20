@@ -73,10 +73,11 @@ dbAutoConnectCheckBox =
     (programConfig . dbconf . dbconfAutoConnect)
 
 queryTextField ::
-  (WidgetModel s, HasFileSelectionQuery s T.Text) => WidgetNode s TaggerEvent
+  (WidgetModel s, HasFileSelectionModel s a1, HasQueryText a1 T.Text) =>
+  WidgetNode s TaggerEvent
 queryTextField =
   dropTarget (FileSelectionAppendQuery . descriptor) $
-    textField_ fileSelectionQuery []
+    textField_ (fileSelectionModel . queryText) []
 
 descriptorNewTextField ::
   (WidgetModel s, HasNewDescriptorText s T.Text) => WidgetNode s TaggerEvent
@@ -148,21 +149,19 @@ descriptorDeleteWidget =
     $ "X"
 
 setQueryCriteriaDropdown ::
-  (WidgetModel s, WidgetEvent e, HasQueryCriteria s QueryCriteria) =>
-  WidgetNode s e
+  WidgetNode TaggerModel TaggerEvent
 setQueryCriteriaDropdown =
   dropdown
-    queryCriteria
+    (fileSelectionModel . queryCriteria)
     [ByTag, ByRelation, ByPattern, ByUntagged]
     (label . T.pack . show)
     (label . T.pack . show)
 
 setArithmeticDropdown ::
-  (WidgetModel s, WidgetEvent e, HasFileSetArithmetic s FileSetArithmetic) =>
-  WidgetNode s e
+  WidgetNode TaggerModel TaggerEvent
 setArithmeticDropdown =
   dropdown
-    fileSetArithmetic
+    (fileSelectionModel . setArithmetic)
     [Union, Intersect, Diff]
     (label . T.pack . show)
     (label . T.pack . show)

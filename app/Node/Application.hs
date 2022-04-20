@@ -36,11 +36,15 @@ import Type.Config
 import Type.Model
 
 visibility ::
-  (Eq a, HasProgramVisibility s1 a) =>
-  s1 ->
+  ( Eq a,
+    WidgetModel s,
+    HasProgramVisibility s ProgramVisibility,
+    HasProgramVisibility s a
+  ) =>
+  s ->
   a ->
-  WidgetNode s2 e ->
-  WidgetNode s2 e
+  WidgetNode s e ->
+  WidgetNode s e
 visibility m vm = flip nodeVisible (vm == m ^. programVisibility)
 
 themeConfig :: [AppConfig e]
@@ -102,18 +106,7 @@ menubar =
     ]
 
 databaseConfigurePage ::
-  ( WidgetModel s,
-    HasFileSetArithmetic s FileSetArithmetic,
-    HasQueryCriteria s QueryCriteria,
-    HasFileSelectionQuery s T.Text,
-    HasShellCmd s T.Text,
-    HasTagsString s T.Text,
-    HasNewDescriptorText s T.Text,
-    HasTaggingMode s TaggingMode,
-    HasNewFileText s T.Text,
-    HasProgramConfig s TaggerConfig
-  ) =>
-  WidgetNode s TaggerEvent
+  WidgetNode TaggerModel TaggerEvent
 databaseConfigurePage =
   box . flip styleBasic [padding 80] . vgrid $
     [ hstack [newFileTextField, newFileTextCommitButton],
@@ -220,16 +213,7 @@ fileSingleWidget isSoloTagMode currentFileSelection sfModel =
         )
 
 operationWidget ::
-  ( WidgetModel s,
-    HasFileSetArithmetic s FileSetArithmetic,
-    HasQueryCriteria s QueryCriteria,
-    HasFileSelectionQuery s T.Text,
-    HasTagsString s T.Text,
-    HasTaggingMode s TaggingMode,
-    HasNewDescriptorText s T.Text,
-    HasShellCmd s T.Text
-  ) =>
-  WidgetNode s TaggerEvent
+  WidgetNode TaggerModel TaggerEvent
 operationWidget =
   flip styleBasic [border 1 black]
     . box_ [alignTop]
@@ -261,8 +245,7 @@ operationWidget =
       ]
   where
     labeledQueryTextField ::
-      (WidgetModel s, HasFileSelectionQuery s T.Text) =>
-      WidgetNode s TaggerEvent
+      WidgetNode TaggerModel TaggerEvent
     labeledQueryTextField =
       flip
         keystroke_
@@ -272,7 +255,9 @@ operationWidget =
         . hstack_ []
         $ [button "→" FileSelectionCommitQuery, queryTextField]
     labeledTagTextField ::
-      (WidgetModel s, HasTagsString s T.Text) =>
+      ( WidgetModel s,
+        HasTagsString s T.Text
+      ) =>
       WidgetNode s TaggerEvent
     labeledTagTextField =
       flip
@@ -283,7 +268,9 @@ operationWidget =
         . hstack_ []
         $ [button "→" TagCommitTagsString, tagsStringTextField]
     labeledNewDescriptorTextField ::
-      (WidgetModel s, HasNewDescriptorText s T.Text) =>
+      ( WidgetModel s,
+        HasNewDescriptorText s T.Text
+      ) =>
       WidgetNode s TaggerEvent
     labeledNewDescriptorTextField =
       flip
@@ -294,7 +281,9 @@ operationWidget =
         . hstack_ []
         $ [button "→" DescriptorCommitNewDescriptorText, descriptorNewTextField]
     labeledShellCmdTextField ::
-      (WidgetModel s, HasShellCmd s T.Text) =>
+      ( WidgetModel s,
+        HasShellCmd s T.Text
+      ) =>
       WidgetNode s TaggerEvent
     labeledShellCmdTextField =
       flip
@@ -305,12 +294,13 @@ operationWidget =
         . hstack_ []
         $ [button "→" ShellCmd, shellCmdTextField]
     selectionOperatorWidget ::
-      ( WidgetModel s,
-        HasFileSetArithmetic s FileSetArithmetic,
-        HasQueryCriteria s QueryCriteria,
-        HasTaggingMode s TaggingMode
-      ) =>
-      WidgetNode s TaggerEvent
+      -- ( WidgetModel s,
+      --   HasTaggingMode s TaggingMode,
+      --   HasSetArithmetic s FileSetArithmetic,
+      --   HasFileSelectionModel s FileSelectionModel,
+      --   HasQueryCriteria s QueryCriteria
+      -- ) =>
+      WidgetNode TaggerModel TaggerEvent
     selectionOperatorWidget =
       box_ []
         . vgrid_ []

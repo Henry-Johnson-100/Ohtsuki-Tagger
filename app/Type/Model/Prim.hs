@@ -4,6 +4,7 @@
 module Type.Model.Prim
   ( TaggerModel (..),
     SingleFileSelectionModel (..),
+    FileSelectionModel (..),
     TaggerEvent (..),
     SingleFileEvent (..),
     ConfigurationEvent (..),
@@ -44,12 +45,8 @@ instance Show TaggedConnection where
       ]
 
 data TaggerModel = TaggerModel
-  { _taggerFileSelection :: ![FileWithTags],
-    _taggerFileSetArithmetic :: !FileSetArithmetic,
-    _taggerQueryCriteria :: !QueryCriteria,
-    _taggerFileSelectionQuery :: !Text,
+  { _taggerFileSelectionModel :: !FileSelectionModel,
     _taggerSingleFileModel :: !SingleFileSelectionModel,
-    _taggerDescriptorDb :: ![Descriptor],
     _taggerDescriptorTree :: !DescriptorTree,
     _taggerUnrelatedDescriptorTree :: !DescriptorTree,
     _taggerDoSoloTag :: !Bool,
@@ -64,6 +61,23 @@ data TaggerModel = TaggerModel
     _taggerProgramVisibility :: !ProgramVisibility
   }
   deriving (Show, Eq)
+
+data FileSelectionModel = FileSelectionModel
+  { _fsmFileSelection :: ![FileWithTags],
+    _fsmSetArithmetic :: !FileSetArithmetic,
+    _fsmQueryCriteria :: !QueryCriteria,
+    _fsmQueryText :: !Text
+  }
+  deriving (Show, Eq)
+
+emptyFileSelectionModel :: FileSelectionModel
+emptyFileSelectionModel =
+  FileSelectionModel
+    { _fsmFileSelection = [],
+      _fsmSetArithmetic = Union,
+      _fsmQueryCriteria = ByTag,
+      _fsmQueryText = ""
+    }
 
 data SingleFileSelectionModel = SingleFileSelectionModel
   { _sfsmSingleFile :: !(Maybe FileWithTags),
@@ -81,12 +95,8 @@ emptySingleFileSelectionModel =
 emptyTaggerModel :: TaggerConfig -> TaggerModel
 emptyTaggerModel cfg =
   TaggerModel
-    { _taggerFileSelection = [],
-      _taggerFileSetArithmetic = Union,
-      _taggerQueryCriteria = ByTag,
-      _taggerFileSelectionQuery = "",
+    { _taggerFileSelectionModel = emptyFileSelectionModel,
       _taggerSingleFileModel = emptySingleFileSelectionModel,
-      _taggerDescriptorDb = [],
       _taggerDescriptorTree = NullTree,
       _taggerDoSoloTag = False,
       _taggerShellCmd = "feh -D120 -zx. -g800x800 -Bwhite",
@@ -157,15 +167,31 @@ data SingleFileEvent
   | SingleFileMaybePut !(Maybe FileWithTags)
   deriving (Show, Eq)
 
+data FileSelectionEvent
+  = FileSelectionEventUpdate ![FileWithTags]
+  | FileSelectionEventPut ![FileWithTags]
+  | FileSelectionEventRefresh_
+  | FileSelectionEventAppendToQueryText !Text
+  | FileSelectionEventCommitQueryText
+  | FileSelectionEventClear
+  | FileSelectionEventQueryTextClear
+  | FileSelectionEventSetArithmetic !FileSetArithmetic
+  | FileSelectionEventNextSetArithmetic
+  | FileSelectionEventPrevSetArithmetic
+  | FileSelectionEventQueryCriteria !QueryCriteria
+  | FileSelectionEventNextQueryCriteria
+  | FileSelectionEventPrevQueryCriteria
+  deriving (Show, Eq)
+
 data ConfigurationEvent
   = ExportAll
   deriving (Show, Eq)
 
 data TaggerEvent
-  = -- Open DB Connection, populate FileDb, DescriptorDb and DescriptorTree with #ALL#
-    TaggerInit
+  = TaggerInit
   | DoSingleFileEvent !SingleFileEvent
   | DoConfigurationEvent !ConfigurationEvent
+  | DoFileSelectionEvent !FileSelectionEvent
   | -- Update current selection
     FileSelectionUpdate ![FileWithTags]
   | -- Like FileSelectionUpdate but does not rely on FileSetArithmetic

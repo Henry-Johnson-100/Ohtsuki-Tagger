@@ -81,20 +81,20 @@ singleFileEventHandler wenv node model event =
         asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
       ]
     SingleFileNextFromFileSelection ->
-      let !ps = popCycleList (model ^. fileSelection)
+      let !ps = popCycleList (model ^. (fileSelectionModel . fileSelection))
           !mi = head' ps
        in [ Model
-              . (fileSelection .~ ps)
+              . ((fileSelectionModel . fileSelection) .~ ps)
               . ((singleFileModel . singleFile) .~ mi)
               . (doSoloTag .~ True)
               $ model,
             asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
           ]
     SingleFilePrevFromFileSelection ->
-      let !ps = dequeueCycleList (model ^. fileSelection)
+      let !ps = dequeueCycleList (model ^. (fileSelectionModel . fileSelection))
           !mi = head' ps
        in [ Model
-              . (fileSelection .~ ps)
+              . ((fileSelectionModel . fileSelection) .~ ps)
               . ((singleFileModel . singleFile) .~ mi)
               . (doSoloTag .~ True)
               $ model,
@@ -132,24 +132,27 @@ taggerEventHandler wenv node model event =
         else []
     DoSingleFileEvent evt -> singleFileEventHandler wenv node model evt
     DoConfigurationEvent evt -> configurationEventHandler wenv node model evt
-    FileSetArithmetic a -> [Model $ model & fileSetArithmetic .~ a]
-    FileSetArithmeticNext -> [Model $ model & fileSetArithmetic %~ next]
-    FileSetArithmeticPrev -> [Model $ model & fileSetArithmetic %~ prev]
-    FileSetQueryCriteria q -> [Model $ model & queryCriteria .~ q]
-    FileSetQueryCriteriaNext -> [Model $ model & queryCriteria %~ next]
-    FileSetQueryCriteriaPrev -> [Model $ model & queryCriteria %~ prev]
+    FileSetArithmetic a -> [Model $ model & (fileSelectionModel . setArithmetic) .~ a]
+    FileSetArithmeticNext -> [Model $ model & (fileSelectionModel . setArithmetic) %~ next]
+    FileSetArithmeticPrev -> [Model $ model & (fileSelectionModel . setArithmetic) %~ prev]
+    FileSetQueryCriteria q -> [Model $ model & (fileSelectionModel . queryCriteria) .~ q]
+    FileSetQueryCriteriaNext -> [Model $ model & (fileSelectionModel . queryCriteria) %~ next]
+    FileSetQueryCriteriaPrev -> [Model $ model & (fileSelectionModel . queryCriteria) %~ prev]
     FileSelectionUpdate ts ->
       [ Model $
-          model & fileSelection
-            .~ doSetAction (model ^. fileSetArithmetic) (model ^. fileSelection) ts
+          model & (fileSelectionModel . fileSelection)
+            .~ doSetAction
+              (model ^. (fileSelectionModel . setArithmetic))
+              (model ^. (fileSelectionModel . fileSelection))
+              ts
       ]
     FileSelectionPut fwts ->
-      [ Model $ model & fileSelection .~ fwts
+      [ Model $ model & (fileSelectionModel . fileSelection) .~ fwts
       ]
     FileSelectionRefresh_ ->
       [ dbConnTask
           FileSelectionPut
-          (flip getRefreshedFWTs (model ^. fileSelection))
+          (flip getRefreshedFWTs (model ^. (fileSelectionModel . fileSelection)))
           (model ^. dbConn),
         dbConnTask
           (DoSingleFileEvent . SingleFileMaybePut)
@@ -166,8 +169,8 @@ taggerEventHandler wenv node model event =
       ]
     FileSelectionAppendQuery t ->
       [ Model $
-          model & fileSelectionQuery
-            .~ T.unwords [model ^. fileSelectionQuery, t]
+          model & (fileSelectionModel . queryText)
+            .~ T.unwords [model ^. (fileSelectionModel . queryText), t]
       ]
     TagsStringAppend t ->
       [ Model $
@@ -180,18 +183,18 @@ taggerEventHandler wenv node model event =
           FileSelectionUpdate
           ( \activeDbConn ->
               doQueryWithCriteria
-                (model ^. queryCriteria)
+                (model ^. (fileSelectionModel . queryCriteria))
                 activeDbConn
-                (T.words (model ^. fileSelectionQuery))
+                (T.words (model ^. (fileSelectionModel . queryText)))
           )
           (model ^. dbConn),
         asyncEvent FileSelectionQueryClear
       ]
     FileSelectionClear ->
-      [ Model $ model & fileSelection .~ [],
+      [ Model $ model & (fileSelectionModel . fileSelection) .~ [],
         asyncEvent FileSelectionQueryClear
       ]
-    FileSelectionQueryClear -> [Model $ model & fileSelectionQuery .~ ""]
+    FileSelectionQueryClear -> [Model $ model & (fileSelectionModel . queryText) .~ ""]
     DescriptorTreePut tr -> [Model $ model & descriptorTree .~ tr]
     UnrelatedDescriptorTreePut tr -> [Model $ model & unrelatedDescriptorTree .~ tr]
     DescriptorTreePutParent ->
@@ -252,7 +255,7 @@ taggerEventHandler wenv node model event =
                               . filePath
                               . file
                           )
-                        $ (model ^. fileSelection)
+                        $ (model ^. (fileSelectionModel . fileSelection))
                   putStrLn $ "Running " ++ T.unpack (model ^. shellCmd)
           )
       ]
@@ -282,7 +285,7 @@ taggerEventHandler wenv node model event =
           ( \activeConn ->
               (if isUntagMode (model ^. taggingMode) then untagWith else tag)
                 activeConn
-                (model ^. fileSelection)
+                (model ^. (fileSelectionModel . fileSelection))
                 (T.words $ model ^. tagsString)
           )
           (model ^. dbConn),

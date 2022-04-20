@@ -3,6 +3,7 @@
 {-# HLINT ignore "Redundant flip" #-}
 {-# HLINT ignore "Redundant $" #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -25,38 +26,36 @@ taggerApplicationUI ::
   WidgetEnv TaggerModel TaggerEvent ->
   TaggerModel ->
   WidgetNode TaggerModel TaggerEvent
-taggerApplicationUI wenv model' = widgetTree
-  where
-    widgetTree =
-      let !model = model'
-       in vstack
-            [ menubar,
-              zstack
-                [ visibility model Config configConfigurationPage,
-                  visibility model Database databaseConfigurePage,
-                  visibility model Selection selectionConfigurePage,
-                  visibility model Main
-                    . vsplit_ [splitIgnoreChildResize True]
-                    $ ( fileSingleWidget
-                          (model ^. doSoloTag)
-                          (model ^. fileSelection)
-                          (model ^. singleFileModel),
-                        box_ [alignBottom] . hgrid $
-                          [ vstack
-                              [ descriptorTreeQuadrantWidget
-                                  (model ^. descriptorTree)
-                                  (model ^. unrelatedDescriptorTree)
-                              ],
-                            operationWidget
-                            -- ,
-                            -- fileSelectionWidget
-                            --   (model ^. (programConfig . selectionconf . selectionDisplayParents))
-                            --   (model ^. fileSelection)
-                          ]
-                      )
-                ]
+taggerApplicationUI wenv model' =
+  let !model = model'
+   in vstack
+        [ menubar,
+          zstack
+            [ visibility model Config configConfigurationPage,
+              visibility model Database databaseConfigurePage,
+              visibility model Selection selectionConfigurePage,
+              visibility model Main
+                . vsplit_ [splitIgnoreChildResize True]
+                $ ( fileSingleWidget
+                      (model ^. doSoloTag)
+                      (model ^. (fileSelectionModel . fileSelection))
+                      (model ^. singleFileModel),
+                    box_ [alignBottom] . hgrid $
+                      [ vstack
+                          [ descriptorTreeQuadrantWidget
+                              (model ^. descriptorTree)
+                              (model ^. unrelatedDescriptorTree)
+                          ],
+                        operationWidget
+                        -- ,
+                        -- fileSelectionWidget
+                        --   (model ^. (programConfig . selectionconf . selectionDisplayParents))
+                        --   (model ^. fileSelection)
+                      ]
+                  )
             ]
-            `styleBasic` [padding 0]
+        ]
+        `styleBasic` [padding 0]
 
 taggerApplicationConfig :: [AppConfig TaggerEvent]
 taggerApplicationConfig =
