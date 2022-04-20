@@ -1,7 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# HLINT ignore "Use ?~" #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 {-# HLINT ignore "Redundant <$>" #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -25,11 +24,6 @@ import Database.Tagger.Type
 import Event.Task
 import IO
 import Monomer
-  ( AppEventResponse,
-    EventResponse (Model, Task),
-    WidgetEnv,
-    WidgetNode,
-  )
 import Type.Config
 import Type.Model
 
@@ -73,11 +67,11 @@ singleFileEventHandler ::
 singleFileEventHandler wenv node model event =
   case event of
     SingleFilePut fwt ->
-      [ Model $ model & (singleFileModel . singleFile) .~ Just fwt,
+      [ model *~ (singleFileModel . singleFile) .~ Just fwt,
         asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
       ]
     SingleFileMaybePut mfwt ->
-      [ Model $ model & (singleFileModel . singleFile) .~ mfwt,
+      [ model *~ (singleFileModel . singleFile) .~ mfwt,
         asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
       ]
     SingleFileNextFromFileSelection ->
@@ -100,7 +94,7 @@ singleFileEventHandler wenv node model event =
               $ model,
             asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
           ]
-    SingleFilePutTagCounts_ tcs -> [Model $ model & (singleFileModel . tagCounts) .~ tcs]
+    SingleFilePutTagCounts_ tcs -> [model *~ (singleFileModel . tagCounts) .~ tcs]
     SingleFileGetTagCounts ->
       [ dbConnTask
           (DoSingleFileEvent . SingleFilePutTagCounts_)
@@ -118,6 +112,76 @@ configurationEventHandler wenv node model event =
   case event of
     ExportAll -> [Task (IOEvent <$> exportConfig (model ^. programConfig))]
 
+fileSelectionEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  FileSelectionEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+fileSelectionEventHandler wenv node model event =
+  case event of
+    FileSelectionEventUpdate fwts ->
+      [ model *~ (fileSelectionModel . fileSelection)
+          .~ doSetAction
+            (model ^. (fileSelectionModel . setArithmetic))
+            (model ^. (fileSelectionModel . fileSelection))
+            fwts
+      ]
+    FileSelectionEventPut fwts ->
+      [ model *~ (fileSelectionModel . fileSelection) .~ fwts
+      ]
+    FileSelectionEventRefresh_ ->
+      [ dbConnTask
+          (DoFileSelectionEvent . FileSelectionEventPut)
+          (flip getRefreshedFWTs (model ^. (fileSelectionModel . fileSelection)))
+          (model ^. dbConn),
+        dbConnTask
+          (DoSingleFileEvent . SingleFileMaybePut)
+          ( \activeConn ->
+              do
+                mrefreshed <-
+                  M.maybe
+                    (return [])
+                    (getRefreshedFWTs activeConn . (: []))
+                    (model ^. (singleFileModel . singleFile))
+                return . head' $ mrefreshed
+          )
+          (model ^. dbConn)
+      ]
+    FileSelectionEventAppendToQueryText t ->
+      [ model *~ (fileSelectionModel . queryText)
+          .~ T.unwords [model ^. (fileSelectionModel . queryText), t]
+      ]
+    FileSelectionEventCommitQueryText ->
+      [ dbConnTask
+          (DoFileSelectionEvent . FileSelectionEventUpdate)
+          ( \activeDbConn ->
+              doQueryWithCriteria
+                (model ^. (fileSelectionModel . queryCriteria))
+                activeDbConn
+                (T.words (model ^. (fileSelectionModel . queryText)))
+          )
+          (model ^. dbConn),
+        asyncEvent (DoFileSelectionEvent FileSelectionEventQueryTextClear)
+      ]
+    FileSelectionEventClear ->
+      [ model *~ (fileSelectionModel . fileSelection) .~ [],
+        asyncEvent (DoFileSelectionEvent FileSelectionEventQueryTextClear)
+      ]
+    FileSelectionEventQueryTextClear -> [model *~ (fileSelectionModel . queryText) .~ ""]
+    FileSelectionEventSetArithmetic a ->
+      [model *~ (fileSelectionModel . setArithmetic) .~ a]
+    FileSelectionEventNextSetArithmetic ->
+      [model *~ (fileSelectionModel . setArithmetic) %~ next]
+    FileSelectionEventPrevSetArithmetic ->
+      [model *~ (fileSelectionModel . setArithmetic) %~ prev]
+    FileSelectionEventQueryCriteria q ->
+      [model *~ (fileSelectionModel . queryCriteria) .~ q]
+    FileSelectionEventNextQueryCriteria ->
+      [model *~ (fileSelectionModel . queryCriteria) %~ next]
+    FileSelectionEventPrevQueryCriteria ->
+      [model *~ (fileSelectionModel . queryCriteria) %~ prev]
+
 taggerEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
   WidgetNode TaggerModel TaggerEvent ->
@@ -132,69 +196,13 @@ taggerEventHandler wenv node model event =
         else []
     DoSingleFileEvent evt -> singleFileEventHandler wenv node model evt
     DoConfigurationEvent evt -> configurationEventHandler wenv node model evt
-    FileSetArithmetic a -> [Model $ model & (fileSelectionModel . setArithmetic) .~ a]
-    FileSetArithmeticNext -> [Model $ model & (fileSelectionModel . setArithmetic) %~ next]
-    FileSetArithmeticPrev -> [Model $ model & (fileSelectionModel . setArithmetic) %~ prev]
-    FileSetQueryCriteria q -> [Model $ model & (fileSelectionModel . queryCriteria) .~ q]
-    FileSetQueryCriteriaNext -> [Model $ model & (fileSelectionModel . queryCriteria) %~ next]
-    FileSetQueryCriteriaPrev -> [Model $ model & (fileSelectionModel . queryCriteria) %~ prev]
-    FileSelectionUpdate ts ->
-      [ Model $
-          model & (fileSelectionModel . fileSelection)
-            .~ doSetAction
-              (model ^. (fileSelectionModel . setArithmetic))
-              (model ^. (fileSelectionModel . fileSelection))
-              ts
-      ]
-    FileSelectionPut fwts ->
-      [ Model $ model & (fileSelectionModel . fileSelection) .~ fwts
-      ]
-    FileSelectionRefresh_ ->
-      [ dbConnTask
-          FileSelectionPut
-          (flip getRefreshedFWTs (model ^. (fileSelectionModel . fileSelection)))
-          (model ^. dbConn),
-        dbConnTask
-          (DoSingleFileEvent . SingleFileMaybePut)
-          ( \activeDbConn ->
-              do
-                mrefreshed <-
-                  M.maybe
-                    (return [])
-                    (getRefreshedFWTs activeDbConn . (: []))
-                    (model ^. (singleFileModel . singleFile))
-                return . head' $ mrefreshed
-          )
-          (model ^. dbConn)
-      ]
-    FileSelectionAppendQuery t ->
-      [ Model $
-          model & (fileSelectionModel . queryText)
-            .~ T.unwords [model ^. (fileSelectionModel . queryText), t]
-      ]
+    DoFileSelectionEvent evt -> fileSelectionEventHandler wenv node model evt
     TagsStringAppend t ->
       [ Model $
           model
             & tagsString .~ T.unwords [model ^. tagsString, t]
       ]
     TagsStringClear -> [Model $ model & tagsString .~ ""]
-    FileSelectionCommitQuery ->
-      [ dbConnTask
-          FileSelectionUpdate
-          ( \activeDbConn ->
-              doQueryWithCriteria
-                (model ^. (fileSelectionModel . queryCriteria))
-                activeDbConn
-                (T.words (model ^. (fileSelectionModel . queryText)))
-          )
-          (model ^. dbConn),
-        asyncEvent FileSelectionQueryClear
-      ]
-    FileSelectionClear ->
-      [ Model $ model & (fileSelectionModel . fileSelection) .~ [],
-        asyncEvent FileSelectionQueryClear
-      ]
-    FileSelectionQueryClear -> [Model $ model & (fileSelectionModel . queryText) .~ ""]
     DescriptorTreePut tr -> [Model $ model & descriptorTree .~ tr]
     UnrelatedDescriptorTreePut tr -> [Model $ model & unrelatedDescriptorTree .~ tr]
     DescriptorTreePutParent ->
@@ -277,7 +285,7 @@ taggerEventHandler wenv node model event =
                 (T.words $ model ^. tagsString)
           )
           (model ^. dbConn),
-        asyncEvent FileSelectionRefresh_
+        asyncEvent (DoFileSelectionEvent FileSelectionEventRefresh_)
       ]
     TagCommitTagsStringDoSelection ->
       [ dbConnTask
@@ -289,13 +297,15 @@ taggerEventHandler wenv node model event =
                 (T.words $ model ^. tagsString)
           )
           (model ^. dbConn),
-        asyncEvent FileSelectionRefresh_
+        asyncEvent (DoFileSelectionEvent FileSelectionEventRefresh_)
       ]
     TaggingModeNext -> [Model $ model & taggingMode %~ next]
     TaggingModePrev -> [Model $ model & taggingMode %~ prev]
     NewFileTextCommit ->
-      [ dbConnTask FileSelectionPut (flip addPath (model ^. newFileText)) $
-          model ^. dbConn,
+      [ dbConnTask
+          (DoFileSelectionEvent . FileSelectionEventPut)
+          (flip addPath (model ^. newFileText))
+          $ model ^. dbConn,
         Model $ model & newFileText .~ ""
       ]
     DatabaseInitialize ->
@@ -342,6 +352,12 @@ taggerEventHandler wenv node model event =
                   )
           )
       ]
+
+-- I will never understand how the stupid fixity stuff works
+infixl 3 *~
+
+(*~) :: a -> (a -> s) -> EventResponse s e sp ep
+m *~ a = Model $ m & a
 
 -- | Replaces "%file" in the first list with the entirety of the second.
 putFileArgs :: [String] -> [String] -> [String]

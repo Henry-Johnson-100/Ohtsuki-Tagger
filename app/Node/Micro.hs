@@ -76,7 +76,7 @@ queryTextField ::
   (WidgetModel s, HasFileSelectionModel s a1, HasQueryText a1 T.Text) =>
   WidgetNode s TaggerEvent
 queryTextField =
-  dropTarget (FileSelectionAppendQuery . descriptor) $
+  dropTarget (DoFileSelectionEvent . FileSelectionEventAppendToQueryText . descriptor) $
     textField_ (fileSelectionModel . queryText) []
 
 descriptorNewTextField ::
@@ -178,7 +178,10 @@ taggingModeDropdown =
 
 commitQueryButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
-commitQueryButton = styledButton FileSelectionCommitQuery "with"
+commitQueryButton =
+  styledButton
+    (DoFileSelectionEvent FileSelectionEventCommitQueryText)
+    "with"
 
 shellCmdWidget :: (WidgetModel s, HasShellCmd s T.Text) => WidgetNode s TaggerEvent
 shellCmdWidget =
@@ -211,7 +214,11 @@ selectButton ::
   (WidgetModel s) =>
   FileWithTags ->
   WidgetNode s TaggerEvent
-selectButton = flip styledButton "Select" . FileSelectionUpdate . (: [])
+selectButton =
+  flip styledButton "Select"
+    . DoFileSelectionEvent
+    . FileSelectionEventUpdate
+    . (: [])
 
 previewButton ::
   (WidgetModel s) =>
@@ -232,10 +239,18 @@ fileSinglePrevFromFileSelectionButton =
 clearSelectionButton ::
   (WidgetModel s) =>
   WidgetNode s TaggerEvent
-clearSelectionButton = styledButton FileSelectionClear "Clear"
+clearSelectionButton =
+  styledButton
+    (DoFileSelectionEvent FileSelectionEventClear)
+    "Clear"
 
 appendToQueryButton :: WidgetModel s => T.Text -> WidgetNode s TaggerEvent
-appendToQueryButton t = styledButton (FileSelectionAppendQuery t) "Add"
+appendToQueryButton t =
+  styledButton
+    ( DoFileSelectionEvent . FileSelectionEventAppendToQueryText $
+        t
+    )
+    "Add"
 
 treeLeafButtonRequestDescriptorTree ::
   WidgetModel s =>

@@ -220,14 +220,14 @@ operationWidget =
     . flip
       keystroke_
       [ignoreChildrenEvts]
-      [ ("Ctrl-y", FileSelectionClear),
+      [ ("Ctrl-y", DoFileSelectionEvent FileSelectionEventClear),
         ("Ctrl-u", ShellCmd),
         ("Ctrl-i", DoSingleFileEvent SingleFilePrevFromFileSelection),
         ("Ctrl-k", DoSingleFileEvent SingleFileNextFromFileSelection),
-        ("Ctrl-j", FileSetArithmeticNext),
-        ("Ctrl-Shift-j", FileSetArithmeticPrev),
-        ("Ctrl-l", FileSetQueryCriteriaNext),
-        ("Ctrl-Shift-l", FileSetQueryCriteriaPrev),
+        ("Ctrl-j", DoFileSelectionEvent FileSelectionEventNextSetArithmetic),
+        ("Ctrl-Shift-j", DoFileSelectionEvent FileSelectionEventPrevSetArithmetic),
+        ("Ctrl-l", DoFileSelectionEvent FileSelectionEventNextQueryCriteria),
+        ("Ctrl-Shift-l", DoFileSelectionEvent FileSelectionEventPrevQueryCriteria),
         ("Ctrl-o", TaggingModeNext),
         ("Ctrl-Shift-o", TaggingModePrev)
       ]
@@ -250,10 +250,12 @@ operationWidget =
       flip
         keystroke_
         [ignoreChildrenEvts]
-        [("Enter", FileSelectionCommitQuery)]
+        [("Enter", DoFileSelectionEvent FileSelectionEventCommitQueryText)]
         . labeledWidget "Query"
         . hstack_ []
-        $ [button "→" FileSelectionCommitQuery, queryTextField]
+        $ [ button "→" (DoFileSelectionEvent FileSelectionEventCommitQueryText),
+            queryTextField
+          ]
     labeledTagTextField ::
       ( WidgetModel s,
         HasTagsString s T.Text

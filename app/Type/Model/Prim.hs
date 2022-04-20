@@ -8,6 +8,7 @@ module Type.Model.Prim
     TaggerEvent (..),
     SingleFileEvent (..),
     ConfigurationEvent (..),
+    FileSelectionEvent (..),
     TaggedConnection (..),
     FileSetArithmetic (..),
     QueryCriteria (..),
@@ -192,40 +193,11 @@ data TaggerEvent
   | DoSingleFileEvent !SingleFileEvent
   | DoConfigurationEvent !ConfigurationEvent
   | DoFileSelectionEvent !FileSelectionEvent
-  | -- Update current selection
-    FileSelectionUpdate ![FileWithTags]
-  | -- Like FileSelectionUpdate but does not rely on FileSetArithmetic
-    FileSelectionPut ![FileWithTags]
-  | -- Refetch table data for files in selection.
-    -- #TODO also refresh the sngle file if there is one
-    FileSelectionRefresh_
-  | -- Appends some text to the current query, separated by a space.
-    FileSelectionAppendQuery !Text
-  | -- Send a query to the db, uses _TaggerQueryCriteria to match query type
-    -- and _taggerFileSelectionQuery
-    FileSelectionCommitQuery
-  | -- Clear current selection
-    FileSelectionClear
-  | FileSelectionQueryClear
-  | -- | Set querying set arithmetic to Union, Intersect, or Diff
-    FileSetArithmetic !FileSetArithmetic
-  | FileSetArithmeticNext
-  | FileSetArithmeticPrev
-  | -- | Set the query critera which is how files will be queried
-    FileSetQueryCriteria !QueryCriteria
-  | FileSetQueryCriteriaNext
-  | FileSetQueryCriteriaPrev
-  | -- Refresh Descriptor DB with argument
-    DescriptorDbUpdate ![Descriptor]
   | -- Put the InfraTree of a descriptor
     DescriptorTreePut !DescriptorTree
   | UnrelatedDescriptorTreePut !DescriptorTree
   | -- Put the parent meta tree of the current tree in the model
     DescriptorTreePutParent
-  | -- Get a flattened descriptor tree
-    DescriptorTreeGet
-  | -- Clear the current descriptor tree
-    DescriptorTreeClear
   | -- Triggers a functionality like 'cycle'
     ToggleDoSoloTag
   | -- Like DescriptorTreePut but looks up a descriptorTree from text
