@@ -39,6 +39,7 @@ taggerApplicationUI wenv model' = widgetTree
                     . vsplit_ [splitIgnoreChildResize True]
                     $ ( fileSingleWidget
                           (model ^. doSoloTag)
+                          (sumSelectionTagCounts $ model ^. fileSelection)
                           (model ^. singleFileModel),
                         box_ [alignBottom] . hgrid $
                           [ vstack

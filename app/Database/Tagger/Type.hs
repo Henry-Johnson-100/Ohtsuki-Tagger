@@ -9,6 +9,10 @@ module Database.Tagger.Type
     MetaDescriptor (..),
     DescriptorTree (..),
     TagCount (..),
+    TagCountMap (..),
+    tagCountUnmap,
+    tagCountMapSumUnion,
+    fileWithTagsToTagCountMap,
     insertIntoDescriptorTree,
     descriptorTreeElem,
     flattenTree,
@@ -26,6 +30,7 @@ where
 import qualified Control.Monad
 import qualified Control.Monad.Trans.Class as Trans
 import Control.Monad.Trans.Maybe (MaybeT (MaybeT, runMaybeT))
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Hashable as H
 import qualified Data.List
 import qualified Data.Text as T
@@ -33,6 +38,18 @@ import qualified GHC.Generics as Generics
 import qualified IO
 
 type TagCount = (Descriptor, Int)
+
+type TagCountMap = HashMap.HashMap Descriptor Int
+
+tagCountUnmap :: TagCountMap -> [TagCount]
+tagCountUnmap = Control.Monad.liftM2 zip HashMap.keys HashMap.elems
+
+tagCountMapSumUnion :: TagCountMap -> TagCountMap -> TagCountMap
+tagCountMapSumUnion = HashMap.unionWith (+)
+
+fileWithTagsToTagCountMap :: FileWithTags -> TagCountMap
+fileWithTagsToTagCountMap (FileWithTags _ ds) =
+  HashMap.fromList . zip ds . Data.List.repeat $ 1
 
 fstElem :: Eq a => a -> [(a, b)] -> Bool
 d `fstElem` tcs = d `elem` map fst tcs

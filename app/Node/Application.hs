@@ -20,6 +20,7 @@ module Node.Application
     menubar,
     visibility,
     operationWidget,
+    sumSelectionTagCounts,
   )
 where
 
@@ -34,6 +35,14 @@ import Node.Color
 import Node.Micro
 import Type.Config
 import Type.Model
+
+sumSelectionTagCounts :: [FileWithTags] -> [TagCount]
+sumSelectionTagCounts [] = []
+sumSelectionTagCounts xs =
+  tagCountUnmap
+    . L.foldl1' tagCountMapSumUnion
+    . map fileWithTagsToTagCountMap
+    $ xs
 
 visibility ::
   (Eq a, HasProgramVisibility s1 a) =>
@@ -196,14 +205,15 @@ fileSelectionWidget dispParents fwts =
 fileSingleWidget ::
   (WidgetModel s, HasDoSoloTag s Bool) =>
   Bool ->
+  [TagCount] ->
   SingleFileSelectionModel ->
   WidgetNode s TaggerEvent
-fileSingleWidget isSoloTagMode sfModel =
+fileSingleWidget isSoloTagMode selectionTagCounts sfModel =
   flip styleBasic [maxHeight 10000]
     . box_ [alignTop, alignMiddle]
     . hsplit_ [splitIgnoreChildResize True]
     $ ( imagePreview . fmap getPlainText $ sfModel ^. singleFile,
-        imageDetails isSoloTagMode (sfModel ^. tagCounts)
+        imageDetails isSoloTagMode selectionTagCounts (sfModel ^. tagCounts)
       )
   where
     imagePreview ::
@@ -221,11 +231,11 @@ fileSingleWidget isSoloTagMode sfModel =
       (WidgetModel s) =>
       Bool ->
       [TagCount] ->
+      [TagCount] ->
       WidgetNode s TaggerEvent
-    imageDetails isSoloTagMode' tcs' =
+    imageDetails isSoloTagMode' selectionTagCounts' tcs' =
       flip styleBasic [borderL 1 black, rangeWidth 160 800]
         . box_ [alignLeft]
-        . stdScroll
         . vstack_ []
         $ [ label "Details:",
             spacer,
@@ -233,8 +243,38 @@ fileSingleWidget isSoloTagMode sfModel =
               `styleBasic` [textColor yuiOrange]
               `nodeVisible` isSoloTagMode',
             spacer,
-            label "Tags: ",
-            hstack_ [] [spacer, vstack_ [] . map imageDetailDescriptor . L.sort $ tcs']
+            vsplit_
+              [splitIgnoreChildResize True]
+              ( vstack_
+                  []
+                  [ label "Tags:",
+                    hstack_
+                      []
+                      [ spacer,
+                        flip styleBasic [border 1 black]
+                          . vscroll_ [wheelRate 50]
+                          . vstack_ []
+                          . map imageDetailDescriptor
+                          . L.sort
+                          $ tcs'
+                      ]
+                  ],
+                vstack_
+                  []
+                  [ label "In Selection:",
+                    spacer,
+                    hstack_
+                      []
+                      [ spacer,
+                        flip styleBasic [border 1 black]
+                          . vscroll_ [wheelRate 50]
+                          . vstack_ []
+                          . map imageDetailDescriptor
+                          . L.sort
+                          $ selectionTagCounts'
+                      ]
+                  ]
+              )
           ]
       where
         imageDetailDescriptor ::
