@@ -179,7 +179,7 @@ fileSelectionWidget dispParents fwts =
               []
               [ hstack_ [] $
                   [ buttonGridNode bs,
-                    fwtSplitNode (fileNode . file $ fwt, tagsNode . tags $ fwt)
+                    box_ [alignLeft] . fileNode . file $ fwt
                   ],
                 separatorLine
               ]
