@@ -76,7 +76,7 @@ queryTextField ::
   (WidgetModel s, HasFileSelectionModel s a1, HasQueryText a1 T.Text) =>
   WidgetNode s TaggerEvent
 queryTextField =
-  dropTarget (DoFileSelectionEvent . FileSelectionEventAppendToQueryText . descriptor) $
+  dropTarget (DoFileSelectionEvent . FileSelectionAppendToQueryText . descriptor) $
     textField_ (fileSelectionModel . queryText) []
 
 descriptorNewTextField ::
@@ -180,7 +180,7 @@ commitQueryButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
 commitQueryButton =
   styledButton
-    (DoFileSelectionEvent FileSelectionEventCommitQueryText)
+    (DoFileSelectionEvent FileSelectionCommitQueryText)
     "with"
 
 shellCmdWidget :: (WidgetModel s, HasShellCmd s T.Text) => WidgetNode s TaggerEvent
@@ -217,7 +217,7 @@ selectButton ::
 selectButton =
   flip styledButton "Select"
     . DoFileSelectionEvent
-    . FileSelectionEventUpdate
+    . FileSelectionUpdate
     . (: [])
 
 previewButton ::
@@ -241,13 +241,13 @@ clearSelectionButton ::
   WidgetNode s TaggerEvent
 clearSelectionButton =
   styledButton
-    (DoFileSelectionEvent FileSelectionEventClear)
+    (DoFileSelectionEvent FileSelectionClear)
     "Clear"
 
 appendToQueryButton :: WidgetModel s => T.Text -> WidgetNode s TaggerEvent
 appendToQueryButton t =
   styledButton
-    ( DoFileSelectionEvent . FileSelectionEventAppendToQueryText $
+    ( DoFileSelectionEvent . FileSelectionAppendToQueryText $
         t
     )
     "Add"

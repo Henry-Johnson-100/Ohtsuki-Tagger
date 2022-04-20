@@ -169,19 +169,19 @@ data SingleFileEvent
   deriving (Show, Eq)
 
 data FileSelectionEvent
-  = FileSelectionEventUpdate ![FileWithTags]
-  | FileSelectionEventPut ![FileWithTags]
-  | FileSelectionEventRefresh_
-  | FileSelectionEventAppendToQueryText !Text
-  | FileSelectionEventCommitQueryText
-  | FileSelectionEventClear
-  | FileSelectionEventQueryTextClear
-  | FileSelectionEventSetArithmetic !FileSetArithmetic
-  | FileSelectionEventNextSetArithmetic
-  | FileSelectionEventPrevSetArithmetic
-  | FileSelectionEventQueryCriteria !QueryCriteria
-  | FileSelectionEventNextQueryCriteria
-  | FileSelectionEventPrevQueryCriteria
+  = FileSelectionUpdate ![FileWithTags]
+  | FileSelectionPut ![FileWithTags]
+  | FileSelectionRefresh_
+  | FileSelectionAppendToQueryText !Text
+  | FileSelectionCommitQueryText
+  | FileSelectionClear
+  | FileSelectionQueryTextClear
+  | FileSelectionSetArithmetic !FileSetArithmetic
+  | FileSelectionNextSetArithmetic
+  | FileSelectionPrevSetArithmetic
+  | FileSelectionQueryCriteria !QueryCriteria
+  | FileSelectionNextQueryCriteria
+  | FileSelectionPrevQueryCriteria
   deriving (Show, Eq)
 
 data ConfigurationEvent

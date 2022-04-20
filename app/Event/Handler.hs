@@ -120,19 +120,19 @@ fileSelectionEventHandler ::
   [AppEventResponse TaggerModel TaggerEvent]
 fileSelectionEventHandler wenv node model event =
   case event of
-    FileSelectionEventUpdate fwts ->
+    FileSelectionUpdate fwts ->
       [ model *~ (fileSelectionModel . fileSelection)
           .~ doSetAction
             (model ^. (fileSelectionModel . setArithmetic))
             (model ^. (fileSelectionModel . fileSelection))
             fwts
       ]
-    FileSelectionEventPut fwts ->
+    FileSelectionPut fwts ->
       [ model *~ (fileSelectionModel . fileSelection) .~ fwts
       ]
-    FileSelectionEventRefresh_ ->
+    FileSelectionRefresh_ ->
       [ dbConnTask
-          (DoFileSelectionEvent . FileSelectionEventPut)
+          (DoFileSelectionEvent . FileSelectionPut)
           (flip getRefreshedFWTs (model ^. (fileSelectionModel . fileSelection)))
           (model ^. dbConn),
         dbConnTask
@@ -148,13 +148,13 @@ fileSelectionEventHandler wenv node model event =
           )
           (model ^. dbConn)
       ]
-    FileSelectionEventAppendToQueryText t ->
+    FileSelectionAppendToQueryText t ->
       [ model *~ (fileSelectionModel . queryText)
           .~ T.unwords [model ^. (fileSelectionModel . queryText), t]
       ]
-    FileSelectionEventCommitQueryText ->
+    FileSelectionCommitQueryText ->
       [ dbConnTask
-          (DoFileSelectionEvent . FileSelectionEventUpdate)
+          (DoFileSelectionEvent . FileSelectionUpdate)
           ( \activeDbConn ->
               doQueryWithCriteria
                 (model ^. (fileSelectionModel . queryCriteria))
@@ -162,24 +162,24 @@ fileSelectionEventHandler wenv node model event =
                 (T.words (model ^. (fileSelectionModel . queryText)))
           )
           (model ^. dbConn),
-        asyncEvent (DoFileSelectionEvent FileSelectionEventQueryTextClear)
+        asyncEvent (DoFileSelectionEvent FileSelectionQueryTextClear)
       ]
-    FileSelectionEventClear ->
+    FileSelectionClear ->
       [ model *~ (fileSelectionModel . fileSelection) .~ [],
-        asyncEvent (DoFileSelectionEvent FileSelectionEventQueryTextClear)
+        asyncEvent (DoFileSelectionEvent FileSelectionQueryTextClear)
       ]
-    FileSelectionEventQueryTextClear -> [model *~ (fileSelectionModel . queryText) .~ ""]
-    FileSelectionEventSetArithmetic a ->
+    FileSelectionQueryTextClear -> [model *~ (fileSelectionModel . queryText) .~ ""]
+    FileSelectionSetArithmetic a ->
       [model *~ (fileSelectionModel . setArithmetic) .~ a]
-    FileSelectionEventNextSetArithmetic ->
+    FileSelectionNextSetArithmetic ->
       [model *~ (fileSelectionModel . setArithmetic) %~ next]
-    FileSelectionEventPrevSetArithmetic ->
+    FileSelectionPrevSetArithmetic ->
       [model *~ (fileSelectionModel . setArithmetic) %~ prev]
-    FileSelectionEventQueryCriteria q ->
+    FileSelectionQueryCriteria q ->
       [model *~ (fileSelectionModel . queryCriteria) .~ q]
-    FileSelectionEventNextQueryCriteria ->
+    FileSelectionNextQueryCriteria ->
       [model *~ (fileSelectionModel . queryCriteria) %~ next]
-    FileSelectionEventPrevQueryCriteria ->
+    FileSelectionPrevQueryCriteria ->
       [model *~ (fileSelectionModel . queryCriteria) %~ prev]
 
 taggerEventHandler ::
@@ -285,7 +285,7 @@ taggerEventHandler wenv node model event =
                 (T.words $ model ^. tagsString)
           )
           (model ^. dbConn),
-        asyncEvent (DoFileSelectionEvent FileSelectionEventRefresh_)
+        asyncEvent (DoFileSelectionEvent FileSelectionRefresh_)
       ]
     TagCommitTagsStringDoSelection ->
       [ dbConnTask
@@ -297,13 +297,13 @@ taggerEventHandler wenv node model event =
                 (T.words $ model ^. tagsString)
           )
           (model ^. dbConn),
-        asyncEvent (DoFileSelectionEvent FileSelectionEventRefresh_)
+        asyncEvent (DoFileSelectionEvent FileSelectionRefresh_)
       ]
     TaggingModeNext -> [Model $ model & taggingMode %~ next]
     TaggingModePrev -> [Model $ model & taggingMode %~ prev]
     NewFileTextCommit ->
       [ dbConnTask
-          (DoFileSelectionEvent . FileSelectionEventPut)
+          (DoFileSelectionEvent . FileSelectionPut)
           (flip addPath (model ^. newFileText))
           $ model ^. dbConn,
         Model $ model & newFileText .~ ""
