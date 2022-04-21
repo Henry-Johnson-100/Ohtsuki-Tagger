@@ -202,9 +202,9 @@ taggerEventHandler wenv node model event =
           model
             & tagsString .~ T.unwords [model ^. tagsString, t]
       ]
-    TagsStringClear -> [Model $ model & tagsString .~ ""]
-    DescriptorTreePut tr -> [Model $ model & descriptorTree .~ tr]
-    UnrelatedDescriptorTreePut tr -> [Model $ model & unrelatedDescriptorTree .~ tr]
+    TagsStringClear -> [model *~ tagsString .~ ""]
+    DescriptorTreePut tr -> [model *~ descriptorTree .~ tr]
+    UnrelatedDescriptorTreePut tr -> [model *~ unrelatedDescriptorTree .~ tr]
     DescriptorTreePutParent ->
       [ dbConnTask
           DescriptorTreePut
@@ -234,7 +234,7 @@ taggerEventHandler wenv node model event =
         asyncEvent RefreshBothDescriptorTrees
       ]
     ToggleDoSoloTag ->
-      [Model $ model & (doSoloTag .~ not (model ^. doSoloTag))]
+      [model *~ (doSoloTag .~ not (model ^. doSoloTag))]
     RequestDescriptorTree s ->
       [dbConnTask DescriptorTreePut (flip lookupInfraDescriptorTree s) (model ^. dbConn)]
     RefreshUnrelatedDescriptorTree ->
@@ -288,14 +288,14 @@ taggerEventHandler wenv node model event =
           (model ^. dbConn),
         asyncEvent (DoFileSelectionEvent FileSelectionRefresh_)
       ]
-    TaggingModeNext -> [Model $ model & taggingMode %~ next]
-    TaggingModePrev -> [Model $ model & taggingMode %~ prev]
+    TaggingModeNext -> [model *~ taggingMode %~ next]
+    TaggingModePrev -> [model *~ taggingMode %~ prev]
     NewFileTextCommit ->
       [ dbConnTask
           (DoFileSelectionEvent . FileSelectionPut)
           (flip addPath (model ^. newFileText))
           $ model ^. dbConn,
-        Model $ model & newFileText .~ ""
+        model *~ newFileText .~ ""
       ]
     DatabaseInitialize ->
       [ dbConnTask
@@ -305,9 +305,9 @@ taggerEventHandler wenv node model event =
       ]
     ToggleVisibilityMode vm ->
       [ let currentVM = model ^. programVisibility
-         in Model $ model & programVisibility .~ (if currentVM == vm then Main else vm)
+         in model *~ programVisibility .~ (if currentVM == vm then Main else vm)
       ]
-    DatabaseConnectionPut_ tc -> [Model $ model & dbConn .~ tc]
+    DatabaseConnectionPut_ tc -> [model *~ dbConn .~ tc]
     DatabaseConnect ->
       [ Task $
           DatabaseConnectionPut_ <$> do
