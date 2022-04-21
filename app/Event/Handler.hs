@@ -249,22 +249,11 @@ taggerEventHandler wenv node model event =
     ShellCmd ->
       [ Task
           ( IOEvent
-              <$> do
-                CM.unless (T.null (model ^. shellCmd)) $ do
-                  let procArgs = T.words (model ^. shellCmd)
-                  p <-
-                    createProcess
-                      . shell
-                      $ L.unwords
-                        . putFileArgs
-                          (map T.unpack procArgs)
-                        . map
-                          ( T.unpack
-                              . filePath
-                              . file
-                          )
-                        $ (model ^. (fileSelectionModel . fileSelection))
-                  putStrLn $ "Running " ++ T.unpack (model ^. shellCmd)
+              <$> runShellCmds
+                (words . T.unpack $ model ^. shellCmd)
+                ( map (T.unpack . filePath . file) $
+                    model ^. (fileSelectionModel . fileSelection)
+                )
           )
       ]
     IOEvent _ -> []
@@ -362,20 +351,8 @@ m *~ a = Model $ m & a
 -- | Replaces "%file" in the first list with the entirety of the second.
 putFileArgs :: [String] -> [String] -> [String]
 putFileArgs args files =
-  let atFileArg = L.break (== "%file") args
+  let !atFileArg = L.break (L.isInfixOf "%file") args
    in fst atFileArg ++ files ++ (tail' . snd $ atFileArg)
-
-tail' :: [a] -> [a]
-tail' [] = []
-tail' (_ : xs) = xs
-
-last' :: [a] -> Maybe a
-last' [] = Nothing
-last' xs = Just . last $ xs
-
-init' :: [a] -> [a]
-init' [] = []
-init' xs = init xs
 
 -- | Take the first item and put it on the end
 popCycleList :: [a] -> [a]

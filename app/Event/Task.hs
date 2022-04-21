@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 {-# HLINT ignore "Use lambda-case" #-}
@@ -11,6 +12,7 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe
 import Data.Char
+import qualified Data.List as L
 import Data.Maybe
 import qualified Data.Text as T
 import Database.SQLite.Simple
@@ -22,6 +24,50 @@ import Type.Config
 import Type.Model
 
 type ConnString = String
+
+tail' :: [a] -> [a]
+tail' [] = []
+tail' (_ : xs) = xs
+
+last' :: [a] -> Maybe a
+last' [] = Nothing
+last' xs = Just . last $ xs
+
+init' :: [a] -> [a]
+init' [] = []
+init' xs = init xs
+
+runShellCmds :: [String] -> [String] -> IO ()
+runShellCmds cs fwtString = do
+  let rawCmd = L.break (L.isInfixOf ";") cs
+  unless (null . fst $ rawCmd) $ do
+    let prog = head . fst $ rawCmd
+        args = findReplaceFileArg (tail' . fst $ rawCmd) fwtString
+    runShellCmd prog args
+    flip runShellCmds fwtString . tail' . snd $ rawCmd
+  where
+    findReplaceFileArg args files =
+      let !atFileArg = L.break (L.isInfixOf "%file") args
+       in fst atFileArg ++ files ++ (tail' . snd $ atFileArg)
+
+    runShellCmd :: String -> [String] -> IO ()
+    runShellCmd c args = do
+      let cmd =
+            (proc c args)
+              { delegate_ctlc = True,
+                new_session = True
+              }
+      p <- createProcess cmd
+      let pout = (\(_, h, _, _) -> h) p
+          perr = (\(_, _, h, _) -> h) p
+          pProc = (\(_, _, _, p') -> p') p
+      hReadMaybe stdout pout
+      hReadMaybe stderr perr
+      print <=< waitForProcess $ pProc
+      where
+        hReadMaybe oh mh =
+          maybe (pure ()) (hGetContents >=> hPutStrLn oh) mh
+        hCloseMaybe = maybe (pure ()) hClose
 
 exportConfig :: TaggerConfig -> IO ()
 exportConfig tc = do

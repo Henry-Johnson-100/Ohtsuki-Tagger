@@ -23,6 +23,7 @@ where
 import Data.Text (Text)
 import Database.Tagger.Access
 import Database.Tagger.Type
+import IO
 import Type.Config
 
 instance Show Connection where
@@ -30,6 +31,13 @@ instance Show Connection where
 
 instance Eq Connection where
   x == y = True
+
+data TaggerExternalProcess = TaggerExternalProcess
+  { pIn :: Maybe Handle,
+    pOut :: Maybe Handle,
+    pErr :: Maybe Handle,
+    pProc :: ProcessHandle
+  } deriving()
 
 data TaggedConnection = TaggedConnection
   { connName :: !Text,
