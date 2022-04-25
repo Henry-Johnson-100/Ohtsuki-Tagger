@@ -17,6 +17,7 @@ module Node.Application
     databaseConfigurePage,
     selectionConfigurePage,
     configConfigurationPage,
+    descriptorConfigurePage,
     menubar,
     visibility,
     operationWidget,
@@ -88,7 +89,7 @@ yuiTheme =
         slSelectedFocusBorder = yuiRed
       }
 
-menubar :: (WidgetModel s) => WidgetNode s TaggerEvent
+menubar :: WidgetNode TaggerModel TaggerEvent
 menubar =
   vstack_ [] $
     [ hstack_ []
@@ -100,7 +101,8 @@ menubar =
           )
         $ [ toggleConfigConfigureVisibility,
             toggleDatabaseConfigureVisibility,
-            toggleSelectionConfigureVisibility
+            toggleSelectionConfigureVisibility,
+            toggleDescriptorConfigureVisibility
           ],
       separatorLine
     ]
@@ -131,6 +133,12 @@ configConfigurationPage =
   box . flip styleBasic [padding 80]
     . vgrid
     $ [configurationExportButton]
+
+descriptorConfigurePage :: WidgetNode TaggerModel TaggerEvent
+descriptorConfigurePage =
+  box . flip styleBasic [padding 80]
+    . vgrid
+    $ [descriptorTreeConfigureMainRequestTextField]
 
 fileSelectionWidget ::
   (WidgetModel s) =>

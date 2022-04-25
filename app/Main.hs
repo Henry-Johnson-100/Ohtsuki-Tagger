@@ -34,6 +34,7 @@ taggerApplicationUI wenv model' =
             [ visibility model Config configConfigurationPage,
               visibility model Database databaseConfigurePage,
               visibility model Selection selectionConfigurePage,
+              visibility model ProgramVisibilityDescriptor descriptorConfigurePage,
               visibility model Main
                 . vsplit_ [splitIgnoreChildResize True]
                 $ ( fileSingleWidget

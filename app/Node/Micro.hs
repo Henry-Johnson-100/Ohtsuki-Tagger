@@ -55,6 +55,10 @@ buttonStylingBasic = [bgColor white, border 0 white]
 buttonStylingHover :: [StyleState]
 buttonStylingHover = [bgColor lightGray]
 
+descriptorTreeConfigureMainRequestTextField :: WidgetNode TaggerModel TaggerEvent
+descriptorTreeConfigureMainRequestTextField =
+  textField (programConfig . descriptorTreeConf . descriptorTreeMainRequest)
+
 dbPathTextField ::
   (WidgetModel s, HasProgramConfig s TaggerConfig) =>
   WidgetNode s TaggerEvent
@@ -140,6 +144,12 @@ toggleSelectionConfigureVisibility =
   styledButton
     (ToggleVisibilityMode Selection)
     "Selection"
+
+toggleDescriptorConfigureVisibility :: WidgetNode TaggerModel TaggerEvent
+toggleDescriptorConfigureVisibility =
+  styledButton
+    (ToggleVisibilityMode ProgramVisibilityDescriptor)
+    "Descriptor"
 
 descriptorDeleteWidget :: WidgetModel s => WidgetNode s TaggerEvent
 descriptorDeleteWidget =

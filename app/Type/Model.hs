@@ -23,3 +23,5 @@ makeLenses ''TaggerConfig
 makeLenses ''DatabaseConfig
 
 makeLenses ''SelectionConfig
+
+makeLenses ''DescriptorTreeConfig
