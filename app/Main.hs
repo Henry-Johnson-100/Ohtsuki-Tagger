@@ -44,6 +44,7 @@ taggerApplicationUI wenv model' =
                     box_ [alignBottom] . hgrid $
                       [ vstack
                           [ descriptorTreeQuadrantWidget
+                              (model ^. (programConfig . descriptorTreeConf))
                               (model ^. descriptorTree)
                               (model ^. unrelatedDescriptorTree)
                           ],

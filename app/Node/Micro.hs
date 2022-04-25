@@ -7,6 +7,7 @@
 
 module Node.Micro where
 
+import Control.Lens
 import qualified Data.List as L
 import qualified Data.Text as T
 import Database.Tagger.Type
@@ -289,9 +290,10 @@ draggableDescriptorWidget d =
 
 mainDescriptorTreeWidget ::
   WidgetModel s =>
+  DescriptorTreeConfig ->
   DescriptorTree ->
   WidgetNode s TaggerEvent
-mainDescriptorTreeWidget tr =
+mainDescriptorTreeWidget dtrConf tr =
   dropTarget
     ( \d' ->
         maybe
@@ -301,30 +303,34 @@ mainDescriptorTreeWidget tr =
     )
     $ generalDescriptorTreeWidget
       tr
-      [ resetDescriptorTreeToButton "#META#",
+      [ resetDescriptorTreeToButton (dtrConf ^. descriptorTreeMainRequest),
         parentDescriptorTreeButton,
         descriptorDeleteWidget
       ]
       treeLeafButtonRequestDescriptorTree
+      dtrConf
 
 unrelatedDescriptorTreeWidget ::
   WidgetModel s =>
+  DescriptorTreeConfig ->
   DescriptorTree ->
   WidgetNode s TaggerEvent
-unrelatedDescriptorTreeWidget tr =
+unrelatedDescriptorTreeWidget dtrConf tr =
   dropTarget (\d' -> DescriptorUnrelate [d']) $
     generalDescriptorTreeWidget
       tr
       [resetUnrelatedDescriptorTree]
       (label . getPlainText)
+      dtrConf
 
 generalDescriptorTreeWidget ::
   WidgetModel s =>
   DescriptorTree ->
   [WidgetNode s TaggerEvent] ->
   (Descriptor -> WidgetNode s TaggerEvent) ->
+  DescriptorTreeConfig ->
   WidgetNode s TaggerEvent
-generalDescriptorTreeWidget tr bs dAction =
+generalDescriptorTreeWidget tr bs dAction dtrConf =
   flip styleBasic [border 1 black] . box_ [alignTop, alignLeft] $
     hstack_
       []

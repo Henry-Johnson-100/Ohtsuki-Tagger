@@ -333,11 +333,12 @@ operationWidget =
 
 descriptorTreeQuadrantWidget ::
   (WidgetModel s) =>
+  DescriptorTreeConfig ->
   DescriptorTree ->
   DescriptorTree ->
   WidgetNode s TaggerEvent
-descriptorTreeQuadrantWidget atr utr =
+descriptorTreeQuadrantWidget dtrConf atr utr =
   flip styleBasic [border 1 black] . box_ [alignTop, alignLeft]
     . hsplit_
       [splitIgnoreChildResize True]
-    $ (mainDescriptorTreeWidget atr, unrelatedDescriptorTreeWidget utr)
+    $ (mainDescriptorTreeWidget dtrConf atr, unrelatedDescriptorTreeWidget dtrConf utr)
