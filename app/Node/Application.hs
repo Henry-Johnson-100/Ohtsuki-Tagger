@@ -134,11 +134,22 @@ configConfigurationPage =
     . vgrid
     $ [configurationExportButton]
 
-descriptorConfigurePage :: WidgetNode TaggerModel TaggerEvent
-descriptorConfigurePage =
+descriptorConfigurePage :: TaggerModel -> WidgetNode TaggerModel TaggerEvent
+descriptorConfigurePage model =
   box . flip styleBasic [padding 80]
-    . vgrid
-    $ [descriptorTreeConfigureMainRequestTextField]
+    . vstack
+    $ [ descriptorTreeConfigureMainRequestTextField,
+        spacer,
+        label "Database Meta-Descriptor Hierarchy: ",
+        generalDescriptorTreeWidget
+          (model ^. descriptorTree)
+          [ resetDescriptorTreeToButton "#ALL#",
+            parentDescriptorTreeButton,
+            descriptorDeleteWidget
+          ]
+          treeLeafButtonRequestDescriptorTree
+          (model ^. (programConfig . descriptorTreeConf))
+      ]
 
 fileSelectionWidget ::
   (WidgetModel s) =>
