@@ -277,11 +277,11 @@ draggableDescriptorWidget d =
     . getPlainText
     $ d
 
-explorableDescriptorTreeWidget ::
+mainDescriptorTreeWidget ::
   WidgetModel s =>
   DescriptorTree ->
   WidgetNode s TaggerEvent
-explorableDescriptorTreeWidget tr =
+mainDescriptorTreeWidget tr =
   dropTarget
     ( \d' ->
         maybe
@@ -291,7 +291,7 @@ explorableDescriptorTreeWidget tr =
     )
     $ generalDescriptorTreeWidget
       tr
-      [ resetDescriptorTreeToButton "#ALL#",
+      [ resetDescriptorTreeToButton "#META#",
         parentDescriptorTreeButton,
         descriptorDeleteWidget
       ]

@@ -332,4 +332,4 @@ descriptorTreeQuadrantWidget atr utr =
   flip styleBasic [border 1 black] . box_ [alignTop, alignLeft]
     . hsplit_
       [splitIgnoreChildResize True]
-    $ (explorableDescriptorTreeWidget atr, unrelatedDescriptorTreeWidget utr)
+    $ (mainDescriptorTreeWidget atr, unrelatedDescriptorTreeWidget utr)
