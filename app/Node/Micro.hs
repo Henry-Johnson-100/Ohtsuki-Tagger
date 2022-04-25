@@ -277,21 +277,6 @@ draggableDescriptorWidget d =
     . getPlainText
     $ d
 
-generalDescriptorTreeWidget ::
-  WidgetModel s =>
-  DescriptorTree ->
-  [WidgetNode s TaggerEvent] ->
-  (Descriptor -> WidgetNode s TaggerEvent) ->
-  WidgetNode s TaggerEvent
-generalDescriptorTreeWidget tr bs dAction =
-  flip styleBasic [border 1 black] . box_ [alignTop, alignLeft] $
-    hstack_
-      []
-      [ vsplit (vstack_ [] bs, spacer),
-        separatorLine,
-        descriptorTreeWidget (sortChildren tr) dAction
-      ]
-
 explorableDescriptorTreeWidget ::
   WidgetModel s =>
   DescriptorTree ->
@@ -323,95 +308,112 @@ unrelatedDescriptorTreeWidget tr =
       [resetUnrelatedDescriptorTree]
       treeLeafButtonRequestDescriptorTree -- #TODO change this
 
-descriptorTreeWidget ::
-  (WidgetModel s) =>
+generalDescriptorTreeWidget ::
+  WidgetModel s =>
   DescriptorTree ->
+  [WidgetNode s TaggerEvent] ->
   (Descriptor -> WidgetNode s TaggerEvent) ->
   WidgetNode s TaggerEvent
-descriptorTreeWidget tr dAction =
-  box . stdScroll . flip styleBasic [textFont "Regular"] . buildTreeWidget dAction $ tr
+generalDescriptorTreeWidget tr bs dAction =
+  flip styleBasic [border 1 black] . box_ [alignTop, alignLeft] $
+    hstack_
+      []
+      [ vsplit (vstack_ [] bs, spacer),
+        separatorLine,
+        descriptorTreeWidget (sortChildren tr) dAction
+      ]
   where
-    buildTreeWidget ::
+    descriptorTreeWidget ::
       (WidgetModel s) =>
-      (Descriptor -> WidgetNode s TaggerEvent) ->
       DescriptorTree ->
+      (Descriptor -> WidgetNode s TaggerEvent) ->
       WidgetNode s TaggerEvent
-    buildTreeWidget action = buildTreeWidgetAccum 0 (vstack []) action
+    descriptorTreeWidget tr dAction =
+      box . stdScroll . flip styleBasic [textFont "Regular"]
+        . buildTreeWidget dAction
+        $ tr
       where
-        buildTreeWidgetAccum ::
+        buildTreeWidget ::
           (WidgetModel s) =>
-          Int ->
-          WidgetNode s TaggerEvent ->
           (Descriptor -> WidgetNode s TaggerEvent) ->
           DescriptorTree ->
           WidgetNode s TaggerEvent
-        buildTreeWidgetAccum l acc action tr =
-          case tr of
-            NullTree -> acc
-            Infra d ->
-              vstack
-                [ acc,
-                  treeLeafDescriptorWidget
-                    black
-                    l
-                    d
-                    action
-                ]
-            Meta d cs ->
-              appendVStack
-                ( vstack
+        buildTreeWidget action = buildTreeWidgetAccum 0 (vstack []) action
+          where
+            buildTreeWidgetAccum ::
+              (WidgetModel s) =>
+              Int ->
+              WidgetNode s TaggerEvent ->
+              (Descriptor -> WidgetNode s TaggerEvent) ->
+              DescriptorTree ->
+              WidgetNode s TaggerEvent
+            buildTreeWidgetAccum l acc action tr =
+              case tr of
+                NullTree -> acc
+                Infra d ->
+                  vstack
                     [ acc,
-                      hstack
-                        [ treeLeafDescriptorWidget
-                            yuiBlue
-                            l
-                            d
-                            action
-                        ]
+                      treeLeafDescriptorWidget
+                        black
+                        l
+                        d
+                        action
                     ]
-                )
-                ( vstack $
-                    map
-                      ( \c ->
-                          case c of
-                            Infra d' ->
-                              treeLeafDescriptorWidget
-                                black
-                                (l + 1)
-                                d'
-                                action
-                            Meta d' _ ->
-                              treeLeafDescriptorWidget
+                Meta d cs ->
+                  appendVStack
+                    ( vstack
+                        [ acc,
+                          hstack
+                            [ treeLeafDescriptorWidget
                                 yuiBlue
-                                (l + 1)
-                                d'
+                                l
+                                d
                                 action
-                            NullTree ->
-                              spacer
-                                `styleBasic` [padding 0, border 0 white]
-                      )
-                      cs
-                )
-    appendVStack x y = vstack [x, y]
-    treeLeafDescriptorWidget ::
-      WidgetModel s =>
-      Color ->
-      Int ->
-      Descriptor ->
-      (Descriptor -> WidgetNode s TaggerEvent) ->
-      WidgetNode s TaggerEvent
-    treeLeafDescriptorWidget tc l d a =
-      hstack_ [] $
-        [ label (T.replicate l "--" !++ "|"),
-          draggable d $
-            a d
-              `styleBasic` [ textColor tc,
-                             bgColor white,
-                             border 0 white,
-                             padding 0
-                           ]
-              `styleHover` [bgColor lightGray]
-        ]
+                            ]
+                        ]
+                    )
+                    ( vstack $
+                        map
+                          ( \c ->
+                              case c of
+                                Infra d' ->
+                                  treeLeafDescriptorWidget
+                                    black
+                                    (l + 1)
+                                    d'
+                                    action
+                                Meta d' _ ->
+                                  treeLeafDescriptorWidget
+                                    yuiBlue
+                                    (l + 1)
+                                    d'
+                                    action
+                                NullTree ->
+                                  spacer
+                                    `styleBasic` [padding 0, border 0 white]
+                          )
+                          cs
+                    )
+        appendVStack x y = vstack [x, y]
+        treeLeafDescriptorWidget ::
+          WidgetModel s =>
+          Color ->
+          Int ->
+          Descriptor ->
+          (Descriptor -> WidgetNode s TaggerEvent) ->
+          WidgetNode s TaggerEvent
+        treeLeafDescriptorWidget tc l d a =
+          hstack_ [] $
+            [ label (T.replicate l "--" !++ "|"),
+              draggable d $
+                a d
+                  `styleBasic` [ textColor tc,
+                                 bgColor white,
+                                 border 0 white,
+                                 padding 0
+                               ]
+                  `styleHover` [bgColor lightGray]
+            ]
 
 imageDetailWidget ::
   (WidgetModel s) =>
