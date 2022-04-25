@@ -306,7 +306,7 @@ unrelatedDescriptorTreeWidget tr =
     generalDescriptorTreeWidget
       tr
       [resetUnrelatedDescriptorTree]
-      treeLeafButtonRequestDescriptorTree -- #TODO change this
+      (label . getPlainText)
 
 generalDescriptorTreeWidget ::
   WidgetModel s =>
