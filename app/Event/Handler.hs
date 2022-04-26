@@ -58,6 +58,14 @@ dbConnTask e f =
     (Task . fmap e . f)
     . connInstance
 
+descriptorTreeEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  DescriptorTreeEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+descriptorTreeEventHandler wenv node model event = []
+
 singleFileEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
   WidgetNode TaggerModel TaggerEvent ->
@@ -197,6 +205,7 @@ taggerEventHandler wenv node model event =
     DoSingleFileEvent evt -> singleFileEventHandler wenv node model evt
     DoConfigurationEvent evt -> configurationEventHandler wenv node model evt
     DoFileSelectionEvent evt -> fileSelectionEventHandler wenv node model evt
+    DoDescriptorTreeEvent evt -> descriptorTreeEventHandler wenv node model evt
     TagsStringAppend t ->
       [ Model $
           model

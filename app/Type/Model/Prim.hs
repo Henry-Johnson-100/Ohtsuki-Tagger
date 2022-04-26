@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Type.Model.Prim
   ( TaggerModel (..),
@@ -10,6 +11,7 @@ module Type.Model.Prim
     SingleFileEvent (..),
     ConfigurationEvent (..),
     FileSelectionEvent (..),
+    DescriptorTreeEvent (..),
     TaggedConnection (..),
     FileSetArithmetic (..),
     QueryCriteria (..),
@@ -21,6 +23,7 @@ module Type.Model.Prim
   )
 where
 
+import Control.Lens
 import Data.Text (Text)
 import Database.Tagger.Access
 import Database.Tagger.Type
@@ -159,11 +162,25 @@ data ConfigurationEvent
   = ExportAll
   deriving (Show, Eq)
 
+-- | A lens used to retrieve a DescriptorTree from a DescriptorTreeModel
+--
+-- Ex.
+--
+-- > mainDescriptorTree
+type DescriptorTreeModelLens = Lens' DescriptorTreeModel DescriptorTree
+
+data DescriptorTreeEvent
+  = MDescriptorTreePut !DescriptorTreeModelLens !DescriptorTree
+  | MDescriptorTreePutParent !DescriptorTreeModelLens
+  | MRequestDescriptorTree !DescriptorTreeModelLens !Text
+  | MRefreshDescriptorTree !DescriptorTreeModelLens
+
 data TaggerEvent
   = TaggerInit
   | DoSingleFileEvent !SingleFileEvent
   | DoConfigurationEvent !ConfigurationEvent
   | DoFileSelectionEvent !FileSelectionEvent
+  | DoDescriptorTreeEvent !DescriptorTreeEvent
   | -- Put the InfraTree of a descriptor
     DescriptorTreePut !DescriptorTree
   | UnrelatedDescriptorTreePut !DescriptorTree
@@ -198,7 +215,6 @@ data TaggerEvent
   | DatabaseBackup
   | DatabaseConnectionPut_ !TaggedConnection
   | ToggleVisibilityMode !ProgramVisibility
-  deriving (Show, Eq)
 
 emptyDescriptorTreeModel :: DescriptorTreeModel
 emptyDescriptorTreeModel =
