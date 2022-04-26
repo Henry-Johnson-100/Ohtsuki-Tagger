@@ -64,7 +64,37 @@ descriptorTreeEventHandler ::
   TaggerModel ->
   DescriptorTreeEvent ->
   [AppEventResponse TaggerModel TaggerEvent]
-descriptorTreeEventHandler wenv node model event = []
+descriptorTreeEventHandler wenv node model event =
+  case event of
+    MDescriptorTreePut mLens toPut ->
+      [ model *~ (descriptorTreeModel . mLens) .~ toPut
+      ]
+    MDescriptorTreePutParent mLens ->
+      [ dbConnTask
+          (DoDescriptorTreeEvent . MDescriptorTreePut mLens)
+          ( flip
+              getParentDescriptorTree
+              (model ^. (descriptorTreeModel . mLens))
+          )
+          (model ^. dbConn)
+      ]
+    MRequestDescriptorTree mLens d ->
+      [ dbConnTask
+          (DoDescriptorTreeEvent . MDescriptorTreePut mLens)
+          (flip lookupInfraDescriptorTree d)
+          (model ^. dbConn)
+      ]
+    MRefreshDescriptorTree mLens ->
+      [ Task
+          ( DoDescriptorTreeEvent . MRequestDescriptorTree mLens
+              <$> ( return
+                      . maybe "#ALL#" descriptor
+                      . getNode
+                      $ model
+                        ^. (descriptorTreeModel . mLens)
+                  )
+          )
+      ]
 
 singleFileEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
