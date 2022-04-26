@@ -157,6 +157,7 @@ data ProgramVisibility
   | Config
   | Database
   | Selection
+  | ProgramVisibilityDescriptor
   deriving (Eq, Show, Enum, Bounded, Cyclic)
 
 data SingleFileEvent

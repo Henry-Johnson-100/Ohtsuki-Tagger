@@ -17,6 +17,7 @@ module Node.Application
     databaseConfigurePage,
     selectionConfigurePage,
     configConfigurationPage,
+    descriptorConfigurePage,
     menubar,
     visibility,
     operationWidget,
@@ -88,7 +89,7 @@ yuiTheme =
         slSelectedFocusBorder = yuiRed
       }
 
-menubar :: (WidgetModel s) => WidgetNode s TaggerEvent
+menubar :: WidgetNode TaggerModel TaggerEvent
 menubar =
   vstack_ [] $
     [ hstack_ []
@@ -100,7 +101,8 @@ menubar =
           )
         $ [ toggleConfigConfigureVisibility,
             toggleDatabaseConfigureVisibility,
-            toggleSelectionConfigureVisibility
+            toggleSelectionConfigureVisibility,
+            toggleDescriptorConfigureVisibility
           ],
       separatorLine
     ]
@@ -131,6 +133,23 @@ configConfigurationPage =
   box . flip styleBasic [padding 80]
     . vgrid
     $ [configurationExportButton]
+
+descriptorConfigurePage :: TaggerModel -> WidgetNode TaggerModel TaggerEvent
+descriptorConfigurePage model =
+  box . flip styleBasic [padding 80]
+    . vstack
+    $ [ descriptorTreeConfigureMainRequestTextField,
+        spacer,
+        label "Database Meta-Descriptor Hierarchy: ",
+        generalDescriptorTreeWidget
+          (model ^. descriptorTree)
+          [ resetDescriptorTreeToButton "#ALL#",
+            parentDescriptorTreeButton,
+            descriptorDeleteWidget
+          ]
+          treeLeafButtonRequestDescriptorTree
+          (model ^. (programConfig . descriptorTreeConf))
+      ]
 
 fileSelectionWidget ::
   (WidgetModel s) =>
@@ -325,11 +344,12 @@ operationWidget =
 
 descriptorTreeQuadrantWidget ::
   (WidgetModel s) =>
+  DescriptorTreeConfig ->
   DescriptorTree ->
   DescriptorTree ->
   WidgetNode s TaggerEvent
-descriptorTreeQuadrantWidget atr utr =
+descriptorTreeQuadrantWidget dtrConf atr utr =
   flip styleBasic [border 1 black] . box_ [alignTop, alignLeft]
     . hsplit_
       [splitIgnoreChildResize True]
-    $ (explorableDescriptorTreeWidget atr, unrelatedDescriptorTreeWidget utr)
+    $ (mainDescriptorTreeWidget dtrConf atr, unrelatedDescriptorTreeWidget dtrConf utr)

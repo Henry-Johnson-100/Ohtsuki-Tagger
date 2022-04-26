@@ -1,5 +1,33 @@
 # Revision history for TaggerGUI
 
-## 0.1.0.0 -- YYYY-mm-dd
+## 0.1.0.0 -- 2022-04-23
 
 * First version. Released on an unsuspecting world.
+
+## 0.1.1.0 -- 2022-04-25
+
+* Added a new configuration table and field: 
+  * [descriptor_tree]
+    * main_request
+      * A text field with the name of a descriptor for the main descriptor tree widget 
+      to request when the refresh button is pushed.
+  * So now a sample minimum config file (keeping mind that selection.display_parents is still not used)
+  for this project to run is:
+```
+[database]
+  auto_connect = true
+  backup = ":memory:"
+  init = "./taggerSchemaDef.sql"
+  path = ":memory:"
+
+[descriptor_tree]
+  main_request = "#ALL#"
+
+[selection]
+  display_parents = 1
+```
+* Also added a 'Descriptor' configuration page.
+  * Can change the value of descriptor_tree.main_request there.
+  * Can also view a similar version of the main descriptor tree widget there.
+* Stopped the descriptors in the #UNRELATED# tree widget from sending request events
+to the main tree widget when clicked.
