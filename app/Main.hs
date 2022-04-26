@@ -34,6 +34,8 @@ taggerApplicationUI wenv model' =
             [ visibility model Config configConfigurationPage,
               visibility model Database databaseConfigurePage,
               visibility model Selection selectionConfigurePage,
+              visibility model ProgramVisibilityDescriptor . descriptorConfigurePage $
+                model,
               visibility model Main
                 . vsplit_ [splitIgnoreChildResize True]
                 $ ( fileSingleWidget
@@ -43,6 +45,7 @@ taggerApplicationUI wenv model' =
                     box_ [alignBottom] . hgrid $
                       [ vstack
                           [ descriptorTreeQuadrantWidget
+                              (model ^. (programConfig . descriptorTreeConf))
                               (model ^. descriptorTree)
                               (model ^. unrelatedDescriptorTree)
                           ],
