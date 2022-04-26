@@ -183,6 +183,7 @@ data FileSelectionEvent
   | FileSelectionQueryCriteria !QueryCriteria
   | FileSelectionNextQueryCriteria
   | FileSelectionPrevQueryCriteria
+  | FileSelectionShuffle
   deriving (Show, Eq)
 
 data ConfigurationEvent

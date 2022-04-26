@@ -19,6 +19,8 @@ import Database.SQLite.Simple
 import Database.Tagger.Access
 import Database.Tagger.Type
 import IO
+import qualified System.Random as Random
+import qualified System.Random.Shuffle as Random.Shuffle
 import qualified Toml
 import Type.Config
 import Type.Model
@@ -36,6 +38,13 @@ last' xs = Just . last $ xs
 init' :: [a] -> [a]
 init' [] = []
 init' xs = init xs
+
+shuffle :: [a] -> IO [a]
+shuffle [] = pure []
+shuffle xs = do
+  g <- Random.initStdGen
+  let shuffled = Random.Shuffle.shuffle' xs (length xs) g
+  return shuffled
 
 runShellCmds :: [String] -> [String] -> IO ()
 runShellCmds cs fwtString = do

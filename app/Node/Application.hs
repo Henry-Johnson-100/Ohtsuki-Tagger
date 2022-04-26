@@ -102,7 +102,10 @@ menubar =
         $ [ toggleConfigConfigureVisibility,
             toggleDatabaseConfigureVisibility,
             toggleSelectionConfigureVisibility,
-            toggleDescriptorConfigureVisibility
+            toggleDescriptorConfigureVisibility,
+            -- #TODO move me
+            spacer,
+            fileSelectionShuffleButton
           ],
       separatorLine
     ]

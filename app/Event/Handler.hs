@@ -181,6 +181,12 @@ fileSelectionEventHandler wenv node model event =
       [model *~ (fileSelectionModel . queryCriteria) %~ next]
     FileSelectionPrevQueryCriteria ->
       [model *~ (fileSelectionModel . queryCriteria) %~ prev]
+    FileSelectionShuffle ->
+      [ Task
+          ( DoFileSelectionEvent . FileSelectionPut
+              <$> shuffle (model ^. (fileSelectionModel . fileSelection))
+          )
+      ]
 
 taggerEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->

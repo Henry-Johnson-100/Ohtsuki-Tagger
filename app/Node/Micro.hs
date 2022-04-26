@@ -255,6 +255,12 @@ clearSelectionButton =
     (DoFileSelectionEvent FileSelectionClear)
     "Clear"
 
+fileSelectionShuffleButton :: WidgetNode TaggerModel TaggerEvent
+fileSelectionShuffleButton =
+  styledButton
+    (DoFileSelectionEvent FileSelectionShuffle)
+    "Shuffle"
+
 appendToQueryButton :: WidgetModel s => T.Text -> WidgetNode s TaggerEvent
 appendToQueryButton t =
   styledButton
