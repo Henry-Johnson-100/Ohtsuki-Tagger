@@ -257,11 +257,16 @@ taggerEventHandler wenv node model event =
           ( IOEvent
               <$> runShellCmds
                 (words . T.unpack $ model ^. shellCmd)
-                ( map (T.unpack . filePath . file) $
-                    model ^. (fileSelectionModel . fileSelection)
+                ( if model ^. doSoloTag && M.isJust singlefwt
+                    then (: []) . fwtPath . M.fromJust $ singlefwt
+                    else selectionFwts
                 )
           )
       ]
+      where
+        fwtPath = T.unpack . filePath . file
+        selectionFwts = map fwtPath $ model ^. fileSelectionModel . fileSelection
+        singlefwt = model ^. singleFileModel . singleFile
     IOEvent _ -> []
     TagCommitTagsString ->
       [ asyncEvent $
