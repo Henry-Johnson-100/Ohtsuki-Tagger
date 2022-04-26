@@ -33,8 +33,6 @@ data TaggerModel = TaggerModel
   { _taggerFileSelectionModel :: !FileSelectionModel,
     _taggerSingleFileModel :: !SingleFileSelectionModel,
     _taggerDescriptorTreeModel :: !DescriptorTreeModel,
-    _taggerDescriptorTree :: !DescriptorTree,
-    _taggerUnrelatedDescriptorTree :: !DescriptorTree,
     _taggerDoSoloTag :: !Bool,
     _taggerShellCmd :: !Text,
     _taggerExtern :: !(),
@@ -181,17 +179,8 @@ data TaggerEvent
   | DoConfigurationEvent !ConfigurationEvent
   | DoFileSelectionEvent !FileSelectionEvent
   | DoDescriptorTreeEvent !DescriptorTreeEvent
-  | -- Put the InfraTree of a descriptor
-    DescriptorTreePut !DescriptorTree
-  | UnrelatedDescriptorTreePut !DescriptorTree
-  | -- Put the parent meta tree of the current tree in the model
-    DescriptorTreePutParent
   | -- Triggers a functionality like 'cycle'
     ToggleDoSoloTag
-  | -- Like DescriptorTreePut but looks up a descriptorTree from text
-    RequestDescriptorTree !Text
-  | RefreshUnrelatedDescriptorTree
-  | RefreshBothDescriptorTrees
   | DescriptorCreateRelation ![Descriptor] ![Descriptor]
   | DescriptorUnrelate ![Descriptor]
   | -- Run the text as shell cmd
@@ -246,13 +235,11 @@ emptyTaggerModel cfg =
     { _taggerFileSelectionModel = emptyFileSelectionModel,
       _taggerSingleFileModel = emptySingleFileSelectionModel,
       _taggerDescriptorTreeModel = emptyDescriptorTreeModel,
-      _taggerDescriptorTree = NullTree,
       _taggerDoSoloTag = False,
       _taggerShellCmd = "feh -D120 -zx. -g800x800 -Bwhite",
       _taggerExtern = (),
       _taggerDbConn = TaggedConnection ":memory:" Nothing,
       _taggerTagsString = "",
-      _taggerUnrelatedDescriptorTree = NullTree,
       _taggerNewDescriptorText = "",
       _taggerTaggingMode = TagMode,
       _taggerNewFileText = "",
