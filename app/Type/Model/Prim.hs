@@ -5,6 +5,7 @@ module Type.Model.Prim
   ( TaggerModel (..),
     SingleFileSelectionModel (..),
     FileSelectionModel (..),
+    DescriptorTreeModel (..),
     TaggerEvent (..),
     SingleFileEvent (..),
     ConfigurationEvent (..),
@@ -28,6 +29,7 @@ import Type.Config
 data TaggerModel = TaggerModel
   { _taggerFileSelectionModel :: !FileSelectionModel,
     _taggerSingleFileModel :: !SingleFileSelectionModel,
+    _taggerDescriptorTreeModel :: !DescriptorTreeModel,
     _taggerDescriptorTree :: !DescriptorTree,
     _taggerUnrelatedDescriptorTree :: !DescriptorTree,
     _taggerDoSoloTag :: !Bool,
@@ -40,6 +42,13 @@ data TaggerModel = TaggerModel
     _taggerNewFileText :: !Text,
     _taggerProgramConfig :: !TaggerConfig,
     _taggerProgramVisibility :: !ProgramVisibility
+  }
+  deriving (Show, Eq)
+
+data DescriptorTreeModel = DescriptorTreeModel
+  { _dtmMainDescriptorTree :: !DescriptorTree,
+    _dtmUnrelatedDescriptorTree :: !DescriptorTree,
+    _dtmAllTree :: !DescriptorTree
   }
   deriving (Show, Eq)
 
@@ -191,6 +200,14 @@ data TaggerEvent
   | ToggleVisibilityMode !ProgramVisibility
   deriving (Show, Eq)
 
+emptyDescriptorTreeModel :: DescriptorTreeModel
+emptyDescriptorTreeModel =
+  DescriptorTreeModel
+    { _dtmMainDescriptorTree = NullTree,
+      _dtmUnrelatedDescriptorTree = NullTree,
+      _dtmAllTree = NullTree
+    }
+
 emptyFileSelectionModel :: FileSelectionModel
 emptyFileSelectionModel =
   FileSelectionModel
@@ -212,6 +229,7 @@ emptyTaggerModel cfg =
   TaggerModel
     { _taggerFileSelectionModel = emptyFileSelectionModel,
       _taggerSingleFileModel = emptySingleFileSelectionModel,
+      _taggerDescriptorTreeModel = emptyDescriptorTreeModel,
       _taggerDescriptorTree = NullTree,
       _taggerDoSoloTag = False,
       _taggerShellCmd = "feh -D120 -zx. -g800x800 -Bwhite",

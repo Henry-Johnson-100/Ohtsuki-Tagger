@@ -18,6 +18,8 @@ makeLensesWith abbreviatedFields ''SingleFileSelectionModel
 
 makeLensesWith abbreviatedFields ''FileSelectionModel
 
+makeLensesWith abbreviatedFields ''DescriptorTreeModel
+
 makeLenses ''TaggerConfig
 
 makeLenses ''DatabaseConfig
