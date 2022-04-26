@@ -25,26 +25,6 @@ import Database.Tagger.Access
 import Database.Tagger.Type
 import Type.Config
 
-instance Show Connection where
-  show _ = "Sqlite Connection"
-
-instance Eq Connection where
-  x == y = True
-
-data TaggedConnection = TaggedConnection
-  { connName :: !Text,
-    connInstance :: !(Maybe Connection)
-  }
-  deriving (Eq)
-
-instance Show TaggedConnection where
-  show (TaggedConnection n m) =
-    concat
-      [ show n,
-        " : ",
-        maybe "Inactive" (const "Active") m
-      ]
-
 data TaggerModel = TaggerModel
   { _taggerFileSelectionModel :: !FileSelectionModel,
     _taggerSingleFileModel :: !SingleFileSelectionModel,
@@ -71,46 +51,31 @@ data FileSelectionModel = FileSelectionModel
   }
   deriving (Show, Eq)
 
-emptyFileSelectionModel :: FileSelectionModel
-emptyFileSelectionModel =
-  FileSelectionModel
-    { _fsmFileSelection = [],
-      _fsmSetArithmetic = Union,
-      _fsmQueryCriteria = ByTag,
-      _fsmQueryText = ""
-    }
-
 data SingleFileSelectionModel = SingleFileSelectionModel
   { _sfsmSingleFile :: !(Maybe FileWithTags),
     _sfsmTagCounts :: ![TagCount]
   }
   deriving (Show, Eq)
 
-emptySingleFileSelectionModel :: SingleFileSelectionModel
-emptySingleFileSelectionModel =
-  SingleFileSelectionModel
-    { _sfsmSingleFile = Nothing,
-      _sfsmTagCounts = []
-    }
+instance Show Connection where
+  show _ = "Sqlite Connection"
 
-emptyTaggerModel :: TaggerConfig -> TaggerModel
-emptyTaggerModel cfg =
-  TaggerModel
-    { _taggerFileSelectionModel = emptyFileSelectionModel,
-      _taggerSingleFileModel = emptySingleFileSelectionModel,
-      _taggerDescriptorTree = NullTree,
-      _taggerDoSoloTag = False,
-      _taggerShellCmd = "feh -D120 -zx. -g800x800 -Bwhite",
-      _taggerExtern = (),
-      _taggerDbConn = TaggedConnection ":memory:" Nothing,
-      _taggerTagsString = "",
-      _taggerUnrelatedDescriptorTree = NullTree,
-      _taggerNewDescriptorText = "",
-      _taggerTaggingMode = TagMode,
-      _taggerNewFileText = "",
-      _taggerProgramConfig = cfg,
-      _taggerProgramVisibility = Main
-    }
+instance Eq Connection where
+  x == y = True
+
+data TaggedConnection = TaggedConnection
+  { connName :: !Text,
+    connInstance :: !(Maybe Connection)
+  }
+  deriving (Eq)
+
+instance Show TaggedConnection where
+  show (TaggedConnection n m) =
+    concat
+      [ show n,
+        " : ",
+        maybe "Inactive" (const "Active") m
+      ]
 
 class (Enum a, Bounded a, Eq a) => Cyclic a where
   next :: a -> a
@@ -122,10 +87,6 @@ data TaggingMode
   = TagMode
   | UntagMode
   deriving (Eq, Read, Enum, Bounded, Cyclic)
-
-isUntagMode :: TaggingMode -> Bool
-isUntagMode UntagMode = True
-isUntagMode _ = False
 
 instance Show TaggingMode where
   show TagMode = "Tag"
@@ -229,3 +190,42 @@ data TaggerEvent
   | DatabaseConnectionPut_ !TaggedConnection
   | ToggleVisibilityMode !ProgramVisibility
   deriving (Show, Eq)
+
+emptyFileSelectionModel :: FileSelectionModel
+emptyFileSelectionModel =
+  FileSelectionModel
+    { _fsmFileSelection = [],
+      _fsmSetArithmetic = Union,
+      _fsmQueryCriteria = ByTag,
+      _fsmQueryText = ""
+    }
+
+emptySingleFileSelectionModel :: SingleFileSelectionModel
+emptySingleFileSelectionModel =
+  SingleFileSelectionModel
+    { _sfsmSingleFile = Nothing,
+      _sfsmTagCounts = []
+    }
+
+emptyTaggerModel :: TaggerConfig -> TaggerModel
+emptyTaggerModel cfg =
+  TaggerModel
+    { _taggerFileSelectionModel = emptyFileSelectionModel,
+      _taggerSingleFileModel = emptySingleFileSelectionModel,
+      _taggerDescriptorTree = NullTree,
+      _taggerDoSoloTag = False,
+      _taggerShellCmd = "feh -D120 -zx. -g800x800 -Bwhite",
+      _taggerExtern = (),
+      _taggerDbConn = TaggedConnection ":memory:" Nothing,
+      _taggerTagsString = "",
+      _taggerUnrelatedDescriptorTree = NullTree,
+      _taggerNewDescriptorText = "",
+      _taggerTaggingMode = TagMode,
+      _taggerNewFileText = "",
+      _taggerProgramConfig = cfg,
+      _taggerProgramVisibility = Main
+    }
+
+isUntagMode :: TaggingMode -> Bool
+isUntagMode UntagMode = True
+isUntagMode _ = False
