@@ -36,6 +36,7 @@ executable tagger
                       ,MagicHash
                       ,DeriveGeneric
                       ,RankNTypes
+                      ,ExistentialQuantification
 
   ghc-options:         -threaded
 

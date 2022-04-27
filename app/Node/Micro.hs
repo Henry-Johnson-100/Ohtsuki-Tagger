@@ -79,10 +79,9 @@ dbAutoConnectCheckBox =
     (programConfig . dbconf . dbconfAutoConnect)
 
 queryTextField ::
-  (WidgetModel s, HasFileSelectionModel s a1, HasQueryText a1 T.Text) =>
-  WidgetNode s TaggerEvent
+  WidgetNode TaggerModel TaggerEvent
 queryTextField =
-  dropTarget (DoFileSelectionEvent . FileSelectionAppendToQueryText . descriptor) $
+  dropTarget (DropTargetAppendText_ (fileSelectionModel . queryText) descriptor) $
     textField_ (fileSelectionModel . queryText) []
 
 descriptorNewTextField ::
@@ -106,9 +105,9 @@ newFileTextCommitButton ::
 newFileTextCommitButton = styledButton NewFileTextCommit "Add Path"
 
 tagsStringTextField ::
-  (WidgetModel s, HasTagsString s T.Text) => WidgetNode s TaggerEvent
+  WidgetNode TaggerModel TaggerEvent
 tagsStringTextField =
-  dropTarget (TagsStringAppend . descriptor) $ textField_ tagsString []
+  dropTarget (DropTargetAppendText_ tagsString descriptor) $ textField_ tagsString []
 
 tagCommitButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
@@ -215,7 +214,7 @@ resetDescriptorTreeToButton ::
   WidgetNode s TaggerEvent
 resetDescriptorTreeToButton t =
   styledButton
-    ( DoDescriptorTreeEvent . RequestDescriptorTree mainDescriptorTree $ t
+    ( DoDescriptorEvent . RequestDescriptorTree mainDescriptorTree $ t
     -- RequestDescriptorTree t
     )
     "↺"
@@ -223,7 +222,7 @@ resetDescriptorTreeToButton t =
 resetUnrelatedDescriptorTree :: WidgetNode TaggerModel TaggerEvent
 resetUnrelatedDescriptorTree =
   styledButton
-    (DoDescriptorTreeEvent (RefreshDescriptorTree unrelatedDescriptorTree))
+    (DoDescriptorEvent (RefreshDescriptorTree unrelatedDescriptorTree))
     -- RefreshUnrelatedDescriptorTree
     "↺"
 
@@ -231,7 +230,7 @@ parentDescriptorTreeButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
 parentDescriptorTreeButton =
   styledButton
-    (DoDescriptorTreeEvent (DescriptorTreePutParent mainDescriptorTree))
+    (DoDescriptorEvent (DescriptorTreePutParent mainDescriptorTree))
     -- DescriptorTreePutParent
     "↑"
 
@@ -272,7 +271,7 @@ clearSelectionButton =
 appendToQueryButton :: WidgetModel s => T.Text -> WidgetNode s TaggerEvent
 appendToQueryButton t =
   styledButton
-    ( DoFileSelectionEvent . FileSelectionAppendToQueryText $
+    ( DropTargetAppendText_ (fileSelectionModel . queryText) id $
         t
     )
     "Add"
@@ -283,7 +282,7 @@ treeLeafButtonRequestDescriptorTree ::
   WidgetNode s TaggerEvent
 treeLeafButtonRequestDescriptorTree d =
   styledButton
-    ( (DoDescriptorTreeEvent . RequestDescriptorTree mainDescriptorTree)
+    ( (DoDescriptorEvent . RequestDescriptorTree mainDescriptorTree)
         . descriptor
         $ d
     )
@@ -340,6 +339,31 @@ unrelatedDescriptorTreeWidget dtrConf tr =
       [resetUnrelatedDescriptorTree]
       (label . getPlainText)
       dtrConf
+
+renameDescriptorWidget :: WidgetNode TaggerModel TaggerEvent
+renameDescriptorWidget =
+  box_ []
+    . labeledWidget "Rename Descriptor"
+    . keystroke_
+      [("Enter", DoDescriptorEvent RenameDescriptor)]
+      []
+    . hstack_ []
+    $ [ dropTarget
+          ( DropTargetAppendText_
+              (descriptorModel . renameDescriptorFrom)
+              descriptor
+          )
+          . textField
+          $ (descriptorModel . renameDescriptorFrom),
+        styledButton (DoDescriptorEvent RenameDescriptor) "To",
+        dropTarget
+          ( DropTargetAppendText_
+              (descriptorModel . renameDescriptorTo)
+              descriptor
+          )
+          . textField
+          $ (descriptorModel . renameDescriptorTo)
+      ]
 
 generalDescriptorTreeWidget ::
   WidgetModel s =>

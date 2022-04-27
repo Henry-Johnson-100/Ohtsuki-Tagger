@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -12,14 +13,14 @@ module Type.Model.Prim
     SingleFileEvent (..),
     ConfigurationEvent (..),
     FileSelectionEvent (..),
-    DescriptorTreeEvent (..),
+    DescriptorEvent (..),
     TaggedConnection (..),
     FileSetArithmetic (..),
     QueryCriteria (..),
     TaggingMode (..),
     ProgramVisibility (..),
     Cyclic (..),
-    DescriptorTreeModelLens (..),
+    DescriptorModelTreeLens (..),
     emptyTaggerModel,
     isUntagMode,
     plantTree,
@@ -51,7 +52,9 @@ data TaggerModel = TaggerModel
 data DescriptorModel = DescriptorModel
   { _dmMainDescriptorTree :: !RootedDescriptorTree,
     _dmUnrelatedDescriptorTree :: !RootedDescriptorTree,
-    _dmAllTree :: !RootedDescriptorTree
+    _dmAllTree :: !RootedDescriptorTree,
+    _dmRenameDescriptorFrom :: !Text,
+    _dmRenameDescriptorTo :: !Text
   }
   deriving (Show, Eq)
 
@@ -164,7 +167,6 @@ data FileSelectionEvent
   = FileSelectionUpdate ![FileWithTags]
   | FileSelectionPut ![FileWithTags]
   | FileSelectionRefresh_
-  | FileSelectionAppendToQueryText !Text
   | FileSelectionCommitQueryText
   | FileSelectionClear
   | FileSelectionQueryTextClear
@@ -185,25 +187,27 @@ data ConfigurationEvent
 -- Ex.
 --
 -- > mainDescriptorTree
-type DescriptorTreeModelLens = Lens' DescriptorModel RootedDescriptorTree
+type DescriptorModelTreeLens = Lens' DescriptorModel RootedDescriptorTree
 
-data DescriptorTreeEvent
-  = DescriptorTreePut !DescriptorTreeModelLens !DescriptorTree
-  | DescriptorTreePutParent !DescriptorTreeModelLens
-  | RequestDescriptorTree !DescriptorTreeModelLens !Text
-  | RefreshDescriptorTree !DescriptorTreeModelLens
+data DescriptorEvent
+  = DescriptorTreePut !DescriptorModelTreeLens !DescriptorTree
+  | DescriptorTreePutParent !DescriptorModelTreeLens
+  | RequestDescriptorTree !DescriptorModelTreeLens !Text
+  | RefreshDescriptorTree !DescriptorModelTreeLens
+  | RenameDescriptor
+
+type TextLens = Lens' TaggerModel Text
 
 data TaggerEvent
   = TaggerInit
   | DoSingleFileEvent !SingleFileEvent
   | DoConfigurationEvent !ConfigurationEvent
   | DoFileSelectionEvent !FileSelectionEvent
-  | DoDescriptorTreeEvent !DescriptorTreeEvent
+  | DoDescriptorEvent !DescriptorEvent
   | -- Triggers a functionality like 'cycle'
     ToggleDoSoloTag
   | DescriptorCreateRelation ![Descriptor] ![Descriptor]
   | DescriptorUnrelate ![Descriptor]
-  | DescriptorRename !Descriptor !Text
   | -- Run the text as shell cmd
     ShellCmd
   | -- Receives nothing and does nothing
@@ -214,8 +218,6 @@ data TaggerEvent
   | TagCommitTagsStringDoSelection
   | TaggingModeNext
   | TaggingModePrev
-  | -- Append Text to the TagsString
-    TagsStringAppend !Text
   | TagsStringClear
   | DescriptorCommitNewDescriptorText
   | DescriptorDelete !Descriptor
@@ -225,13 +227,16 @@ data TaggerEvent
   | DatabaseBackup
   | DatabaseConnectionPut_ !TaggedConnection
   | ToggleVisibilityMode !ProgramVisibility
+  | forall a. DropTargetAppendText_ TextLens (a -> Text) a
 
 emptyDescriptorTreeModel :: DescriptorModel
 emptyDescriptorTreeModel =
   DescriptorModel
     { _dmMainDescriptorTree = plantTree NullTree,
       _dmUnrelatedDescriptorTree = (plantTree NullTree) {_rootName = "#UNRELATED#"},
-      _dmAllTree = plantTree NullTree
+      _dmAllTree = plantTree NullTree,
+      _dmRenameDescriptorFrom = "",
+      _dmRenameDescriptorTo = ""
     }
 
 emptyFileSelectionModel :: FileSelectionModel

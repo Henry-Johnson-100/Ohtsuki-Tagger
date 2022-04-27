@@ -138,7 +138,9 @@ descriptorConfigurePage :: TaggerModel -> WidgetNode TaggerModel TaggerEvent
 descriptorConfigurePage model =
   box . flip styleBasic [padding 80]
     . vstack
-    $ [ descriptorTreeConfigureMainRequestTextField,
+    $ [ labeledWidget "Main Tree Root" descriptorTreeConfigureMainRequestTextField,
+        spacer,
+        renameDescriptorWidget,
         spacer,
         label "Database Meta-Descriptor Hierarchy: ",
         generalDescriptorTreeWidget
@@ -276,10 +278,7 @@ operationWidget =
             queryTextField
           ]
     labeledTagTextField ::
-      ( WidgetModel s,
-        HasTagsString s T.Text
-      ) =>
-      WidgetNode s TaggerEvent
+      WidgetNode TaggerModel TaggerEvent
     labeledTagTextField =
       flip
         keystroke_
