@@ -43,3 +43,8 @@ selection are arguments to the shell cmd.
 #### 0.1.2.1 -- 2022-04-27
 
 * Added a command line option `-v, --version` to see the program version.
+
+### 0.1.3.0 -- 2022-04-27
+
+* Added a field to rename descriptors.
+  * In the Descriptor configuration page.
