@@ -19,6 +19,7 @@ module Type.Model.Prim
     TaggingMode (..),
     ProgramVisibility (..),
     Cyclic (..),
+    DescriptorTreeModelLens (..),
     emptyTaggerModel,
     isUntagMode,
     plantTree,
@@ -49,9 +50,9 @@ data TaggerModel = TaggerModel
   deriving (Show, Eq)
 
 data DescriptorTreeModel = DescriptorTreeModel
-  { _dtmMainDescriptorTree :: !DescriptorTree,
-    _dtmUnrelatedDescriptorTree :: !DescriptorTree,
-    _dtmAllTree :: !DescriptorTree
+  { _dtmMainDescriptorTree :: !RootedDescriptorTree,
+    _dtmUnrelatedDescriptorTree :: !RootedDescriptorTree,
+    _dtmAllTree :: !RootedDescriptorTree
   }
   deriving (Show, Eq)
 
@@ -180,12 +181,12 @@ data ConfigurationEvent
   = ExportAll
   deriving (Show, Eq)
 
--- | A lens used to retrieve a DescriptorTree from a DescriptorTreeModel
+-- | A lens used to retrieve a RootedDescriptorTree from a DescriptorTreeModel
 --
 -- Ex.
 --
 -- > mainDescriptorTree
-type DescriptorTreeModelLens = Lens' DescriptorTreeModel DescriptorTree
+type DescriptorTreeModelLens = Lens' DescriptorTreeModel RootedDescriptorTree
 
 data DescriptorTreeEvent
   = MDescriptorTreePut !DescriptorTreeModelLens !DescriptorTree
@@ -228,9 +229,9 @@ data TaggerEvent
 emptyDescriptorTreeModel :: DescriptorTreeModel
 emptyDescriptorTreeModel =
   DescriptorTreeModel
-    { _dtmMainDescriptorTree = NullTree,
-      _dtmUnrelatedDescriptorTree = NullTree,
-      _dtmAllTree = NullTree
+    { _dtmMainDescriptorTree = plantTree NullTree,
+      _dtmUnrelatedDescriptorTree = (plantTree NullTree) {_rootName = "#UNRELATED#"},
+      _dtmAllTree = plantTree NullTree
     }
 
 emptyFileSelectionModel :: FileSelectionModel

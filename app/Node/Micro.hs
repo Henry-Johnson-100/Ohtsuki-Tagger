@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# HLINT ignore "Redundant $" #-}
 {-# HLINT ignore "Use lambda-case" #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}

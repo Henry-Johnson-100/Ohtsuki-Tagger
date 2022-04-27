@@ -68,14 +68,14 @@ descriptorTreeEventHandler ::
 descriptorTreeEventHandler wenv node model event =
   case event of
     MDescriptorTreePut mLens toPut ->
-      [ model *~ (descriptorTreeModel . mLens) .~ toPut
+      [ model *~ (descriptorTreeModel . mLens . rootTree) .~ toPut
       ]
     MDescriptorTreePutParent mLens ->
       [ dbConnTask
           (DoDescriptorTreeEvent . MDescriptorTreePut mLens)
           ( flip
               getParentDescriptorTree
-              (model ^. (descriptorTreeModel . mLens))
+              (model ^. (descriptorTreeModel . mLens . rootTree))
           )
           (model ^. dbConn)
       ]
@@ -89,10 +89,10 @@ descriptorTreeEventHandler wenv node model event =
       [ Task
           ( DoDescriptorTreeEvent . MRequestDescriptorTree mLens
               <$> ( return
-                      . maybe "#ALL#" descriptor
+                      . maybe (model ^. descriptorTreeModel . mLens . rootName) descriptor
                       . getNode
                       $ model
-                        ^. (descriptorTreeModel . mLens)
+                        ^. (descriptorTreeModel . mLens . rootTree)
                   )
           )
       ]
