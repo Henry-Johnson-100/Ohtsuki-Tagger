@@ -189,10 +189,10 @@ data ConfigurationEvent
 type DescriptorTreeModelLens = Lens' DescriptorTreeModel RootedDescriptorTree
 
 data DescriptorTreeEvent
-  = MDescriptorTreePut !DescriptorTreeModelLens !DescriptorTree
-  | MDescriptorTreePutParent !DescriptorTreeModelLens
-  | MRequestDescriptorTree !DescriptorTreeModelLens !Text
-  | MRefreshDescriptorTree !DescriptorTreeModelLens
+  = DescriptorTreePut !DescriptorTreeModelLens !DescriptorTree
+  | DescriptorTreePutParent !DescriptorTreeModelLens
+  | RequestDescriptorTree !DescriptorTreeModelLens !Text
+  | RefreshDescriptorTree !DescriptorTreeModelLens
 
 data TaggerEvent
   = TaggerInit

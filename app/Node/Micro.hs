@@ -215,7 +215,7 @@ resetDescriptorTreeToButton ::
   WidgetNode s TaggerEvent
 resetDescriptorTreeToButton t =
   styledButton
-    ( DoDescriptorTreeEvent . MRequestDescriptorTree mainDescriptorTree $ t
+    ( DoDescriptorTreeEvent . RequestDescriptorTree mainDescriptorTree $ t
     -- RequestDescriptorTree t
     )
     "↺"
@@ -223,7 +223,7 @@ resetDescriptorTreeToButton t =
 resetUnrelatedDescriptorTree :: WidgetNode TaggerModel TaggerEvent
 resetUnrelatedDescriptorTree =
   styledButton
-    (DoDescriptorTreeEvent (MRefreshDescriptorTree unrelatedDescriptorTree))
+    (DoDescriptorTreeEvent (RefreshDescriptorTree unrelatedDescriptorTree))
     -- RefreshUnrelatedDescriptorTree
     "↺"
 
@@ -231,7 +231,7 @@ parentDescriptorTreeButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
 parentDescriptorTreeButton =
   styledButton
-    (DoDescriptorTreeEvent (MDescriptorTreePutParent mainDescriptorTree))
+    (DoDescriptorTreeEvent (DescriptorTreePutParent mainDescriptorTree))
     -- DescriptorTreePutParent
     "↑"
 
@@ -283,7 +283,7 @@ treeLeafButtonRequestDescriptorTree ::
   WidgetNode s TaggerEvent
 treeLeafButtonRequestDescriptorTree d =
   styledButton
-    ( (DoDescriptorTreeEvent . MRequestDescriptorTree mainDescriptorTree)
+    ( (DoDescriptorTreeEvent . RequestDescriptorTree mainDescriptorTree)
         . descriptor
         $ d
     )
