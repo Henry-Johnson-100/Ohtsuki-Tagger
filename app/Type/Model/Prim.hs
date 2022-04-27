@@ -6,7 +6,7 @@ module Type.Model.Prim
   ( TaggerModel (..),
     SingleFileSelectionModel (..),
     FileSelectionModel (..),
-    DescriptorTreeModel (..),
+    DescriptorModel (..),
     RootedDescriptorTree (..),
     TaggerEvent (..),
     SingleFileEvent (..),
@@ -35,10 +35,9 @@ import Type.Config
 data TaggerModel = TaggerModel
   { _taggerFileSelectionModel :: !FileSelectionModel,
     _taggerSingleFileModel :: !SingleFileSelectionModel,
-    _taggerDescriptorTreeModel :: !DescriptorTreeModel,
+    _taggerDescriptorModel :: !DescriptorModel,
     _taggerDoSoloTag :: !Bool,
     _taggerShellCmd :: !Text,
-    _taggerExtern :: !(),
     _taggerDbConn :: !TaggedConnection,
     _taggerTagsString :: !Text,
     _taggerTaggingMode :: !TaggingMode,
@@ -49,10 +48,10 @@ data TaggerModel = TaggerModel
   }
   deriving (Show, Eq)
 
-data DescriptorTreeModel = DescriptorTreeModel
-  { _dtmMainDescriptorTree :: !RootedDescriptorTree,
-    _dtmUnrelatedDescriptorTree :: !RootedDescriptorTree,
-    _dtmAllTree :: !RootedDescriptorTree
+data DescriptorModel = DescriptorModel
+  { _dmMainDescriptorTree :: !RootedDescriptorTree,
+    _dmUnrelatedDescriptorTree :: !RootedDescriptorTree,
+    _dmAllTree :: !RootedDescriptorTree
   }
   deriving (Show, Eq)
 
@@ -181,12 +180,12 @@ data ConfigurationEvent
   = ExportAll
   deriving (Show, Eq)
 
--- | A lens used to retrieve a RootedDescriptorTree from a DescriptorTreeModel
+-- | A lens used to retrieve a RootedDescriptorTree from a DescriptorModel
 --
 -- Ex.
 --
 -- > mainDescriptorTree
-type DescriptorTreeModelLens = Lens' DescriptorTreeModel RootedDescriptorTree
+type DescriptorTreeModelLens = Lens' DescriptorModel RootedDescriptorTree
 
 data DescriptorTreeEvent
   = DescriptorTreePut !DescriptorTreeModelLens !DescriptorTree
@@ -227,12 +226,12 @@ data TaggerEvent
   | DatabaseConnectionPut_ !TaggedConnection
   | ToggleVisibilityMode !ProgramVisibility
 
-emptyDescriptorTreeModel :: DescriptorTreeModel
+emptyDescriptorTreeModel :: DescriptorModel
 emptyDescriptorTreeModel =
-  DescriptorTreeModel
-    { _dtmMainDescriptorTree = plantTree NullTree,
-      _dtmUnrelatedDescriptorTree = (plantTree NullTree) {_rootName = "#UNRELATED#"},
-      _dtmAllTree = plantTree NullTree
+  DescriptorModel
+    { _dmMainDescriptorTree = plantTree NullTree,
+      _dmUnrelatedDescriptorTree = (plantTree NullTree) {_rootName = "#UNRELATED#"},
+      _dmAllTree = plantTree NullTree
     }
 
 emptyFileSelectionModel :: FileSelectionModel
@@ -256,10 +255,9 @@ emptyTaggerModel cfg =
   TaggerModel
     { _taggerFileSelectionModel = emptyFileSelectionModel,
       _taggerSingleFileModel = emptySingleFileSelectionModel,
-      _taggerDescriptorTreeModel = emptyDescriptorTreeModel,
+      _taggerDescriptorModel = emptyDescriptorTreeModel,
       _taggerDoSoloTag = False,
       _taggerShellCmd = "feh -D120 -zx. -g800x800 -Bwhite",
-      _taggerExtern = (),
       _taggerDbConn = TaggedConnection ":memory:" Nothing,
       _taggerTagsString = "",
       _taggerNewDescriptorText = "",

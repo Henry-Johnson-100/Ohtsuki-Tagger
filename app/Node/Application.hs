@@ -142,7 +142,7 @@ descriptorConfigurePage model =
         spacer,
         label "Database Meta-Descriptor Hierarchy: ",
         generalDescriptorTreeWidget
-          (model ^. (descriptorTreeModel . mainDescriptorTree . rootTree))
+          (model ^. (descriptorModel . mainDescriptorTree . rootTree))
           [ resetDescriptorTreeToButton "#ALL#",
             parentDescriptorTreeButton,
             descriptorDeleteWidget

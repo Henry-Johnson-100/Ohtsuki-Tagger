@@ -23,7 +23,7 @@ makeLensesWith abbreviatedFields ''SingleFileSelectionModel
 
 makeLensesWith abbreviatedFields ''FileSelectionModel
 
-makeLensesWith abbreviatedFields ''DescriptorTreeModel
+makeLensesWith abbreviatedFields ''DescriptorModel
 
 makeLenses ''TaggerConfig
 
