@@ -37,6 +37,9 @@ init' :: [a] -> [a]
 init' [] = []
 init' xs = init xs
 
+renameDescriptor :: Connection -> Descriptor -> T.Text -> IO ()
+renameDescriptor = Database.Tagger.Access.renameDescriptor
+
 runShellCmds :: [String] -> [String] -> IO ()
 runShellCmds cs fwtString = do
   let rawCmd = L.break (L.isInfixOf ";") cs

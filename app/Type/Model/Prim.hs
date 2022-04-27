@@ -204,6 +204,7 @@ data TaggerEvent
     ToggleDoSoloTag
   | DescriptorCreateRelation ![Descriptor] ![Descriptor]
   | DescriptorUnrelate ![Descriptor]
+  | DescriptorRename !Descriptor !Text
   | -- Run the text as shell cmd
     ShellCmd
   | -- Receives nothing and does nothing

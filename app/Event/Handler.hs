@@ -278,6 +278,17 @@ taggerEventHandler wenv node model event =
                      RefreshDescriptorTree unrelatedDescriptorTree
                    ]
            )
+    DescriptorRename d n ->
+      [ dbConnTask
+          IOEvent
+          (\c -> renameDescriptor c d n)
+          (model ^. dbConn)
+      ]
+        ++ ( asyncEvent . DoDescriptorTreeEvent
+               <$> [ RefreshDescriptorTree mainDescriptorTree,
+                     RefreshDescriptorTree unrelatedDescriptorTree
+                   ]
+           )
     ToggleDoSoloTag ->
       [model *~ (doSoloTag .~ not (model ^. doSoloTag))]
     ShellCmd ->

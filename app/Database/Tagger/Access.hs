@@ -91,45 +91,6 @@ type DescriptorKey = Int
 activateForeignKeyPragma :: Connection -> IO ()
 activateForeignKeyPragma c = execute_ c "PRAGMA foreign_keys = on"
 
--- | Check if all the required tables are present.
--- And if the 3 required meta descriptors are set up properly.
-validateDb :: Connection -> IO Bool
-validateDb c = do
-  tables <-
-    fmap (all (onlyIntEquals 4))
-      . (query_ :: Connection -> Query -> IO [Only Int])
-        c
-      $ "SELECT COUNT(*) \
-        \FROM sqlite_master \
-        \WHERE type = 'table' \
-        \  AND tbl_name IN ('Descriptor','File','MetaDescriptor','Tag')"
-  errout# $ "has valid number of tables: " ++ show tables
-  requiredMetaDescriptors <-
-    fmap (all (onlyIntEquals 3))
-      . (query_ :: Connection -> Query -> IO [Only Int])
-        c
-      $ "SELECT COUNT(*) FROM Descriptor \
-        \WHERE descriptor IN ('#ALL#','#UNRELATED#','#META#')"
-  errout# $ "Has valid number of meta descriptors: " ++ show requiredMetaDescriptors
-  requiredRelations <-
-    fmap (all (onlyIntEquals 2))
-      . (query_ :: Connection -> Query -> IO [Only Int]) c
-      $ "SELECT COUNT(*) \
-        \FROM MetaDescriptor \
-        \WHERE (metaDescriptorId = \
-        \    (SELECT id FROM Descriptor WHERE descriptor = '#ALL#') \
-        \    AND infraDescriptorId = \
-        \      (SELECT id FROM Descriptor WHERE descriptor = '#META#')) \
-        \  OR (metaDescriptorId = \
-        \      (SELECT id FROM Descriptor WHERE descriptor = '#ALL#') \
-        \    AND infraDescriptorId = \
-        \      (SELECT id FROM Descriptor WHERE descriptor = '#UNRELATED#'))"
-  errout# $ "Has valid number of predefined relations: " ++ show requiredRelations
-  return $ tables && requiredMetaDescriptors && requiredRelations
-  where
-    onlyIntEquals :: Eq a => a -> Only a -> Bool
-    onlyIntEquals n (Only m) = n == m
-
 getTagCount :: Connection -> Descriptor -> IO TagCount
 getTagCount c d = do
   result <- query c "SELECT COUNT(*) FROM Tag WHERE descriptorTagId = ?" [descriptorId d]
