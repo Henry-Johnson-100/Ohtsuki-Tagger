@@ -7,6 +7,7 @@ module Type.Model.Prim
     SingleFileSelectionModel (..),
     FileSelectionModel (..),
     DescriptorTreeModel (..),
+    RootedDescriptorTree (..),
     TaggerEvent (..),
     SingleFileEvent (..),
     ConfigurationEvent (..),
@@ -20,6 +21,7 @@ module Type.Model.Prim
     Cyclic (..),
     emptyTaggerModel,
     isUntagMode,
+    plantTree,
   )
 where
 
@@ -52,6 +54,24 @@ data DescriptorTreeModel = DescriptorTreeModel
     _dtmAllTree :: !DescriptorTree
   }
   deriving (Show, Eq)
+
+-- | A data type to be used in Tagger sub-models
+--
+-- makes use of lenses
+--
+-- Contains a text field which has the name of a descriptor. This is used when refreshing
+-- the tree to make sure the correct root descriptor is fetched from the database.
+--
+-- The Ord instance is only an instance of the underlying DescriptorTree and ignores the
+-- name field entirely.
+data RootedDescriptorTree = RootedDescriptorTree
+  { _rootName :: !Text,
+    _rootTree :: !DescriptorTree
+  }
+  deriving (Show, Eq)
+
+instance Ord RootedDescriptorTree where
+  compare trx try = compare (_rootTree trx) (_rootTree try)
 
 data FileSelectionModel = FileSelectionModel
   { _fsmFileSelection :: ![FileWithTags],
@@ -250,3 +270,6 @@ emptyTaggerModel cfg =
 isUntagMode :: TaggingMode -> Bool
 isUntagMode UntagMode = True
 isUntagMode _ = False
+
+plantTree :: DescriptorTree -> RootedDescriptorTree
+plantTree = RootedDescriptorTree "#ALL#"

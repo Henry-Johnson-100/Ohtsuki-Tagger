@@ -32,3 +32,5 @@ makeLenses ''DatabaseConfig
 makeLenses ''SelectionConfig
 
 makeLenses ''DescriptorTreeConfig
+
+makeLenses ''RootedDescriptorTree

@@ -35,6 +35,3 @@ cradle:
 
     - path: "app/IO.hs"
       component: "tagger:exe:tagger"
-
-    - path: "app/Paths_tagger.hs"
-      component: "tagger:exe:tagger"
