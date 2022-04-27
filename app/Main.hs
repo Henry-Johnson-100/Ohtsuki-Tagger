@@ -11,6 +11,7 @@
 module Main where
 
 import Control.Lens ((^.))
+import Control.Monad
 import Control.Monad.Trans.Except (runExceptT)
 import qualified Data.Text as T
 import Database.SQLite.Simple (Connection, close, open)
@@ -74,7 +75,11 @@ runTaggerWindow cfg =
 
 main :: IO ()
 main = do
-  configPath <- getConfigPath
-  try' (getConfig configPath) runTaggerWindow
+  rawArgs <- getArgs
+  let hasVersionFlag = or $ flip elem rawArgs <$> ["-v", "--version"]
+  when hasVersionFlag (putStrLn taggerVersion)
+  unless hasVersionFlag $ do
+    configPath <- getConfigPath
+    try' (getConfig configPath) runTaggerWindow
   where
     try' e c = runExceptT e >>= either (hPutStrLn stderr) c
