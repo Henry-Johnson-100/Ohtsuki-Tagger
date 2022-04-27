@@ -35,6 +35,7 @@ executable tagger
                       ,FunctionalDependencies
                       ,MagicHash
                       ,DeriveGeneric
+                      ,RankNTypes
 
   ghc-options:         -threaded
 

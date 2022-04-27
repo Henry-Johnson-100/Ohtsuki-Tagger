@@ -142,7 +142,7 @@ descriptorConfigurePage model =
         spacer,
         label "Database Meta-Descriptor Hierarchy: ",
         generalDescriptorTreeWidget
-          (model ^. descriptorTree)
+          (model ^. (descriptorTreeModel . mainDescriptorTree . rootTree))
           [ resetDescriptorTreeToButton "#ALL#",
             parentDescriptorTreeButton,
             descriptorDeleteWidget
@@ -343,11 +343,10 @@ operationWidget =
           ]
 
 descriptorTreeQuadrantWidget ::
-  (WidgetModel s) =>
   DescriptorTreeConfig ->
   DescriptorTree ->
   DescriptorTree ->
-  WidgetNode s TaggerEvent
+  WidgetNode TaggerModel TaggerEvent
 descriptorTreeQuadrantWidget dtrConf atr utr =
   flip styleBasic [border 1 black] . box_ [alignTop, alignLeft]
     . hsplit_

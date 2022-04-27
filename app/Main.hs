@@ -47,8 +47,8 @@ taggerApplicationUI wenv model' =
                       [ vstack
                           [ descriptorTreeQuadrantWidget
                               (model ^. (programConfig . descriptorTreeConf))
-                              (model ^. descriptorTree)
-                              (model ^. unrelatedDescriptorTree)
+                              (model ^. (descriptorTreeModel . mainDescriptorTree . rootTree))
+                              (model ^. (descriptorTreeModel . unrelatedDescriptorTree . rootTree))
                           ],
                         operationWidget
                         -- ,

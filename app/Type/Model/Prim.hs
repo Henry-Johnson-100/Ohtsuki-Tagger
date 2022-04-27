@@ -1,29 +1,92 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Type.Model.Prim
   ( TaggerModel (..),
     SingleFileSelectionModel (..),
     FileSelectionModel (..),
+    DescriptorTreeModel (..),
+    RootedDescriptorTree (..),
     TaggerEvent (..),
     SingleFileEvent (..),
     ConfigurationEvent (..),
     FileSelectionEvent (..),
+    DescriptorTreeEvent (..),
     TaggedConnection (..),
     FileSetArithmetic (..),
     QueryCriteria (..),
     TaggingMode (..),
     ProgramVisibility (..),
     Cyclic (..),
+    DescriptorTreeModelLens (..),
     emptyTaggerModel,
     isUntagMode,
+    plantTree,
   )
 where
 
+import Control.Lens
 import Data.Text (Text)
 import Database.Tagger.Access
 import Database.Tagger.Type
 import Type.Config
+
+data TaggerModel = TaggerModel
+  { _taggerFileSelectionModel :: !FileSelectionModel,
+    _taggerSingleFileModel :: !SingleFileSelectionModel,
+    _taggerDescriptorTreeModel :: !DescriptorTreeModel,
+    _taggerDoSoloTag :: !Bool,
+    _taggerShellCmd :: !Text,
+    _taggerExtern :: !(),
+    _taggerDbConn :: !TaggedConnection,
+    _taggerTagsString :: !Text,
+    _taggerTaggingMode :: !TaggingMode,
+    _taggerNewDescriptorText :: !Text,
+    _taggerNewFileText :: !Text,
+    _taggerProgramConfig :: !TaggerConfig,
+    _taggerProgramVisibility :: !ProgramVisibility
+  }
+  deriving (Show, Eq)
+
+data DescriptorTreeModel = DescriptorTreeModel
+  { _dtmMainDescriptorTree :: !RootedDescriptorTree,
+    _dtmUnrelatedDescriptorTree :: !RootedDescriptorTree,
+    _dtmAllTree :: !RootedDescriptorTree
+  }
+  deriving (Show, Eq)
+
+-- | A data type to be used in Tagger sub-models
+--
+-- makes use of lenses
+--
+-- Contains a text field which has the name of a descriptor. This is used when refreshing
+-- the tree to make sure the correct root descriptor is fetched from the database.
+--
+-- The Ord instance is only an instance of the underlying DescriptorTree and ignores the
+-- name field entirely.
+data RootedDescriptorTree = RootedDescriptorTree
+  { _rootName :: !Text,
+    _rootTree :: !DescriptorTree
+  }
+  deriving (Show, Eq)
+
+instance Ord RootedDescriptorTree where
+  compare trx try = compare (_rootTree trx) (_rootTree try)
+
+data FileSelectionModel = FileSelectionModel
+  { _fsmFileSelection :: ![FileWithTags],
+    _fsmSetArithmetic :: !FileSetArithmetic,
+    _fsmQueryCriteria :: !QueryCriteria,
+    _fsmQueryText :: !Text
+  }
+  deriving (Show, Eq)
+
+data SingleFileSelectionModel = SingleFileSelectionModel
+  { _sfsmSingleFile :: !(Maybe FileWithTags),
+    _sfsmTagCounts :: ![TagCount]
+  }
+  deriving (Show, Eq)
 
 instance Show Connection where
   show _ = "Sqlite Connection"
@@ -45,73 +108,6 @@ instance Show TaggedConnection where
         maybe "Inactive" (const "Active") m
       ]
 
-data TaggerModel = TaggerModel
-  { _taggerFileSelectionModel :: !FileSelectionModel,
-    _taggerSingleFileModel :: !SingleFileSelectionModel,
-    _taggerDescriptorTree :: !DescriptorTree,
-    _taggerUnrelatedDescriptorTree :: !DescriptorTree,
-    _taggerDoSoloTag :: !Bool,
-    _taggerShellCmd :: !Text,
-    _taggerExtern :: !(),
-    _taggerDbConn :: !TaggedConnection,
-    _taggerTagsString :: !Text,
-    _taggerTaggingMode :: !TaggingMode,
-    _taggerNewDescriptorText :: !Text,
-    _taggerNewFileText :: !Text,
-    _taggerProgramConfig :: !TaggerConfig,
-    _taggerProgramVisibility :: !ProgramVisibility
-  }
-  deriving (Show, Eq)
-
-data FileSelectionModel = FileSelectionModel
-  { _fsmFileSelection :: ![FileWithTags],
-    _fsmSetArithmetic :: !FileSetArithmetic,
-    _fsmQueryCriteria :: !QueryCriteria,
-    _fsmQueryText :: !Text
-  }
-  deriving (Show, Eq)
-
-emptyFileSelectionModel :: FileSelectionModel
-emptyFileSelectionModel =
-  FileSelectionModel
-    { _fsmFileSelection = [],
-      _fsmSetArithmetic = Union,
-      _fsmQueryCriteria = ByTag,
-      _fsmQueryText = ""
-    }
-
-data SingleFileSelectionModel = SingleFileSelectionModel
-  { _sfsmSingleFile :: !(Maybe FileWithTags),
-    _sfsmTagCounts :: ![TagCount]
-  }
-  deriving (Show, Eq)
-
-emptySingleFileSelectionModel :: SingleFileSelectionModel
-emptySingleFileSelectionModel =
-  SingleFileSelectionModel
-    { _sfsmSingleFile = Nothing,
-      _sfsmTagCounts = []
-    }
-
-emptyTaggerModel :: TaggerConfig -> TaggerModel
-emptyTaggerModel cfg =
-  TaggerModel
-    { _taggerFileSelectionModel = emptyFileSelectionModel,
-      _taggerSingleFileModel = emptySingleFileSelectionModel,
-      _taggerDescriptorTree = NullTree,
-      _taggerDoSoloTag = False,
-      _taggerShellCmd = "feh -D120 -zx. -g800x800 -Bwhite",
-      _taggerExtern = (),
-      _taggerDbConn = TaggedConnection ":memory:" Nothing,
-      _taggerTagsString = "",
-      _taggerUnrelatedDescriptorTree = NullTree,
-      _taggerNewDescriptorText = "",
-      _taggerTaggingMode = TagMode,
-      _taggerNewFileText = "",
-      _taggerProgramConfig = cfg,
-      _taggerProgramVisibility = Main
-    }
-
 class (Enum a, Bounded a, Eq a) => Cyclic a where
   next :: a -> a
   next x = if x == maxBound then minBound else succ x
@@ -122,10 +118,6 @@ data TaggingMode
   = TagMode
   | UntagMode
   deriving (Eq, Read, Enum, Bounded, Cyclic)
-
-isUntagMode :: TaggingMode -> Bool
-isUntagMode UntagMode = True
-isUntagMode _ = False
 
 instance Show TaggingMode where
   show TagMode = "Tag"
@@ -189,22 +181,27 @@ data ConfigurationEvent
   = ExportAll
   deriving (Show, Eq)
 
+-- | A lens used to retrieve a RootedDescriptorTree from a DescriptorTreeModel
+--
+-- Ex.
+--
+-- > mainDescriptorTree
+type DescriptorTreeModelLens = Lens' DescriptorTreeModel RootedDescriptorTree
+
+data DescriptorTreeEvent
+  = DescriptorTreePut !DescriptorTreeModelLens !DescriptorTree
+  | DescriptorTreePutParent !DescriptorTreeModelLens
+  | RequestDescriptorTree !DescriptorTreeModelLens !Text
+  | RefreshDescriptorTree !DescriptorTreeModelLens
+
 data TaggerEvent
   = TaggerInit
   | DoSingleFileEvent !SingleFileEvent
   | DoConfigurationEvent !ConfigurationEvent
   | DoFileSelectionEvent !FileSelectionEvent
-  | -- Put the InfraTree of a descriptor
-    DescriptorTreePut !DescriptorTree
-  | UnrelatedDescriptorTreePut !DescriptorTree
-  | -- Put the parent meta tree of the current tree in the model
-    DescriptorTreePutParent
+  | DoDescriptorTreeEvent !DescriptorTreeEvent
   | -- Triggers a functionality like 'cycle'
     ToggleDoSoloTag
-  | -- Like DescriptorTreePut but looks up a descriptorTree from text
-    RequestDescriptorTree !Text
-  | RefreshUnrelatedDescriptorTree
-  | RefreshBothDescriptorTrees
   | DescriptorCreateRelation ![Descriptor] ![Descriptor]
   | DescriptorUnrelate ![Descriptor]
   | -- Run the text as shell cmd
@@ -228,4 +225,52 @@ data TaggerEvent
   | DatabaseBackup
   | DatabaseConnectionPut_ !TaggedConnection
   | ToggleVisibilityMode !ProgramVisibility
-  deriving (Show, Eq)
+
+emptyDescriptorTreeModel :: DescriptorTreeModel
+emptyDescriptorTreeModel =
+  DescriptorTreeModel
+    { _dtmMainDescriptorTree = plantTree NullTree,
+      _dtmUnrelatedDescriptorTree = (plantTree NullTree) {_rootName = "#UNRELATED#"},
+      _dtmAllTree = plantTree NullTree
+    }
+
+emptyFileSelectionModel :: FileSelectionModel
+emptyFileSelectionModel =
+  FileSelectionModel
+    { _fsmFileSelection = [],
+      _fsmSetArithmetic = Union,
+      _fsmQueryCriteria = ByTag,
+      _fsmQueryText = ""
+    }
+
+emptySingleFileSelectionModel :: SingleFileSelectionModel
+emptySingleFileSelectionModel =
+  SingleFileSelectionModel
+    { _sfsmSingleFile = Nothing,
+      _sfsmTagCounts = []
+    }
+
+emptyTaggerModel :: TaggerConfig -> TaggerModel
+emptyTaggerModel cfg =
+  TaggerModel
+    { _taggerFileSelectionModel = emptyFileSelectionModel,
+      _taggerSingleFileModel = emptySingleFileSelectionModel,
+      _taggerDescriptorTreeModel = emptyDescriptorTreeModel,
+      _taggerDoSoloTag = False,
+      _taggerShellCmd = "feh -D120 -zx. -g800x800 -Bwhite",
+      _taggerExtern = (),
+      _taggerDbConn = TaggedConnection ":memory:" Nothing,
+      _taggerTagsString = "",
+      _taggerNewDescriptorText = "",
+      _taggerTaggingMode = TagMode,
+      _taggerNewFileText = "",
+      _taggerProgramConfig = cfg,
+      _taggerProgramVisibility = Main
+    }
+
+isUntagMode :: TaggingMode -> Bool
+isUntagMode UntagMode = True
+isUntagMode _ = False
+
+plantTree :: DescriptorTree -> RootedDescriptorTree
+plantTree = RootedDescriptorTree "#ALL#"

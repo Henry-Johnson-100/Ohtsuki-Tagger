@@ -7,6 +7,7 @@
 
 {-# HLINT ignore "Use section" #-}
 {-# HLINT ignore "Use list comprehension" #-}
+{-# HLINT ignore "Use :" #-}
 
 module Event.Handler
   ( taggerEventHandler,
@@ -57,6 +58,44 @@ dbConnTask e f =
     (Task (IOEvent <$> hPutStrLn stderr "Database connection not active."))
     (Task . fmap e . f)
     . connInstance
+
+descriptorTreeEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  DescriptorTreeEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+descriptorTreeEventHandler wenv node model event =
+  case event of
+    DescriptorTreePut mLens toPut ->
+      [ model *~ (descriptorTreeModel . mLens . rootTree) .~ toPut
+      ]
+    DescriptorTreePutParent mLens ->
+      [ dbConnTask
+          (DoDescriptorTreeEvent . DescriptorTreePut mLens)
+          ( flip
+              getParentDescriptorTree
+              (model ^. (descriptorTreeModel . mLens . rootTree))
+          )
+          (model ^. dbConn)
+      ]
+    RequestDescriptorTree mLens d ->
+      [ dbConnTask
+          (DoDescriptorTreeEvent . DescriptorTreePut mLens)
+          (flip lookupInfraDescriptorTree d)
+          (model ^. dbConn)
+      ]
+    RefreshDescriptorTree mLens ->
+      [ Task
+          ( DoDescriptorTreeEvent . RequestDescriptorTree mLens
+              <$> ( return
+                      . maybe (model ^. descriptorTreeModel . mLens . rootName) descriptor
+                      . getNode
+                      $ model
+                        ^. (descriptorTreeModel . mLens . rootTree)
+                  )
+          )
+      ]
 
 singleFileEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -197,55 +236,50 @@ taggerEventHandler wenv node model event =
     DoSingleFileEvent evt -> singleFileEventHandler wenv node model evt
     DoConfigurationEvent evt -> configurationEventHandler wenv node model evt
     DoFileSelectionEvent evt -> fileSelectionEventHandler wenv node model evt
+    DoDescriptorTreeEvent evt -> descriptorTreeEventHandler wenv node model evt
     TagsStringAppend t ->
       [ Model $
           model
             & tagsString .~ T.unwords [model ^. tagsString, t]
       ]
     TagsStringClear -> [model *~ tagsString .~ ""]
-    DescriptorTreePut tr -> [model *~ descriptorTree .~ tr]
-    UnrelatedDescriptorTreePut tr -> [model *~ unrelatedDescriptorTree .~ tr]
-    DescriptorTreePutParent ->
-      [ dbConnTask
-          DescriptorTreePut
-          ( flip
-              getParentDescriptorTree
-              (model ^. descriptorTree)
-          )
-          (model ^. dbConn)
-      ]
     DescriptorCommitNewDescriptorText ->
       [ dbConnTask
           IOEvent
           (flip createNewDescriptors (T.words (model ^. newDescriptorText)))
-          (model ^. dbConn),
-        asyncEvent RefreshBothDescriptorTrees
+          (model ^. dbConn)
       ]
+        ++ ( asyncEvent . DoDescriptorTreeEvent
+               <$> [ RefreshDescriptorTree mainDescriptorTree,
+                     RefreshDescriptorTree unrelatedDescriptorTree
+                   ]
+           )
     DescriptorDelete d ->
-      [ dbConnTask IOEvent (flip deleteDescriptor d) (model ^. dbConn),
-        asyncEvent RefreshBothDescriptorTrees
+      [ dbConnTask IOEvent (flip deleteDescriptor d) (model ^. dbConn)
       ]
+        ++ ( asyncEvent . DoDescriptorTreeEvent
+               <$> [ RefreshDescriptorTree mainDescriptorTree,
+                     RefreshDescriptorTree unrelatedDescriptorTree
+                   ]
+           )
     DescriptorCreateRelation ms is ->
-      [ dbConnTask IOEvent (\activeConn -> relateTo activeConn ms is) (model ^. dbConn),
-        asyncEvent RefreshBothDescriptorTrees
+      [ dbConnTask IOEvent (\activeConn -> relateTo activeConn ms is) (model ^. dbConn)
       ]
+        ++ ( asyncEvent . DoDescriptorTreeEvent
+               <$> [ RefreshDescriptorTree mainDescriptorTree,
+                     RefreshDescriptorTree unrelatedDescriptorTree
+                   ]
+           )
     DescriptorUnrelate is ->
-      [ dbConnTask IOEvent (flip unrelate is) (model ^. dbConn),
-        asyncEvent RefreshBothDescriptorTrees
+      [ dbConnTask IOEvent (flip unrelate is) (model ^. dbConn)
       ]
+        ++ ( asyncEvent . DoDescriptorTreeEvent
+               <$> [ RefreshDescriptorTree mainDescriptorTree,
+                     RefreshDescriptorTree unrelatedDescriptorTree
+                   ]
+           )
     ToggleDoSoloTag ->
       [model *~ (doSoloTag .~ not (model ^. doSoloTag))]
-    RequestDescriptorTree s ->
-      [dbConnTask DescriptorTreePut (flip lookupInfraDescriptorTree s) (model ^. dbConn)]
-    RefreshUnrelatedDescriptorTree ->
-      [dbConnTask UnrelatedDescriptorTreePut getUnrelatedInfraTree (model ^. dbConn)]
-    RefreshBothDescriptorTrees ->
-      [ Task
-          ( RequestDescriptorTree
-              <$> (return . maybe "#ALL#" descriptor . getNode $ model ^. descriptorTree)
-          ),
-        asyncEvent RefreshUnrelatedDescriptorTree
-      ]
     ShellCmd ->
       [ Task
           ( IOEvent
@@ -320,9 +354,13 @@ taggerEventHandler wenv node model event =
             let newConnTag = model ^. (programConfig . dbconf . dbconfPath)
             newConnInstance <- open . T.unpack $ newConnTag
             activateForeignKeyPragma newConnInstance
-            return . TaggedConnection newConnTag . Just $ newConnInstance,
-        asyncEvent RefreshBothDescriptorTrees
+            return . TaggedConnection newConnTag . Just $ newConnInstance
       ]
+        ++ ( asyncEvent . DoDescriptorTreeEvent
+               <$> [ RefreshDescriptorTree mainDescriptorTree,
+                     RefreshDescriptorTree unrelatedDescriptorTree
+                   ]
+           )
     DatabaseBackup ->
       [ Task
           ( IOEvent

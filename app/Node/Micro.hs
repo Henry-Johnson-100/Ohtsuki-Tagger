@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# HLINT ignore "Redundant $" #-}
 {-# HLINT ignore "Use lambda-case" #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -212,14 +213,27 @@ resetDescriptorTreeToButton ::
   (WidgetModel s) =>
   T.Text ->
   WidgetNode s TaggerEvent
-resetDescriptorTreeToButton t = styledButton (RequestDescriptorTree t) "↺"
+resetDescriptorTreeToButton t =
+  styledButton
+    ( DoDescriptorTreeEvent . RequestDescriptorTree mainDescriptorTree $ t
+    -- RequestDescriptorTree t
+    )
+    "↺"
 
-resetUnrelatedDescriptorTree :: (WidgetModel s) => WidgetNode s TaggerEvent
-resetUnrelatedDescriptorTree = styledButton RefreshUnrelatedDescriptorTree "↺"
+resetUnrelatedDescriptorTree :: WidgetNode TaggerModel TaggerEvent
+resetUnrelatedDescriptorTree =
+  styledButton
+    (DoDescriptorTreeEvent (RefreshDescriptorTree unrelatedDescriptorTree))
+    -- RefreshUnrelatedDescriptorTree
+    "↺"
 
 parentDescriptorTreeButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
-parentDescriptorTreeButton = styledButton DescriptorTreePutParent "↑"
+parentDescriptorTreeButton =
+  styledButton
+    (DoDescriptorTreeEvent (DescriptorTreePutParent mainDescriptorTree))
+    -- DescriptorTreePutParent
+    "↑"
 
 selectButton ::
   (WidgetModel s) =>
@@ -268,7 +282,12 @@ treeLeafButtonRequestDescriptorTree ::
   Descriptor ->
   WidgetNode s TaggerEvent
 treeLeafButtonRequestDescriptorTree d =
-  styledButton (RequestDescriptorTree . descriptor $ d) (descriptor d)
+  styledButton
+    ( (DoDescriptorTreeEvent . RequestDescriptorTree mainDescriptorTree)
+        . descriptor
+        $ d
+    )
+    (descriptor d)
 
 draggableDescriptorListWidget ::
   (WidgetModel s, WidgetEvent e) => [Descriptor] -> WidgetNode s e
@@ -311,10 +330,9 @@ mainDescriptorTreeWidget dtrConf tr =
       dtrConf
 
 unrelatedDescriptorTreeWidget ::
-  WidgetModel s =>
   DescriptorTreeConfig ->
   DescriptorTree ->
-  WidgetNode s TaggerEvent
+  WidgetNode TaggerModel TaggerEvent
 unrelatedDescriptorTreeWidget dtrConf tr =
   dropTarget (\d' -> DescriptorUnrelate [d']) $
     generalDescriptorTreeWidget
