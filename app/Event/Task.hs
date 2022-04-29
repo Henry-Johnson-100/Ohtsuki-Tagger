@@ -37,6 +37,18 @@ init' :: [a] -> [a]
 init' [] = []
 init' xs = init xs
 
+getRepresentative :: Connection -> Descriptor -> MaybeT IO Representative
+getRepresentative c = Database.Tagger.Access.getRepresentative c . descriptorId
+
+createRepresentative ::
+  Connection -> File -> Descriptor -> Maybe T.Text -> IO ()
+createRepresentative c f d des =
+  addRepresentative c $ Representative f d des
+
+updateRepresentativeText :: Connection -> Descriptor -> T.Text -> IO ()
+updateRepresentativeText c =
+  Database.Tagger.Access.updateRepresentativeText c . descriptorId
+
 renameDescriptor :: Connection -> Descriptor -> T.Text -> IO ()
 renameDescriptor = Database.Tagger.Access.renameDescriptor
 

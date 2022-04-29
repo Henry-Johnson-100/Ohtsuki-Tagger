@@ -13,6 +13,7 @@ module Database.Tagger.Access
     addFile,
     addDescriptor,
     addRepresentative,
+    updateRepresentativeText,
     renameDescriptor,
     deleteDescriptor,
     newTag,
@@ -157,6 +158,18 @@ addRepresentative c (Representative f d des) =
     "INSERT INTO Representative (repFileId, repDescriptorId, description) \
     \ VALUES (?,?,?)"
     (fileId f, descriptorId d, des)
+
+updateRepresentativeText ::
+  Connection ->
+  DescriptorKey ->
+  T.Text ->
+  IO ()
+updateRepresentativeText c dk des =
+  execute
+    c
+    "UPDATE Representative Set description = ? \
+    \WHERE repDescriptorId = ?"
+    (des, dk)
 
 renameDescriptor :: Connection -> Descriptor -> T.Text -> IO ()
 renameDescriptor c d n =
