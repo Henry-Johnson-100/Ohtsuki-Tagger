@@ -124,12 +124,14 @@ databaseConfigurePage =
     ]
 
 selectionConfigurePage ::
-  (WidgetModel s, HasProgramConfig s TaggerConfig) =>
-  WidgetNode s TaggerEvent
+  WidgetNode TaggerModel TaggerEvent
 selectionConfigurePage =
   box . flip styleBasic [padding 80]
     . vgrid
-    $ [selectionDisplayParentsNumberField]
+    $ [ selectionDisplayParentsNumberField,
+        spacer,
+        selectionDisplayBufferSizeNumberField
+      ]
 
 configConfigurationPage :: (WidgetModel s) => WidgetNode s TaggerEvent
 configConfigurationPage =

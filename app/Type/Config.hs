@@ -26,6 +26,7 @@ import qualified Toml
 
 [selection]
   display_parents = 3
+  buffer_size = 25
 
 [descriptor_tree]
   main_request = "#META#"
@@ -62,13 +63,16 @@ databaseConfigCodec =
     <*> Toml.bool "auto_connect" .= _dbconfAutoConnect
 
 data SelectionConfig = SelectionConfig
-  { _selectionDisplayParents :: !Int
+  { _selectionDisplayParents :: !Int,
+    _selectionBufferSize :: !Int
   }
   deriving (Show, Eq)
 
 selectionConfigCodec :: Toml.Codec SelectionConfig SelectionConfig
 selectionConfigCodec =
-  SelectionConfig <$> Toml.int "display_parents" .= _selectionDisplayParents
+  SelectionConfig
+    <$> Toml.int "display_parents" .= _selectionDisplayParents
+    <*> Toml.int "buffer_size" .= _selectionBufferSize
 
 data DescriptorTreeConfig = DescriptorTreeConfig
   { _descriptorTreeMainRequest :: !T.Text

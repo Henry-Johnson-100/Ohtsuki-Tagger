@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -78,6 +79,7 @@ instance Ord RootedDescriptorTree where
 
 data FileSelectionModel = FileSelectionModel
   { _fsmFileSelection :: ![FileWithTags],
+    _fsmLazyBuffer :: ![FileWithTags],
     _fsmSetArithmetic :: !FileSetArithmetic,
     _fsmQueryCriteria :: !QueryCriteria,
     _fsmQueryText :: !Text
@@ -177,6 +179,9 @@ data FileSelectionEvent
   | FileSelectionNextQueryCriteria
   | FileSelectionPrevQueryCriteria
   | FileSelectionShuffle
+  | LazyBufferLoad
+  | LazyBufferLoadAll
+  | LazyBufferFlush
   deriving (Show, Eq)
 
 data ConfigurationEvent
@@ -244,6 +249,7 @@ emptyFileSelectionModel :: FileSelectionModel
 emptyFileSelectionModel =
   FileSelectionModel
     { _fsmFileSelection = [],
+      _fsmLazyBuffer = [],
       _fsmSetArithmetic = Union,
       _fsmQueryCriteria = ByTag,
       _fsmQueryText = ""

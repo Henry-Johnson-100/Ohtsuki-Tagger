@@ -94,11 +94,20 @@ newFileTextField ::
 newFileTextField = textField newFileText
 
 selectionDisplayParentsNumberField ::
-  (WidgetModel s, HasProgramConfig s TaggerConfig) =>
-  WidgetNode s TaggerEvent
+  WidgetNode TaggerModel TaggerEvent
 selectionDisplayParentsNumberField =
-  numericField
-    (programConfig . selectionconf . selectionDisplayParents)
+  labeledWidget "Display Parent Folders"
+    . flip styleBasic [textLeft]
+    . numericField
+    $ (programConfig . selectionconf . selectionDisplayParents)
+
+selectionDisplayBufferSizeNumberField ::
+  WidgetNode TaggerModel TaggerEvent
+selectionDisplayBufferSizeNumberField =
+  labeledWidget "Selection Buffer Size"
+    . flip styleBasic [textLeft]
+    . numericField
+    $ (programConfig . selectionconf . selectionBufferSize)
 
 newFileTextCommitButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent

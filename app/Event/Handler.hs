@@ -249,6 +249,30 @@ fileSelectionEventHandler wenv node model event =
               <$> shuffle (model ^. (fileSelectionModel . fileSelection))
           )
       ]
+    LazyBufferLoad ->
+      [ let !fsSplit =
+              L.splitAt
+                (model ^. programConfig . selectionconf . selectionBufferSize)
+                (model ^. fileSelectionModel . fileSelection)
+         in Model $
+              model
+                & fileSelectionModel . fileSelection .~ snd fsSplit
+                & fileSelectionModel . lazyBuffer %~ (flip (++) . fst $ fsSplit)
+      ]
+    LazyBufferLoadAll ->
+      [ Model $
+          model
+            & fileSelectionModel . lazyBuffer
+              .~ (model ^. fileSelectionModel . fileSelection)
+            & fileSelectionModel . fileSelection .~ []
+      ]
+    LazyBufferFlush ->
+      [ Model $
+          model
+            & fileSelectionModel . fileSelection
+              %~ flip (++) (model ^. fileSelectionModel . lazyBuffer)
+            & fileSelectionModel . lazyBuffer .~ []
+      ]
 
 taggerEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
