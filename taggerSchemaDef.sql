@@ -23,6 +23,14 @@ CREATE TABLE IF NOT EXISTS  "Tag" (
   FOREIGN KEY("fileTagId") REFERENCES "File"("id") ON DELETE CASCADE,
   FOREIGN KEY("descriptorTagId") REFERENCES "Descriptor"("id") ON DELETE CASCADE
 );
+CREATE TABLE IF NOT EXISTS "Representative" (
+  "repFileId" INTEGER NOT NULL,
+  "repDescriptorId" INTEGER NOT NULL,
+  "description" TEXT,
+  FOREIGN KEY("repFileId") REFERENCES "File"("id") ON DELETE CASCADE,
+  FOREIGN KEY("repDescriptorId") REFERENCES "Descriptor"("id") ON DELETE CASCADE,
+  CONSTRAINT "repDescriptorUnique" UNIQUE("repDescriptorId") ON CONFLICT REPLACE
+);
 INSERT INTO Descriptor (descriptor) VALUES ('#ALL#'), ('#META#'),  ('#UNRELATED#');
 -- relate #META# and #UNRELATED# to #ALL#
 INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId)
