@@ -12,6 +12,7 @@ module Database.Tagger.Access
     DescriptorKey (..),
     addFile,
     addDescriptor,
+    addRepresentative,
     renameDescriptor,
     deleteDescriptor,
     newTag,
@@ -26,6 +27,7 @@ module Database.Tagger.Access
     getFile,
     getTagCount,
     getUntaggedFileWithTags,
+    getRepresentative,
     lookupFileWithTagsByRelation,
     lookupFileWithTagsByFilePattern,
     lookupFileWithTagsByTagPattern,
@@ -41,7 +43,7 @@ import Control.Monad (unless, when, (>=>))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Maybe (MaybeT (..))
 import Data.List (foldl', isPrefixOf, isSuffixOf)
-import Data.Maybe (catMaybes, fromJust, fromMaybe)
+import Data.Maybe (catMaybes, fromJust, fromMaybe, maybe)
 import qualified Data.Text as T
 import Database.SQLite.Simple
   ( Connection,
@@ -62,6 +64,7 @@ import Database.Tagger.Type
     File (File, fileId),
     FileWithTags (FileWithTags, tags),
     MetaDescriptor (..),
+    Representative (Representative, repDescription),
     Tag (..),
     TagCount (..),
     descriptorTreeElem,
@@ -147,7 +150,14 @@ addDescriptor c dT = do
     #*# show (MetaDescriptor (descriptorId unrelatedDescriptor) newDId)
   return . Descriptor newDId $ dT
 
--- #TODO no task or event assigned
+addRepresentative :: Connection -> Representative -> IO ()
+addRepresentative c (Representative f d des) =
+  execute
+    c
+    "INSERT INTO Representative (repFileId, repDescriptorId, description) \
+    \ VALUES (?,?,?)"
+    (fileId f, descriptorId d, des)
+
 renameDescriptor :: Connection -> Descriptor -> T.Text -> IO ()
 renameDescriptor c d n =
   execute
@@ -376,6 +386,24 @@ lookupFilePattern conn p = do
       [p]
   return . map mapQToFile $ r
 
+getRepresentative :: Connection -> DescriptorKey -> MaybeT IO Representative
+getRepresentative c descriptorId = do
+  r' <-
+    lift $
+      query
+        c
+        "SELECT repFileId, repDescriptorId, description \
+        \FROM Representative \
+        \WHERE repDescriptorId = ?"
+        [descriptorId] ::
+      MaybeT IO [(Int, Int, Maybe T.Text)]
+  r <- hoistMaybe . head' $ r'
+  rep <- do
+    f <- getFile c . (\(k, _, _) -> k) $ r
+    d <- getDescriptor c . (\(_, k, _) -> k) $ r
+    return $ Representative f d Nothing
+  return $ rep {repDescription = (\(_, _, d') -> d') r}
+
 mapQToFile :: (Int, T.Text) -> File
 mapQToFile (fid, fpath) = File fid fpath
 
@@ -410,6 +438,9 @@ mapQToFWT (fid, fp, dids, dds) = FileWithTags (File fid fp) [Descriptor dids dds
 
 mapQToTagCount :: Descriptor -> Only Int -> TagCount
 mapQToTagCount d (Only n) = (d, n)
+
+uncurry3 :: (t1 -> t2 -> t3 -> t4) -> (t1, t2, t3) -> t4
+uncurry3 f (x, y, z) = f x y z
 
 head' :: [a] -> Maybe a
 head' [] = Nothing
