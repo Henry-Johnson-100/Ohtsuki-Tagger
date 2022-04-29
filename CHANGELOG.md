@@ -4,7 +4,7 @@
 
 * First version. Released on an unsuspecting world.
 
-## 0.1.1.0 -- 2022-04-25
+### 0.1.1.0 -- 2022-04-25
 
 * Added a new configuration table and field: 
   * [descriptor_tree]
@@ -31,3 +31,20 @@
   * Can also view a similar version of the main descriptor tree widget there.
 * Stopped the descriptors in the #UNRELATED# tree widget from sending request events
 to the main tree widget when clicked.
+
+### 0.1.2.0 -- 2022-04-26
+
+* Adjusted the Cmd so that, if Solo Tagging Mode is enabled, the shell cmd
+will take the file currently previewed as the command's only argument.
+If Solo Tagging Mode is not enabled or there is no file previewed then all files in the
+selection are arguments to the shell cmd.
+  * The argument substitution keyword is still '`%file`'
+
+#### 0.1.2.1 -- 2022-04-27
+
+* Added a command line option `-v, --version` to see the program version.
+
+### 0.1.3.0 -- 2022-04-27
+
+* Added a field to rename descriptors.
+  * In the Descriptor configuration page.

@@ -141,11 +141,13 @@ descriptorConfigurePage :: TaggerModel -> WidgetNode TaggerModel TaggerEvent
 descriptorConfigurePage model =
   box . flip styleBasic [padding 80]
     . vstack
-    $ [ descriptorTreeConfigureMainRequestTextField,
+    $ [ labeledWidget "Main Tree Root" descriptorTreeConfigureMainRequestTextField,
+        spacer,
+        renameDescriptorWidget,
         spacer,
         label "Database Meta-Descriptor Hierarchy: ",
         generalDescriptorTreeWidget
-          (model ^. descriptorTree)
+          (model ^. (descriptorModel . mainDescriptorTree . rootTree))
           [ resetDescriptorTreeToButton "#ALL#",
             parentDescriptorTreeButton,
             descriptorDeleteWidget
@@ -279,10 +281,7 @@ operationWidget =
             queryTextField
           ]
     labeledTagTextField ::
-      ( WidgetModel s,
-        HasTagsString s T.Text
-      ) =>
-      WidgetNode s TaggerEvent
+      WidgetNode TaggerModel TaggerEvent
     labeledTagTextField =
       flip
         keystroke_
@@ -346,11 +345,10 @@ operationWidget =
           ]
 
 descriptorTreeQuadrantWidget ::
-  (WidgetModel s) =>
   DescriptorTreeConfig ->
   DescriptorTree ->
   DescriptorTree ->
-  WidgetNode s TaggerEvent
+  WidgetNode TaggerModel TaggerEvent
 descriptorTreeQuadrantWidget dtrConf atr utr =
   flip styleBasic [border 1 black] . box_ [alignTop, alignLeft]
     . hsplit_
