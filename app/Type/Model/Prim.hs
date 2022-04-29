@@ -54,7 +54,8 @@ data DescriptorModel = DescriptorModel
     _dmUnrelatedDescriptorTree :: !RootedDescriptorTree,
     _dmAllTree :: !RootedDescriptorTree,
     _dmRenameDescriptorFrom :: !Text,
-    _dmRenameDescriptorTo :: !Text
+    _dmRenameDescriptorTo :: !Text,
+    _dmRepresentativeFile :: !(Maybe Representative)
   }
   deriving (Show, Eq)
 
@@ -195,6 +196,9 @@ data DescriptorEvent
   | RequestDescriptorTree !DescriptorModelTreeLens !Text
   | RefreshDescriptorTree !DescriptorModelTreeLens
   | RenameDescriptor
+  | RepresentativeFilePut !(Maybe Representative)
+  | RepresentativeFileLookup !Descriptor
+  | RepresentativeFileClear
 
 type TextLens = Lens' TaggerModel Text
 
@@ -236,7 +240,8 @@ emptyDescriptorTreeModel =
       _dmUnrelatedDescriptorTree = (plantTree NullTree) {_rootName = "#UNRELATED#"},
       _dmAllTree = plantTree NullTree,
       _dmRenameDescriptorFrom = "",
-      _dmRenameDescriptorTo = ""
+      _dmRenameDescriptorTo = "",
+      _dmRepresentativeFile = Nothing
     }
 
 emptyFileSelectionModel :: FileSelectionModel

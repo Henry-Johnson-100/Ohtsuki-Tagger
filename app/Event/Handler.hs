@@ -17,11 +17,12 @@ where
 import Control.Lens ((%~), (&), (.~), (^.))
 import Control.Monad
 import qualified Control.Monad as CM
+import Control.Monad.Trans.Maybe
 import qualified Data.List as L
 import qualified Data.Maybe as M
 import qualified Data.Text as T
 import Database.SQLite.Simple
-import Database.Tagger.Access (activateForeignKeyPragma, lookupDescriptorPattern)
+import Database.Tagger.Access (activateForeignKeyPragma, hoistMaybe, lookupDescriptorPattern)
 import Database.Tagger.Type
 import Event.Task
 import IO
@@ -120,6 +121,18 @@ descriptorTreeEventHandler wenv node model event =
                      RefreshDescriptorTree unrelatedDescriptorTree
                    ]
            )
+    RepresentativeFilePut r -> [model *~ descriptorModel . representativeFile .~ r]
+    RepresentativeFileClear -> [model *~ descriptorModel . representativeFile .~ Nothing]
+    RepresentativeFileLookup d ->
+      [ Task
+          ( DoDescriptorEvent . RepresentativeFilePut
+              <$> runMaybeT
+                ( do
+                    c <- hoistMaybe . connInstance $ model ^. dbConn
+                    getRepresentative c d
+                )
+          )
+      ]
 
 maybeM_ :: Monad m => (a -> m ()) -> Maybe a -> m ()
 maybeM_ = M.maybe (pure ())

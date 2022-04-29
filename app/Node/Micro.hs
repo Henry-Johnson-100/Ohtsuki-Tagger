@@ -133,6 +133,11 @@ configurationExportButton :: (WidgetModel s) => WidgetNode s TaggerEvent
 configurationExportButton =
   styledButton (DoConfigurationEvent ExportAll) "Export Configuration"
 
+representativeFileLookupDropTargetButton :: WidgetNode TaggerModel TaggerEvent
+representativeFileLookupDropTargetButton =
+  dropTarget (DoDescriptorEvent . RepresentativeFileLookup) $
+    styledButton (IOEvent ()) "Rep"
+
 toggleConfigConfigureVisibility :: (WidgetModel s) => WidgetNode s TaggerEvent
 toggleConfigConfigureVisibility = styledButton (ToggleVisibilityMode Config) "Config"
 
@@ -307,10 +312,9 @@ draggableDescriptorWidget d =
     $ d
 
 mainDescriptorTreeWidget ::
-  WidgetModel s =>
   DescriptorTreeConfig ->
   DescriptorTree ->
-  WidgetNode s TaggerEvent
+  WidgetNode TaggerModel TaggerEvent
 mainDescriptorTreeWidget dtrConf tr =
   dropTarget
     ( \d' ->
@@ -366,12 +370,11 @@ renameDescriptorWidget =
       ]
 
 generalDescriptorTreeWidget ::
-  WidgetModel s =>
   DescriptorTree ->
-  [WidgetNode s TaggerEvent] ->
-  (Descriptor -> WidgetNode s TaggerEvent) ->
+  [WidgetNode TaggerModel TaggerEvent] ->
+  (Descriptor -> WidgetNode TaggerModel TaggerEvent) ->
   DescriptorTreeConfig ->
-  WidgetNode s TaggerEvent
+  WidgetNode TaggerModel TaggerEvent
 generalDescriptorTreeWidget tr bs dAction dtrConf =
   flip styleBasic [border 1 black] . box_ [alignTop, alignLeft] $
     hstack_
@@ -382,29 +385,26 @@ generalDescriptorTreeWidget tr bs dAction dtrConf =
       ]
   where
     descriptorTreeWidget ::
-      (WidgetModel s) =>
       DescriptorTree ->
-      (Descriptor -> WidgetNode s TaggerEvent) ->
-      WidgetNode s TaggerEvent
+      (Descriptor -> WidgetNode TaggerModel TaggerEvent) ->
+      WidgetNode TaggerModel TaggerEvent
     descriptorTreeWidget tr dAction =
       box . stdScroll . flip styleBasic [textFont "Regular"]
         . buildTreeWidget dAction
         $ tr
       where
         buildTreeWidget ::
-          (WidgetModel s) =>
-          (Descriptor -> WidgetNode s TaggerEvent) ->
+          (Descriptor -> WidgetNode TaggerModel TaggerEvent) ->
           DescriptorTree ->
-          WidgetNode s TaggerEvent
+          WidgetNode TaggerModel TaggerEvent
         buildTreeWidget action = buildTreeWidgetAccum 0 (vstack []) action
           where
             buildTreeWidgetAccum ::
-              (WidgetModel s) =>
               Int ->
-              WidgetNode s TaggerEvent ->
-              (Descriptor -> WidgetNode s TaggerEvent) ->
+              WidgetNode TaggerModel TaggerEvent ->
+              (Descriptor -> WidgetNode TaggerModel TaggerEvent) ->
               DescriptorTree ->
-              WidgetNode s TaggerEvent
+              WidgetNode TaggerModel TaggerEvent
             buildTreeWidgetAccum l acc action tr =
               case tr of
                 NullTree -> acc
@@ -454,12 +454,11 @@ generalDescriptorTreeWidget tr bs dAction dtrConf =
                     )
         appendVStack x y = vstack [x, y]
         treeLeafDescriptorWidget ::
-          WidgetModel s =>
           Color ->
           Int ->
           Descriptor ->
-          (Descriptor -> WidgetNode s TaggerEvent) ->
-          WidgetNode s TaggerEvent
+          (Descriptor -> WidgetNode TaggerModel TaggerEvent) ->
+          WidgetNode TaggerModel TaggerEvent
         treeLeafDescriptorWidget tc l d a =
           hstack_ [] $
             [ label (T.replicate l "--" !++ "|"),
