@@ -19,8 +19,6 @@ import Database.SQLite.Simple
 import Database.Tagger.Access
 import Database.Tagger.Type
 import IO
-import qualified System.Random as Random
-import qualified System.Random.Shuffle as Random.Shuffle
 import qualified Toml
 import Type.Config
 import Type.Model
@@ -42,8 +40,8 @@ init' xs = init xs
 shuffle :: [a] -> IO [a]
 shuffle [] = pure []
 shuffle xs = do
-  g <- Random.initStdGen
-  let shuffled = Random.Shuffle.shuffle' xs (length xs) g
+  g <- initStdGen
+  let shuffled = shuffle' xs (length xs) g
   return shuffled
 
 renameDescriptor :: Connection -> Descriptor -> T.Text -> IO ()

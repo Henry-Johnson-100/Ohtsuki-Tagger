@@ -24,7 +24,7 @@ import Database.SQLite.Simple
 import Database.Tagger.Access (activateForeignKeyPragma, lookupDescriptorPattern)
 import Database.Tagger.Type
 import Event.Task
-import IO
+import qualified IO
 import Monomer
 import Type.BufferList
 import Type.Config
@@ -57,7 +57,7 @@ dbConnTask ::
   EventResponse s TaggerEvent sp ep
 dbConnTask e f =
   maybe
-    (Task (IOEvent <$> hPutStrLn stderr "Database connection not active."))
+    (Task (IOEvent <$> IO.hPutStrLn IO.stderr "Database connection not active."))
     (Task . fmap e . f)
     . connInstance
 
@@ -383,7 +383,7 @@ taggerEventHandler wenv node model event =
     DatabaseInitialize ->
       [ dbConnTask
           IOEvent
-          (runInitScript (T.unpack $ model ^. (programConfig . dbconf . dbconfInit)))
+          (IO.runInitScript (T.unpack $ model ^. (programConfig . dbconf . dbconfInit)))
           (model ^. dbConn)
       ]
     ToggleVisibilityMode vm ->
@@ -409,12 +409,12 @@ taggerEventHandler wenv node model event =
       [ Task
           ( IOEvent
               <$> ( maybe
-                      ( hPutStrLn
-                          stderr
+                      ( IO.hPutStrLn
+                          IO.stderr
                           "Failed to backup, no database is currently connected."
                       )
                       ( flip
-                          backupDbConn
+                          IO.backupDbConn
                           ( T.unpack $
                               model
                                 ^. ( programConfig

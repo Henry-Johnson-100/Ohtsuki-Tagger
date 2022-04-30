@@ -1,5 +1,8 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use <&>" #-}
 
 module Type.BufferList
   ( BufferList (..),
@@ -10,12 +13,14 @@ module Type.BufferList
     takeToBuffer,
     toBuffer,
     emptyBuffer,
+    shuffleBufferList,
   )
 where
 
 import Control.Lens.TH (makeLenses)
 import qualified Data.List as L
 import Data.Maybe
+import IO
 
 head' :: [a] -> Maybe a
 head' [] = Nothing
@@ -78,6 +83,14 @@ toBuffer (BufferList bs xs) = BufferList (bs ++ xs) []
 -- | Moves all buffered items to head of the list.
 emptyBuffer :: BufferList a -> BufferList a
 emptyBuffer (BufferList bs xs) = BufferList [] (bs ++ xs)
+
+shuffleBufferList :: BufferList a -> IO (BufferList a)
+shuffleBufferList (BufferList bs xs) = do
+  bsh <- shuffle'' bs
+  xsh <- shuffle'' xs
+  return $ BufferList bsh xsh
+  where
+    shuffle'' xs = initStdGen >>= return . shuffle' xs (length xs)
 
 instance Functor BufferList where
   fmap f (BufferList bs xs) = BufferList (fmap f bs) (fmap f xs)

@@ -7,6 +7,8 @@ module IO
     module System.Environment,
     module System.Directory,
     module System.Process,
+    module System.Random,
+    module System.Random.Shuffle,
   )
 where
 
@@ -20,6 +22,8 @@ import System.Directory
 import System.Environment
 import System.IO
 import System.Process
+import System.Random
+import System.Random.Shuffle
 import Toml
 import Type.Config
 
