@@ -26,6 +26,7 @@ import Database.Tagger.Type
 import Event.Task
 import IO
 import Monomer
+import Type.BufferList
 import Type.Config
 import Type.Model
 
@@ -141,8 +142,8 @@ singleFileEventHandler wenv node model event =
         asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
       ]
     SingleFileNextFromFileSelection ->
-      let !ps = popCycleList (model ^. (fileSelectionModel . fileSelection))
-          !mi = head' ps
+      let !ps = cPop $ model ^. fileSelectionModel . fileSelection
+          !mi = cHead ps
        in [ Model
               . ((fileSelectionModel . fileSelection) .~ ps)
               . ((singleFileModel . singleFile) .~ mi)
@@ -151,8 +152,8 @@ singleFileEventHandler wenv node model event =
             asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
           ]
     SingleFilePrevFromFileSelection ->
-      let !ps = dequeueCycleList (model ^. (fileSelectionModel . fileSelection))
-          !mi = head' ps
+      let !ps = cDequeue $ model ^. fileSelectionModel . fileSelection
+          !mi = cHead ps
        in [ Model
               . ((fileSelectionModel . fileSelection) .~ ps)
               . ((singleFileModel . singleFile) .~ mi)
@@ -188,18 +189,25 @@ fileSelectionEventHandler wenv node model event =
   case event of
     FileSelectionUpdate fwts ->
       [ model *~ (fileSelectionModel . fileSelection)
-          .~ doSetAction
-            (model ^. (fileSelectionModel . setArithmetic))
-            (model ^. (fileSelectionModel . fileSelection))
-            fwts
+          .~ cFromList
+            ( doSetAction
+                (model ^. (fileSelectionModel . setArithmetic))
+                (cCollect $ model ^. (fileSelectionModel . fileSelection))
+                fwts
+            )
       ]
     FileSelectionPut fwts ->
-      [ model *~ (fileSelectionModel . fileSelection) .~ fwts
+      [ model *~ (fileSelectionModel . fileSelection) .~ cFromList fwts
       ]
     FileSelectionRefresh_ ->
       [ dbConnTask
           (DoFileSelectionEvent . FileSelectionPut)
-          (flip getRefreshedFWTs (model ^. (fileSelectionModel . fileSelection)))
+          ( flip
+              getRefreshedFWTs
+              ( cCollect $
+                  model ^. (fileSelectionModel . fileSelection)
+              )
+          )
           (model ^. dbConn),
         dbConnTask
           (DoSingleFileEvent . SingleFileMaybePut)
@@ -227,7 +235,7 @@ fileSelectionEventHandler wenv node model event =
         asyncEvent (DoFileSelectionEvent FileSelectionQueryTextClear)
       ]
     FileSelectionClear ->
-      [ model *~ (fileSelectionModel . fileSelection) .~ [],
+      [ model *~ (fileSelectionModel . fileSelection) .~ emptyBufferList,
         asyncEvent (DoFileSelectionEvent FileSelectionQueryTextClear)
       ]
     FileSelectionQueryTextClear -> [model *~ (fileSelectionModel . queryText) .~ ""]
@@ -246,32 +254,18 @@ fileSelectionEventHandler wenv node model event =
     FileSelectionShuffle ->
       [ Task
           ( DoFileSelectionEvent . FileSelectionPut
-              <$> shuffle (model ^. (fileSelectionModel . fileSelection))
+              <$> (shuffle . cCollect $ (model ^. (fileSelectionModel . fileSelection)))
           )
       ]
     LazyBufferLoad ->
-      [ let !fsSplit =
-              L.splitAt
-                (model ^. programConfig . selectionconf . selectionBufferSize)
-                (model ^. fileSelectionModel . fileSelection)
-         in Model $
-              model
-                & fileSelectionModel . fileSelection .~ snd fsSplit
-                & fileSelectionModel . lazyBuffer %~ (flip (++) . fst $ fsSplit)
+      [ model *~ fileSelectionModel . fileSelection
+          %~ takeToBuffer (model ^. programConfig . selectionconf . selectionBufferSize)
       ]
     LazyBufferLoadAll ->
-      [ Model $
-          model
-            & fileSelectionModel . lazyBuffer
-              .~ (model ^. fileSelectionModel . fileSelection)
-            & fileSelectionModel . fileSelection .~ []
+      [ model *~ fileSelectionModel . fileSelection %~ toBuffer
       ]
     LazyBufferFlush ->
-      [ Model $
-          model
-            & fileSelectionModel . fileSelection
-              %~ flip (++) (model ^. fileSelectionModel . lazyBuffer)
-            & fileSelectionModel . lazyBuffer .~ []
+      [ model *~ fileSelectionModel . fileSelection %~ emptyBuffer
       ]
 
 taggerEventHandler ::
@@ -341,7 +335,9 @@ taggerEventHandler wenv node model event =
       ]
       where
         fwtPath = T.unpack . filePath . file
-        selectionFwts = map fwtPath $ model ^. fileSelectionModel . fileSelection
+        selectionFwts =
+          map fwtPath . cCollect $
+            model ^. fileSelectionModel . fileSelection
         singlefwt = model ^. singleFileModel . singleFile
     IOEvent _ -> []
     TagCommitTagsString ->
@@ -369,7 +365,7 @@ taggerEventHandler wenv node model event =
           ( \activeConn ->
               (if isUntagMode (model ^. taggingMode) then untagWith else tag)
                 activeConn
-                (model ^. (fileSelectionModel . fileSelection))
+                (cCollect $ model ^. (fileSelectionModel . fileSelection))
                 (T.words $ model ^. tagsString)
           )
           (model ^. dbConn),

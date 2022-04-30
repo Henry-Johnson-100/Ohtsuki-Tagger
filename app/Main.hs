@@ -39,10 +39,7 @@ taggerApplicationUI wenv model' =
                 model,
               visibility model Main
                 . vsplit_ [splitIgnoreChildResize True]
-                $ ( fileSingleWidget
-                      (model ^. doSoloTag)
-                      (model ^. (fileSelectionModel . fileSelection))
-                      (model ^. singleFileModel),
+                $ ( fileSingleWidget model,
                     box_ [alignBottom] . hsplit_ [splitIgnoreChildResize True] $
                       ( hgrid
                           [ vstack

@@ -28,9 +28,11 @@ module Type.Model.Prim
 where
 
 import Control.Lens
+import Control.Monad
 import Data.Text (Text)
 import Database.Tagger.Access
 import Database.Tagger.Type
+import Type.BufferList
 import Type.Config
 
 data TaggerModel = TaggerModel
@@ -77,8 +79,7 @@ instance Ord RootedDescriptorTree where
   compare trx try = compare (_rootTree trx) (_rootTree try)
 
 data FileSelectionModel = FileSelectionModel
-  { _fsmFileSelection :: ![FileWithTags],
-    _fsmLazyBuffer :: ![FileWithTags],
+  { _fsmFileSelection :: !(BufferList FileWithTags),
     _fsmSetArithmetic :: !FileSetArithmetic,
     _fsmQueryCriteria :: !QueryCriteria,
     _fsmQueryText :: !Text
@@ -247,8 +248,7 @@ emptyDescriptorTreeModel =
 emptyFileSelectionModel :: FileSelectionModel
 emptyFileSelectionModel =
   FileSelectionModel
-    { _fsmFileSelection = [],
-      _fsmLazyBuffer = [],
+    { _fsmFileSelection = emptyBufferList,
       _fsmSetArithmetic = Union,
       _fsmQueryCriteria = ByTag,
       _fsmQueryText = ""

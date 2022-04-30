@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Type.BufferList
@@ -6,11 +7,15 @@ module Type.BufferList
     emptyBufferList,
     buffer,
     list,
+    takeToBuffer,
+    toBuffer,
+    emptyBuffer,
   )
 where
 
 import Control.Lens.TH (makeLenses)
-import Data.Maybe (fromMaybe)
+import qualified Data.List as L
+import Data.Maybe
 
 head' :: [a] -> Maybe a
 head' [] = Nothing
@@ -44,6 +49,8 @@ class Cycleable c where
   -- | Collect the Cycleable as a list of elements
   cCollect :: c a -> [a]
 
+  cFromList :: [a] -> c a
+
 data BufferList a = BufferList
   { _buffer :: ![a],
     _list :: ![a]
@@ -58,36 +65,51 @@ emptyBufferList = BufferList [] []
 _totalList :: BufferList a -> [a]
 _totalList (BufferList bs xs) = bs ++ xs
 
+-- | Loads n items from list to the buffer.
+takeToBuffer :: Int -> BufferList a -> BufferList a
+takeToBuffer n (BufferList bs xs) =
+  let !s = L.splitAt n xs
+   in BufferList (bs ++ fst s) (snd s)
+
+-- | Loads all items in list to the buffer.
+toBuffer :: BufferList a -> BufferList a
+toBuffer (BufferList bs xs) = BufferList (bs ++ xs) []
+
+-- | Moves all buffered items to head of the list.
+emptyBuffer :: BufferList a -> BufferList a
+emptyBuffer (BufferList bs xs) = BufferList [] (bs ++ xs)
+
 instance Functor BufferList where
   fmap f (BufferList bs xs) = BufferList (fmap f bs) (fmap f xs)
 
-instance Cycleable BufferList where
-  -- For (BufferList bs xs)
-  --
-  -- If bs is empty then pop xs
-  --
-  -- Else, move the head of the buffer to the end of xs
-  cPop (BufferList bs xs) =
-    case bs of
-      [] -> case xs of
-        x' : xs' -> BufferList [] (xs' ++ [x'])
-        [] -> emptyBufferList
-      b' : bs' -> BufferList bs' (xs ++ [b'])
+instance Cycleable [] where
+  cPop [] = []
+  cPop (x : xs) = xs ++ [x]
+  cDequeue [] = []
+  cDequeue xs = maybe [] (\x -> x : init' xs) . last' $ xs
+  cHead = head'
+  cTail [] = Nothing
+  cTail (x : xs) = Just xs
+  cCollect = id
+  cFromList = id
 
-  --  For (BufferList bs xs)
-  --
-  -- If xs is empty then dequeue the buffer
-  --
-  -- Else, move the last item in xs to the head of the buffer.
-  cDequeue (BufferList bs xs) =
-    case xs of
-      [] -> case bs of
-        [] -> emptyBufferList
-        bs' -> maybe emptyBufferList (\b' -> BufferList (b' : tail' bs') []) . last' $ bs'
-      xs' -> maybe emptyBufferList (\x' -> BufferList [x'] (tail' xs')) . last' $ xs'
+instance Cycleable BufferList where
+  cPop (BufferList bs xs) = uncurry BufferList $
+    case (bs, xs) of
+      ([], []) -> ([], [])
+      (bs, []) -> (cPop bs, [])
+      (bs, xs) -> (head xs : bs, tail' xs)
+
+  cDequeue (BufferList bs xs) = uncurry BufferList $
+    case (bs, xs) of
+      ([], []) -> ([], [])
+      (bs, []) -> (cDequeue bs, [])
+      ([], xs) -> (maybeToList . last' $ xs, init' xs)
+      (bs, xs) -> (maybe bs (: bs) . last' $ xs, init' xs)
 
   cHead (BufferList bs xs) = head' $ if null bs then xs else bs
   cTail (BufferList [] []) = Nothing
   cTail (BufferList [] (x : xs)) = Just (BufferList [] xs)
   cTail (BufferList (b : bs) xs) = Just (BufferList bs xs)
   cCollect = _totalList
+  cFromList xs = BufferList [] xs

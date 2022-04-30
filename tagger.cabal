@@ -24,6 +24,7 @@ executable tagger
                       ,Type.Model
                       ,Type.Model.Prim
                       ,Type.Config
+                      ,Type.BufferList
                       ,Database.Tagger.Type
                       ,Database.Tagger.Access
                       ,IO

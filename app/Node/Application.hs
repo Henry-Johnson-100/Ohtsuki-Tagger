@@ -33,6 +33,7 @@ import Monomer
 import Monomer.Core.Themes.BaseTheme
 import Node.Color
 import Node.Micro
+import Type.BufferList
 import Type.Config
 import Type.Model
 
@@ -163,7 +164,7 @@ fileSelectionWidget ::
   TaggerWidget
 fileSelectionWidget m =
   vstack_ [] $
-    [ lazyBufferWidget (m ^. fileSelectionModel . lazyBuffer),
+    [ lazyBufferWidget (m ^. fileSelectionModel . fileSelection . buffer),
       hstack_ [] [lazyBufferLoadButton, lazyBufferLoadAllButton, lazyBufferFlushButton]
     ]
   where
@@ -192,31 +193,31 @@ fileSelectionWidget m =
             $ brokenPath
 
 fileSingleWidget ::
-  (WidgetModel s, HasDoSoloTag s Bool) =>
-  Bool ->
-  [FileWithTags] ->
-  SingleFileSelectionModel ->
-  WidgetNode s TaggerEvent
-fileSingleWidget isSoloTagMode currentFileSelection sfModel =
+  TaggerModel -> TaggerWidget
+fileSingleWidget m =
   flip styleBasic [maxHeight 10000]
     . box_ [alignTop, alignMiddle]
     . hsplit_ [splitIgnoreChildResize True]
-    $ ( imagePreview . fmap getPlainText $ sfModel ^. singleFile,
-        imageDetailWidget isSoloTagMode currentFileSelection (sfModel ^. tagCounts)
+    $ ( imagePreview . fmap getPlainText $ (m ^. singleFileModel . singleFile),
+        imageDetailWidget m
       )
   where
     imagePreview ::
       (WidgetModel s, HasDoSoloTag s Bool) =>
       Maybe T.Text ->
       WidgetNode s TaggerEvent
-    imagePreview =
+    imagePreview mt =
       dropTarget (DoSingleFileEvent . SingleFilePut)
-        . maybe
-          (label "No Preview")
-          ( box_ [alignMiddle, onClick ToggleDoSoloTag]
-              . flip styleBasic [paddingB 3, paddingT 3]
-              . flip image_ [fitHeight, alignCenter]
-          )
+        . zstack
+        $ [ maybe
+              (label "No Preview")
+              ( box_ [alignMiddle, onClick ToggleDoSoloTag]
+                  . flip styleBasic [paddingB 3, paddingT 3]
+                  . flip image_ [fitHeight, alignCenter]
+              )
+              $ mt,
+            label . T.pack . show $ mt
+          ]
 
 operationWidget ::
   WidgetNode TaggerModel TaggerEvent

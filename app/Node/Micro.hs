@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -14,6 +15,7 @@ import qualified Data.Text as T
 import Database.Tagger.Type
 import Monomer
 import Node.Color
+import Type.BufferList
 import Type.Config
 import Type.Model
 
@@ -515,60 +517,61 @@ generalDescriptorTreeWidget tr bs dAction dtrConf =
                   `styleHover` [bgColor lightGray]
             ]
 
+-- #TODO Clean up this let in the future
+-- I need to change the events for Next and Prev now while I am thinking about it.
 imageDetailWidget ::
-  (WidgetModel s) =>
-  Bool ->
-  [FileWithTags] ->
-  [TagCount] ->
-  WidgetNode s TaggerEvent
-imageDetailWidget isSoloTagMode' currentFileSelection' tcs' =
-  flip styleBasic [borderL 1 black, rangeWidth 160 800]
-    . box_ [alignLeft]
-    . vstack_ []
-    $ [ label "Details:",
-        spacer,
-        label "Solo Tagging Mode"
-          `styleBasic` [textColor yuiOrange]
-          `nodeVisible` isSoloTagMode',
-        spacer,
-        vsplit_
-          [splitIgnoreChildResize True]
-          ( vstack_
-              []
-              [ label "Tags:",
-                hstack_
+  TaggerModel -> TaggerWidget
+imageDetailWidget m =
+  let !isSoloTagMode' = m ^. doSoloTag
+      !currentFileSelection' = cCollect (m ^. fileSelectionModel . fileSelection)
+      !tagCounts' = m ^. singleFileModel . tagCounts
+   in flip styleBasic [borderL 1 black, rangeWidth 160 800]
+        . box_ [alignLeft]
+        . vstack_ []
+        $ [ label "Details:",
+            spacer,
+            label "Solo Tagging Mode"
+              `styleBasic` [textColor yuiOrange]
+              `nodeVisible` isSoloTagMode',
+            spacer,
+            vsplit_
+              [splitIgnoreChildResize True]
+              ( vstack_
                   []
-                  [ spacer,
-                    flip styleBasic [border 1 black]
-                      . vscroll_ [wheelRate 50]
-                      . vstack_ []
-                      . map imageDetailDescriptor
-                      . L.sort
-                      $ tcs'
-                  ]
-              ],
-            vstack_
-              []
-              [ label $
-                  "In Selection: "
-                    !++ "("
-                    !++ (T.pack . show . length) currentFileSelection'
-                    !++ ")",
-                spacer,
-                hstack_
+                  [ label "Tags:",
+                    hstack_
+                      []
+                      [ spacer,
+                        flip styleBasic [border 1 black]
+                          . vscroll_ [wheelRate 50]
+                          . vstack_ []
+                          . map imageDetailDescriptor
+                          . L.sort
+                          $ tagCounts'
+                      ]
+                  ],
+                vstack_
                   []
-                  [ spacer,
-                    flip styleBasic [border 1 black]
-                      . vscroll_ [wheelRate 50]
-                      . vstack_ []
-                      . map imageDetailDescriptor
-                      . L.sort
-                      . sumSelectionTagCounts
-                      $ currentFileSelection'
+                  [ label $
+                      "In Selection: "
+                        !++ "("
+                        !++ (T.pack . show . length) currentFileSelection'
+                        !++ ")",
+                    spacer,
+                    hstack_
+                      []
+                      [ spacer,
+                        flip styleBasic [border 1 black]
+                          . vscroll_ [wheelRate 50]
+                          . vstack_ []
+                          . map imageDetailDescriptor
+                          . L.sort
+                          . sumSelectionTagCounts
+                          $ currentFileSelection'
+                      ]
                   ]
-              ]
-          )
-      ]
+              )
+          ]
   where
     imageDetailDescriptor ::
       (WidgetModel s) =>
