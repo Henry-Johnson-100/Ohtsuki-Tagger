@@ -94,11 +94,15 @@ instance Cycleable [] where
   cFromList = id
 
 instance Cycleable BufferList where
-  cPop (BufferList bs xs) = uncurry BufferList $
-    case (bs, xs) of
-      ([], []) -> ([], [])
-      (bs, []) -> (cPop bs, [])
-      (bs, xs) -> (head xs : bs, tail' xs)
+  -- cPop consumes the buffer if elements are present and places them in the list.
+  cPop bl =
+    case bl of
+      BufferList bs xs ->
+        let virtualHead' = head' . cCollect $ bl
+         in uncurry BufferList $ case (bs, xs) of
+              ([], []) -> ([], [])
+              ([], xs') -> ([], cPop xs')
+              (bs', xs') -> (tail' bs', maybe xs' (\x -> xs' ++ [x]) virtualHead')
 
   cDequeue (BufferList bs xs) = uncurry BufferList $
     case (bs, xs) of
