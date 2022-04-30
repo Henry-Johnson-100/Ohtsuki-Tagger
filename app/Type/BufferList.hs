@@ -104,12 +104,15 @@ instance Cycleable BufferList where
               ([], xs') -> ([], cPop xs')
               (bs', xs') -> (tail' bs', maybe xs' (\x -> xs' ++ [x]) virtualHead')
 
-  cDequeue (BufferList bs xs) = uncurry BufferList $
-    case (bs, xs) of
-      ([], []) -> ([], [])
-      (bs, []) -> (cDequeue bs, [])
-      ([], xs) -> (maybeToList . last' $ xs, init' xs)
-      (bs, xs) -> (maybe bs (: bs) . last' $ xs, init' xs)
+  -- cDequeue consumes the list if elements are present and places them in the buffer.
+  cDequeue bl =
+    case bl of
+      BufferList bs xs ->
+        let virtualLast' = last' . cCollect $ bl
+         in uncurry BufferList $ case (bs, xs) of
+              ([], []) -> ([], [])
+              (bs', []) -> (cDequeue bs', [])
+              (bs', xs') -> (maybe bs' (: bs') virtualLast', init' xs')
 
   cHead (BufferList bs xs) = head' $ if null bs then xs else bs
   cTail (BufferList [] []) = Nothing
