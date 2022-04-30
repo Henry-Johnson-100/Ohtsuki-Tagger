@@ -24,6 +24,15 @@ type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 (!++) :: T.Text -> T.Text -> T.Text
 (!++) = T.append
 
+getPathComponents :: Int -> T.Text -> T.Text
+getPathComponents n p =
+  let !brokenPath = T.splitOn "/" p
+      !droppedDirs = length brokenPath - n
+   in (!++) ((T.pack . show) droppedDirs !++ ".../")
+        . T.intercalate "/"
+        . drop droppedDirs
+        $ brokenPath
+
 class GetPlainText g where
   getPlainText :: g -> T.Text
 

@@ -9,6 +9,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
+{-# HLINT ignore "Use :" #-}
+
 module Node.Application
   ( themeConfig,
     fileSelectionWidget,
@@ -160,44 +162,52 @@ fileSelectionWidget ::
   TaggerModel ->
   TaggerWidget
 fileSelectionWidget m =
-  hstack_ [] $
-    [ vstack_
-        []
-        [ lazyBufferLoadButton,
-          lazyBufferLoadAllButton,
-          lazyBufferFlushButton,
-          fileSelectionShuffleButton
-        ],
-      lazyBufferWidget (m ^. fileSelectionModel . fileSelection . buffer)
-    ]
+  flip styleBasic [border 1 black]
+    . vstack_ []
+    $ [ label
+          ( "("
+              !++ ( T.pack . show . length $
+                      m ^. fileSelectionModel . fileSelection . buffer
+                  )
+              !++ " / "
+              !++ ( T.pack . show . length . cCollect $
+                      m ^. fileSelectionModel . fileSelection
+                  )
+              !++ ")"
+          )
+          `styleBasic` [paddingT 2],
+        separatorLine,
+        hstack_
+          []
+          [ lazyBufferWidget (m ^. fileSelectionModel . fileSelection . buffer),
+            vstack_
+              []
+              [ lazyBufferLoadButton,
+                lazyBufferLoadAllButton,
+                lazyBufferFlushButton,
+                fileSelectionShuffleButton
+              ]
+          ]
+      ]
   where
     lazyBufferWidget :: [FileWithTags] -> TaggerWidget
     lazyBufferWidget =
-      vscroll_ [wheelRate 50]
+      flip styleBasic [maxWidth 10000]
+        . vscroll_ [wheelRate 50]
         . vstack_ [childSpacing_ 5]
-        . map fileWithTagsWidget
+        . map
+          ( fileWithTagsWidget
+              (m ^. programConfig . selectionconf . selectionDisplayParents)
+          )
       where
-        fileWithTagsWidget :: FileWithTags -> TaggerWidget
-        fileWithTagsWidget fwt =
+        fileWithTagsWidget :: Int -> FileWithTags -> TaggerWidget
+        fileWithTagsWidget n fwt =
           draggable fwt
             . flip styleBasic [textColor (if null . tags $ fwt then black else yuiBlue)]
-            . label
-            . getPathComponents
-              ( m
-                  ^. programConfig
-                    . selectionconf
-                    . selectionDisplayParents
-              )
+            . flip label_ [ellipsis]
+            . getPathComponents n
             . getPlainText
             $ fwt
-    getPathComponents :: Int -> T.Text -> T.Text
-    getPathComponents n p =
-      let !brokenPath = T.splitOn "/" p
-          !droppedDirs = length brokenPath - n
-       in (!++) ((T.pack . show) droppedDirs !++ ".../")
-            . T.intercalate "/"
-            . drop droppedDirs
-            $ brokenPath
 
 fileSingleWidget ::
   TaggerModel -> TaggerWidget
@@ -223,9 +233,22 @@ fileSingleWidget m =
               ( flip styleBasic [paddingB 3, paddingT 3]
                   . flip image_ [fitHeight, alignCenter]
               )
-              $ mt,
-            label . T.pack . show $ mt
+              $ mt
           ]
+          ++ maybe
+            []
+            ( (: [])
+                . box_ [alignTop, alignLeft]
+                . flip styleBasic [bgColor white]
+                . label
+                . getPathComponents
+                  ( m
+                      ^. programConfig
+                        . selectionconf
+                        . selectionDisplayParents
+                  )
+            )
+            mt
       where
         maybeDraggable ss = maybe id (`draggable_` ss)
 
