@@ -1,10 +1,15 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module Type.BufferList
   ( BufferList (..),
     Cycleable (..),
     emptyBufferList,
+    buffer,
+    list,
   )
 where
 
+import Control.Lens.TH (makeLenses)
 import Data.Maybe (fromMaybe)
 
 head' :: [a] -> Maybe a
@@ -40,10 +45,12 @@ class Cycleable c where
   cCollect :: c a -> [a]
 
 data BufferList a = BufferList
-  { buffer :: ![a],
-    list :: ![a]
+  { _buffer :: ![a],
+    _list :: ![a]
   }
   deriving (Show, Eq)
+
+makeLenses ''BufferList
 
 emptyBufferList :: BufferList a
 emptyBufferList = BufferList [] []
