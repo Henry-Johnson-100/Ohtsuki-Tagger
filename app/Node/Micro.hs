@@ -65,6 +65,15 @@ buttonStylingBasic = [bgColor white, border 0 white]
 buttonStylingHover :: [StyleState]
 buttonStylingHover = [bgColor lightGray]
 
+lazyBufferLoadButton :: WidgetNode TaggerModel TaggerEvent
+lazyBufferLoadButton = styledButton (DoFileSelectionEvent LazyBufferLoad) "Load"
+
+lazyBufferLoadAllButton :: WidgetNode TaggerModel TaggerEvent
+lazyBufferLoadAllButton = styledButton (DoFileSelectionEvent LazyBufferLoadAll) "All"
+
+lazyBufferFlushButton :: WidgetNode TaggerModel TaggerEvent
+lazyBufferFlushButton = styledButton (DoFileSelectionEvent LazyBufferFlush) "Flush"
+
 newFileTextCommitButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
 newFileTextCommitButton = styledButton NewFileTextCommit "Add Path"
