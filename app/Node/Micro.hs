@@ -526,8 +526,6 @@ generalDescriptorTreeWidget tr bs dAction dtrConf =
                   `styleHover` [bgColor lightGray]
             ]
 
--- #TODO Clean up this let in the future
--- I need to change the events for Next and Prev now while I am thinking about it.
 imageDetailWidget ::
   TaggerModel -> TaggerWidget
 imageDetailWidget m =

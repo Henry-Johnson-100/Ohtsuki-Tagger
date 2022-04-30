@@ -44,9 +44,23 @@ taggerApplicationUI wenv model' =
                       hgrid
                         [ vstack
                             [ descriptorTreeQuadrantWidget
-                                (model ^. (programConfig . descriptorTreeConf))
-                                (model ^. (descriptorModel . mainDescriptorTree . rootTree))
-                                (model ^. (descriptorModel . unrelatedDescriptorTree . rootTree))
+                                ( model
+                                    ^. ( programConfig
+                                           . descriptorTreeConf
+                                       )
+                                )
+                                ( model
+                                    ^. ( descriptorModel
+                                           . mainDescriptorTree
+                                           . rootTree
+                                       )
+                                )
+                                ( model
+                                    ^. ( descriptorModel
+                                           . unrelatedDescriptorTree
+                                           . rootTree
+                                       )
+                                )
                             ],
                           operationWidget,
                           fileSelectionWidget model
