@@ -172,7 +172,10 @@ fileSelectionWidget m =
     ]
   where
     lazyBufferWidget :: [FileWithTags] -> TaggerWidget
-    lazyBufferWidget = vscroll_ [] . vstack_ [childSpacing_ 5] . map fileWithTagsWidget
+    lazyBufferWidget =
+      vscroll_ [wheelRate 50]
+        . vstack_ [childSpacing_ 5]
+        . map fileWithTagsWidget
       where
         fileWithTagsWidget :: FileWithTags -> TaggerWidget
         fileWithTagsWidget fwt =
@@ -211,17 +214,20 @@ fileSingleWidget m =
       Maybe T.Text ->
       WidgetNode s TaggerEvent
     imagePreview mt =
-      dropTarget (DoSingleFileEvent . SingleFilePut)
+      box_ [onClick ToggleDoSoloTag]
+        . maybeDraggable [transparency 0.3] (m ^. singleFileModel . singleFile)
+        . flip dropTarget_ [] (DoSingleFileEvent . SingleFilePut)
         . zstack
         $ [ maybe
               (label "No Preview")
-              ( box_ [alignMiddle, onClick ToggleDoSoloTag]
-                  . flip styleBasic [paddingB 3, paddingT 3]
+              ( flip styleBasic [paddingB 3, paddingT 3]
                   . flip image_ [fitHeight, alignCenter]
               )
               $ mt,
             label . T.pack . show $ mt
           ]
+      where
+        maybeDraggable ss = maybe id (`draggable_` ss)
 
 operationWidget ::
   WidgetNode TaggerModel TaggerEvent
