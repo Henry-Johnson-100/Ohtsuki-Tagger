@@ -43,19 +43,18 @@ taggerApplicationUI wenv model' =
                       (model ^. doSoloTag)
                       (model ^. (fileSelectionModel . fileSelection))
                       (model ^. singleFileModel),
-                    box_ [alignBottom] . hgrid $
-                      [ vstack
-                          [ descriptorTreeQuadrantWidget
-                              (model ^. (programConfig . descriptorTreeConf))
-                              (model ^. (descriptorModel . mainDescriptorTree . rootTree))
-                              (model ^. (descriptorModel . unrelatedDescriptorTree . rootTree))
+                    box_ [alignBottom] . hsplit_ [splitIgnoreChildResize True] $
+                      ( hgrid
+                          [ vstack
+                              [ descriptorTreeQuadrantWidget
+                                  (model ^. (programConfig . descriptorTreeConf))
+                                  (model ^. (descriptorModel . mainDescriptorTree . rootTree))
+                                  (model ^. (descriptorModel . unrelatedDescriptorTree . rootTree))
+                              ],
+                            operationWidget
                           ],
-                        operationWidget
-                        -- ,
-                        -- fileSelectionWidget
-                        --   (model ^. (programConfig . selectionconf . selectionDisplayParents))
-                        --   (model ^. fileSelection)
-                      ]
+                        fileSelectionWidget model
+                      )
                   )
             ]
         ]

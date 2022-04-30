@@ -159,58 +159,37 @@ descriptorConfigurePage model =
       ]
 
 fileSelectionWidget ::
-  (WidgetModel s) =>
-  Int ->
-  [FileWithTags] ->
-  WidgetNode s TaggerEvent
-fileSelectionWidget dispParents fwts =
-  let fileWithTagsZone =
-        map
-          ( \fwt ->
-              fileWithTagWidget
-                [previewButton fwt, selectButton fwt]
-                dispParents
-                fwt
-          )
-      fileWithTagsStack = stdScroll $ box_ [] . vstack . fileWithTagsZone $ fwts
-   in stdDelayTooltip "File Database" fileWithTagsStack
+  TaggerModel ->
+  TaggerWidget
+fileSelectionWidget m =
+  vstack_ [] $
+    [ lazyBufferWidget (m ^. fileSelectionModel . lazyBuffer),
+      hstack_ [] [lazyBufferLoadButton, lazyBufferLoadAllButton, lazyBufferFlushButton]
+    ]
   where
-    -- A widget that shows a FileWithTags, an arbitrary number of buttons
-    -- and sizes appropriately to the parent container
-    fileWithTagWidget ::
-      (WidgetModel s) =>
-      [WidgetNode s TaggerEvent] ->
-      Int ->
-      FileWithTags ->
-      WidgetNode s TaggerEvent
-    fileWithTagWidget bs dispParents' fwt =
-      let buttonGridNode bs' =
-            box_ [alignLeft] $ hstack_ [] bs'
-          fileNode f' =
-            box_ [alignLeft] . flip label_ [ellipsis] . getPathComponents dispParents' $
-              (filePath $ f')
-          tagsNode ts' = draggableDescriptorListWidget ts'
-          fwtSplitNode (fn', tn') =
-            box_ [alignLeft] $ vsplit_ [] $ (stdScroll fn', stdScroll tn')
-       in box_
-            [alignLeft]
-            $ vstack_
-              []
-              [ hstack_ [] $
-                  [ buttonGridNode bs,
-                    box_ [alignLeft] . fileNode . file $ fwt
-                  ],
-                separatorLine
-              ]
+    lazyBufferWidget :: [FileWithTags] -> TaggerWidget
+    lazyBufferWidget = vscroll_ [] . vstack_ [childSpacing_ 5] . map fileWithTagsWidget
       where
-        getPathComponents :: Int -> T.Text -> T.Text
-        getPathComponents n p =
-          let !brokenPath = T.splitOn "/" p
-              !droppedDirs = length brokenPath - n
-           in (!++) ((T.pack . show) droppedDirs !++ ".../")
-                . T.intercalate "/"
-                . drop droppedDirs
-                $ brokenPath
+        fileWithTagsWidget :: FileWithTags -> TaggerWidget
+        fileWithTagsWidget fwt =
+          draggable fwt
+            . label
+            . getPathComponents
+              ( m
+                  ^. programConfig
+                    . selectionconf
+                    . selectionDisplayParents
+              )
+            . getPlainText
+            $ fwt
+    getPathComponents :: Int -> T.Text -> T.Text
+    getPathComponents n p =
+      let !brokenPath = T.splitOn "/" p
+          !droppedDirs = length brokenPath - n
+       in (!++) ((T.pack . show) droppedDirs !++ ".../")
+            . T.intercalate "/"
+            . drop droppedDirs
+            $ brokenPath
 
 fileSingleWidget ::
   (WidgetModel s, HasDoSoloTag s Bool) =>
@@ -231,12 +210,13 @@ fileSingleWidget isSoloTagMode currentFileSelection sfModel =
       Maybe T.Text ->
       WidgetNode s TaggerEvent
     imagePreview =
-      maybe
-        (label "No Preview")
-        ( box_ [alignMiddle, onClick ToggleDoSoloTag]
-            . flip styleBasic [paddingB 3, paddingT 3]
-            . flip image_ [fitHeight, alignCenter]
-        )
+      dropTarget (DoSingleFileEvent . SingleFilePut)
+        . maybe
+          (label "No Preview")
+          ( box_ [alignMiddle, onClick ToggleDoSoloTag]
+              . flip styleBasic [paddingB 3, paddingT 3]
+              . flip image_ [fitHeight, alignCenter]
+          )
 
 operationWidget ::
   WidgetNode TaggerModel TaggerEvent

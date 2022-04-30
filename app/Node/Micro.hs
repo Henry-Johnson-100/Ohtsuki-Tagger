@@ -17,6 +17,8 @@ import Node.Color
 import Type.Config
 import Type.Model
 
+type TaggerWidget = WidgetNode TaggerModel TaggerEvent
+
 (!++) :: T.Text -> T.Text -> T.Text
 (!++) = T.append
 
