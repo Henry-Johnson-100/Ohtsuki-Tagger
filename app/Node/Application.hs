@@ -103,10 +103,7 @@ menubar =
         $ [ toggleConfigConfigureVisibility,
             toggleDatabaseConfigureVisibility,
             toggleSelectionConfigureVisibility,
-            toggleDescriptorConfigureVisibility,
-            -- #TODO move me
-            spacer,
-            fileSelectionShuffleButton
+            toggleDescriptorConfigureVisibility
           ],
       separatorLine
     ]
@@ -163,9 +160,15 @@ fileSelectionWidget ::
   TaggerModel ->
   TaggerWidget
 fileSelectionWidget m =
-  vstack_ [] $
-    [ lazyBufferWidget (m ^. fileSelectionModel . fileSelection . buffer),
-      hstack_ [] [lazyBufferLoadButton, lazyBufferLoadAllButton, lazyBufferFlushButton]
+  hstack_ [] $
+    [ vstack_
+        []
+        [ lazyBufferLoadButton,
+          lazyBufferLoadAllButton,
+          lazyBufferFlushButton,
+          fileSelectionShuffleButton
+        ],
+      lazyBufferWidget (m ^. fileSelectionModel . fileSelection . buffer)
     ]
   where
     lazyBufferWidget :: [FileWithTags] -> TaggerWidget
@@ -174,6 +177,7 @@ fileSelectionWidget m =
         fileWithTagsWidget :: FileWithTags -> TaggerWidget
         fileWithTagsWidget fwt =
           draggable fwt
+            . flip styleBasic [textColor (if null . tags $ fwt then black else yuiBlue)]
             . label
             . getPathComponents
               ( m

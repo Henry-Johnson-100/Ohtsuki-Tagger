@@ -103,7 +103,6 @@ getRefreshedFWTs c fwts = do
   refreshedFWTs <- mapM (lookupFileWithTagsByFileId c) fids
   return . concat $ refreshedFWTs
 
--- #TODO no assigned event
 -- untagWith :: Connection -> [Tag] -> IO ()
 -- untagWith = untag
 untagWith :: Connection -> [FileWithTags] -> [T.Text] -> IO ()

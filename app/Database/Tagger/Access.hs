@@ -147,7 +147,6 @@ addDescriptor c dT = do
     #*# show (MetaDescriptor (descriptorId unrelatedDescriptor) newDId)
   return . Descriptor newDId $ dT
 
--- #TODO no task or event assigned
 renameDescriptor :: Connection -> Descriptor -> T.Text -> IO ()
 renameDescriptor c d n =
   execute
