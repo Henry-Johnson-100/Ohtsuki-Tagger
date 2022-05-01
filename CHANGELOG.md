@@ -62,3 +62,8 @@ selection are arguments to the shell cmd.
       * Does not change the order in which images are cycled via Ctrl-i or -k.
   * Made it a draggable FileWithTags.
     * There aren't currently any other widgets that are drop targets for this message type.
+
+#### 0.1.4.1 -- 2022-04-30
+
+* Fixed a bug with the lazy selection that would flush the buffer when an image was tagged.
+* Fixed a bug where shuffling an empty selection would result in an inifinite hang.

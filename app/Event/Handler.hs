@@ -196,18 +196,23 @@ fileSelectionEventHandler wenv node model event =
                 fwts
             )
       ]
-    FileSelectionPut fwts ->
-      [ model *~ (fileSelectionModel . fileSelection) .~ cFromList fwts
+    FileSelectionPut bfwts ->
+      [ model *~ (fileSelectionModel . fileSelection) .~ bfwts
+      ]
+    FileSelectionBufferPut fwts ->
+      [ model *~ fileSelectionModel . fileSelection . buffer .~ fwts
+      ]
+    FileSelectionListPut fwts ->
+      [ model *~ fileSelectionModel . fileSelection . list .~ fwts
       ]
     FileSelectionRefresh_ ->
       [ dbConnTask
-          (DoFileSelectionEvent . FileSelectionPut)
-          ( flip
-              getRefreshedFWTs
-              ( cCollect $
-                  model ^. (fileSelectionModel . fileSelection)
-              )
-          )
+          (DoFileSelectionEvent . FileSelectionBufferPut)
+          (flip getRefreshedFWTs $ model ^. fileSelectionModel . fileSelection . buffer)
+          (model ^. dbConn),
+        dbConnTask
+          (DoFileSelectionEvent . FileSelectionListPut)
+          (flip getRefreshedFWTs $ model ^. fileSelectionModel . fileSelection . list)
           (model ^. dbConn),
         dbConnTask
           (DoSingleFileEvent . SingleFileMaybePut)
@@ -252,11 +257,18 @@ fileSelectionEventHandler wenv node model event =
     FileSelectionPrevQueryCriteria ->
       [model *~ (fileSelectionModel . queryCriteria) %~ prev]
     FileSelectionShuffle ->
-      [ Task
-          ( DoFileSelectionEvent . FileSelectionPut
-              <$> (shuffle . cCollect $ (model ^. (fileSelectionModel . fileSelection)))
-          )
-      ]
+      let !shuffledBufferList = shuffleBufferList $ model ^. fileSelectionModel . fileSelection
+       in [ Task
+              ( DoFileSelectionEvent
+                  . FileSelectionBufferPut
+                  <$> fmap _buffer shuffledBufferList
+              ),
+            Task
+              ( DoFileSelectionEvent
+                  . FileSelectionListPut
+                  <$> fmap _list shuffledBufferList
+              )
+          ]
     LazyBufferLoad ->
       [ model *~ fileSelectionModel . fileSelection
           %~ takeToBuffer (model ^. programConfig . selectionconf . selectionBufferSize)
@@ -376,7 +388,7 @@ taggerEventHandler wenv node model event =
     NewFileTextCommit ->
       [ dbConnTask
           (DoFileSelectionEvent . FileSelectionPut)
-          (flip addPath (model ^. newFileText))
+          (\conn -> fmap cFromList . addPath conn $ (model ^. newFileText))
           $ model ^. dbConn,
         model *~ newFileText .~ ""
       ]

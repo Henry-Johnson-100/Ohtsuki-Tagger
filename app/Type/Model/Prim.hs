@@ -167,7 +167,9 @@ data SingleFileEvent
 
 data FileSelectionEvent
   = FileSelectionUpdate ![FileWithTags]
-  | FileSelectionPut ![FileWithTags]
+  | FileSelectionPut !(BufferList FileWithTags)
+  | FileSelectionBufferPut ![FileWithTags]
+  | FileSelectionListPut ![FileWithTags]
   | FileSelectionRefresh_
   | FileSelectionCommitQueryText
   | FileSelectionClear

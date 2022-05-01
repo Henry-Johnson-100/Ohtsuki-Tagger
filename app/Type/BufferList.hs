@@ -85,9 +85,10 @@ emptyBuffer :: BufferList a -> BufferList a
 emptyBuffer (BufferList bs xs) = BufferList [] (bs ++ xs)
 
 shuffleBufferList :: BufferList a -> IO (BufferList a)
+shuffleBufferList (BufferList [] []) = pure emptyBufferList
 shuffleBufferList (BufferList bs xs) = do
-  bsh <- shuffle'' bs
-  xsh <- shuffle'' xs
+  bsh <- if null bs then pure [] else shuffle'' bs
+  xsh <- if null xs then pure [] else shuffle'' xs
   return $ BufferList bsh xsh
   where
     shuffle'' xs = initStdGen >>= return . shuffle' xs (length xs)
