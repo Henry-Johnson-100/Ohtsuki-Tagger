@@ -49,6 +49,13 @@ updateRepresentativeText :: Connection -> Descriptor -> T.Text -> IO ()
 updateRepresentativeText c =
   Database.Tagger.Access.updateRepresentativeText c . descriptorId
 
+shuffle :: [a] -> IO [a]
+shuffle [] = pure []
+shuffle xs = do
+  g <- initStdGen
+  let shuffled = shuffle' xs (length xs) g
+  return shuffled
+
 renameDescriptor :: Connection -> Descriptor -> T.Text -> IO ()
 renameDescriptor = Database.Tagger.Access.renameDescriptor
 
@@ -108,7 +115,6 @@ getRefreshedFWTs c fwts = do
   refreshedFWTs <- mapM (lookupFileWithTagsByFileId c) fids
   return . concat $ refreshedFWTs
 
--- #TODO no assigned event
 -- untagWith :: Connection -> [Tag] -> IO ()
 -- untagWith = untag
 untagWith :: Connection -> [FileWithTags] -> [T.Text] -> IO ()

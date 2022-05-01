@@ -39,23 +39,32 @@ taggerApplicationUI wenv model' =
                 model,
               visibility model Main
                 . vsplit_ [splitIgnoreChildResize True]
-                $ ( fileSingleWidget
-                      (model ^. doSoloTag)
-                      (model ^. (fileSelectionModel . fileSelection))
-                      (model ^. singleFileModel),
-                    box_ [alignBottom] . hgrid $
-                      [ vstack
-                          [ descriptorTreeQuadrantWidget
-                              (model ^. (programConfig . descriptorTreeConf))
-                              (model ^. (descriptorModel . mainDescriptorTree . rootTree))
-                              (model ^. (descriptorModel . unrelatedDescriptorTree . rootTree))
-                          ],
-                        operationWidget
-                        -- ,
-                        -- fileSelectionWidget
-                        --   (model ^. (programConfig . selectionconf . selectionDisplayParents))
-                        --   (model ^. fileSelection)
-                      ]
+                $ ( fileSingleWidget model,
+                    box_ [alignBottom] $
+                      hgrid
+                        [ vstack
+                            [ descriptorTreeQuadrantWidget
+                                ( model
+                                    ^. ( programConfig
+                                           . descriptorTreeConf
+                                       )
+                                )
+                                ( model
+                                    ^. ( descriptorModel
+                                           . mainDescriptorTree
+                                           . rootTree
+                                       )
+                                )
+                                ( model
+                                    ^. ( descriptorModel
+                                           . unrelatedDescriptorTree
+                                           . rootTree
+                                       )
+                                )
+                            ],
+                          operationWidget,
+                          fileSelectionWidget model
+                        ]
                   )
             ]
         ]

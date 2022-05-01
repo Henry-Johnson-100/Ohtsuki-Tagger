@@ -9,6 +9,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
+{-# HLINT ignore "Use :" #-}
+
 module Node.Application
   ( themeConfig,
     fileSelectionWidget,
@@ -33,6 +35,7 @@ import Monomer
 import Monomer.Core.Themes.BaseTheme
 import Node.Color
 import Node.Micro
+import Type.BufferList
 import Type.Config
 import Type.Model
 
@@ -121,12 +124,14 @@ databaseConfigurePage =
     ]
 
 selectionConfigurePage ::
-  (WidgetModel s, HasProgramConfig s TaggerConfig) =>
-  WidgetNode s TaggerEvent
+  WidgetNode TaggerModel TaggerEvent
 selectionConfigurePage =
   box . flip styleBasic [padding 80]
     . vgrid
-    $ [selectionDisplayParentsNumberField]
+    $ [ selectionDisplayParentsNumberField,
+        spacer,
+        selectionDisplayBufferSizeNumberField
+      ]
 
 configConfigurationPage :: (WidgetModel s) => WidgetNode s TaggerEvent
 configConfigurationPage =
@@ -154,84 +159,98 @@ descriptorConfigurePage model =
       ]
 
 fileSelectionWidget ::
-  (WidgetModel s) =>
-  Int ->
-  [FileWithTags] ->
-  WidgetNode s TaggerEvent
-fileSelectionWidget dispParents fwts =
-  let fileWithTagsZone =
-        map
-          ( \fwt ->
-              fileWithTagWidget
-                [previewButton fwt, selectButton fwt]
-                dispParents
-                fwt
+  TaggerModel ->
+  TaggerWidget
+fileSelectionWidget m =
+  flip styleBasic [border 1 black]
+    . vstack_ []
+    $ [ label
+          ( "("
+              !++ ( T.pack . show . length $
+                      m ^. fileSelectionModel . fileSelection . buffer
+                  )
+              !++ " / "
+              !++ ( T.pack . show . length . cCollect $
+                      m ^. fileSelectionModel . fileSelection
+                  )
+              !++ ")"
           )
-      fileWithTagsStack = stdScroll $ box_ [] . vstack . fileWithTagsZone $ fwts
-   in stdDelayTooltip "File Database" fileWithTagsStack
-  where
-    -- A widget that shows a FileWithTags, an arbitrary number of buttons
-    -- and sizes appropriately to the parent container
-    fileWithTagWidget ::
-      (WidgetModel s) =>
-      [WidgetNode s TaggerEvent] ->
-      Int ->
-      FileWithTags ->
-      WidgetNode s TaggerEvent
-    fileWithTagWidget bs dispParents' fwt =
-      let buttonGridNode bs' =
-            box_ [alignLeft] $ hstack_ [] bs'
-          fileNode f' =
-            box_ [alignLeft] . flip label_ [ellipsis] . getPathComponents dispParents' $
-              (filePath $ f')
-          tagsNode ts' = draggableDescriptorListWidget ts'
-          fwtSplitNode (fn', tn') =
-            box_ [alignLeft] $ vsplit_ [] $ (stdScroll fn', stdScroll tn')
-       in box_
-            [alignLeft]
-            $ vstack_
+          `styleBasic` [paddingT 2],
+        separatorLine,
+        hstack_
+          []
+          [ lazyBufferWidget (m ^. fileSelectionModel . fileSelection . buffer),
+            vstack_
               []
-              [ hstack_ [] $
-                  [ buttonGridNode bs,
-                    box_ [alignLeft] . fileNode . file $ fwt
-                  ],
-                separatorLine
+              [ lazyBufferLoadButton,
+                lazyBufferLoadAllButton,
+                lazyBufferFlushButton,
+                fileSelectionShuffleButton
               ]
+          ]
+      ]
+  where
+    lazyBufferWidget :: [FileWithTags] -> TaggerWidget
+    lazyBufferWidget =
+      flip styleBasic [maxWidth 10000]
+        . vscroll_ [wheelRate 50]
+        . vstack_ [childSpacing_ 5]
+        . map
+          ( fileWithTagsWidget
+              (m ^. programConfig . selectionconf . selectionDisplayParents)
+          )
       where
-        getPathComponents :: Int -> T.Text -> T.Text
-        getPathComponents n p =
-          let !brokenPath = T.splitOn "/" p
-              !droppedDirs = length brokenPath - n
-           in (!++) ((T.pack . show) droppedDirs !++ ".../")
-                . T.intercalate "/"
-                . drop droppedDirs
-                $ brokenPath
+        fileWithTagsWidget :: Int -> FileWithTags -> TaggerWidget
+        fileWithTagsWidget n fwt =
+          draggable fwt
+            . flip styleBasic [textColor (if null . tags $ fwt then black else yuiBlue)]
+            . flip label_ [ellipsis]
+            . getPathComponents n
+            . getPlainText
+            $ fwt
 
 fileSingleWidget ::
-  (WidgetModel s, HasDoSoloTag s Bool) =>
-  Bool ->
-  [FileWithTags] ->
-  SingleFileSelectionModel ->
-  WidgetNode s TaggerEvent
-fileSingleWidget isSoloTagMode currentFileSelection sfModel =
+  TaggerModel -> TaggerWidget
+fileSingleWidget m =
   flip styleBasic [maxHeight 10000]
     . box_ [alignTop, alignMiddle]
     . hsplit_ [splitIgnoreChildResize True]
-    $ ( imagePreview . fmap getPlainText $ sfModel ^. singleFile,
-        imageDetailWidget isSoloTagMode currentFileSelection (sfModel ^. tagCounts)
+    $ ( imagePreview . fmap getPlainText $ (m ^. singleFileModel . singleFile),
+        imageDetailWidget m
       )
   where
     imagePreview ::
       (WidgetModel s, HasDoSoloTag s Bool) =>
       Maybe T.Text ->
       WidgetNode s TaggerEvent
-    imagePreview =
-      maybe
-        (label "No Preview")
-        ( box_ [alignMiddle, onClick ToggleDoSoloTag]
-            . flip styleBasic [paddingB 3, paddingT 3]
-            . flip image_ [fitHeight, alignCenter]
-        )
+    imagePreview mt =
+      box_ [onClick ToggleDoSoloTag]
+        . maybeDraggable [transparency 0.3] (m ^. singleFileModel . singleFile)
+        . flip dropTarget_ [] (DoSingleFileEvent . SingleFilePut)
+        . zstack
+        $ [ maybe
+              (label "No Preview")
+              ( flip styleBasic [paddingB 3, paddingT 3]
+                  . flip image_ [fitHeight, alignCenter]
+              )
+              $ mt
+          ]
+          ++ maybe
+            []
+            ( (: [])
+                . box_ [alignTop, alignLeft]
+                . flip styleBasic [bgColor white]
+                . label
+                . getPathComponents
+                  ( m
+                      ^. programConfig
+                        . selectionconf
+                        . selectionDisplayParents
+                  )
+            )
+            mt
+      where
+        maybeDraggable ss = maybe id (`draggable_` ss)
 
 operationWidget ::
   WidgetNode TaggerModel TaggerEvent

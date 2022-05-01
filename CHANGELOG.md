@@ -48,3 +48,22 @@ selection are arguments to the shell cmd.
 
 * Added a field to rename descriptors.
   * In the Descriptor configuration page.
+
+### 0.1.4.0 -- 2022-04-30
+
+* Added the FileSelection widget back in.
+  * It uses a lazy buffer that can be loaded or flushed for a more responsive GUI.
+  * Uses a new config field ```selection.buffer_size = int``` to determine how many elements to load.
+  * Added buttons to load, load all, flush, and shuffle the file selection.
+* Improved styling of the ImagePreview widget.
+  * Added a filename to the top left.
+  * Made it a drop target for FileWithTags.
+    * Dropping a file from the fileSelection Widget into the image preview widget will open a preview of that file.
+      * Does not change the order in which images are cycled via Ctrl-i or -k.
+  * Made it a draggable FileWithTags.
+    * There aren't currently any other widgets that are drop targets for this message type.
+
+#### 0.1.4.1 -- 2022-04-30
+
+* Fixed a bug with the lazy selection that would flush the buffer when an image was tagged.
+* Fixed a bug where shuffling an empty selection would result in an inifinite hang.

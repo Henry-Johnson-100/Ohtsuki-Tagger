@@ -25,8 +25,9 @@ import Database.SQLite.Simple
 import Database.Tagger.Access (activateForeignKeyPragma, hoistMaybe, lookupDescriptorPattern)
 import Database.Tagger.Type
 import Event.Task
-import IO
+import qualified IO
 import Monomer
+import Type.BufferList
 import Type.Config
 import Type.Model
 
@@ -57,7 +58,7 @@ dbConnTask ::
   EventResponse s TaggerEvent sp ep
 dbConnTask e f =
   maybe
-    (Task (IOEvent <$> hPutStrLn stderr "Database connection not active."))
+    (Task (IOEvent <$> IO.hPutStrLn IO.stderr "Database connection not active."))
     (Task . fmap e . f)
     . connInstance
 
@@ -154,8 +155,8 @@ singleFileEventHandler wenv node model event =
         asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
       ]
     SingleFileNextFromFileSelection ->
-      let !ps = popCycleList (model ^. (fileSelectionModel . fileSelection))
-          !mi = head' ps
+      let !ps = cPop $ model ^. fileSelectionModel . fileSelection
+          !mi = cHead ps
        in [ Model
               . ((fileSelectionModel . fileSelection) .~ ps)
               . ((singleFileModel . singleFile) .~ mi)
@@ -164,8 +165,8 @@ singleFileEventHandler wenv node model event =
             asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
           ]
     SingleFilePrevFromFileSelection ->
-      let !ps = dequeueCycleList (model ^. (fileSelectionModel . fileSelection))
-          !mi = head' ps
+      let !ps = cDequeue $ model ^. fileSelectionModel . fileSelection
+          !mi = cHead ps
        in [ Model
               . ((fileSelectionModel . fileSelection) .~ ps)
               . ((singleFileModel . singleFile) .~ mi)
@@ -201,18 +202,30 @@ fileSelectionEventHandler wenv node model event =
   case event of
     FileSelectionUpdate fwts ->
       [ model *~ (fileSelectionModel . fileSelection)
-          .~ doSetAction
-            (model ^. (fileSelectionModel . setArithmetic))
-            (model ^. (fileSelectionModel . fileSelection))
-            fwts
+          .~ cFromList
+            ( doSetAction
+                (model ^. (fileSelectionModel . setArithmetic))
+                (cCollect $ model ^. (fileSelectionModel . fileSelection))
+                fwts
+            )
       ]
-    FileSelectionPut fwts ->
-      [ model *~ (fileSelectionModel . fileSelection) .~ fwts
+    FileSelectionPut bfwts ->
+      [ model *~ (fileSelectionModel . fileSelection) .~ bfwts
+      ]
+    FileSelectionBufferPut fwts ->
+      [ model *~ fileSelectionModel . fileSelection . buffer .~ fwts
+      ]
+    FileSelectionListPut fwts ->
+      [ model *~ fileSelectionModel . fileSelection . list .~ fwts
       ]
     FileSelectionRefresh_ ->
       [ dbConnTask
-          (DoFileSelectionEvent . FileSelectionPut)
-          (flip getRefreshedFWTs (model ^. (fileSelectionModel . fileSelection)))
+          (DoFileSelectionEvent . FileSelectionBufferPut)
+          (flip getRefreshedFWTs $ model ^. fileSelectionModel . fileSelection . buffer)
+          (model ^. dbConn),
+        dbConnTask
+          (DoFileSelectionEvent . FileSelectionListPut)
+          (flip getRefreshedFWTs $ model ^. fileSelectionModel . fileSelection . list)
           (model ^. dbConn),
         dbConnTask
           (DoSingleFileEvent . SingleFileMaybePut)
@@ -240,7 +253,7 @@ fileSelectionEventHandler wenv node model event =
         asyncEvent (DoFileSelectionEvent FileSelectionQueryTextClear)
       ]
     FileSelectionClear ->
-      [ model *~ (fileSelectionModel . fileSelection) .~ [],
+      [ model *~ (fileSelectionModel . fileSelection) .~ emptyBufferList,
         asyncEvent (DoFileSelectionEvent FileSelectionQueryTextClear)
       ]
     FileSelectionQueryTextClear -> [model *~ (fileSelectionModel . queryText) .~ ""]
@@ -256,6 +269,29 @@ fileSelectionEventHandler wenv node model event =
       [model *~ (fileSelectionModel . queryCriteria) %~ next]
     FileSelectionPrevQueryCriteria ->
       [model *~ (fileSelectionModel . queryCriteria) %~ prev]
+    FileSelectionShuffle ->
+      let !shuffledBufferList = shuffleBufferList $ model ^. fileSelectionModel . fileSelection
+       in [ Task
+              ( DoFileSelectionEvent
+                  . FileSelectionBufferPut
+                  <$> fmap _buffer shuffledBufferList
+              ),
+            Task
+              ( DoFileSelectionEvent
+                  . FileSelectionListPut
+                  <$> fmap _list shuffledBufferList
+              )
+          ]
+    LazyBufferLoad ->
+      [ model *~ fileSelectionModel . fileSelection
+          %~ takeToBuffer (model ^. programConfig . selectionconf . selectionBufferSize)
+      ]
+    LazyBufferLoadAll ->
+      [ model *~ fileSelectionModel . fileSelection %~ toBuffer
+      ]
+    LazyBufferFlush ->
+      [ model *~ fileSelectionModel . fileSelection %~ emptyBuffer
+      ]
 
 taggerEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -324,7 +360,9 @@ taggerEventHandler wenv node model event =
       ]
       where
         fwtPath = T.unpack . filePath . file
-        selectionFwts = map fwtPath $ model ^. fileSelectionModel . fileSelection
+        selectionFwts =
+          map fwtPath . cCollect $
+            model ^. fileSelectionModel . fileSelection
         singlefwt = model ^. singleFileModel . singleFile
     IOEvent _ -> []
     TagCommitTagsString ->
@@ -352,7 +390,7 @@ taggerEventHandler wenv node model event =
           ( \activeConn ->
               (if isUntagMode (model ^. taggingMode) then untagWith else tag)
                 activeConn
-                (model ^. (fileSelectionModel . fileSelection))
+                (cCollect $ model ^. (fileSelectionModel . fileSelection))
                 (T.words $ model ^. tagsString)
           )
           (model ^. dbConn),
@@ -363,14 +401,14 @@ taggerEventHandler wenv node model event =
     NewFileTextCommit ->
       [ dbConnTask
           (DoFileSelectionEvent . FileSelectionPut)
-          (flip addPath (model ^. newFileText))
+          (\conn -> fmap cFromList . addPath conn $ (model ^. newFileText))
           $ model ^. dbConn,
         model *~ newFileText .~ ""
       ]
     DatabaseInitialize ->
       [ dbConnTask
           IOEvent
-          (runInitScript (T.unpack $ model ^. (programConfig . dbconf . dbconfInit)))
+          (IO.runInitScript (T.unpack $ model ^. (programConfig . dbconf . dbconfInit)))
           (model ^. dbConn)
       ]
     ToggleVisibilityMode vm ->
@@ -396,12 +434,12 @@ taggerEventHandler wenv node model event =
       [ Task
           ( IOEvent
               <$> ( maybe
-                      ( hPutStrLn
-                          stderr
+                      ( IO.hPutStrLn
+                          IO.stderr
                           "Failed to backup, no database is currently connected."
                       )
                       ( flip
-                          backupDbConn
+                          IO.backupDbConn
                           ( T.unpack $
                               model
                                 ^. ( programConfig
