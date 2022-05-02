@@ -32,13 +32,13 @@ import Type.Config
 import Type.Model
 
 fwtUnion :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]
-fwtUnion = L.unionBy fwtFileEqual
+fwtUnion = unionBy fwtFileEqual
 
 fwtIntersect :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]
-fwtIntersect = L.intersectBy fwtFileEqual
+fwtIntersect = intersectBy fwtFileEqual
 
 fwtDiff :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]
-fwtDiff = L.deleteFirstsBy fwtFileEqual
+fwtDiff = diffBy fwtFileEqual
 
 doSetAction ::
   FileSetArithmetic ->
@@ -50,6 +50,18 @@ doSetAction a s o =
     Union -> s `fwtUnion` o
     Intersect -> s `fwtIntersect` o
     Diff -> s `fwtDiff` o
+
+doSetAction' ::
+  Intersectable l =>
+  FileSetArithmetic ->
+  (a -> a -> Bool) ->
+  l a ->
+  l a ->
+  l a
+doSetAction' a f = case a of
+  Union -> unionBy f
+  Intersect -> intersectBy f
+  Diff -> diffBy f
 
 dbConnTask ::
   (a -> TaggerEvent) ->
@@ -122,17 +134,23 @@ descriptorTreeEventHandler wenv node model event =
                      RefreshDescriptorTree unrelatedDescriptorTree
                    ]
            )
-    RepresentativeFilePut r -> [model *~ descriptorModel . representativeFile .~ r]
+    RepresentativeFilePut_ r -> [model *~ descriptorModel . representativeFile .~ r]
     RepresentativeFileClear -> [model *~ descriptorModel . representativeFile .~ Nothing]
     RepresentativeFileLookup d ->
       [ Task
-          ( DoDescriptorEvent . RepresentativeFilePut
+          ( DoDescriptorEvent . RepresentativeFilePut_
               <$> runMaybeT
                 ( do
                     c <- hoistMaybe . connInstance $ model ^. dbConn
                     getRepresentative c d
                 )
           )
+      ]
+    RepresentativeCreate f d ->
+      [ dbConnTask
+          IOEvent
+          (\c -> createRepresentative c f d Nothing)
+          (model ^. dbConn)
       ]
 
 maybeM_ :: Monad m => (a -> m ()) -> Maybe a -> m ()
@@ -202,12 +220,13 @@ fileSelectionEventHandler wenv node model event =
   case event of
     FileSelectionUpdate fwts ->
       [ model *~ (fileSelectionModel . fileSelection)
-          .~ cFromList
-            ( doSetAction
-                (model ^. (fileSelectionModel . setArithmetic))
-                (cCollect $ model ^. (fileSelectionModel . fileSelection))
-                fwts
-            )
+          .~ ( doSetAction'
+                 (model ^. (fileSelectionModel . setArithmetic))
+                 fwtFileEqual
+                 (model ^. (fileSelectionModel . fileSelection))
+                 . cFromList
+                 $ fwts
+             )
       ]
     FileSelectionPut bfwts ->
       [ model *~ (fileSelectionModel . fileSelection) .~ bfwts

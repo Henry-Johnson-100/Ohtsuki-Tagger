@@ -115,11 +115,6 @@ configurationExportButton :: (WidgetModel s) => WidgetNode s TaggerEvent
 configurationExportButton =
   styledButton (DoConfigurationEvent ExportAll) "Export Configuration"
 
-representativeFileLookupDropTargetButton :: WidgetNode TaggerModel TaggerEvent
-representativeFileLookupDropTargetButton =
-  dropTarget (DoDescriptorEvent . RepresentativeFileLookup) $
-    styledButton (IOEvent ()) "Rep"
-
 toggleConfigConfigureVisibility :: (WidgetModel s) => WidgetNode s TaggerEvent
 toggleConfigConfigureVisibility = styledButton (ToggleVisibilityMode Config) "Config"
 
@@ -515,14 +510,24 @@ generalDescriptorTreeWidget tr bs dAction dtrConf =
         treeLeafDescriptorWidget tc l d a =
           hstack_ [] $
             [ label (T.replicate l "--" !++ "|"),
-              draggable d $
-                a d
-                  `styleBasic` [ textColor tc,
-                                 bgColor white,
-                                 border 0 white,
-                                 padding 0
-                               ]
-                  `styleHover` [bgColor lightGray]
+              dropTarget_
+                (DoDescriptorEvent . flip RepresentativeCreate d . file)
+                [ dropTargetStyle
+                    [border 1 black]
+                ]
+                . draggable d
+                . flip
+                  styleBasic
+                  [ textColor tc,
+                    bgColor white,
+                    border 0 white,
+                    padding 0
+                  ]
+                . flip
+                  styleHover
+                  [bgColor lightGray]
+                . a
+                $ d
             ]
 
 imageDetailWidget ::
@@ -606,3 +611,24 @@ imageDetailWidget m =
         . L.foldl1' tagCountMapSumUnion
         . map fileWithTagsToTagCountMap
         $ xs
+
+representativeFilePreview :: Maybe Representative -> TaggerWidget
+representativeFilePreview mr =
+  labeledWidget
+    ( maybe
+        "No Representative"
+        ( (!++) "Representative File for: "
+            . descriptor
+            . repDescriptorId
+        )
+        mr
+    )
+    . flip styleBasic [border 1 black]
+    . dropTarget_
+      (DoDescriptorEvent . RepresentativeFileLookup)
+      [dropTargetStyle [border 2 yuiYellow]]
+    . box_ []
+    . maybe
+      (label "")
+      (flip image_ [fitHeight, alignCenter] . filePath . repFileId)
+    $ mr

@@ -1,7 +1,11 @@
+{-# HLINT ignore "Use union" #-}
+{-# HLINT ignore "Use infix" #-}
+{-# HLINT ignore "Use intersect" #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Type.Model.Prim
   ( TaggerModel (..),
@@ -20,6 +24,8 @@ module Type.Model.Prim
     TaggingMode (..),
     ProgramVisibility (..),
     Cyclic (..),
+    Listable (..),
+    Intersectable (..),
     DescriptorModelTreeLens (..),
     emptyTaggerModel,
     isUntagMode,
@@ -29,6 +35,7 @@ where
 
 import Control.Lens
 import Control.Monad
+import qualified Data.List as L
 import Data.Text (Text)
 import Database.Tagger.Access
 import Database.Tagger.Type
@@ -119,6 +126,48 @@ class (Enum a, Bounded a, Eq a) => Cyclic a where
   prev :: a -> a
   prev x = if x == minBound then maxBound else pred x
 
+class Listable l where
+  toList :: l a -> [a]
+  fromList :: [a] -> l a
+
+class Intersectable l where
+  unionBy :: (a -> a -> Bool) -> l a -> l a -> l a
+  union :: Eq a => l a -> l a -> l a
+  union x y = unionBy (==) x y
+  intersectBy :: (a -> a -> Bool) -> l a -> l a -> l a
+  intersect :: Eq a => l a -> l a -> l a
+  intersect x y = intersectBy (==) x y
+  diffBy :: (a -> a -> Bool) -> l a -> l a -> l a
+  diff :: Eq a => l a -> l a -> l a
+  diff x y = diffBy (==) x y
+
+instance Listable [] where
+  toList = id
+  fromList = id
+
+instance Intersectable [] where
+  unionBy = L.unionBy
+  intersectBy = L.intersectBy
+  diffBy = L.deleteFirstsBy
+
+instance Listable BufferList where
+  toList = cCollect
+  fromList = cFromList
+
+instance Intersectable BufferList where
+  unionBy b (BufferList bx xx) (BufferList by xy) =
+    BufferList (unionBy b bx by) (unionBy b xx xy)
+  intersectBy b (BufferList bx xx) (BufferList by xy) =
+    let combinedSelection b' = unionBy b' by xy
+     in BufferList
+          (intersectBy b bx (combinedSelection b))
+          (intersectBy b xx (combinedSelection b))
+  diffBy b (BufferList bx xx) (BufferList by xy) =
+    let combinedDiff = unionBy b by xy
+     in BufferList
+          (diffBy b bx combinedDiff)
+          (diffBy b xx combinedDiff)
+
 data TaggingMode
   = TagMode
   | UntagMode
@@ -204,9 +253,10 @@ data DescriptorEvent
   | RequestDescriptorTree !DescriptorModelTreeLens !Text
   | RefreshDescriptorTree !DescriptorModelTreeLens
   | RenameDescriptor
-  | RepresentativeFilePut !(Maybe Representative)
+  | RepresentativeFilePut_ !(Maybe Representative)
   | RepresentativeFileLookup !Descriptor
   | RepresentativeFileClear
+  | RepresentativeCreate !File !Descriptor
 
 type TextLens = Lens' TaggerModel Text
 

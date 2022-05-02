@@ -67,3 +67,21 @@ selection are arguments to the shell cmd.
 
 * Fixed a bug with the lazy selection that would flush the buffer when an image was tagged.
 * Fixed a bug where shuffling an empty selection would result in an inifinite hang.
+
+## 0.2.0.0 -- 2022-05-01
+
+![image](Doc/doc_tan.jpg)
+* Added a new Representative File feature:
+  * Added a new table `Representative`
+    * This table creates links between a descriptor and an image. The purpose of creating
+    Representative links is to provide a quintessential example of what a descriptor is meant
+    to convey when it tags a file. It is meant to be used as an aid for tagging, rather than querying.
+    Shell commands cannot be performed on a Representative file that is being previewed, nor can it be tagged.
+  * Representative files are viewed in the `Descriptor` config page.
+    * From the Descriptor tree structure of the database, drag a descriptor into the Representative box.
+    If there is a representative file for a given Descriptor it will be displayed, otherwise nothing will happen.
+  * To create a Representative file, in the main page of the application, drag an image or filename from either the active image preview or the image selection buffer.
+    Then drop it onto the descriptor, in the Main descriptor widget on the bottom left, that you want to create a representative link for.
+    A box will appear around a given descriptor as you drag a file over it to show you which descriptor a link will be created for.
+* Minor fixes involving the lazy selection buffer. When unioning, intersecting, or diffing a new query.
+The buffer will not flush but rather be unioned, intersected, or diffed appropriately with the contents of the new query selection.

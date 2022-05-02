@@ -147,6 +147,9 @@ descriptorConfigurePage model =
         spacer,
         renameDescriptorWidget,
         spacer,
+        representativeFilePreview
+          (model ^. descriptorModel . representativeFile),
+        spacer,
         label "Database Meta-Descriptor Hierarchy: ",
         generalDescriptorTreeWidget
           (model ^. (descriptorModel . mainDescriptorTree . rootTree))
