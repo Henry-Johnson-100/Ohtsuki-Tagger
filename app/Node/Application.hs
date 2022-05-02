@@ -322,11 +322,7 @@ operationWidget =
         . labeledWidget "Descriptor"
         . hstack_ []
         $ [button "→" DescriptorCommitNewDescriptorText, descriptorNewTextField]
-    labeledShellCmdTextField ::
-      ( WidgetModel s,
-        HasShellCmd s T.Text
-      ) =>
-      WidgetNode s TaggerEvent
+    labeledShellCmdTextField :: TaggerWidget
     labeledShellCmdTextField =
       flip
         keystroke_

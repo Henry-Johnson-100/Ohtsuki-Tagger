@@ -1,3 +1,4 @@
+shell_command = "feh -D10 -zx. -g800x800 -Bwhite"
 
 [database]
   auto_connect = true

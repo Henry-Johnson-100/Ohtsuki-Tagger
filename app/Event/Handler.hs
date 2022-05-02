@@ -370,7 +370,7 @@ taggerEventHandler wenv node model event =
       [ Task
           ( IOEvent
               <$> runShellCmds
-                (words . T.unpack $ model ^. shellCmd)
+                (words . T.unpack $ model ^. programConfig . shellCmd)
                 ( if model ^. doSoloTag && M.isJust singlefwt
                     then (: []) . fwtPath . M.fromJust $ singlefwt
                     else selectionFwts

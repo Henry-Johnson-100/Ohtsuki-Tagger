@@ -304,8 +304,8 @@ tagsStringTextField =
   dropTarget (DropTargetAppendText_ tagsString descriptor) $ textField_ tagsString []
 
 shellCmdTextField ::
-  (WidgetModel s, HasShellCmd s T.Text) => WidgetNode s TaggerEvent
-shellCmdTextField = textField_ shellCmd []
+  TaggerWidget
+shellCmdTextField = textField_ (programConfig . shellCmd) []
 
 renameDescriptorWidget :: WidgetNode TaggerModel TaggerEvent
 renameDescriptorWidget =
@@ -360,7 +360,7 @@ taggingModeDropdown =
     (label . T.pack . show)
     (label . T.pack . show)
 
-shellCmdWidget :: (WidgetModel s, HasShellCmd s T.Text) => WidgetNode s TaggerEvent
+shellCmdWidget :: TaggerWidget
 shellCmdWidget =
   keystroke [("Enter", ShellCmd)]
     . hstack

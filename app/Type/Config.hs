@@ -20,6 +20,8 @@ import Toml ((.=))
 import qualified Toml
 
 {-
+shell_command = ""
+
 [database]
   path = ""
   backup = ""
@@ -44,7 +46,8 @@ data TaggerConfig = TaggerConfig
   { _dbconf :: !DatabaseConfig,
     _selectionconf :: !SelectionConfig,
     _descriptorTreeConf :: !DescriptorTreeConfig,
-    _styleConf :: !StyleConfig
+    _styleConf :: !StyleConfig,
+    _shellCmd :: !T.Text
   }
   deriving (Show, Eq)
 
@@ -55,6 +58,7 @@ taggerConfigCodec =
     <*> Toml.table selectionConfigCodec "selection" .= _selectionconf
     <*> Toml.table descriptorTreeConfigCodec "descriptor_tree" .= _descriptorTreeConf
     <*> Toml.table styleConfigCodec "style" .= _styleConf
+    <*> Toml.text "shell_command" .= _shellCmd
 
 data DatabaseConfig = DatabaseConfig
   { _dbconfPath :: !T.Text,

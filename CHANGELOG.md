@@ -74,3 +74,5 @@ selection are arguments to the shell cmd.
 The buffer will not flush but rather be unioned, intersected, or diffed appropriately with the contents of the new query selection.
 * Added new fields to the config file: `style` and `style.font`
   * `style.font` takes three keys, `regular`, `thin`, and `bold`. These are paths to a font for tagger to use.
+* Moved the `Shell Command` used on startup to the config file under the key `shell_command`.
+  * Exporting the config will now export the current shell command as well.
