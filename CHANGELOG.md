@@ -11,21 +11,6 @@
     * main_request
       * A text field with the name of a descriptor for the main descriptor tree widget 
       to request when the refresh button is pushed.
-  * So now a sample minimum config file (keeping mind that selection.display_parents is still not used)
-  for this project to run is:
-```
-[database]
-  auto_connect = true
-  backup = ":memory:"
-  init = "./taggerSchemaDef.sql"
-  path = ":memory:"
-
-[descriptor_tree]
-  main_request = "#ALL#"
-
-[selection]
-  display_parents = 1
-```
 * Also added a 'Descriptor' configuration page.
   * Can change the value of descriptor_tree.main_request there.
   * Can also view a similar version of the main descriptor tree widget there.
@@ -66,7 +51,9 @@ selection are arguments to the shell cmd.
 #### 0.1.4.1 -- 2022-04-30
 
 * Fixed a bug with the lazy selection that would flush the buffer when an image was tagged.
-* Fixed a bug where shuffling an empty selection would result in an inifinite hang.
+* Fixed a bug where shuffling an empty selection would result in an infinite hang.
+
+------
 
 ## 0.2.0.0 -- 2022-05-01
 
@@ -85,3 +72,5 @@ selection are arguments to the shell cmd.
     A box will appear around a given descriptor as you drag a file over it to show you which descriptor a link will be created for.
 * Minor fixes involving the lazy selection buffer. When unioning, intersecting, or diffing a new query.
 The buffer will not flush but rather be unioned, intersected, or diffed appropriately with the contents of the new query selection.
+* Added new fields to the config file: `style` and `style.font`
+  * `style.font` takes three keys, `regular`, `thin`, and `bold`. These are paths to a font for tagger to use.

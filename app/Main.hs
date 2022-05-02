@@ -70,9 +70,9 @@ taggerApplicationUI wenv model' =
         ]
         `styleBasic` [padding 0]
 
-taggerApplicationConfig :: [AppConfig TaggerEvent]
-taggerApplicationConfig =
-  appInitEvent TaggerInit : themeConfig
+taggerApplicationConfig :: TaggerConfig -> [AppConfig TaggerEvent]
+taggerApplicationConfig cfg =
+  appInitEvent TaggerInit : themeConfig (cfg ^. styleConf)
 
 runTaggerWindow :: TaggerConfig -> IO ()
 runTaggerWindow cfg =
@@ -80,7 +80,7 @@ runTaggerWindow cfg =
     (emptyTaggerModel cfg)
     taggerEventHandler
     taggerApplicationUI
-    taggerApplicationConfig
+    (taggerApplicationConfig cfg)
 
 main :: IO ()
 main = do

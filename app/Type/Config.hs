@@ -7,6 +7,8 @@ module Type.Config
     DatabaseConfig (..),
     SelectionConfig (..),
     DescriptorTreeConfig (..),
+    StyleConfig (..),
+    FontConfig (..),
     taggerConfigCodec,
     databaseConfigCodec,
     selectionConfigCodec,
@@ -30,12 +32,19 @@ import qualified Toml
 
 [descriptor_tree]
   main_request = "#META#"
+
+[style]
+  [style.font]
+    regular = "/usr/local/share/fonts/i/iosevka_light.ttf"
+    thin = "/usr/local/share/fonts/i/iosevka_thin.ttf"
+    bold = "/usr/local/share/fonts/i/iosevka_bold.ttf"
 -}
 
 data TaggerConfig = TaggerConfig
   { _dbconf :: !DatabaseConfig,
     _selectionconf :: !SelectionConfig,
-    _descriptorTreeConf :: !DescriptorTreeConfig
+    _descriptorTreeConf :: !DescriptorTreeConfig,
+    _styleConf :: !StyleConfig
   }
   deriving (Show, Eq)
 
@@ -45,6 +54,7 @@ taggerConfigCodec =
     <$> Toml.table databaseConfigCodec "database" .= _dbconf
     <*> Toml.table selectionConfigCodec "selection" .= _selectionconf
     <*> Toml.table descriptorTreeConfigCodec "descriptor_tree" .= _descriptorTreeConf
+    <*> Toml.table styleConfigCodec "style" .= _styleConf
 
 data DatabaseConfig = DatabaseConfig
   { _dbconfPath :: !T.Text,
@@ -83,3 +93,27 @@ descriptorTreeConfigCodec :: Toml.TomlCodec DescriptorTreeConfig
 descriptorTreeConfigCodec =
   DescriptorTreeConfig
     <$> Toml.text "main_request" .= _descriptorTreeMainRequest
+
+data StyleConfig = StyleConfig
+  { font :: !FontConfig
+  }
+  deriving (Show, Eq)
+
+styleConfigCodec :: Toml.Codec StyleConfig StyleConfig
+styleConfigCodec =
+  StyleConfig
+    <$> Toml.table fontConfigCodec "font" .= font
+
+data FontConfig = FontConfig
+  { regular :: !T.Text,
+    thin :: !T.Text,
+    bold :: !T.Text
+  }
+  deriving (Show, Eq)
+
+fontConfigCodec :: Toml.Codec FontConfig FontConfig
+fontConfigCodec =
+  FontConfig
+    <$> Toml.text "regular" .= regular
+    <*> Toml.text "thin" .= thin
+    <*> Toml.text "bold" .= bold

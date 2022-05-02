@@ -51,13 +51,13 @@ visibility ::
   WidgetNode s e
 visibility m vm = flip nodeVisible (vm == m ^. programVisibility)
 
-themeConfig :: [AppConfig e]
-themeConfig =
+themeConfig :: StyleConfig -> [AppConfig e]
+themeConfig cfg =
   [ appWindowTitle "Tagger",
     appTheme yuiTheme,
-    appFontDef "Regular" "/usr/local/share/fonts/i/iosevka_light.ttf",
-    appFontDef "Thin" "/usr/local/share/fonts/i/iosevka_thin.ttf",
-    appFontDef "Bold" "/usr/local/share/fonts/i/iosevka_bold.ttf"
+    appFontDef "Regular" (regular . font $ cfg),
+    appFontDef "Thin" (thin . font $ cfg),
+    appFontDef "Bold" (bold . font $ cfg)
   ]
 
 yuiTheme :: Theme
