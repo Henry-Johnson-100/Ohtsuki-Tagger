@@ -114,12 +114,22 @@ databaseConfigurePage ::
   WidgetNode TaggerModel TaggerEvent
 databaseConfigurePage =
   box . flip styleBasic [padding 80] . vgrid $
-    [ hstack [newFileTextField, newFileTextCommitButton],
-      dbPathTextField,
-      dbBackupTextField,
+    [ labeledWidget "Add files to database:"
+        . hstack
+        $ [newFileTextCommitButton, newFileTextField],
+      spacer,
+      labeledWidget
+        "Database to load:"
+        dbPathTextField,
+      spacer,
+      labeledWidget
+        "Database to backup to:"
+        dbBackupTextField,
+      spacer,
       dbAutoConnectCheckBox,
       databaseConnectButton,
       databaseBackupButton,
+      spacer,
       initializeDatabaseButton
     ]
 
