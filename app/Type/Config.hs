@@ -9,6 +9,7 @@ module Type.Config
     DescriptorTreeConfig (..),
     StyleConfig (..),
     FontConfig (..),
+    WindowConfig (..),
     taggerConfigCodec,
     databaseConfigCodec,
     selectionConfigCodec,
@@ -99,7 +100,8 @@ descriptorTreeConfigCodec =
     <$> Toml.text "main_request" .= _descriptorTreeMainRequest
 
 data StyleConfig = StyleConfig
-  { font :: !FontConfig
+  { font :: !FontConfig,
+    window :: !WindowConfig
   }
   deriving (Show, Eq)
 
@@ -107,6 +109,21 @@ styleConfigCodec :: Toml.Codec StyleConfig StyleConfig
 styleConfigCodec =
   StyleConfig
     <$> Toml.table fontConfigCodec "font" .= font
+    <*> Toml.table windowConfigCodec "window" .= window
+
+data WindowConfig = WindowConfig
+  { maximize :: !Bool,
+    windowSizeX :: !Integer,
+    windowSizeY :: !Integer
+  }
+  deriving (Show, Eq)
+
+windowConfigCodec :: Toml.Codec WindowConfig WindowConfig
+windowConfigCodec =
+  WindowConfig
+    <$> Toml.bool "maximize" .= maximize
+    <*> Toml.integer "window_size_x" .= windowSizeX
+    <*> Toml.integer "window_size_y" .= windowSizeY
 
 data FontConfig = FontConfig
   { regular :: !T.Text,

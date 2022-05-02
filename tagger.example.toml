@@ -18,3 +18,8 @@ shell_command = "feh -D10 -zx. -g800x800 -Bwhite"
     regular = "/path/to/font.ttf"
     thin = "/path/to/font.ttf"
     bold = "/path/to/font.ttf"
+
+  [style.window]
+    maximize = false
+    window_size_x = 800
+    window_size_y = 600

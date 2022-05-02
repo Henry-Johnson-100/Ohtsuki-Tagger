@@ -54,6 +54,14 @@ visibility m vm = flip nodeVisible (vm == m ^. programVisibility)
 themeConfig :: StyleConfig -> [AppConfig e]
 themeConfig cfg =
   [ appWindowTitle "Tagger",
+    appWindowState $
+      if maximize . window $ cfg
+        then MainWindowMaximized
+        else
+          MainWindowNormal
+            ( fromIntegral . windowSizeX . window $ cfg,
+              fromIntegral . windowSizeY . window $ cfg
+            ),
     appTheme yuiTheme,
     appFontDef "Regular" (regular . font $ cfg),
     appFontDef "Thin" (thin . font $ cfg),

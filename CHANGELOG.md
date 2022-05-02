@@ -72,7 +72,10 @@ selection are arguments to the shell cmd.
     A box will appear around a given descriptor as you drag a file over it to show you which descriptor a link will be created for.
 * Minor fixes involving the lazy selection buffer. When unioning, intersecting, or diffing a new query.
 The buffer will not flush but rather be unioned, intersected, or diffed appropriately with the contents of the new query selection.
-* Added new fields to the config file: `style` and `style.font`
+* Added new fields to the config file: `style`, `style.font`, and `style.window`.
   * `style.font` takes three keys, `regular`, `thin`, and `bold`. These are paths to a font for tagger to use.
+  * `style.window` takes three keys. `maximize`, `window_size_x`, and `window_size_y`.
+    * `maximize` is a boolean, if true the window is maximized on start-up.
+    The other two keys are the x and y sizes to use for the window if false.
 * Moved the `Shell Command` used on startup to the config file under the key `shell_command`.
   * Exporting the config will now export the current shell command as well.
