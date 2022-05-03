@@ -17,11 +17,19 @@ CREATE TABLE IF NOT EXISTS  "MetaDescriptor" (
   FOREIGN KEY("infraDescriptorId") REFERENCES "Descriptor"("id") ON DELETE CASCADE
 );
 CREATE TABLE IF NOT EXISTS  "Tag" (
+  "id" INTEGER PRIMARY KEY NOT NULL,
   "fileTagId" INTEGER NOT NULL,
   "descriptorTagId" INTEGER NOT NULL,
   CONSTRAINT "TagKey" UNIQUE("fileTagId", "descriptorTagId") ON CONFLICT IGNORE,
   FOREIGN KEY("fileTagId") REFERENCES "File"("id") ON DELETE CASCADE,
   FOREIGN KEY("descriptorTagId") REFERENCES "Descriptor"("id") ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS "SubTag" (
+  "tagId" INTEGER NOT NULL,
+  "descriptorId" INTEGER NOT NULL,
+  FOREIGN KEY ("tagId") REFERENCES "Tag"("id") ON DELETE CASCADE,
+  FOREIGN KEY ("descriptorId") REFERENCES "Descriptor"("id") ON DELETE CASCADE,
+  CONSTRAINT "SubTag_unique" UNIQUE("tagId","descriptorId") ON CONFLICT IGNORE
 );
 CREATE TABLE IF NOT EXISTS "Representative" (
   "repFileId" INTEGER NOT NULL,
