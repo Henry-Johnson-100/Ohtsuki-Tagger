@@ -1,6 +1,8 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# HLINT ignore "Redundant $" #-}
 {-# HLINT ignore "Use lambda-case" #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -13,11 +15,23 @@ import qualified Data.Text as T
 import Database.Tagger.Type
 import Monomer
 import Node.Color
+import Type.BufferList
 import Type.Config
 import Type.Model
 
+type TaggerWidget = WidgetNode TaggerModel TaggerEvent
+
 (!++) :: T.Text -> T.Text -> T.Text
 (!++) = T.append
+
+getPathComponents :: Int -> T.Text -> T.Text
+getPathComponents n p =
+  let !brokenPath = T.splitOn "/" p
+      !droppedDirs = length brokenPath - n
+   in (!++) ((T.pack . show) droppedDirs !++ ".../")
+        . T.intercalate "/"
+        . drop droppedDirs
+        $ brokenPath
 
 class GetPlainText g where
   getPlainText :: g -> T.Text
@@ -46,6 +60,14 @@ labeledWidget l w =
   box_ [alignLeft] . vstack_ [] $
     [label l `styleBasic` [textSize 16], w]
 
+{-
+ ____  _   _ _____ _____ ___  _   _ ____
+| __ )| | | |_   _|_   _/ _ \| \ | / ___|
+|  _ \| | | | | |   | || | | |  \| \___ \
+| |_) | |_| | | |   | || |_| | |\  |___) |
+|____/ \___/  |_|   |_| \___/|_| \_|____/
+-}
+
 styledButton :: (WidgetModel s) => TaggerEvent -> T.Text -> WidgetNode s TaggerEvent
 styledButton a t =
   button t a
@@ -56,58 +78,18 @@ buttonStylingBasic = [bgColor white, border 0 white]
 buttonStylingHover :: [StyleState]
 buttonStylingHover = [bgColor lightGray]
 
-descriptorTreeConfigureMainRequestTextField :: WidgetNode TaggerModel TaggerEvent
-descriptorTreeConfigureMainRequestTextField =
-  textField (programConfig . descriptorTreeConf . descriptorTreeMainRequest)
+lazyBufferLoadButton :: WidgetNode TaggerModel TaggerEvent
+lazyBufferLoadButton = styledButton (DoFileSelectionEvent LazyBufferLoad) "Load"
 
-dbPathTextField ::
-  (WidgetModel s, HasProgramConfig s TaggerConfig) =>
-  WidgetNode s TaggerEvent
-dbPathTextField = textField (programConfig . dbconf . dbconfPath)
+lazyBufferLoadAllButton :: WidgetNode TaggerModel TaggerEvent
+lazyBufferLoadAllButton = styledButton (DoFileSelectionEvent LazyBufferLoadAll) "All"
 
-dbBackupTextField ::
-  (WidgetModel s, HasProgramConfig s TaggerConfig) => WidgetNode s TaggerEvent
-dbBackupTextField = textField (programConfig . dbconf . dbconfBackup)
-
-dbAutoConnectCheckBox ::
-  (WidgetModel s, HasProgramConfig s TaggerConfig) =>
-  WidgetNode s TaggerEvent
-dbAutoConnectCheckBox =
-  labeledCheckbox
-    "Auto-Connect"
-    (programConfig . dbconf . dbconfAutoConnect)
-
-queryTextField ::
-  (WidgetModel s, HasFileSelectionModel s a1, HasQueryText a1 T.Text) =>
-  WidgetNode s TaggerEvent
-queryTextField =
-  dropTarget (DoFileSelectionEvent . FileSelectionAppendToQueryText . descriptor) $
-    textField_ (fileSelectionModel . queryText) []
-
-descriptorNewTextField ::
-  (WidgetModel s, HasNewDescriptorText s T.Text) => WidgetNode s TaggerEvent
-descriptorNewTextField =
-  textField_ newDescriptorText []
-
-newFileTextField ::
-  (WidgetModel s, HasNewFileText s T.Text) => WidgetNode s TaggerEvent
-newFileTextField = textField newFileText
-
-selectionDisplayParentsNumberField ::
-  (WidgetModel s, HasProgramConfig s TaggerConfig) =>
-  WidgetNode s TaggerEvent
-selectionDisplayParentsNumberField =
-  numericField
-    (programConfig . selectionconf . selectionDisplayParents)
+lazyBufferFlushButton :: WidgetNode TaggerModel TaggerEvent
+lazyBufferFlushButton = styledButton (DoFileSelectionEvent LazyBufferFlush) "Flush"
 
 newFileTextCommitButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
 newFileTextCommitButton = styledButton NewFileTextCommit "Add Path"
-
-tagsStringTextField ::
-  (WidgetModel s, HasTagsString s T.Text) => WidgetNode s TaggerEvent
-tagsStringTextField =
-  dropTarget (TagsStringAppend . descriptor) $ textField_ tagsString []
 
 tagCommitButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
@@ -159,50 +141,12 @@ descriptorDeleteWidget =
     . styledButton (IOEvent ())
     $ "X"
 
-setQueryCriteriaDropdown ::
-  WidgetNode TaggerModel TaggerEvent
-setQueryCriteriaDropdown =
-  dropdown
-    (fileSelectionModel . queryCriteria)
-    [ByTag, ByRelation, ByPattern, ByUntagged]
-    (label . T.pack . show)
-    (label . T.pack . show)
-
-setArithmeticDropdown ::
-  WidgetNode TaggerModel TaggerEvent
-setArithmeticDropdown =
-  dropdown
-    (fileSelectionModel . setArithmetic)
-    [Union, Intersect, Diff]
-    (label . T.pack . show)
-    (label . T.pack . show)
-
-taggingModeDropdown ::
-  (WidgetModel s, WidgetEvent e, HasTaggingMode s TaggingMode) =>
-  WidgetNode s e
-taggingModeDropdown =
-  dropdown
-    taggingMode
-    [TagMode, UntagMode]
-    (label . T.pack . show)
-    (label . T.pack . show)
-
 commitQueryButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
 commitQueryButton =
   styledButton
     (DoFileSelectionEvent FileSelectionCommitQueryText)
     "with"
-
-shellCmdWidget :: (WidgetModel s, HasShellCmd s T.Text) => WidgetNode s TaggerEvent
-shellCmdWidget =
-  keystroke [("Enter", ShellCmd)]
-    . hstack
-    $ [shellCmdTextField, doShellCmdButton]
-
-shellCmdTextField ::
-  (WidgetModel s, HasShellCmd s T.Text) => WidgetNode s TaggerEvent
-shellCmdTextField = textField_ shellCmd []
 
 doShellCmdButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
@@ -212,14 +156,27 @@ resetDescriptorTreeToButton ::
   (WidgetModel s) =>
   T.Text ->
   WidgetNode s TaggerEvent
-resetDescriptorTreeToButton t = styledButton (RequestDescriptorTree t) "↺"
+resetDescriptorTreeToButton t =
+  styledButton
+    ( DoDescriptorEvent . RequestDescriptorTree mainDescriptorTree $ t
+    -- RequestDescriptorTree t
+    )
+    "↺"
 
-resetUnrelatedDescriptorTree :: (WidgetModel s) => WidgetNode s TaggerEvent
-resetUnrelatedDescriptorTree = styledButton RefreshUnrelatedDescriptorTree "↺"
+resetUnrelatedDescriptorTree :: WidgetNode TaggerModel TaggerEvent
+resetUnrelatedDescriptorTree =
+  styledButton
+    (DoDescriptorEvent (RefreshDescriptorTree unrelatedDescriptorTree))
+    -- RefreshUnrelatedDescriptorTree
+    "↺"
 
 parentDescriptorTreeButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
-parentDescriptorTreeButton = styledButton DescriptorTreePutParent "↑"
+parentDescriptorTreeButton =
+  styledButton
+    (DoDescriptorEvent (DescriptorTreePutParent mainDescriptorTree))
+    -- DescriptorTreePutParent
+    "↑"
 
 selectButton ::
   (WidgetModel s) =>
@@ -255,10 +212,16 @@ clearSelectionButton =
     (DoFileSelectionEvent FileSelectionClear)
     "Clear"
 
+fileSelectionShuffleButton :: WidgetNode TaggerModel TaggerEvent
+fileSelectionShuffleButton =
+  styledButton
+    (DoFileSelectionEvent FileSelectionShuffle)
+    "Shuffle"
+
 appendToQueryButton :: WidgetModel s => T.Text -> WidgetNode s TaggerEvent
 appendToQueryButton t =
   styledButton
-    ( DoFileSelectionEvent . FileSelectionAppendToQueryText $
+    ( DropTargetAppendText_ (fileSelectionModel . queryText) id $
         t
     )
     "Add"
@@ -268,7 +231,140 @@ treeLeafButtonRequestDescriptorTree ::
   Descriptor ->
   WidgetNode s TaggerEvent
 treeLeafButtonRequestDescriptorTree d =
-  styledButton (RequestDescriptorTree . descriptor $ d) (descriptor d)
+  styledButton
+    ( (DoDescriptorEvent . RequestDescriptorTree mainDescriptorTree)
+        . descriptor
+        $ d
+    )
+    (descriptor d)
+
+{-
+ _____ _______  _______ _____ ___ _____ _     ____  ____
+|_   _| ____\ \/ /_   _|  ___|_ _| ____| |   |  _ \/ ___|
+  | | |  _|  \  /  | | | |_   | ||  _| | |   | | | \___ \
+  | | | |___ /  \  | | |  _|  | || |___| |___| |_| |___) |
+  |_| |_____/_/\_\ |_| |_|   |___|_____|_____|____/|____/
+-}
+
+descriptorTreeConfigureMainRequestTextField :: WidgetNode TaggerModel TaggerEvent
+descriptorTreeConfigureMainRequestTextField =
+  textField (programConfig . descriptorTreeConf . descriptorTreeMainRequest)
+
+dbPathTextField ::
+  (WidgetModel s, HasProgramConfig s TaggerConfig) =>
+  WidgetNode s TaggerEvent
+dbPathTextField = textField (programConfig . dbconf . dbconfPath)
+
+dbBackupTextField ::
+  (WidgetModel s, HasProgramConfig s TaggerConfig) => WidgetNode s TaggerEvent
+dbBackupTextField = textField (programConfig . dbconf . dbconfBackup)
+
+dbAutoConnectCheckBox ::
+  (WidgetModel s, HasProgramConfig s TaggerConfig) =>
+  WidgetNode s TaggerEvent
+dbAutoConnectCheckBox =
+  labeledCheckbox
+    "Auto-Connect"
+    (programConfig . dbconf . dbconfAutoConnect)
+
+queryTextField ::
+  WidgetNode TaggerModel TaggerEvent
+queryTextField =
+  dropTarget (DropTargetAppendText_ (fileSelectionModel . queryText) descriptor) $
+    textField_ (fileSelectionModel . queryText) []
+
+descriptorNewTextField ::
+  (WidgetModel s, HasNewDescriptorText s T.Text) => WidgetNode s TaggerEvent
+descriptorNewTextField =
+  textField_ newDescriptorText []
+
+newFileTextField ::
+  (WidgetModel s, HasNewFileText s T.Text) => WidgetNode s TaggerEvent
+newFileTextField = textField newFileText
+
+selectionDisplayParentsNumberField ::
+  WidgetNode TaggerModel TaggerEvent
+selectionDisplayParentsNumberField =
+  labeledWidget "Display Parent Folders"
+    . flip styleBasic [textLeft]
+    . numericField
+    $ (programConfig . selectionconf . selectionDisplayParents)
+
+selectionDisplayBufferSizeNumberField ::
+  WidgetNode TaggerModel TaggerEvent
+selectionDisplayBufferSizeNumberField =
+  labeledWidget "Selection Buffer Size"
+    . flip styleBasic [textLeft]
+    . numericField
+    $ (programConfig . selectionconf . selectionBufferSize)
+
+tagsStringTextField ::
+  WidgetNode TaggerModel TaggerEvent
+tagsStringTextField =
+  dropTarget (DropTargetAppendText_ tagsString descriptor) $ textField_ tagsString []
+
+shellCmdTextField ::
+  TaggerWidget
+shellCmdTextField = textField_ (programConfig . shellCmd) []
+
+renameDescriptorWidget :: WidgetNode TaggerModel TaggerEvent
+renameDescriptorWidget =
+  box_ []
+    . labeledWidget "Rename Descriptor"
+    . keystroke_
+      [("Enter", DoDescriptorEvent RenameDescriptor)]
+      []
+    . hstack_ []
+    $ [ dropTarget
+          ( DropTargetAppendText_
+              (descriptorModel . renameDescriptorFrom)
+              descriptor
+          )
+          . textField
+          $ (descriptorModel . renameDescriptorFrom),
+        styledButton (DoDescriptorEvent RenameDescriptor) "To",
+        dropTarget
+          ( DropTargetAppendText_
+              (descriptorModel . renameDescriptorTo)
+              descriptor
+          )
+          . textField
+          $ (descriptorModel . renameDescriptorTo)
+      ]
+
+setQueryCriteriaDropdown ::
+  WidgetNode TaggerModel TaggerEvent
+setQueryCriteriaDropdown =
+  dropdown
+    (fileSelectionModel . queryCriteria)
+    [ByTag, ByRelation, ByPattern, ByUntagged]
+    (label . T.pack . show)
+    (label . T.pack . show)
+
+setArithmeticDropdown ::
+  WidgetNode TaggerModel TaggerEvent
+setArithmeticDropdown =
+  dropdown
+    (fileSelectionModel . setArithmetic)
+    [Union, Intersect, Diff]
+    (label . T.pack . show)
+    (label . T.pack . show)
+
+taggingModeDropdown ::
+  (WidgetModel s, WidgetEvent e, HasTaggingMode s TaggingMode) =>
+  WidgetNode s e
+taggingModeDropdown =
+  dropdown
+    taggingMode
+    [TagMode, UntagMode]
+    (label . T.pack . show)
+    (label . T.pack . show)
+
+shellCmdWidget :: TaggerWidget
+shellCmdWidget =
+  keystroke [("Enter", ShellCmd)]
+    . hstack
+    $ [shellCmdTextField, doShellCmdButton]
 
 draggableDescriptorListWidget ::
   (WidgetModel s, WidgetEvent e) => [Descriptor] -> WidgetNode s e
@@ -289,10 +385,9 @@ draggableDescriptorWidget d =
     $ d
 
 mainDescriptorTreeWidget ::
-  WidgetModel s =>
   DescriptorTreeConfig ->
   DescriptorTree ->
-  WidgetNode s TaggerEvent
+  WidgetNode TaggerModel TaggerEvent
 mainDescriptorTreeWidget dtrConf tr =
   dropTarget
     ( \d' ->
@@ -311,10 +406,9 @@ mainDescriptorTreeWidget dtrConf tr =
       dtrConf
 
 unrelatedDescriptorTreeWidget ::
-  WidgetModel s =>
   DescriptorTreeConfig ->
   DescriptorTree ->
-  WidgetNode s TaggerEvent
+  WidgetNode TaggerModel TaggerEvent
 unrelatedDescriptorTreeWidget dtrConf tr =
   dropTarget (\d' -> DescriptorUnrelate [d']) $
     generalDescriptorTreeWidget
@@ -324,12 +418,11 @@ unrelatedDescriptorTreeWidget dtrConf tr =
       dtrConf
 
 generalDescriptorTreeWidget ::
-  WidgetModel s =>
   DescriptorTree ->
-  [WidgetNode s TaggerEvent] ->
-  (Descriptor -> WidgetNode s TaggerEvent) ->
+  [WidgetNode TaggerModel TaggerEvent] ->
+  (Descriptor -> WidgetNode TaggerModel TaggerEvent) ->
   DescriptorTreeConfig ->
-  WidgetNode s TaggerEvent
+  WidgetNode TaggerModel TaggerEvent
 generalDescriptorTreeWidget tr bs dAction dtrConf =
   flip styleBasic [border 1 black] . box_ [alignTop, alignLeft] $
     hstack_
@@ -340,29 +433,26 @@ generalDescriptorTreeWidget tr bs dAction dtrConf =
       ]
   where
     descriptorTreeWidget ::
-      (WidgetModel s) =>
       DescriptorTree ->
-      (Descriptor -> WidgetNode s TaggerEvent) ->
-      WidgetNode s TaggerEvent
+      (Descriptor -> WidgetNode TaggerModel TaggerEvent) ->
+      WidgetNode TaggerModel TaggerEvent
     descriptorTreeWidget tr dAction =
       box . stdScroll . flip styleBasic [textFont "Regular"]
         . buildTreeWidget dAction
         $ tr
       where
         buildTreeWidget ::
-          (WidgetModel s) =>
-          (Descriptor -> WidgetNode s TaggerEvent) ->
+          (Descriptor -> WidgetNode TaggerModel TaggerEvent) ->
           DescriptorTree ->
-          WidgetNode s TaggerEvent
+          WidgetNode TaggerModel TaggerEvent
         buildTreeWidget action = buildTreeWidgetAccum 0 (vstack []) action
           where
             buildTreeWidgetAccum ::
-              (WidgetModel s) =>
               Int ->
-              WidgetNode s TaggerEvent ->
-              (Descriptor -> WidgetNode s TaggerEvent) ->
+              WidgetNode TaggerModel TaggerEvent ->
+              (Descriptor -> WidgetNode TaggerModel TaggerEvent) ->
               DescriptorTree ->
-              WidgetNode s TaggerEvent
+              WidgetNode TaggerModel TaggerEvent
             buildTreeWidgetAccum l acc action tr =
               case tr of
                 NullTree -> acc
@@ -412,79 +502,87 @@ generalDescriptorTreeWidget tr bs dAction dtrConf =
                     )
         appendVStack x y = vstack [x, y]
         treeLeafDescriptorWidget ::
-          WidgetModel s =>
           Color ->
           Int ->
           Descriptor ->
-          (Descriptor -> WidgetNode s TaggerEvent) ->
-          WidgetNode s TaggerEvent
+          (Descriptor -> WidgetNode TaggerModel TaggerEvent) ->
+          WidgetNode TaggerModel TaggerEvent
         treeLeafDescriptorWidget tc l d a =
           hstack_ [] $
             [ label (T.replicate l "--" !++ "|"),
-              draggable d $
-                a d
-                  `styleBasic` [ textColor tc,
-                                 bgColor white,
-                                 border 0 white,
-                                 padding 0
-                               ]
-                  `styleHover` [bgColor lightGray]
+              dropTarget_
+                (DoDescriptorEvent . flip RepresentativeCreate d . file)
+                [ dropTargetStyle
+                    [border 1 black]
+                ]
+                . draggable d
+                . flip
+                  styleBasic
+                  [ textColor tc,
+                    bgColor white,
+                    border 0 white,
+                    padding 0
+                  ]
+                . flip
+                  styleHover
+                  [bgColor lightGray]
+                . a
+                $ d
             ]
 
 imageDetailWidget ::
-  (WidgetModel s) =>
-  Bool ->
-  [FileWithTags] ->
-  [TagCount] ->
-  WidgetNode s TaggerEvent
-imageDetailWidget isSoloTagMode' currentFileSelection' tcs' =
-  flip styleBasic [borderL 1 black, rangeWidth 160 800]
-    . box_ [alignLeft]
-    . vstack_ []
-    $ [ label "Details:",
-        spacer,
-        label "Solo Tagging Mode"
-          `styleBasic` [textColor yuiOrange]
-          `nodeVisible` isSoloTagMode',
-        spacer,
-        vsplit_
-          [splitIgnoreChildResize True]
-          ( vstack_
-              []
-              [ label "Tags:",
-                hstack_
+  TaggerModel -> TaggerWidget
+imageDetailWidget m =
+  let !isSoloTagMode' = m ^. doSoloTag
+      !currentFileSelection' = cCollect (m ^. fileSelectionModel . fileSelection)
+      !tagCounts' = m ^. singleFileModel . tagCounts
+   in flip styleBasic [borderL 1 black, rangeWidth 160 800]
+        . box_ [alignLeft]
+        . vstack_ []
+        $ [ label "Details:",
+            spacer,
+            label "Solo Tagging Mode"
+              `styleBasic` [textColor yuiOrange]
+              `nodeVisible` isSoloTagMode',
+            spacer,
+            vsplit_
+              [splitIgnoreChildResize True]
+              ( vstack_
                   []
-                  [ spacer,
-                    flip styleBasic [border 1 black]
-                      . vscroll_ [wheelRate 50]
-                      . vstack_ []
-                      . map imageDetailDescriptor
-                      . L.sort
-                      $ tcs'
-                  ]
-              ],
-            vstack_
-              []
-              [ label $
-                  "In Selection: "
-                    !++ "("
-                    !++ (T.pack . show . length) currentFileSelection'
-                    !++ ")",
-                spacer,
-                hstack_
+                  [ label "Tags:",
+                    hstack_
+                      []
+                      [ spacer,
+                        flip styleBasic [border 1 black]
+                          . vscroll_ [wheelRate 50]
+                          . vstack_ []
+                          . map imageDetailDescriptor
+                          . L.sort
+                          $ tagCounts'
+                      ]
+                  ],
+                vstack_
                   []
-                  [ spacer,
-                    flip styleBasic [border 1 black]
-                      . vscroll_ [wheelRate 50]
-                      . vstack_ []
-                      . map imageDetailDescriptor
-                      . L.sort
-                      . sumSelectionTagCounts
-                      $ currentFileSelection'
+                  [ label $
+                      "In Selection: "
+                        !++ "("
+                        !++ (T.pack . show . length) currentFileSelection'
+                        !++ ")",
+                    spacer,
+                    hstack_
+                      []
+                      [ spacer,
+                        flip styleBasic [border 1 black]
+                          . vscroll_ [wheelRate 50]
+                          . vstack_ []
+                          . map imageDetailDescriptor
+                          . L.sort
+                          . sumSelectionTagCounts
+                          $ currentFileSelection'
+                      ]
                   ]
-              ]
-          )
-      ]
+              )
+          ]
   where
     imageDetailDescriptor ::
       (WidgetModel s) =>
@@ -513,3 +611,24 @@ imageDetailWidget isSoloTagMode' currentFileSelection' tcs' =
         . L.foldl1' tagCountMapSumUnion
         . map fileWithTagsToTagCountMap
         $ xs
+
+representativeFilePreview :: Maybe Representative -> TaggerWidget
+representativeFilePreview mr =
+  labeledWidget
+    ( maybe
+        "No Representative"
+        ( (!++) "Representative File for: "
+            . descriptor
+            . repDescriptorId
+        )
+        mr
+    )
+    . flip styleBasic [border 1 black]
+    . dropTarget_
+      (DoDescriptorEvent . RepresentativeFileLookup)
+      [dropTargetStyle [border 2 yuiYellow]]
+    . box_ []
+    . maybe
+      (label "")
+      (flip image_ [fitHeight, alignCenter] . filePath . repFileId)
+    $ mr

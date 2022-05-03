@@ -1,7 +1,7 @@
 cabal-version:       2.4
 
 name:                tagger
-version:             0.1.1.0
+version:             0.2.0.1
 synopsis:            A file/image tagger that connects to or initializes sqlite databases.
 -- description:
 -- bug-reports:
@@ -24,9 +24,11 @@ executable tagger
                       ,Type.Model
                       ,Type.Model.Prim
                       ,Type.Config
+                      ,Type.BufferList
                       ,Database.Tagger.Type
                       ,Database.Tagger.Access
                       ,IO
+                      ,Paths_tagger
 
   other-extensions:    OverloadedStrings
                       ,TemplateHaskell
@@ -34,21 +36,25 @@ executable tagger
                       ,FunctionalDependencies
                       ,MagicHash
                       ,DeriveGeneric
+                      ,RankNTypes
+                      ,ExistentialQuantification
 
   ghc-options:         -threaded
 
   build-depends:       base ^>=4.13.0.0
                       ,monomer == 1.3.0.0
-                      ,lens
-                      ,text
-                      ,transformers
-                      ,directory
-                      ,process
+                      ,lens == 5.1
+                      ,text == 1.2.4.0
+                      ,transformers == 0.5.6.2
+                      ,directory == 1.3.6.0
+                      ,process == 1.6.9.0
                       ,sqlite-simple == 0.4.18.0
                       ,direct-sqlite == 2.3.26
                       ,tomland == 1.3.3.1
-                      ,containers
-                      ,hashable
-                      ,unordered-containers
+                      ,containers == 0.6.2.1
+                      ,hashable == 1.4.0.2
+                      ,unordered-containers == 0.2.18.0
+                      ,random == 1.2.1
+                      ,random-shuffle == 0.0.4
   hs-source-dirs:      app
   default-language:    Haskell2010

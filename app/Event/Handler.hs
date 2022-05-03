@@ -7,6 +7,7 @@
 
 {-# HLINT ignore "Use section" #-}
 {-# HLINT ignore "Use list comprehension" #-}
+{-# HLINT ignore "Use :" #-}
 
 module Event.Handler
   ( taggerEventHandler,
@@ -14,27 +15,30 @@ module Event.Handler
 where
 
 import Control.Lens ((%~), (&), (.~), (^.))
+import Control.Monad
 import qualified Control.Monad as CM
+import Control.Monad.Trans.Maybe
 import qualified Data.List as L
 import qualified Data.Maybe as M
 import qualified Data.Text as T
 import Database.SQLite.Simple
-import Database.Tagger.Access (activateForeignKeyPragma)
+import Database.Tagger.Access (activateForeignKeyPragma, hoistMaybe, lookupDescriptorPattern)
 import Database.Tagger.Type
 import Event.Task
-import IO
+import qualified IO
 import Monomer
+import Type.BufferList
 import Type.Config
 import Type.Model
 
 fwtUnion :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]
-fwtUnion = L.unionBy fwtFileEqual
+fwtUnion = unionBy fwtFileEqual
 
 fwtIntersect :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]
-fwtIntersect = L.intersectBy fwtFileEqual
+fwtIntersect = intersectBy fwtFileEqual
 
 fwtDiff :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]
-fwtDiff = L.deleteFirstsBy fwtFileEqual
+fwtDiff = diffBy fwtFileEqual
 
 doSetAction ::
   FileSetArithmetic ->
@@ -47,6 +51,18 @@ doSetAction a s o =
     Intersect -> s `fwtIntersect` o
     Diff -> s `fwtDiff` o
 
+doSetAction' ::
+  Intersectable l =>
+  FileSetArithmetic ->
+  (a -> a -> Bool) ->
+  l a ->
+  l a ->
+  l a
+doSetAction' a f = case a of
+  Union -> unionBy f
+  Intersect -> intersectBy f
+  Diff -> diffBy f
+
 dbConnTask ::
   (a -> TaggerEvent) ->
   (Connection -> IO a) ->
@@ -54,9 +70,91 @@ dbConnTask ::
   EventResponse s TaggerEvent sp ep
 dbConnTask e f =
   maybe
-    (Task (IOEvent <$> hPutStrLn stderr "Database connection not active."))
+    (Task (IOEvent <$> IO.hPutStrLn IO.stderr "Database connection not active."))
     (Task . fmap e . f)
     . connInstance
+
+descriptorTreeEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  DescriptorEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+descriptorTreeEventHandler wenv node model event =
+  case event of
+    DescriptorTreePut mLens toPut ->
+      [ model *~ (descriptorModel . mLens . rootTree) .~ toPut
+      ]
+    DescriptorTreePutParent mLens ->
+      [ dbConnTask
+          (DoDescriptorEvent . DescriptorTreePut mLens)
+          ( flip
+              getParentDescriptorTree
+              (model ^. (descriptorModel . mLens . rootTree))
+          )
+          (model ^. dbConn)
+      ]
+    RequestDescriptorTree mLens d ->
+      [ dbConnTask
+          (DoDescriptorEvent . DescriptorTreePut mLens)
+          (flip lookupInfraDescriptorTree d)
+          (model ^. dbConn)
+      ]
+    RefreshDescriptorTree mLens ->
+      [ Task
+          ( DoDescriptorEvent . RequestDescriptorTree mLens
+              <$> ( return
+                      . maybe (model ^. descriptorModel . mLens . rootName) descriptor
+                      . getNode
+                      $ model
+                        ^. (descriptorModel . mLens . rootTree)
+                  )
+          )
+      ]
+    RenameDescriptor ->
+      [ dbConnTask
+          IOEvent
+          ( \c -> do
+              d <-
+                fmap head'
+                  . lookupDescriptorPattern c
+                  . T.strip
+                  $ (model ^. descriptorModel . renameDescriptorFrom)
+              maybeM_
+                ( flip
+                    (renameDescriptor c)
+                    (T.strip $ model ^. descriptorModel . renameDescriptorTo)
+                )
+                d
+          )
+          (model ^. dbConn)
+      ]
+        ++ ( asyncEvent . DoDescriptorEvent
+               <$> [ RefreshDescriptorTree mainDescriptorTree,
+                     RefreshDescriptorTree unrelatedDescriptorTree
+                   ]
+           )
+    RepresentativeFilePut_ r -> [model *~ descriptorModel . representativeFile .~ r]
+    RepresentativeFileClear -> [model *~ descriptorModel . representativeFile .~ Nothing]
+    RepresentativeFileLookup d ->
+      [ Task
+          ( DoDescriptorEvent . RepresentativeFilePut_
+              <$> runMaybeT
+                ( do
+                    c <- hoistMaybe . connInstance $ model ^. dbConn
+                    getRepresentative c d
+                )
+          )
+      ]
+    RepresentativeCreate f d ->
+      [ dbConnTask
+          IOEvent
+          (\c -> createRepresentative c f d Nothing)
+          (model ^. dbConn)
+      ]
+
+maybeM_ :: Monad m => (a -> m ()) -> Maybe a -> m ()
+maybeM_ = M.maybe (pure ())
 
 singleFileEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -75,8 +173,8 @@ singleFileEventHandler wenv node model event =
         asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
       ]
     SingleFileNextFromFileSelection ->
-      let !ps = popCycleList (model ^. (fileSelectionModel . fileSelection))
-          !mi = head' ps
+      let !ps = cPop $ model ^. fileSelectionModel . fileSelection
+          !mi = cHead ps
        in [ Model
               . ((fileSelectionModel . fileSelection) .~ ps)
               . ((singleFileModel . singleFile) .~ mi)
@@ -85,8 +183,8 @@ singleFileEventHandler wenv node model event =
             asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
           ]
     SingleFilePrevFromFileSelection ->
-      let !ps = dequeueCycleList (model ^. (fileSelectionModel . fileSelection))
-          !mi = head' ps
+      let !ps = cDequeue $ model ^. fileSelectionModel . fileSelection
+          !mi = cHead ps
        in [ Model
               . ((fileSelectionModel . fileSelection) .~ ps)
               . ((singleFileModel . singleFile) .~ mi)
@@ -122,18 +220,31 @@ fileSelectionEventHandler wenv node model event =
   case event of
     FileSelectionUpdate fwts ->
       [ model *~ (fileSelectionModel . fileSelection)
-          .~ doSetAction
-            (model ^. (fileSelectionModel . setArithmetic))
-            (model ^. (fileSelectionModel . fileSelection))
-            fwts
+          .~ ( doSetAction'
+                 (model ^. (fileSelectionModel . setArithmetic))
+                 fwtFileEqual
+                 (model ^. (fileSelectionModel . fileSelection))
+                 . cFromList
+                 $ fwts
+             )
       ]
-    FileSelectionPut fwts ->
-      [ model *~ (fileSelectionModel . fileSelection) .~ fwts
+    FileSelectionPut bfwts ->
+      [ model *~ (fileSelectionModel . fileSelection) .~ bfwts
+      ]
+    FileSelectionBufferPut fwts ->
+      [ model *~ fileSelectionModel . fileSelection . buffer .~ fwts
+      ]
+    FileSelectionListPut fwts ->
+      [ model *~ fileSelectionModel . fileSelection . list .~ fwts
       ]
     FileSelectionRefresh_ ->
       [ dbConnTask
-          (DoFileSelectionEvent . FileSelectionPut)
-          (flip getRefreshedFWTs (model ^. (fileSelectionModel . fileSelection)))
+          (DoFileSelectionEvent . FileSelectionBufferPut)
+          (flip getRefreshedFWTs $ model ^. fileSelectionModel . fileSelection . buffer)
+          (model ^. dbConn),
+        dbConnTask
+          (DoFileSelectionEvent . FileSelectionListPut)
+          (flip getRefreshedFWTs $ model ^. fileSelectionModel . fileSelection . list)
           (model ^. dbConn),
         dbConnTask
           (DoSingleFileEvent . SingleFileMaybePut)
@@ -148,10 +259,6 @@ fileSelectionEventHandler wenv node model event =
           )
           (model ^. dbConn)
       ]
-    FileSelectionAppendToQueryText t ->
-      [ model *~ (fileSelectionModel . queryText)
-          .~ T.unwords [model ^. (fileSelectionModel . queryText), t]
-      ]
     FileSelectionCommitQueryText ->
       [ dbConnTask
           (DoFileSelectionEvent . FileSelectionUpdate)
@@ -165,7 +272,7 @@ fileSelectionEventHandler wenv node model event =
         asyncEvent (DoFileSelectionEvent FileSelectionQueryTextClear)
       ]
     FileSelectionClear ->
-      [ model *~ (fileSelectionModel . fileSelection) .~ [],
+      [ model *~ (fileSelectionModel . fileSelection) .~ emptyBufferList,
         asyncEvent (DoFileSelectionEvent FileSelectionQueryTextClear)
       ]
     FileSelectionQueryTextClear -> [model *~ (fileSelectionModel . queryText) .~ ""]
@@ -181,6 +288,29 @@ fileSelectionEventHandler wenv node model event =
       [model *~ (fileSelectionModel . queryCriteria) %~ next]
     FileSelectionPrevQueryCriteria ->
       [model *~ (fileSelectionModel . queryCriteria) %~ prev]
+    FileSelectionShuffle ->
+      let !shuffledBufferList = shuffleBufferList $ model ^. fileSelectionModel . fileSelection
+       in [ Task
+              ( DoFileSelectionEvent
+                  . FileSelectionBufferPut
+                  <$> fmap _buffer shuffledBufferList
+              ),
+            Task
+              ( DoFileSelectionEvent
+                  . FileSelectionListPut
+                  <$> fmap _list shuffledBufferList
+              )
+          ]
+    LazyBufferLoad ->
+      [ model *~ fileSelectionModel . fileSelection
+          %~ takeToBuffer (model ^. programConfig . selectionconf . selectionBufferSize)
+      ]
+    LazyBufferLoadAll ->
+      [ model *~ fileSelectionModel . fileSelection %~ toBuffer
+      ]
+    LazyBufferFlush ->
+      [ model *~ fileSelectionModel . fileSelection %~ emptyBuffer
+      ]
 
 taggerEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -197,60 +327,50 @@ taggerEventHandler wenv node model event =
     DoSingleFileEvent evt -> singleFileEventHandler wenv node model evt
     DoConfigurationEvent evt -> configurationEventHandler wenv node model evt
     DoFileSelectionEvent evt -> fileSelectionEventHandler wenv node model evt
-    TagsStringAppend t ->
-      [ Model $
-          model
-            & tagsString .~ T.unwords [model ^. tagsString, t]
-      ]
+    DoDescriptorEvent evt -> descriptorTreeEventHandler wenv node model evt
     TagsStringClear -> [model *~ tagsString .~ ""]
-    DescriptorTreePut tr -> [model *~ descriptorTree .~ tr]
-    UnrelatedDescriptorTreePut tr -> [model *~ unrelatedDescriptorTree .~ tr]
-    DescriptorTreePutParent ->
-      [ dbConnTask
-          DescriptorTreePut
-          ( flip
-              getParentDescriptorTree
-              (model ^. descriptorTree)
-          )
-          (model ^. dbConn)
-      ]
     DescriptorCommitNewDescriptorText ->
       [ dbConnTask
           IOEvent
           (flip createNewDescriptors (T.words (model ^. newDescriptorText)))
-          (model ^. dbConn),
-        asyncEvent RefreshBothDescriptorTrees
+          (model ^. dbConn)
       ]
+        ++ ( asyncEvent . DoDescriptorEvent
+               <$> [ RefreshDescriptorTree mainDescriptorTree,
+                     RefreshDescriptorTree unrelatedDescriptorTree
+                   ]
+           )
     DescriptorDelete d ->
-      [ dbConnTask IOEvent (flip deleteDescriptor d) (model ^. dbConn),
-        asyncEvent RefreshBothDescriptorTrees
+      [ dbConnTask IOEvent (flip deleteDescriptor d) (model ^. dbConn)
       ]
+        ++ ( asyncEvent . DoDescriptorEvent
+               <$> [ RefreshDescriptorTree mainDescriptorTree,
+                     RefreshDescriptorTree unrelatedDescriptorTree
+                   ]
+           )
     DescriptorCreateRelation ms is ->
-      [ dbConnTask IOEvent (\activeConn -> relateTo activeConn ms is) (model ^. dbConn),
-        asyncEvent RefreshBothDescriptorTrees
+      [ dbConnTask IOEvent (\activeConn -> relateTo activeConn ms is) (model ^. dbConn)
       ]
+        ++ ( asyncEvent . DoDescriptorEvent
+               <$> [ RefreshDescriptorTree mainDescriptorTree,
+                     RefreshDescriptorTree unrelatedDescriptorTree
+                   ]
+           )
     DescriptorUnrelate is ->
-      [ dbConnTask IOEvent (flip unrelate is) (model ^. dbConn),
-        asyncEvent RefreshBothDescriptorTrees
+      [ dbConnTask IOEvent (flip unrelate is) (model ^. dbConn)
       ]
+        ++ ( asyncEvent . DoDescriptorEvent
+               <$> [ RefreshDescriptorTree mainDescriptorTree,
+                     RefreshDescriptorTree unrelatedDescriptorTree
+                   ]
+           )
     ToggleDoSoloTag ->
       [model *~ (doSoloTag .~ not (model ^. doSoloTag))]
-    RequestDescriptorTree s ->
-      [dbConnTask DescriptorTreePut (flip lookupInfraDescriptorTree s) (model ^. dbConn)]
-    RefreshUnrelatedDescriptorTree ->
-      [dbConnTask UnrelatedDescriptorTreePut getUnrelatedInfraTree (model ^. dbConn)]
-    RefreshBothDescriptorTrees ->
-      [ Task
-          ( RequestDescriptorTree
-              <$> (return . maybe "#ALL#" descriptor . getNode $ model ^. descriptorTree)
-          ),
-        asyncEvent RefreshUnrelatedDescriptorTree
-      ]
     ShellCmd ->
       [ Task
           ( IOEvent
               <$> runShellCmds
-                (words . T.unpack $ model ^. shellCmd)
+                (words . T.unpack $ model ^. programConfig . shellCmd)
                 ( if model ^. doSoloTag && M.isJust singlefwt
                     then (: []) . fwtPath . M.fromJust $ singlefwt
                     else selectionFwts
@@ -259,7 +379,9 @@ taggerEventHandler wenv node model event =
       ]
       where
         fwtPath = T.unpack . filePath . file
-        selectionFwts = map fwtPath $ model ^. fileSelectionModel . fileSelection
+        selectionFwts =
+          map fwtPath . cCollect $
+            model ^. fileSelectionModel . fileSelection
         singlefwt = model ^. singleFileModel . singleFile
     IOEvent _ -> []
     TagCommitTagsString ->
@@ -287,7 +409,7 @@ taggerEventHandler wenv node model event =
           ( \activeConn ->
               (if isUntagMode (model ^. taggingMode) then untagWith else tag)
                 activeConn
-                (model ^. (fileSelectionModel . fileSelection))
+                (cCollect $ model ^. (fileSelectionModel . fileSelection))
                 (T.words $ model ^. tagsString)
           )
           (model ^. dbConn),
@@ -298,14 +420,14 @@ taggerEventHandler wenv node model event =
     NewFileTextCommit ->
       [ dbConnTask
           (DoFileSelectionEvent . FileSelectionPut)
-          (flip addPath (model ^. newFileText))
+          (\conn -> fmap cFromList . addPath conn $ (model ^. newFileText))
           $ model ^. dbConn,
         model *~ newFileText .~ ""
       ]
     DatabaseInitialize ->
       [ dbConnTask
           IOEvent
-          (runInitScript (T.unpack $ model ^. (programConfig . dbconf . dbconfInit)))
+          (IO.runInitScript (T.unpack $ model ^. (programConfig . dbconf . dbconfInit)))
           (model ^. dbConn)
       ]
     ToggleVisibilityMode vm ->
@@ -320,19 +442,23 @@ taggerEventHandler wenv node model event =
             let newConnTag = model ^. (programConfig . dbconf . dbconfPath)
             newConnInstance <- open . T.unpack $ newConnTag
             activateForeignKeyPragma newConnInstance
-            return . TaggedConnection newConnTag . Just $ newConnInstance,
-        asyncEvent RefreshBothDescriptorTrees
+            return . TaggedConnection newConnTag . Just $ newConnInstance
       ]
+        ++ ( asyncEvent . DoDescriptorEvent
+               <$> [ RefreshDescriptorTree mainDescriptorTree,
+                     RefreshDescriptorTree unrelatedDescriptorTree
+                   ]
+           )
     DatabaseBackup ->
       [ Task
           ( IOEvent
               <$> ( maybe
-                      ( hPutStrLn
-                          stderr
+                      ( IO.hPutStrLn
+                          IO.stderr
                           "Failed to backup, no database is currently connected."
                       )
                       ( flip
-                          backupDbConn
+                          IO.backupDbConn
                           ( T.unpack $
                               model
                                 ^. ( programConfig
@@ -346,6 +472,8 @@ taggerEventHandler wenv node model event =
                   )
           )
       ]
+    DropTargetAppendText_ l df d ->
+      [Model $ model & l %~ flip T.append (" " `T.append` df d)]
 
 -- I will never understand how the stupid fixity stuff works
 infixl 3 *~

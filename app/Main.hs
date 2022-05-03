@@ -11,6 +11,7 @@
 module Main where
 
 import Control.Lens ((^.))
+import Control.Monad
 import Control.Monad.Trans.Except (runExceptT)
 import qualified Data.Text as T
 import Database.SQLite.Simple (Connection, close, open)
@@ -38,31 +39,40 @@ taggerApplicationUI wenv model' =
                 model,
               visibility model Main
                 . vsplit_ [splitIgnoreChildResize True]
-                $ ( fileSingleWidget
-                      (model ^. doSoloTag)
-                      (model ^. (fileSelectionModel . fileSelection))
-                      (model ^. singleFileModel),
-                    box_ [alignBottom] . hgrid $
-                      [ vstack
-                          [ descriptorTreeQuadrantWidget
-                              (model ^. (programConfig . descriptorTreeConf))
-                              (model ^. descriptorTree)
-                              (model ^. unrelatedDescriptorTree)
-                          ],
-                        operationWidget
-                        -- ,
-                        -- fileSelectionWidget
-                        --   (model ^. (programConfig . selectionconf . selectionDisplayParents))
-                        --   (model ^. fileSelection)
-                      ]
+                $ ( fileSingleWidget model,
+                    box_ [alignBottom] $
+                      hgrid
+                        [ vstack
+                            [ descriptorTreeQuadrantWidget
+                                ( model
+                                    ^. ( programConfig
+                                           . descriptorTreeConf
+                                       )
+                                )
+                                ( model
+                                    ^. ( descriptorModel
+                                           . mainDescriptorTree
+                                           . rootTree
+                                       )
+                                )
+                                ( model
+                                    ^. ( descriptorModel
+                                           . unrelatedDescriptorTree
+                                           . rootTree
+                                       )
+                                )
+                            ],
+                          operationWidget,
+                          fileSelectionWidget model
+                        ]
                   )
             ]
         ]
         `styleBasic` [padding 0]
 
-taggerApplicationConfig :: [AppConfig TaggerEvent]
-taggerApplicationConfig =
-  appInitEvent TaggerInit : themeConfig
+taggerApplicationConfig :: TaggerConfig -> [AppConfig TaggerEvent]
+taggerApplicationConfig cfg =
+  appInitEvent TaggerInit : themeConfig (cfg ^. styleConf)
 
 runTaggerWindow :: TaggerConfig -> IO ()
 runTaggerWindow cfg =
@@ -70,11 +80,15 @@ runTaggerWindow cfg =
     (emptyTaggerModel cfg)
     taggerEventHandler
     taggerApplicationUI
-    taggerApplicationConfig
+    (taggerApplicationConfig cfg)
 
 main :: IO ()
 main = do
-  configPath <- getConfigPath
-  try' (getConfig configPath) runTaggerWindow
+  rawArgs <- getArgs
+  let hasVersionFlag = or $ flip elem rawArgs <$> ["-v", "--version"]
+  when hasVersionFlag (putStrLn taggerVersion)
+  unless hasVersionFlag $ do
+    configPath <- getConfigPath
+    try' (getConfig configPath) runTaggerWindow
   where
     try' e c = runExceptT e >>= either (hPutStrLn stderr) c

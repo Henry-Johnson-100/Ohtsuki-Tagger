@@ -7,6 +7,9 @@ module Type.Config
     DatabaseConfig (..),
     SelectionConfig (..),
     DescriptorTreeConfig (..),
+    StyleConfig (..),
+    FontConfig (..),
+    WindowConfig (..),
     taggerConfigCodec,
     databaseConfigCodec,
     selectionConfigCodec,
@@ -18,6 +21,8 @@ import Toml ((.=))
 import qualified Toml
 
 {-
+shell_command = ""
+
 [database]
   path = ""
   backup = ""
@@ -26,15 +31,24 @@ import qualified Toml
 
 [selection]
   display_parents = 3
+  buffer_size = 25
 
 [descriptor_tree]
   main_request = "#META#"
+
+[style]
+  [style.font]
+    regular = "/usr/local/share/fonts/i/iosevka_light.ttf"
+    thin = "/usr/local/share/fonts/i/iosevka_thin.ttf"
+    bold = "/usr/local/share/fonts/i/iosevka_bold.ttf"
 -}
 
 data TaggerConfig = TaggerConfig
   { _dbconf :: !DatabaseConfig,
     _selectionconf :: !SelectionConfig,
-    _descriptorTreeConf :: !DescriptorTreeConfig
+    _descriptorTreeConf :: !DescriptorTreeConfig,
+    _styleConf :: !StyleConfig,
+    _shellCmd :: !T.Text
   }
   deriving (Show, Eq)
 
@@ -44,6 +58,8 @@ taggerConfigCodec =
     <$> Toml.table databaseConfigCodec "database" .= _dbconf
     <*> Toml.table selectionConfigCodec "selection" .= _selectionconf
     <*> Toml.table descriptorTreeConfigCodec "descriptor_tree" .= _descriptorTreeConf
+    <*> Toml.table styleConfigCodec "style" .= _styleConf
+    <*> Toml.text "shell_command" .= _shellCmd
 
 data DatabaseConfig = DatabaseConfig
   { _dbconfPath :: !T.Text,
@@ -62,13 +78,16 @@ databaseConfigCodec =
     <*> Toml.bool "auto_connect" .= _dbconfAutoConnect
 
 data SelectionConfig = SelectionConfig
-  { _selectionDisplayParents :: !Int
+  { _selectionDisplayParents :: !Int,
+    _selectionBufferSize :: !Int
   }
   deriving (Show, Eq)
 
 selectionConfigCodec :: Toml.Codec SelectionConfig SelectionConfig
 selectionConfigCodec =
-  SelectionConfig <$> Toml.int "display_parents" .= _selectionDisplayParents
+  SelectionConfig
+    <$> Toml.int "display_parents" .= _selectionDisplayParents
+    <*> Toml.int "buffer_size" .= _selectionBufferSize
 
 data DescriptorTreeConfig = DescriptorTreeConfig
   { _descriptorTreeMainRequest :: !T.Text
@@ -79,3 +98,43 @@ descriptorTreeConfigCodec :: Toml.TomlCodec DescriptorTreeConfig
 descriptorTreeConfigCodec =
   DescriptorTreeConfig
     <$> Toml.text "main_request" .= _descriptorTreeMainRequest
+
+data StyleConfig = StyleConfig
+  { font :: !FontConfig,
+    window :: !WindowConfig
+  }
+  deriving (Show, Eq)
+
+styleConfigCodec :: Toml.Codec StyleConfig StyleConfig
+styleConfigCodec =
+  StyleConfig
+    <$> Toml.table fontConfigCodec "font" .= font
+    <*> Toml.table windowConfigCodec "window" .= window
+
+data WindowConfig = WindowConfig
+  { maximize :: !Bool,
+    windowSizeX :: !Integer,
+    windowSizeY :: !Integer
+  }
+  deriving (Show, Eq)
+
+windowConfigCodec :: Toml.Codec WindowConfig WindowConfig
+windowConfigCodec =
+  WindowConfig
+    <$> Toml.bool "maximize" .= maximize
+    <*> Toml.integer "window_size_x" .= windowSizeX
+    <*> Toml.integer "window_size_y" .= windowSizeY
+
+data FontConfig = FontConfig
+  { regular :: !T.Text,
+    thin :: !T.Text,
+    bold :: !T.Text
+  }
+  deriving (Show, Eq)
+
+fontConfigCodec :: Toml.Codec FontConfig FontConfig
+fontConfigCodec =
+  FontConfig
+    <$> Toml.text "regular" .= regular
+    <*> Toml.text "thin" .= thin
+    <*> Toml.text "bold" .= bold

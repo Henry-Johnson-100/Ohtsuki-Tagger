@@ -10,6 +10,7 @@ module Database.Tagger.Type
     DescriptorTree (..),
     TagCount (..),
     TagCountMap (..),
+    Representative (..),
     tagCountUnmap,
     tagCountMapSumUnion,
     fileWithTagsToTagCountMap,
@@ -74,6 +75,13 @@ instance Ord Descriptor where
 
 data Tag = Tag {fileTagId :: Int, descriptorTagId :: Int}
   deriving (Show, Eq, Ord)
+
+data Representative = Representative
+  { repFileId :: !File,
+    repDescriptorId :: !Descriptor,
+    repDescription :: !(Maybe T.Text)
+  }
+  deriving (Show, Eq)
 
 data MetaDescriptor = MetaDescriptor
   { metaDescriptorId :: Int,

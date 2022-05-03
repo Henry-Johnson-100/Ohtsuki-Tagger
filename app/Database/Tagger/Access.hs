@@ -12,6 +12,8 @@ module Database.Tagger.Access
     DescriptorKey (..),
     addFile,
     addDescriptor,
+    addRepresentative,
+    updateRepresentativeText,
     renameDescriptor,
     deleteDescriptor,
     newTag,
@@ -26,6 +28,7 @@ module Database.Tagger.Access
     getFile,
     getTagCount,
     getUntaggedFileWithTags,
+    getRepresentative,
     lookupFileWithTagsByRelation,
     lookupFileWithTagsByFilePattern,
     lookupFileWithTagsByTagPattern,
@@ -41,7 +44,7 @@ import Control.Monad (unless, when, (>=>))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Maybe (MaybeT (..))
 import Data.List (foldl', isPrefixOf, isSuffixOf)
-import Data.Maybe (catMaybes, fromJust, fromMaybe)
+import Data.Maybe (catMaybes, fromJust, fromMaybe, maybe)
 import qualified Data.Text as T
 import Database.SQLite.Simple
   ( Connection,
@@ -62,6 +65,7 @@ import Database.Tagger.Type
     File (File, fileId),
     FileWithTags (FileWithTags, tags),
     MetaDescriptor (..),
+    Representative (Representative, repDescription),
     Tag (..),
     TagCount (..),
     descriptorTreeElem,
@@ -90,45 +94,6 @@ type DescriptorKey = Int
 
 activateForeignKeyPragma :: Connection -> IO ()
 activateForeignKeyPragma c = execute_ c "PRAGMA foreign_keys = on"
-
--- | Check if all the required tables are present.
--- And if the 3 required meta descriptors are set up properly.
-validateDb :: Connection -> IO Bool
-validateDb c = do
-  tables <-
-    fmap (all (onlyIntEquals 4))
-      . (query_ :: Connection -> Query -> IO [Only Int])
-        c
-      $ "SELECT COUNT(*) \
-        \FROM sqlite_master \
-        \WHERE type = 'table' \
-        \  AND tbl_name IN ('Descriptor','File','MetaDescriptor','Tag')"
-  errout# $ "has valid number of tables: " ++ show tables
-  requiredMetaDescriptors <-
-    fmap (all (onlyIntEquals 3))
-      . (query_ :: Connection -> Query -> IO [Only Int])
-        c
-      $ "SELECT COUNT(*) FROM Descriptor \
-        \WHERE descriptor IN ('#ALL#','#UNRELATED#','#META#')"
-  errout# $ "Has valid number of meta descriptors: " ++ show requiredMetaDescriptors
-  requiredRelations <-
-    fmap (all (onlyIntEquals 2))
-      . (query_ :: Connection -> Query -> IO [Only Int]) c
-      $ "SELECT COUNT(*) \
-        \FROM MetaDescriptor \
-        \WHERE (metaDescriptorId = \
-        \    (SELECT id FROM Descriptor WHERE descriptor = '#ALL#') \
-        \    AND infraDescriptorId = \
-        \      (SELECT id FROM Descriptor WHERE descriptor = '#META#')) \
-        \  OR (metaDescriptorId = \
-        \      (SELECT id FROM Descriptor WHERE descriptor = '#ALL#') \
-        \    AND infraDescriptorId = \
-        \      (SELECT id FROM Descriptor WHERE descriptor = '#UNRELATED#'))"
-  errout# $ "Has valid number of predefined relations: " ++ show requiredRelations
-  return $ tables && requiredMetaDescriptors && requiredRelations
-  where
-    onlyIntEquals :: Eq a => a -> Only a -> Bool
-    onlyIntEquals n (Only m) = n == m
 
 getTagCount :: Connection -> Descriptor -> IO TagCount
 getTagCount c d = do
@@ -186,7 +151,26 @@ addDescriptor c dT = do
     #*# show (MetaDescriptor (descriptorId unrelatedDescriptor) newDId)
   return . Descriptor newDId $ dT
 
--- #TODO no task or event assigned
+addRepresentative :: Connection -> Representative -> IO ()
+addRepresentative c (Representative f d des) =
+  execute
+    c
+    "INSERT INTO Representative (repFileId, repDescriptorId, description) \
+    \ VALUES (?,?,?)"
+    (fileId f, descriptorId d, des)
+
+updateRepresentativeText ::
+  Connection ->
+  DescriptorKey ->
+  T.Text ->
+  IO ()
+updateRepresentativeText c dk des =
+  execute
+    c
+    "UPDATE Representative Set description = ? \
+    \WHERE repDescriptorId = ?"
+    (des, dk)
+
 renameDescriptor :: Connection -> Descriptor -> T.Text -> IO ()
 renameDescriptor c d n =
   execute
@@ -415,6 +399,24 @@ lookupFilePattern conn p = do
       [p]
   return . map mapQToFile $ r
 
+getRepresentative :: Connection -> DescriptorKey -> MaybeT IO Representative
+getRepresentative c descriptorId = do
+  r' <-
+    lift $
+      query
+        c
+        "SELECT repFileId, repDescriptorId, description \
+        \FROM Representative \
+        \WHERE repDescriptorId = ?"
+        [descriptorId] ::
+      MaybeT IO [(Int, Int, Maybe T.Text)]
+  r <- hoistMaybe . head' $ r'
+  rep <- do
+    f <- getFile c . (\(k, _, _) -> k) $ r
+    d <- getDescriptor c . (\(_, k, _) -> k) $ r
+    return $ Representative f d Nothing
+  return $ rep {repDescription = (\(_, _, d') -> d') r}
+
 mapQToFile :: (Int, T.Text) -> File
 mapQToFile (fid, fpath) = File fid fpath
 
@@ -449,6 +451,9 @@ mapQToFWT (fid, fp, dids, dds) = FileWithTags (File fid fp) [Descriptor dids dds
 
 mapQToTagCount :: Descriptor -> Only Int -> TagCount
 mapQToTagCount d (Only n) = (d, n)
+
+uncurry3 :: (t1 -> t2 -> t3 -> t4) -> (t1, t2, t3) -> t4
+uncurry3 f (x, y, z) = f x y z
 
 head' :: [a] -> Maybe a
 head' [] = Nothing

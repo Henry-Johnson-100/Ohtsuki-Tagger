@@ -37,6 +37,28 @@ init' :: [a] -> [a]
 init' [] = []
 init' xs = init xs
 
+getRepresentative :: Connection -> Descriptor -> MaybeT IO Representative
+getRepresentative c = Database.Tagger.Access.getRepresentative c . descriptorId
+
+createRepresentative ::
+  Connection -> File -> Descriptor -> Maybe T.Text -> IO ()
+createRepresentative c f d des =
+  addRepresentative c $ Representative f d des
+
+updateRepresentativeText :: Connection -> Descriptor -> T.Text -> IO ()
+updateRepresentativeText c =
+  Database.Tagger.Access.updateRepresentativeText c . descriptorId
+
+shuffle :: [a] -> IO [a]
+shuffle [] = pure []
+shuffle xs = do
+  g <- initStdGen
+  let shuffled = shuffle' xs (length xs) g
+  return shuffled
+
+renameDescriptor :: Connection -> Descriptor -> T.Text -> IO ()
+renameDescriptor = Database.Tagger.Access.renameDescriptor
+
 runShellCmds :: [String] -> [String] -> IO ()
 runShellCmds cs fwtString = do
   let rawCmd = L.break (L.isInfixOf ";") cs
@@ -93,7 +115,6 @@ getRefreshedFWTs c fwts = do
   refreshedFWTs <- mapM (lookupFileWithTagsByFileId c) fids
   return . concat $ refreshedFWTs
 
--- #TODO no assigned event
 -- untagWith :: Connection -> [Tag] -> IO ()
 -- untagWith = untag
 untagWith :: Connection -> [FileWithTags] -> [T.Text] -> IO ()
