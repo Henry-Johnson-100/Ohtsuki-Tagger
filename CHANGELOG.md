@@ -79,3 +79,7 @@ The buffer will not flush but rather be unioned, intersected, or diffed appropri
     The other two keys are the x and y sizes to use for the window if false.
 * Moved the `Shell Command` used on startup to the config file under the key `shell_command`.
   * Exporting the config will now export the current shell command as well.
+
+#### 0.2.0.1 -- 2022-05-02
+
+ * Fixed a bug with unioning results into a BufferList. Should hopefully no longer union duplicate files into the selection BufferList.

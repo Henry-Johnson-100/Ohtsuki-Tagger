@@ -154,8 +154,9 @@ instance Listable BufferList where
   fromList = cFromList
 
 instance Intersectable BufferList where
-  unionBy b (BufferList bx xx) (BufferList by xy) =
-    BufferList (unionBy b bx by) (unionBy b xx xy)
+  unionBy b bl@(BufferList bx xx) (BufferList by xy) =
+    let onlyNew xs' = diffBy b xs' (cCollect bl)
+     in BufferList (unionBy b bx (onlyNew by)) (unionBy b xx (onlyNew xy))
   intersectBy b (BufferList bx xx) (BufferList by xy) =
     let combinedSelection b' = unionBy b' by xy
      in BufferList
