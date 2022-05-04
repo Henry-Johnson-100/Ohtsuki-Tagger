@@ -102,7 +102,7 @@ data Descriptor = Descriptor {descriptorId :: Int, descriptor :: T.Text}
   deriving (Show, Eq, Generics.Generic)
 
 instance H.Hashable Descriptor where
-  hash (Descriptor i d) = H.hash $ show i ++ show d
+  hash d = H.hash $ (show . descriptorId $ d) ++ (show . descriptor $ d)
 
 instance Ord Descriptor where
   compare (Descriptor _ dx) (Descriptor _ dy) = compare dx dy
