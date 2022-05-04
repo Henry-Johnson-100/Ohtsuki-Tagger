@@ -59,10 +59,17 @@ import Database.SQLite.Simple
     query_,
   )
 import Database.SQLite.Simple.ToField (ToField)
+import Database.Tagger.Access.RowMap
+  ( fileWithMaybeTagsMapper,
+    fileWithTagsMapper,
+    tagCountMapper,
+  )
 import Database.Tagger.Type
   ( Descriptor (Descriptor, descriptor, descriptorId),
+    DescriptorKey,
     DescriptorTree (Infra),
     File (File, fileId),
+    FileKey,
     FileWithTags (FileWithTags, tags),
     MetaDescriptor (..),
     Representative (Representative, repDescription),
@@ -88,17 +95,13 @@ erroutConcat# loc msg = errout# $ loc ++ msg
 liftErroutConcat# :: MonadTrans t => String -> String -> t IO ()
 liftErroutConcat# loc msg = lift . errout# $ loc ++ msg
 
-type FileKey = Int
-
-type DescriptorKey = Int
-
 activateForeignKeyPragma :: Connection -> IO ()
 activateForeignKeyPragma c = execute_ c "PRAGMA foreign_keys = on"
 
 getTagCount :: Connection -> Descriptor -> IO TagCount
 getTagCount c d = do
   result <- query c "SELECT COUNT(*) FROM Tag WHERE descriptorTagId = ?" [descriptorId d]
-  return . mapQToTagCount d . fromMaybe (Only 0 :: Only Int) . head' $ result
+  return . tagCountMapper d . fromMaybe (Only 0 :: Only Int) . head' $ result
 
 -- | Attempts to add a new file to db
 -- Performs no checking of the validity of a path.
@@ -113,7 +116,7 @@ addFile c f = do
   return . File (fromIntegral insertedId) $ f
 
 newTag :: Connection -> Tag -> IO ()
-newTag c (Tag f d) =
+newTag c (Tag (-1) f d) =
   execute
     c
     "INSERT INTO Tag (fileTagId, descriptorTagId) VALUES (?,?)"
@@ -125,7 +128,7 @@ untag c =
     . map encurryTag
   where
     encurryTag :: Tag -> (FileKey, DescriptorKey)
-    encurryTag (Tag fk dk) = (fk, dk)
+    encurryTag (Tag (-1) fk dk) = (fk, dk)
 
 getUnrelatedDescriptor :: Connection -> MaybeT IO Descriptor
 getUnrelatedDescriptor =
@@ -271,7 +274,7 @@ fetchMetaDescriptors c did = do
       \    ON md.metaDescriptorId = d.id \
       \WHERE md.infraDescriptorId = ?"
       [did]
-  return . map mapQToDescriptor $ r
+  return r
 
 fetchInfraDescriptors :: Connection -> DescriptorKey -> IO [Descriptor]
 fetchInfraDescriptors c did = do
@@ -284,7 +287,7 @@ fetchInfraDescriptors c did = do
       \    ON md.infraDescriptorId = d.id \
       \WHERE md.metaDescriptorId = ?"
       [did]
-  return . map mapQToDescriptor $ r
+  return r
 
 hoistMaybe :: Monad m => Maybe a -> MaybeT m a
 hoistMaybe = MaybeT . return
@@ -297,12 +300,12 @@ getDescriptor c did = do
         c
         "SELECT id , descriptor FROM Descriptor WHERE id = ?"
         [did]
-  hoistMaybe . fmap mapQToDescriptor . head' $ r
+  hoistMaybe . head' $ r
 
 getFile :: Connection -> FileKey -> MaybeT IO File
 getFile c fid = do
   r <- lift $ query c "SELECT id, filePath FROM File WHERE id = ?" [fid]
-  hoistMaybe . fmap mapQToFile . head' $ r
+  hoistMaybe . head' $ r
 
 getUntaggedFileWithTags :: Connection -> IO [FileWithTags]
 getUntaggedFileWithTags c = do
@@ -314,8 +317,7 @@ getUntaggedFileWithTags c = do
       \  LEFT JOIN Tag t \
       \    ON f.id = t.fileTagId \
       \WHERE t.descriptorTagId IS NULL"
-  let files = map mapQToFile r
-  return . map (`FileWithTags` []) $ files
+  return . map (`FileWithTags` []) $ r
 
 lookupFileWithTagsByRelation :: Connection -> DescriptorKey -> IO [FileWithTags]
 lookupFileWithTagsByRelation c did = do
@@ -359,7 +361,7 @@ lookupFileWithTagByTagId conn t = do
       \ORDER BY \
       \f1.filePath;"
       [t]
-  return . groupRFWT [] $ r
+  return . fileWithTagsMapper $ r
 
 lookupFileWithTagsByFileId :: Connection -> FileKey -> IO [FileWithTags]
 lookupFileWithTagsByFileId c fid = do
@@ -375,7 +377,7 @@ lookupFileWithTagsByFileId c fid = do
       \WHERE f.id = ? \
       \ORDER BY f.filePath"
       [fid]
-  return . groupRFWMT [] $ r
+  return . fileWithMaybeTagsMapper $ r
 
 lookupDescriptorPattern :: Connection -> T.Text -> IO [Descriptor]
 lookupDescriptorPattern conn p = do
@@ -386,7 +388,7 @@ lookupDescriptorPattern conn p = do
       \FROM Descriptor \
       \WHERE descriptor LIKE ?"
       [p]
-  return . map mapQToDescriptor $ r
+  return r
 
 lookupFilePattern :: Connection -> T.Text -> IO [File]
 lookupFilePattern conn p = do
@@ -397,7 +399,7 @@ lookupFilePattern conn p = do
       \FROM File \
       \WHERE filePath LIKE ?"
       [p]
-  return . map mapQToFile $ r
+  return r
 
 getRepresentative :: Connection -> DescriptorKey -> MaybeT IO Representative
 getRepresentative c descriptorId = do
@@ -417,43 +419,8 @@ getRepresentative c descriptorId = do
     return $ Representative f d Nothing
   return $ rep {repDescription = (\(_, _, d') -> d') r}
 
-mapQToFile :: (Int, T.Text) -> File
-mapQToFile (fid, fpath) = File fid fpath
-
-mapQToDescriptor :: (Int, T.Text) -> Descriptor
-mapQToDescriptor (did, d) = Descriptor did d
-
-groupRFWT :: [FileWithTags] -> [(Int, T.Text, Int, T.Text)] -> [FileWithTags]
-groupRFWT accum [] = accum
-groupRFWT [] (r : rs) = groupRFWT [mapQToFWT r] rs
-groupRFWT (old : past) (r : rs) =
-  let new = mapQToFWT r
-   in if new `fwtFileEqual` old
-        then groupRFWT (foldl' pushTag old (tags new) : past) rs
-        else groupRFWT (new : old : past) rs
-
--- | For grouping FWTs that have Maybe Tags
-groupRFWMT :: [FileWithTags] -> [(Int, T.Text, Maybe Int, Maybe T.Text)] -> [FileWithTags]
-groupRFWMT accum [] = accum
-groupRFWMT [] (r : rs) = groupRFWMT [mapQToFWMT r] rs
-groupRFWMT (old : past) (r : rs) =
-  let new = mapQToFWMT r
-   in if new `fwtFileEqual` old
-        then groupRFWMT (foldl' pushTag old (tags new) : past) rs
-        else groupRFWMT (new : old : past) rs
-
-mapQToFWMT :: (Int, T.Text, Maybe Int, Maybe T.Text) -> FileWithTags
-mapQToFWMT (fid, fp, dids, dds) =
-  FileWithTags (File fid fp) (maybe [] (\d -> [Descriptor (fromJust dids) d]) dds)
-
-mapQToFWT :: (Int, T.Text, Int, T.Text) -> FileWithTags
-mapQToFWT (fid, fp, dids, dds) = FileWithTags (File fid fp) [Descriptor dids dds]
-
-mapQToTagCount :: Descriptor -> Only Int -> TagCount
-mapQToTagCount d (Only n) = (d, n)
-
-uncurry3 :: (t1 -> t2 -> t3 -> t4) -> (t1, t2, t3) -> t4
-uncurry3 f (x, y, z) = f x y z
+testFileMap :: Connection -> FileKey -> IO [File]
+testFileMap c f = query c "" [f]
 
 head' :: [a] -> Maybe a
 head' [] = Nothing

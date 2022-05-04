@@ -27,6 +27,7 @@ executable tagger
                       ,Type.BufferList
                       ,Database.Tagger.Type
                       ,Database.Tagger.Access
+                      ,Database.Tagger.Access.RowMap
                       ,IO
                       ,Paths_tagger
 

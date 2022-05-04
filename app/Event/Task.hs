@@ -106,7 +106,7 @@ addPath c p = do
 tag :: Connection -> [FileWithTags] -> [T.Text] -> IO ()
 tag c fwts dds = do
   withDescriptors <- fmap concat . mapM (lookupDescriptorPattern c) $ dds
-  let newTags = Tag . (fileId . file) <$> fwts <*> map descriptorId withDescriptors
+  let newTags = Tag (-1) . (fileId . file) <$> fwts <*> map descriptorId withDescriptors
   mapM_ (newTag c) newTags
 
 getRefreshedFWTs :: Connection -> [FileWithTags] -> IO [FileWithTags]
@@ -121,7 +121,7 @@ untagWith :: Connection -> [FileWithTags] -> [T.Text] -> IO ()
 untagWith c fwts dds = do
   let fids = map (fileId . file) fwts
   ds <- fmap (map descriptorId . concat) . mapM (lookupDescriptorPattern c) $ dds
-  let tags = Tag <$> fids <*> ds
+  let tags = Tag (-1) <$> fids <*> ds
   untag c tags
 
 relateTo :: Connection -> [Descriptor] -> [Descriptor] -> IO ()

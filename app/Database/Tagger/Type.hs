@@ -11,6 +11,9 @@ module Database.Tagger.Type
     TagCount (..),
     TagCountMap (..),
     Representative (..),
+    FileKey,
+    DescriptorKey,
+    TagKey,
     tagCountUnmap,
     tagCountMapSumUnion,
     fileWithTagsToTagCountMap,
@@ -24,7 +27,6 @@ module Database.Tagger.Type
     pushTag,
     fwtFileEqual,
     sortChildren,
-    fstElem,
   )
 where
 
@@ -35,8 +37,23 @@ import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Hashable as H
 import qualified Data.List
 import qualified Data.Text as T
+import Database.SQLite.Simple
 import qualified GHC.Generics as Generics
 import qualified IO
+
+{-
+ ______   ___   _
+/ ___\ \ / / \ | |
+\___ \\ V /|  \| |
+ ___) || | | |\  |
+|____/ |_| |_| \_|
+-}
+
+type FileKey = Int
+
+type DescriptorKey = Int
+
+type TagKey = Int
 
 type TagCount = (Descriptor, Int)
 
@@ -52,8 +69,13 @@ fileWithTagsToTagCountMap :: FileWithTags -> TagCountMap
 fileWithTagsToTagCountMap (FileWithTags _ ds) =
   HashMap.fromList . zip ds . Data.List.repeat $ 1
 
-fstElem :: Eq a => a -> [(a, b)] -> Bool
-d `fstElem` tcs = d `elem` map fst tcs
+{-
+ _____ ___ _     _____
+|  ___|_ _| |   | ____|
+| |_   | || |   |  _|
+|  _|  | || |___| |___
+|_|   |___|_____|_____|
+-}
 
 data File = File {fileId :: Int, filePath :: T.Text}
   deriving (Show, Eq, Generics.Generic)
@@ -64,6 +86,17 @@ instance H.Hashable File where
 instance Ord File where
   compare (File _ px) (File _ py) = compare px py
 
+instance FromRow File where
+  fromRow = File <$> field <*> field
+
+{-
+ ____  _____ ____   ____ ____  ___ ____ _____ ___  ____
+|  _ \| ____/ ___| / ___|  _ \|_ _|  _ \_   _/ _ \|  _ \
+| | | |  _| \___ \| |   | |_) || || |_) || || | | | |_) |
+| |_| | |___ ___) | |___|  _ < | ||  __/ | || |_| |  _ <
+|____/|_____|____/ \____|_| \_\___|_|    |_| \___/|_| \_\
+-}
+
 data Descriptor = Descriptor {descriptorId :: Int, descriptor :: T.Text}
   deriving (Show, Eq, Generics.Generic)
 
@@ -73,8 +106,31 @@ instance H.Hashable Descriptor where
 instance Ord Descriptor where
   compare (Descriptor _ dx) (Descriptor _ dy) = compare dx dy
 
-data Tag = Tag {fileTagId :: Int, descriptorTagId :: Int}
+instance FromRow Descriptor where
+  fromRow = Descriptor <$> field <*> field
+
+{-
+ _____  _    ____
+|_   _|/ \  / ___|
+  | | / _ \| |  _
+  | |/ ___ \ |_| |
+  |_/_/   \_\____|
+-}
+
+data Tag
+  = Tag {tagId :: Int, fileTagId :: Int, descriptorTagId :: Int}
   deriving (Show, Eq, Ord)
+
+instance FromRow Tag where
+  fromRow = Tag <$> field <*> field <*> field
+
+{-
+ ____  _____ ____
+|  _ \| ____|  _ \
+| |_) |  _| | |_) |
+|  _ <| |___|  __/
+|_| \_\_____|_|
+-}
 
 data Representative = Representative
   { repFileId :: !File,
@@ -83,23 +139,33 @@ data Representative = Representative
   }
   deriving (Show, Eq)
 
+{-
+ __  __ _____ _____  _    ____  _____ ____
+|  \/  | ____|_   _|/ \  |  _ \| ____/ ___|
+| |\/| |  _|   | | / _ \ | | | |  _| \___ \
+| |  | | |___  | |/ ___ \| |_| | |___ ___) |
+|_|  |_|_____| |_/_/   \_\____/|_____|____(_)
+-}
+
 data MetaDescriptor = MetaDescriptor
   { metaDescriptorId :: Int,
     infraDescriptorId :: Int
   }
   deriving (Show, Eq)
 
+{-
+ _______        _______
+|  ___\ \      / /_   _|
+| |_   \ \ /\ / /  | |
+|  _|   \ V  V /   | |
+|_|      \_/\_/    |_|
+-}
+
 data FileWithTags = FileWithTags
   { file :: File,
     tags :: [Descriptor]
   }
   deriving (Eq, Generics.Generic)
-
-fwtFileEqual :: FileWithTags -> FileWithTags -> Bool
-(FileWithTags fx _) `fwtFileEqual` (FileWithTags fy _) = fx == fy
-
-pushTag :: FileWithTags -> Descriptor -> FileWithTags
-pushTag (FileWithTags f ds) d = FileWithTags f (d : ds)
 
 instance Show FileWithTags where
   show =
@@ -110,6 +176,20 @@ instance Show FileWithTags where
 
 instance H.Hashable FileWithTags where
   hash = H.hash . file
+
+fwtFileEqual :: FileWithTags -> FileWithTags -> Bool
+(FileWithTags fx _) `fwtFileEqual` (FileWithTags fy _) = fx == fy
+
+pushTag :: FileWithTags -> Descriptor -> FileWithTags
+pushTag (FileWithTags f ds) d = FileWithTags f (d : ds)
+
+{-
+ ____  _____ ____ _____ ____  _____ _____
+|  _ \| ____/ ___|_   _|  _ \| ____| ____|
+| | | |  _| \___ \ | | | |_) |  _| |  _|
+| |_| | |___ ___) || | |  _ <| |___| |___
+|____/|_____|____/ |_| |_| \_\_____|_____|
+-}
 
 data DescriptorTree
   = Infra Descriptor
