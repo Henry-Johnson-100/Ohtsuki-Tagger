@@ -3,3 +3,4 @@ dist-newstyle/
 *.db
 *.db.backup
 scratch/
+*.l.*
