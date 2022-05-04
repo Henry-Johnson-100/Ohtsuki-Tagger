@@ -2,38 +2,51 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Event.Parser
-  ( RawSubTag (..),
-    subTagQueryParser,
+  ( PseudoDescriptor (..),
+    PseudoSubTag (..),
+    pseudoSubTagQueryParser,
+    pseudoDescriptorText,
   )
 where
 
-import Data.Functor.Identity
+import Data.Functor.Identity (Identity)
 import qualified Data.Text as T
 import Text.Parsec
+  ( ParsecT,
+    char,
+    many,
+    many1,
+    noneOf,
+    spaces,
+    (<?>),
+  )
 
-type RawSubTag = (T.Text, [T.Text])
+newtype PseudoDescriptor = PDescriptor T.Text deriving (Show, Eq)
+
+pseudoDescriptorText :: PseudoDescriptor -> T.Text
+pseudoDescriptorText (PDescriptor t) = t
+
+type PseudoSubTag = (PseudoDescriptor, [PseudoDescriptor])
 
 type TextFieldParser a = ParsecT T.Text () Identity a
-
-descriptorNameParser :: TextFieldParser T.Text
-descriptorNameParser =
-  fmap T.pack . many1 $
-    letter
-      <|> digit
-      <|> oneOf "-_!@#$%^&*~=+.,<>"
 
 spaces' :: TextFieldParser ()
 spaces' = spaces <?> ""
 
-subTagQueryParser :: TextFieldParser RawSubTag
-subTagQueryParser = do
-  rawDes <- descriptorNameParser
+-- | Parses a descriptor
+pseudoDescriptorParser :: TextFieldParser PseudoDescriptor
+pseudoDescriptorParser =
+  fmap (PDescriptor . T.pack) . many1 . noneOf $ "{} \t\n"
+
+pseudoSubTagQueryParser :: TextFieldParser PseudoSubTag
+pseudoSubTagQueryParser = do
+  rawDes <- pseudoDescriptorParser
   spaces'
   char '{'
   spaces'
   subDess <- do
     many $ do
-      sd'' <- descriptorNameParser
+      sd'' <- pseudoDescriptorParser
       spaces'
       return sd''
   char '}'
