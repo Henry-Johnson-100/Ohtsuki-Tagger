@@ -6,6 +6,7 @@ module Database.Tagger.Type
     Descriptor (..),
     FileWithTags (..),
     Tag (..),
+    SubTag (..),
     MetaDescriptor (..),
     DescriptorTree (..),
     TagCount (..),
@@ -117,12 +118,24 @@ instance FromRow Descriptor where
   |_/_/   \_\____|
 -}
 
-data Tag
-  = Tag {tagId :: Int, fileTagId :: Int, descriptorTagId :: Int}
+data Tag = Tag {tagId :: Int, fileTagId :: Int, descriptorTagId :: Int}
   deriving (Show, Eq, Ord)
 
 instance FromRow Tag where
   fromRow = Tag <$> field <*> field <*> field
+
+{-
+ ____  _   _ ____ _____  _    ____
+/ ___|| | | | __ )_   _|/ \  / ___|
+\___ \| | | |  _ \ | | / _ \| |  _
+ ___) | |_| | |_) || |/ ___ \ |_| |
+|____/ \___/|____/ |_/_/   \_\____|
+-}
+
+data SubTag = SubTag {subTagId :: Int, subTagDescriptorId :: Int} deriving (Show, Eq)
+
+instance FromRow SubTag where
+  fromRow = SubTag <$> field <*> field
 
 {-
  ____  _____ ____
