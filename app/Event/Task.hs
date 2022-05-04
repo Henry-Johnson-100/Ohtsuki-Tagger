@@ -109,6 +109,14 @@ tag c fwts dds = do
   let newTags = Tag (-1) . (fileId . file) <$> fwts <*> map descriptorId withDescriptors
   mapM_ (newTag c) newTags
 
+subTag :: Connection -> [SubTag] -> IO ()
+subTag = newSubTags
+
+getSubTagsForTag :: Connection -> Tag -> IO [Descriptor]
+getSubTagsForTag c =
+  fmap catMaybes . mapM (runMaybeT . getDescriptor c . subDescriptorId)
+    <=< getSubTags c
+
 getRefreshedFWTs :: Connection -> [FileWithTags] -> IO [FileWithTags]
 getRefreshedFWTs c fwts = do
   let fids = map (fileId . file) fwts
