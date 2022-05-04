@@ -125,8 +125,6 @@ getRefreshedFWTs c fwts = do
   refreshedFWTs <- mapM (lookupFileWithTagsByFileId c) fids
   return . concat $ refreshedFWTs
 
--- untagWith :: Connection -> [Tag] -> IO ()
--- untagWith = untag
 untagWith :: Connection -> [FileWithTags] -> [T.Text] -> IO ()
 untagWith c fwts dds = do
   let fids = map (fileId . file) fwts
@@ -263,8 +261,6 @@ createNewDescriptors c ts = do
 
 deleteDescriptor :: Connection -> Descriptor -> IO ()
 deleteDescriptor = Database.Tagger.Access.deleteDescriptor
-
--- const (pure . pure $ ()) . runMaybeT . Database.Tagger.Access.deleteDescriptor
 
 head' :: [a] -> Maybe a
 head' [] = Nothing
