@@ -7,6 +7,7 @@
 
 module Event.Task where
 
+import Control.Applicative
 import Control.Lens
 import Control.Monad
 import Control.Monad.Trans.Class
@@ -18,6 +19,7 @@ import qualified Data.Text as T
 import Database.SQLite.Simple
 import Database.Tagger.Access
 import Database.Tagger.Type
+import Event.Parser
 import IO
 import qualified Toml
 import Type.Config
@@ -147,42 +149,6 @@ getTagCounts :: Connection -> [Descriptor] -> IO [TagCount]
 getTagCounts c ds = do
   mapM (getTagCount c) ds
 
-queryByTag ::
-  Connection ->
-  [T.Text] ->
-  IO [FileWithTags]
-queryByTag c ts = do
-  fwts <- mapM (lookupFileWithTagsByTagPattern c) ts
-  return . concat $ fwts
-
-queryUntagged ::
-  Connection -> [T.Text] -> IO [FileWithTags]
-queryUntagged c ns = do
-  untaggedFwts <- getUntaggedFileWithTags c
-  case ns of
-    [] -> return untaggedFwts
-    (n : _) ->
-      if T.all isDigit n
-        then return . take (read . T.unpack $ n) $ untaggedFwts
-        else return untaggedFwts
-
-queryRelation ::
-  Connection -> [T.Text] -> IO [FileWithTags]
-queryRelation c rs = do
-  ds <- fmap concat . mapM (lookupDescriptorPattern c) $ rs
-  fmap concat
-    . mapM
-      ( lookupFileWithTagsByRelation c
-          . descriptorId
-      )
-    $ ds
-
-queryFilePattern ::
-  Connection -> [T.Text] -> IO [FileWithTags]
-queryFilePattern c ps = do
-  fwts <- mapM (lookupFileWithTagsByFilePattern c) ps
-  return . concat $ fwts
-
 doQueryWithCriteria ::
   QueryCriteria ->
   Connection ->
@@ -194,6 +160,39 @@ doQueryWithCriteria qc =
     ByRelation -> queryRelation
     ByUntagged -> queryUntagged
     ByPattern -> queryFilePattern
+  where
+    queryByTag ::
+      Connection ->
+      [T.Text] ->
+      IO [FileWithTags]
+    queryByTag c ts = do
+      fwts <- mapM (lookupFileWithTagsByTagPattern c) ts
+      return . concat $ fwts
+    queryRelation ::
+      Connection -> [T.Text] -> IO [FileWithTags]
+    queryRelation c rs = do
+      ds <- fmap concat . mapM (lookupDescriptorPattern c) $ rs
+      fmap concat
+        . mapM
+          ( lookupFileWithTagsByRelation c
+              . descriptorId
+          )
+        $ ds
+    queryUntagged ::
+      Connection -> [T.Text] -> IO [FileWithTags]
+    queryUntagged c ns = do
+      untaggedFwts <- getUntaggedFileWithTags c
+      case ns of
+        [] -> return untaggedFwts
+        (n : _) ->
+          if T.all isDigit n
+            then return . take (read . T.unpack $ n) $ untaggedFwts
+            else return untaggedFwts
+    queryFilePattern ::
+      Connection -> [T.Text] -> IO [FileWithTags]
+    queryFilePattern c ps = do
+      fwts <- mapM (lookupFileWithTagsByFilePattern c) ps
+      return . concat $ fwts
 
 lookupInfraDescriptorTree ::
   Connection -> T.Text -> IO DescriptorTree
