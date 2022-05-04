@@ -86,6 +86,7 @@ import Database.Tagger.Type
     tagId,
   )
 import IO (hPutStrLn, stderr)
+import Util.Core
 
 debug# :: Bool
 debug# = False
@@ -310,9 +311,6 @@ fetchInfraDescriptors c did = do
       [did]
   return r
 
-hoistMaybe :: Monad m => Maybe a -> MaybeT m a
-hoistMaybe = MaybeT . return
-
 getDescriptor :: Connection -> DescriptorKey -> MaybeT IO Descriptor
 getDescriptor c did = do
   r <-
@@ -439,10 +437,3 @@ getRepresentative c descriptorId = do
     d <- getDescriptor c . (\(_, k, _) -> k) $ r
     return $ Representative f d Nothing
   return $ rep {repDescription = (\(_, _, d') -> d') r}
-
-testFileMap :: Connection -> FileKey -> IO [File]
-testFileMap c f = query c "" [f]
-
-head' :: [a] -> Maybe a
-head' [] = Nothing
-head' (x : _) = Just x

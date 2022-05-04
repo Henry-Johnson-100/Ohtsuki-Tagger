@@ -36,9 +36,9 @@ import qualified Control.Monad.Trans.Class as Trans
 import Control.Monad.Trans.Maybe (MaybeT (MaybeT, runMaybeT))
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Hashable as H
-import qualified Data.List
+import qualified Data.List as L
 import qualified Data.Text as T
-import Database.SQLite.Simple
+import Database.SQLite.Simple (FromRow (..), field)
 import qualified GHC.Generics as Generics
 import qualified IO
 
@@ -68,7 +68,7 @@ tagCountMapSumUnion = HashMap.unionWith (+)
 
 fileWithTagsToTagCountMap :: FileWithTags -> TagCountMap
 fileWithTagsToTagCountMap (FileWithTags _ ds) =
-  HashMap.fromList . zip ds . Data.List.repeat $ 1
+  HashMap.fromList . zip ds . L.repeat $ 1
 
 {-
  _____ ___ _     _____
@@ -185,7 +185,7 @@ instance Show FileWithTags where
     Control.Monad.liftM2
       (++)
       (flip (++) " : " . show . file)
-      (concatMap show . Data.List.sort . tags)
+      (concatMap show . L.sort . tags)
 
 instance H.Hashable FileWithTags where
   hash = H.hash . file
@@ -229,7 +229,7 @@ instance Ord DescriptorTree where
 sortChildren :: DescriptorTree -> DescriptorTree
 sortChildren tr =
   case tr of
-    Meta d cs -> Meta d (Data.List.sort cs)
+    Meta d cs -> Meta d (L.sort cs)
     _ -> tr
 
 insertIntoDescriptorTree :: DescriptorTree -> DescriptorTree -> DescriptorTree
@@ -268,7 +268,7 @@ flattenTree = flattenTree' []
     flattenTree' xs tr =
       case tr of
         Infra d -> d : xs
-        Meta d cs -> Data.List.foldl' flattenTree' (d : xs) cs
+        Meta d cs -> L.foldl' flattenTree' (d : xs) cs
         NullTree -> []
 
 -- | Validates paths and expands directories

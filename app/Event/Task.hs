@@ -24,20 +24,9 @@ import IO
 import qualified Toml
 import Type.Config
 import Type.Model
+import Util.Core
 
 type ConnString = String
-
-tail' :: [a] -> [a]
-tail' [] = []
-tail' (_ : xs) = xs
-
-last' :: [a] -> Maybe a
-last' [] = Nothing
-last' xs = Just . last $ xs
-
-init' :: [a] -> [a]
-init' [] = []
-init' xs = init xs
 
 getRepresentative :: Connection -> Descriptor -> MaybeT IO Representative
 getRepresentative c = Database.Tagger.Access.getRepresentative c . descriptorId
@@ -261,7 +250,3 @@ createNewDescriptors c ts = do
 
 deleteDescriptor :: Connection -> Descriptor -> IO ()
 deleteDescriptor = Database.Tagger.Access.deleteDescriptor
-
-head' :: [a] -> Maybe a
-head' [] = Nothing
-head' (x : _) = Just x

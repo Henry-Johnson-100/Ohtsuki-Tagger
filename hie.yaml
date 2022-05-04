@@ -44,3 +44,6 @@ cradle:
 
     - path: "app/IO.hs"
       component: "tagger:exe:tagger"
+
+    - path: "app/Util/Core.hs"
+      component: "tagger:exe:tagger"

@@ -20,22 +20,7 @@ where
 import Control.Lens.TH (makeLenses)
 import qualified Data.List as L
 import IO
-
-head' :: [a] -> Maybe a
-head' [] = Nothing
-head' xs = Just . head $ xs
-
-tail' :: [a] -> [a]
-tail' [] = []
-tail' (_ : xs) = xs
-
-last' :: [a] -> Maybe a
-last' [] = Nothing
-last' xs = Just . last $ xs
-
-init' :: [a] -> [a]
-init' [] = []
-init' xs = init xs
+import Util.Core
 
 class Cycleable c where
   -- | Take the head item and move it to the back

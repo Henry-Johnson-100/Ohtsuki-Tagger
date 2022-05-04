@@ -18,11 +18,9 @@ import Node.Color
 import Type.BufferList
 import Type.Config
 import Type.Model
+import Util.Core
 
 type TaggerWidget = WidgetNode TaggerModel TaggerEvent
-
-(!++) :: T.Text -> T.Text -> T.Text
-(!++) = T.append
 
 getPathComponents :: Int -> T.Text -> T.Text
 getPathComponents n p =

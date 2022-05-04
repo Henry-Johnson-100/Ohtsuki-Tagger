@@ -22,7 +22,7 @@ import qualified Data.List as L
 import qualified Data.Maybe as M
 import qualified Data.Text as T
 import Database.SQLite.Simple
-import Database.Tagger.Access (activateForeignKeyPragma, hoistMaybe, lookupDescriptorPattern)
+import Database.Tagger.Access (activateForeignKeyPragma, lookupDescriptorPattern)
 import Database.Tagger.Type
 import Event.Task
 import qualified IO
@@ -30,6 +30,7 @@ import Monomer
 import Type.BufferList
 import Type.Config
 import Type.Model
+import Util.Core
 
 fwtUnion :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]
 fwtUnion = unionBy fwtFileEqual
@@ -289,7 +290,8 @@ fileSelectionEventHandler wenv node model event =
     FileSelectionPrevQueryCriteria ->
       [model *~ (fileSelectionModel . queryCriteria) %~ prev]
     FileSelectionShuffle ->
-      let !shuffledBufferList = shuffleBufferList $ model ^. fileSelectionModel . fileSelection
+      let !shuffledBufferList =
+            shuffleBufferList $ model ^. fileSelectionModel . fileSelection
        in [ Task
               ( DoFileSelectionEvent
                   . FileSelectionBufferPut
@@ -486,16 +488,6 @@ putFileArgs :: [String] -> [String] -> [String]
 putFileArgs args files =
   let !atFileArg = L.break (L.isInfixOf "%file") args
    in fst atFileArg ++ files ++ (tail' . snd $ atFileArg)
-
--- | Take the first item and put it on the end
-popCycleList :: [a] -> [a]
-popCycleList [] = []
-popCycleList (x : xs) = xs ++ [x]
-
--- | Take the last item and put it on the front
-dequeueCycleList :: [a] -> [a]
-dequeueCycleList [] = []
-dequeueCycleList xs = last xs : init xs
 
 asyncEvent :: e -> EventResponse s e sp ep
 asyncEvent = Task . flip (<$) emptyM

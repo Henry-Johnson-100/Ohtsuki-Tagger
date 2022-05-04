@@ -30,6 +30,7 @@ executable tagger
                       ,Database.Tagger.Access
                       ,Database.Tagger.Access.RowMap
                       ,IO
+                      ,Util.Core
                       ,Paths_tagger
 
   other-extensions:    OverloadedStrings

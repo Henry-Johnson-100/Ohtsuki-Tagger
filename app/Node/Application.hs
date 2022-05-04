@@ -38,6 +38,7 @@ import Node.Micro
 import Type.BufferList
 import Type.Config
 import Type.Model
+import Util.Core
 
 visibility ::
   ( Eq a,
