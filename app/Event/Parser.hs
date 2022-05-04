@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Event.Parser
   ( PseudoDescriptor (..),
     PseudoSubTag (..),
-    pseudoSubTagQueryParser,
-    pseudoDescriptorText,
+    pseudoQueryParser,
   )
 where
 
@@ -18,20 +18,34 @@ import Text.Parsec
     many1,
     noneOf,
     spaces,
+    try,
     (<?>),
+    (<|>),
   )
 
+-- | A newtype wrapper around Data.Text.Text
 newtype PseudoDescriptor = PDescriptor T.Text deriving (Show, Eq)
 
 pseudoDescriptorText :: PseudoDescriptor -> T.Text
 pseudoDescriptorText (PDescriptor t) = t
 
+-- | (PseudoDescriptor, [PseudoDescriptor])
 type PseudoSubTag = (PseudoDescriptor, [PseudoDescriptor])
 
 type TextFieldParser a = ParsecT T.Text () Identity a
 
 spaces' :: TextFieldParser ()
 spaces' = spaces <?> ""
+
+pseudoQueryParser :: TextFieldParser [PseudoSubTag]
+pseudoQueryParser =
+  many pseudoEitherParser
+  where
+    pseudoEitherParser :: ParsecT T.Text () Identity PseudoSubTag
+    pseudoEitherParser = do
+      pd <- try pseudoSubTagQueryParser <|> fmap (,[]) pseudoDescriptorParser
+      spaces
+      return pd
 
 -- | Parses a descriptor
 pseudoDescriptorParser :: TextFieldParser PseudoDescriptor
