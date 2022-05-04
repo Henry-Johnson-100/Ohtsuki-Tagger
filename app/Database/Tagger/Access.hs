@@ -17,7 +17,6 @@ module Database.Tagger.Access
     renameDescriptor,
     deleteDescriptor,
     newTag,
-    newSubTags,
     untag,
     relate,
     unrelate,
@@ -74,7 +73,6 @@ import Database.Tagger.Type
     FileWithTags (FileWithTags, tags),
     MetaDescriptor (..),
     Representative (Representative, repDescription),
-    SubTag (SubTag),
     Tag (..),
     TagCount (..),
     descriptorTreeElem,
@@ -123,13 +121,6 @@ newTag c (Tag (-1) f d) =
     c
     "INSERT INTO Tag (fileTagId, descriptorTagId) VALUES (?,?)"
     (f, d)
-
-newSubTags :: Connection -> [SubTag] -> IO ()
-newSubTags c =
-  executeMany
-    c
-    "INSERT INTO SubTag (tagId, descriptorId) VALUES (?,?)"
-    . map (\(SubTag tid did) -> (tid, did))
 
 untag :: Connection -> [Tag] -> IO ()
 untag c =
