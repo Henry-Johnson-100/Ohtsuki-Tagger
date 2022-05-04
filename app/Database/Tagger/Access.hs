@@ -17,6 +17,8 @@ module Database.Tagger.Access
     renameDescriptor,
     deleteDescriptor,
     newTag,
+    newSubTags,
+    getSubTags,
     untag,
     relate,
     unrelate,
@@ -73,6 +75,7 @@ import Database.Tagger.Type
     FileWithTags (FileWithTags, tags),
     MetaDescriptor (..),
     Representative (Representative, repDescription),
+    SubTag (SubTag),
     Tag (..),
     TagCount (..),
     descriptorTreeElem,
@@ -80,6 +83,7 @@ import Database.Tagger.Type
     fwtFileEqual,
     insertIntoDescriptorTree,
     pushTag,
+    tagId,
   )
 import IO (hPutStrLn, stderr)
 
@@ -121,6 +125,23 @@ newTag c (Tag (-1) f d) =
     c
     "INSERT INTO Tag (fileTagId, descriptorTagId) VALUES (?,?)"
     (f, d)
+
+newSubTags :: Connection -> [SubTag] -> IO ()
+newSubTags c =
+  executeMany
+    c
+    "INSERT INTO SubTag (tagId, descriptorId) VALUES (?,?)"
+    . map (\(SubTag tid did) -> (tid, did))
+
+getSubTags :: Connection -> Tag -> IO [SubTag]
+getSubTags c t =
+  query
+    c
+    "SELECT tagId, descriptorId \
+    \FROM SubTag \
+    \WHERE tagId = ? \
+    \ORDER BY tagId"
+    [tagId t]
 
 untag :: Connection -> [Tag] -> IO ()
 untag c =
