@@ -21,6 +21,7 @@ executable tagger
                       ,Node.Micro
                       ,Event.Task
                       ,Event.Handler
+                      ,Event.Parser
                       ,Type.Model
                       ,Type.Model.Prim
                       ,Type.Config
@@ -57,5 +58,6 @@ executable tagger
                       ,unordered-containers == 0.2.18.0
                       ,random == 1.2.1
                       ,random-shuffle == 0.0.4
+                      ,parsec
   hs-source-dirs:      app
   default-language:    Haskell2010

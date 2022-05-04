@@ -18,6 +18,9 @@ cradle:
     - path: "app/Event/Handler.hs"
       component: "tagger:exe:tagger"
 
+    - path: "app/Event/Parser.hs"
+      component: "tagger:exe:tagger"
+
     - path: "app/Type/Model.hs"
       component: "tagger:exe:tagger"
 
