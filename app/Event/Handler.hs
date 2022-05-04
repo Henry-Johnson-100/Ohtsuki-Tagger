@@ -397,7 +397,7 @@ taggerEventHandler wenv node model event =
       [ dbConnTask
           IOEvent
           ( \activeConn ->
-              (if isUntagMode (model ^. taggingMode) then untagWith else tag)
+              (if isUntagMode (model ^. taggingMode) then untag else tag)
                 activeConn
                 (M.maybeToList $ model ^. (singleFileModel . singleFile))
                 (T.words $ model ^. tagsString)
@@ -409,7 +409,7 @@ taggerEventHandler wenv node model event =
       [ dbConnTask
           IOEvent
           ( \activeConn ->
-              (if isUntagMode (model ^. taggingMode) then untagWith else tag)
+              (if isUntagMode (model ^. taggingMode) then untag else tag)
                 activeConn
                 (cCollect $ model ^. (fileSelectionModel . fileSelection))
                 (T.words $ model ^. tagsString)
