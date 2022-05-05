@@ -19,7 +19,7 @@ module Database.Tagger.Access
     insertDatabaseTag,
     fromDatabaseTag,
     newSubTags,
-    getDatabaseSubTags,
+    getsDatabaseSubTags,
     deleteDatabaseTags,
     fromDatabaseSubTag,
     relate,
@@ -108,11 +108,6 @@ liftErroutConcat# loc msg = lift . errout# $ loc ++ msg
 activateForeignKeyPragma :: Connection -> IO ()
 activateForeignKeyPragma c = execute_ c "PRAGMA foreign_keys = on"
 
-getTagCount :: Connection -> Descriptor -> IO TagCount
-getTagCount c d = do
-  result <- query c "SELECT COUNT(*) FROM Tag WHERE descriptorTagId = ?" [descriptorId d]
-  return . tagCountMapper d . fromMaybe (Only 0 :: Only Int) . head' $ result
-
 -- | Attempts to add a new file to db
 -- Performs no checking of the validity of a path.
 addFile :: Connection -> T.Text -> IO File
@@ -132,18 +127,6 @@ insertDatabaseTag c (Tag_ _ f d) =
     "INSERT INTO Tag (fileTagId, descriptorTagId) VALUES (?,?)"
     (f, d)
 
-getTag :: Connection -> TagKey -> MaybeT IO DatabaseTag
-getTag c tk = do
-  r <-
-    lift $
-      query
-        c
-        "SELECT id, fileTagId, descriptorTagId \
-        \FROM Tag WHERE id = ?"
-        [tk] ::
-      MaybeT IO [DatabaseTag]
-  hoistMaybe . head' $ r
-
 fromDatabaseTag :: Connection -> DatabaseTag -> MaybeT IO Tag
 fromDatabaseTag c (Tag_ tk fk dk) = do
   f <- getFile c fk
@@ -157,16 +140,6 @@ newSubTags c =
     "INSERT INTO SubTag (tagId, descriptorId) VALUES (?,?)"
     . map (\(SubTag_ tid did) -> (tid, did))
 
-getDatabaseSubTags :: Connection -> DatabaseTag -> IO [DatabaseSubTag]
-getDatabaseSubTags c (Tag_ tid _ _) =
-  query
-    c
-    "SELECT tagId, descriptorId \
-    \FROM SubTag \
-    \WHERE tagId = ? \
-    \ORDER BY tagId"
-    [tid]
-
 fromDatabaseSubTag :: Connection -> DatabaseSubTag -> MaybeT IO SubTag
 fromDatabaseSubTag c (SubTag_ tk dk) = do
   dt <- getTag c tk
@@ -178,10 +151,6 @@ deleteDatabaseTags :: Connection -> [DatabaseTag] -> IO ()
 deleteDatabaseTags c =
   executeMany c "DELETE FROM Tag WHERE fileTagId = ? AND descriptorTagId = ?"
     . map (\(Tag_ _ fk dk) -> (fk, dk))
-
-getUnrelatedDescriptor :: Connection -> MaybeT IO Descriptor
-getUnrelatedDescriptor =
-  lift . flip lookupDescriptorPattern "#UNRELATED#" >=> hoistMaybe . head'
 
 -- | Create new descriptor and relate it to #UNRELATED#
 addDescriptor :: Connection -> T.Text -> MaybeT IO Descriptor
@@ -338,21 +307,7 @@ fetchInfraDescriptors c did = do
       [did]
   return r
 
-getDescriptor :: Connection -> DescriptorKey -> MaybeT IO Descriptor
-getDescriptor c did = do
-  r <-
-    lift $
-      query
-        c
-        "SELECT id , descriptor FROM Descriptor WHERE id = ?"
-        [did]
-  hoistMaybe . head' $ r
-
-getFile :: Connection -> FileKey -> MaybeT IO File
-getFile c fid = do
-  r <- lift $ query c "SELECT id, filePath FROM File WHERE id = ?" [fid]
-  hoistMaybe . head' $ r
-
+-- #TODO rename this
 getUntaggedFileWithTags :: Connection -> IO [FileWithTags]
 getUntaggedFileWithTags c = do
   r <-
@@ -447,6 +402,38 @@ lookupFilePattern conn p = do
       [p]
   return r
 
+{-
+  ____ _____ _____
+ / ___| ____|_   _|
+| |  _|  _|   | |
+| |_| | |___  | |
+ \____|_____| |_|
+
+Get functions take some primitive db value, either a key or link type like Tag
+ and return a single MaybeT IO a of another primitive db value.
+
+Gets functions take a list of primitive values and return IO [a] of another value.
+-}
+
+getDescriptor :: Connection -> DescriptorKey -> MaybeT IO Descriptor
+getDescriptor c did = do
+  r <-
+    lift $
+      query
+        c
+        "SELECT id , descriptor FROM Descriptor WHERE id = ?"
+        [did]
+  hoistMaybe . head' $ r
+
+getFile :: Connection -> FileKey -> MaybeT IO File
+getFile c fid = do
+  r <- lift $ query c "SELECT id, filePath FROM File WHERE id = ?" [fid]
+  hoistMaybe . head' $ r
+
+getUnrelatedDescriptor :: Connection -> MaybeT IO Descriptor
+getUnrelatedDescriptor =
+  lift . flip lookupDescriptorPattern "#UNRELATED#" >=> hoistMaybe . head'
+
 getRepresentative :: Connection -> DescriptorKey -> MaybeT IO Representative
 getRepresentative c descriptorId = do
   r' <-
@@ -464,3 +451,30 @@ getRepresentative c descriptorId = do
     d <- getDescriptor c . (\(_, k, _) -> k) $ r
     return $ Representative f d Nothing
   return $ rep {repDescription = (\(_, _, d') -> d') r}
+
+getsDatabaseSubTags :: Connection -> DatabaseTag -> IO [DatabaseSubTag]
+getsDatabaseSubTags c (Tag_ tid _ _) =
+  query
+    c
+    "SELECT tagId, descriptorId \
+    \FROM SubTag \
+    \WHERE tagId = ? \
+    \ORDER BY tagId"
+    [tid]
+
+getTag :: Connection -> TagKey -> MaybeT IO DatabaseTag
+getTag c tk = do
+  r <-
+    lift $
+      query
+        c
+        "SELECT id, fileTagId, descriptorTagId \
+        \FROM Tag WHERE id = ?"
+        [tk] ::
+      MaybeT IO [DatabaseTag]
+  hoistMaybe . head' $ r
+
+getTagCount :: Connection -> Descriptor -> IO TagCount
+getTagCount c d = do
+  result <- query c "SELECT COUNT(*) FROM Tag WHERE descriptorTagId = ?" [descriptorId d]
+  return . tagCountMapper d . fromMaybe (Only 0 :: Only Int) . head' $ result
