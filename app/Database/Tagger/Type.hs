@@ -5,6 +5,9 @@ module Database.Tagger.Type
   ( File (..),
     Descriptor (..),
     FileWithTags (..),
+    DatabaseFileWithTags (..),
+    databaseFileWithTagsFileKey,
+    databaseFileWithTagsTagKeys,
     Tag (..),
     toDatabaseTag,
     DatabaseTag (..),
@@ -41,6 +44,7 @@ import Control.Monad.Trans.Maybe (MaybeT (MaybeT, runMaybeT))
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Hashable as H
 import qualified Data.List as L
+import qualified Data.Maybe as M
 import qualified Data.Text as T
 import Database.SQLite.Simple (FromRow (..), field)
 import qualified GHC.Generics as Generics
@@ -193,11 +197,29 @@ data MetaDescriptor = MetaDescriptor
 |_|      \_/\_/    |_|
 -}
 
+data DatabaseFileWithTags
+  = TaggedFile_ !FileKey !(Maybe TagKey)
+  | FileWithTags_ !FileKey [TagKey]
+  deriving (Show, Eq)
+
+databaseFileWithTagsFileKey :: DatabaseFileWithTags -> FileKey
+databaseFileWithTagsFileKey (TaggedFile_ fk _) = fk
+databaseFileWithTagsFileKey (FileWithTags_ fk _) = fk
+
+databaseFileWithTagsTagKeys :: DatabaseFileWithTags -> [TagKey]
+databaseFileWithTagsTagKeys (TaggedFile_ _ tk) = M.maybeToList tk
+databaseFileWithTagsTagKeys (FileWithTags_ _ tks) = tks
+
+instance FromRow DatabaseFileWithTags where
+  fromRow = TaggedFile_ <$> field <*> field
+
 data FileWithTags = FileWithTags
   { file :: File,
     tags :: [Descriptor]
   }
   deriving (Eq, Generics.Generic)
+
+-- #TODO toDatabaseFileWithTags :: FileWithTags -> DatabaseFileWithTags
 
 instance Show FileWithTags where
   show =

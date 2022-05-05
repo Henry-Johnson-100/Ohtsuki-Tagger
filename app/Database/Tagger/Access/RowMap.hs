@@ -8,21 +8,37 @@ module Database.Tagger.Access.RowMap
   ( fileWithTagsMapper,
     fileWithMaybeTagsMapper,
     tagCountMapper,
+    reduceDbFwtList,
   )
 where
 
 import qualified Data.List as L
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as M
 import qualified Data.Text as T
 import Database.SQLite.Simple (Only (Only))
 import Database.Tagger.Type
-  ( Descriptor (Descriptor),
-    File (File),
-    FileWithTags (FileWithTags, tags),
-    TagCount,
-    fwtFileEqual,
-    pushTag,
-  )
+
+type DatabaseFWTMap = Map.Map FileKey [TagKey]
+
+-- | Given a list of DatabaseFileWithTags,
+-- folds all of the common files together to aggregate their tags keys.
+reduceDbFwtList :: [DatabaseFileWithTags] -> [DatabaseFileWithTags]
+reduceDbFwtList = fromDbFwtMap . L.foldl' insertDbFwt Map.empty
+  where
+    insertDbFwt :: DatabaseFWTMap -> DatabaseFileWithTags -> DatabaseFWTMap
+    insertDbFwt m f =
+      maybe
+        (Map.insert (fk' f) (tks' f) m)
+        (\tks -> Map.insert (fk' f) (tks ++ tks' f) m)
+        (Map.lookup (fk' f) m)
+      where
+        fk' (TaggedFile_ fk _) = fk
+        fk' (FileWithTags_ fk _) = fk
+        tks' (TaggedFile_ _ tk) = M.maybeToList tk
+        tks' (FileWithTags_ _ tks) = tks
+    fromDbFwtMap :: DatabaseFWTMap -> [DatabaseFileWithTags]
+    fromDbFwtMap = map (uncurry FileWithTags_) . Map.toList
 
 fileWithTagsMapper :: [(Int, T.Text, Int, T.Text)] -> [FileWithTags]
 fileWithTagsMapper =

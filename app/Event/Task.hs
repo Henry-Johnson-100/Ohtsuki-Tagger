@@ -163,7 +163,7 @@ doQueryWithCriteria qc =
     queryUntagged ::
       Connection -> [T.Text] -> IO [FileWithTags]
     queryUntagged c ns = do
-      untaggedFwts <- getUntaggedFileWithTags c
+      untaggedFwts <- getsUntaggedFileWithTags c
       case ns of
         [] -> return untaggedFwts
         (n : _) ->
