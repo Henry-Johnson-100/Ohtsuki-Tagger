@@ -531,57 +531,60 @@ generalDescriptorTreeWidget tr bs dAction dtrConf =
 imageDetailWidget ::
   TaggerModel -> TaggerWidget
 imageDetailWidget m =
-  let !isSoloTagMode' = m ^. doSoloTag
-      !currentFileSelection' = cCollect (m ^. fileSelectionModel . fileSelection)
-      !tagCounts' = m ^. singleFileModel . tagCounts
-   in flip styleBasic [borderL 1 black, rangeWidth 160 800]
-        . box_ [alignLeft]
-        . vstack_ []
-        $ [ label "Details:",
-            spacer,
-            label "Solo Tagging Mode"
-              `styleBasic` [textColor yuiOrange]
-              `nodeVisible` isSoloTagMode',
-            spacer,
-            vsplit_
-              [splitIgnoreChildResize True]
-              ( vstack_
-                  []
-                  [ label "Tags:",
-                    hstack_
-                      []
-                      [ spacer,
-                        flip styleBasic [border 1 black]
-                          . vscroll_ [wheelRate 50]
-                          . vstack_ []
-                          . map imageDetailDescriptor
-                          . L.sort
-                          $ tagCounts'
-                      ]
-                  ],
-                vstack_
-                  []
-                  [ label $
-                      "In Selection: "
-                        !++ "("
-                        !++ (T.pack . show . length) currentFileSelection'
-                        !++ ")",
-                    spacer,
-                    hstack_
-                      []
-                      [ spacer,
-                        flip styleBasic [border 1 black]
-                          . vscroll_ [wheelRate 50]
-                          . vstack_ []
-                          . map imageDetailDescriptor
-                          . L.sort
-                          . sumSelectionTagCounts
-                          $ currentFileSelection'
-                      ]
-                  ]
-              )
-          ]
+  flip styleBasic [borderL 1 black, rangeWidth 160 800]
+    . box_ [alignLeft]
+    . vstack_ []
+    $ [ label "Details:",
+        spacer,
+        label "Solo Tagging Mode"
+          `styleBasic` [textColor yuiOrange]
+          `nodeVisible` (m ^. doSoloTag),
+        spacer,
+        vsplit_
+          [splitIgnoreChildResize True]
+          (detailTagsWidget, inSelectionWidget)
+      ]
   where
+    detailTagsWidget :: TaggerWidget
+    detailTagsWidget =
+      vstack_
+        []
+        [ label "Tags:",
+          hstack_
+            []
+            [ spacer,
+              flip styleBasic [border 1 black]
+                . vscroll_ [wheelRate 50]
+                . vstack_ []
+                . map imageDetailDescriptor
+                . L.sort
+                $ (m ^. singleFileModel . tagCounts)
+            ]
+        ]
+    inSelectionWidget :: TaggerWidget
+    inSelectionWidget =
+      vstack_
+        []
+        [ label $
+            "In Selection: "
+              !++ "("
+              !++ (T.pack . show . length . cCollect)
+                (m ^. fileSelectionModel . fileSelection)
+              !++ ")",
+          spacer,
+          hstack_
+            []
+            [ spacer,
+              flip styleBasic [border 1 black]
+                . vscroll_ [wheelRate 50]
+                . vstack_ []
+                . map imageDetailDescriptor
+                . L.sort
+                . sumSelectionTagCounts
+                . cCollect
+                $ (m ^. fileSelectionModel . fileSelection)
+            ]
+        ]
     imageDetailDescriptor ::
       (WidgetModel s) =>
       TagCount ->

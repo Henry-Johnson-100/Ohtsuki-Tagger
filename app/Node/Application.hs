@@ -1,6 +1,5 @@
 {-# HLINT ignore "Use lambda-case" #-}
 {-# HLINT ignore "Use list comprehension" #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# HLINT ignore "Use lambda" #-}
 {-# HLINT ignore "Eta reduce" #-}
@@ -351,12 +350,6 @@ operationWidget =
         . hstack_ []
         $ [button "→" ShellCmd, shellCmdTextField]
     selectionOperatorWidget ::
-      -- ( WidgetModel s,
-      --   HasTaggingMode s TaggingMode,
-      --   HasSetArithmetic s FileSetArithmetic,
-      --   HasFileSelectionModel s FileSelectionModel,
-      --   HasQueryCriteria s QueryCriteria
-      -- ) =>
       WidgetNode TaggerModel TaggerEvent
     selectionOperatorWidget =
       box_ []
