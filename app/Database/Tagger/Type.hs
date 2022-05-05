@@ -9,6 +9,8 @@ module Database.Tagger.Type
     toDatabaseTag,
     DatabaseTag (..),
     SubTag (..),
+    toDatabaseSubTag,
+    DatabaseSubTag (..),
     MetaDescriptor (..),
     DescriptorTree (..),
     TagCount (..),
@@ -120,10 +122,19 @@ instance FromRow Descriptor where
 |____/ \___/|____/ |_/_/   \_\____|
 -}
 
-data SubTag = SubTag {subTag :: Int, subDescriptorId :: Int} deriving (Show, Eq)
+data DatabaseSubTag = SubTag_ TagKey DescriptorKey deriving (Show, Eq)
 
-instance FromRow SubTag where
-  fromRow = SubTag <$> field <*> field
+instance FromRow DatabaseSubTag where
+  fromRow = SubTag_ <$> field <*> field
+
+data SubTag = SubTag {subTagTag :: Tag, subTagDescriptor :: Descriptor}
+  deriving (Show, Eq)
+
+toDatabaseSubTag :: SubTag -> DatabaseSubTag
+toDatabaseSubTag st =
+  SubTag_
+    (tagId . subTagTag $ st)
+    (descriptorId . subTagDescriptor $ st)
 
 {-
  _____  _    ____

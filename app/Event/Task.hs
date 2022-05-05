@@ -101,12 +101,7 @@ tag c fwts dds = do
   mapM_ (insertDatabaseTag c) newTags
 
 subTag :: Connection -> [SubTag] -> IO ()
-subTag = newSubTags
-
-getSubTagsForTag :: Connection -> Tag -> IO [Descriptor]
-getSubTagsForTag c =
-  fmap catMaybes . mapM (runMaybeT . getDescriptor c . subDescriptorId)
-    <=< getSubTags c
+subTag c = newSubTags c . map toDatabaseSubTag
 
 getRefreshedFWTs :: Connection -> [FileWithTags] -> IO [FileWithTags]
 getRefreshedFWTs c fwts = do
