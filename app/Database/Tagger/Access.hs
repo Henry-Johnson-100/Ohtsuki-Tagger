@@ -32,13 +32,13 @@ module Database.Tagger.Access
     getFile,
     getTagCount,
     getsUntaggedFileWithTags,
-    getFileWithTags,
+    fromDatabaseFileWithTags,
     getRepresentative,
-    lookupFileWithTagsByRelation,
-    lookupFileWithTagsByFilePattern,
-    lookupFileWithTagsByTagPattern,
-    lookupFileWithTagByTagId,
-    lookupFileWithTagsByFileId,
+    lookupFileWithTagsByInfraRelation,
+    lookupFileWithTagsByFilePattern',
+    lookupFileWithTagsByTagPattern',
+    lookupFileWithTagsByDescriptorId',
+    lookupFileWithTagsByFileId',
     lookupDescriptorPattern,
     hoistMaybe,
     activateForeignKeyPragma,
@@ -65,9 +65,7 @@ import Database.SQLite.Simple
   )
 import Database.SQLite.Simple.ToField (ToField)
 import Database.Tagger.Access.RowMap
-  ( fileWithMaybeTagsMapper,
-    fileWithTagsMapper,
-    reduceDbFwtList,
+  ( reduceDbFwtList,
     tagCountMapper,
   )
 import Database.Tagger.Type
@@ -87,11 +85,11 @@ import Database.Tagger.Type
     TagCount (..),
     TagKey,
     databaseFileWithTagsFileKey,
+    databaseFileWithTagsTagKeys,
     descriptorTreeElem,
     flattenTree,
     fwtFileEqual,
     insertIntoDescriptorTree,
-    pushTag,
     tagId,
   )
 import IO (hPutStrLn, stderr)
@@ -337,13 +335,6 @@ lookupUntaggedFileWithTags c = do
       IO [DatabaseFileWithTags]
   return . reduceDbFwtList $ r
 
-lookupFileWithTagsByRelation :: Connection -> DescriptorKey -> IO [FileWithTags]
-lookupFileWithTagsByRelation c did = do
-  relationTree <- runMaybeT . fetchInfraTree c $ did
-  let maybeTags = map descriptorId . maybe [] flattenTree $ relationTree
-  fmap concat . mapM (lookupFileWithTagByTagId c) $maybeTags
-
--- | New implementation of lookupFileWithTagsByRelation
 lookupFileWithTagsByInfraRelation ::
   Connection -> DescriptorKey -> IO [DatabaseFileWithTags]
 lookupFileWithTagsByInfraRelation c dk = do
@@ -351,57 +342,16 @@ lookupFileWithTagsByInfraRelation c dk = do
   let maybeTags = map descriptorId . maybe [] flattenTree $ relationTree
   fmap concat . mapM (lookupFileWithTagsByDescriptorId' c) $ maybeTags
 
-lookupFileWithTagsByFilePattern :: Connection -> T.Text -> IO [FileWithTags]
-lookupFileWithTagsByFilePattern c p = do
-  fs <- lookupFilePattern c p
-  fmap concat . mapM (lookupFileWithTagsByFileId c . fileId) $ fs
-
 lookupFileWithTagsByFilePattern' :: Connection -> T.Text -> IO [DatabaseFileWithTags]
 lookupFileWithTagsByFilePattern' c =
   fmap concat . mapM (lookupFileWithTagsByFileId' c . fileId)
     <=< lookupFilePattern c
-
-lookupFileWithTagsByTagPattern :: Connection -> T.Text -> IO [FileWithTags]
-lookupFileWithTagsByTagPattern c p = do
-  ds <- lookupDescriptorPattern c p
-  fmap concat . mapM (lookupFileWithTagByTagId c . descriptorId) $ ds
 
 lookupFileWithTagsByTagPattern' :: Connection -> T.Text -> IO [DatabaseFileWithTags]
 lookupFileWithTagsByTagPattern' c =
   fmap concat . mapM (lookupFileWithTagsByDescriptorId' c . descriptorId)
     <=< lookupDescriptorPattern c
 
-lookupFileWithTagByTagId :: Connection -> DescriptorKey -> IO [FileWithTags]
-lookupFileWithTagByTagId conn t = do
-  r <-
-    query
-      conn
-      "SELECT \
-      \f1.id, \
-      \f1.filePath, \
-      \d.id, \
-      \d.descriptor \
-      \FROM \
-      \Tag t \
-      \JOIN Descriptor d ON t.descriptorTagId = d.id \
-      \JOIN ( \
-      \SELECT \
-      \f.* \
-      \FROM \
-      \File f \
-      \JOIN Tag t ON f.id = t.fileTagId \
-      \JOIN Descriptor d ON t.descriptorTagId = d.id \
-      \WHERE \
-      \d.id = ? \
-      \) as f1 ON t.fileTagId = f1.id \
-      \ORDER BY \
-      \f1.filePath;"
-      [t]
-  return . fileWithTagsMapper $ r
-
--- | Version of lookupFileWithTagByTagId
---
--- Name has been changed to better describe what it queries with.
 lookupFileWithTagsByDescriptorId' ::
   Connection -> DescriptorKey -> IO [DatabaseFileWithTags]
 lookupFileWithTagsByDescriptorId' c dk = do
@@ -425,22 +375,6 @@ lookupFileWithTagsByDescriptorId' c dk = do
       . reduceDbFwtList
       $ r
   return . reduceDbFwtList $ r'
-
-lookupFileWithTagsByFileId :: Connection -> FileKey -> IO [FileWithTags]
-lookupFileWithTagsByFileId c fid = do
-  r <-
-    query
-      c
-      "SELECT f.id, f.filePath, d.id, d.descriptor \
-      \FROM File f \
-      \  LEFT JOIN Tag t \
-      \    ON f.id = t.fileTagId \
-      \  LEFT JOIN Descriptor d \
-      \    ON t.descriptorTagId = d.id \
-      \WHERE f.id = ? \
-      \ORDER BY f.filePath"
-      [fid]
-  return . fileWithMaybeTagsMapper $ r
 
 lookupFileWithTagsByFileId' :: Connection -> FileKey -> IO [DatabaseFileWithTags]
 lookupFileWithTagsByFileId' c fk = do
@@ -479,6 +413,18 @@ lookupFilePattern conn p = do
       [p]
   return r
 
+fromDatabaseFileWithTags :: Connection -> DatabaseFileWithTags -> MaybeT IO FileWithTags
+fromDatabaseFileWithTags c dbfwt = do
+  f <- getFile c . databaseFileWithTagsFileKey $ dbfwt
+  dbt <-
+    fmap catMaybes
+      . lift
+      . mapM (runMaybeT . getTag c)
+      . databaseFileWithTagsTagKeys
+      $ dbfwt
+  t <- fmap catMaybes . lift . mapM (runMaybeT . fromDatabaseTag c) $ dbt
+  return $ FileWithTags f t
+
 {-
   ____ _____ _____
  / ___| ____|_   _|
@@ -491,9 +437,6 @@ Get functions take some primitive db value, either a key or link type like Tag
 
 Gets functions take a list of primitive values and return IO [a] of another value.
 -}
-
-getFileWithTags :: Connection -> DatabaseFileWithTags -> MaybeT IO FileWithTags
-getFileWithTags c dbfwt = undefined
 
 getDescriptor :: Connection -> DescriptorKey -> MaybeT IO Descriptor
 getDescriptor c did = do

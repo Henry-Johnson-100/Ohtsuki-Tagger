@@ -106,8 +106,8 @@ subTag c = newSubTags c . map toDatabaseSubTag
 getRefreshedFWTs :: Connection -> [FileWithTags] -> IO [FileWithTags]
 getRefreshedFWTs c fwts = do
   let fids = map (fileId . file) fwts
-  refreshedFWTs <- mapM (lookupFileWithTagsByFileId c) fids
-  return . concat $ refreshedFWTs
+  refreshedDbFwts <- fmap concat . mapM (lookupFileWithTagsByFileId' c) $ fids
+  fmap catMaybes . mapM (runMaybeT . fromDatabaseFileWithTags c) $ refreshedDbFwts
 
 untag :: Connection -> [FileWithTags] -> [T.Text] -> IO ()
 untag c fwts dds = do
@@ -148,18 +148,20 @@ doQueryWithCriteria qc =
       [T.Text] ->
       IO [FileWithTags]
     queryByTag c ts = do
-      fwts <- mapM (lookupFileWithTagsByTagPattern c) ts
-      return . concat $ fwts
+      dbFwts <- fmap concat . mapM (lookupFileWithTagsByTagPattern' c) $ ts
+      fmap catMaybes . mapM (runMaybeT . fromDatabaseFileWithTags c) $ dbFwts
     queryRelation ::
       Connection -> [T.Text] -> IO [FileWithTags]
     queryRelation c rs = do
       ds <- fmap concat . mapM (lookupDescriptorPattern c) $ rs
-      fmap concat
-        . mapM
-          ( lookupFileWithTagsByRelation c
-              . descriptorId
-          )
-        $ ds
+      dbfwts <-
+        fmap concat
+          . mapM
+            ( lookupFileWithTagsByInfraRelation c
+                . descriptorId
+            )
+          $ ds
+      fmap catMaybes . mapM (runMaybeT . fromDatabaseFileWithTags c) $ dbfwts
     queryUntagged ::
       Connection -> [T.Text] -> IO [FileWithTags]
     queryUntagged c ns = do
@@ -173,8 +175,8 @@ doQueryWithCriteria qc =
     queryFilePattern ::
       Connection -> [T.Text] -> IO [FileWithTags]
     queryFilePattern c ps = do
-      fwts <- mapM (lookupFileWithTagsByFilePattern c) ps
-      return . concat $ fwts
+      dbFwts <- fmap concat . mapM (lookupFileWithTagsByFilePattern' c) $ ps
+      fmap catMaybes . mapM (runMaybeT . fromDatabaseFileWithTags c) $ dbFwts
 
 lookupInfraDescriptorTree ::
   Connection -> T.Text -> IO DescriptorTree

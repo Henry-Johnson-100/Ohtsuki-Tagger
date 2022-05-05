@@ -197,7 +197,10 @@ singleFileEventHandler wenv node model event =
     SingleFileGetTagCounts ->
       [ dbConnTask
           (DoSingleFileEvent . SingleFilePutTagCounts_)
-          (flip getTagCounts . maybe [] tags $ model ^. (singleFileModel . singleFile))
+          ( flip getTagCounts
+              . maybe [] (map tagDescriptor . tags)
+              $ model ^. (singleFileModel . singleFile)
+          )
           (model ^. dbConn)
       ]
 

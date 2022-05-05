@@ -5,6 +5,7 @@ module Database.Tagger.Type
   ( File (..),
     Descriptor (..),
     FileWithTags (..),
+    toDatabaseFileWithTags,
     DatabaseFileWithTags (..),
     databaseFileWithTagsFileKey,
     databaseFileWithTagsTagKeys,
@@ -32,7 +33,6 @@ module Database.Tagger.Type
     constructValidDbPath,
     getPathsToAdd,
     getNode,
-    pushTag,
     fwtFileEqual,
     sortChildren,
   )
@@ -76,7 +76,7 @@ tagCountMapSumUnion = HashMap.unionWith (+)
 
 fileWithTagsToTagCountMap :: FileWithTags -> TagCountMap
 fileWithTagsToTagCountMap (FileWithTags _ ds) =
-  HashMap.fromList . zip ds . L.repeat $ 1
+  HashMap.fromList . zip (map tagDescriptor ds) . L.repeat $ 1
 
 {-
  _____ ___ _     _____
@@ -215,11 +215,12 @@ instance FromRow DatabaseFileWithTags where
 
 data FileWithTags = FileWithTags
   { file :: File,
-    tags :: [Descriptor]
+    tags :: [Tag]
   }
   deriving (Eq, Generics.Generic)
 
--- #TODO toDatabaseFileWithTags :: FileWithTags -> DatabaseFileWithTags
+toDatabaseFileWithTags :: FileWithTags -> DatabaseFileWithTags
+toDatabaseFileWithTags fwt = FileWithTags_ (fileId . file $ fwt) (map tagId . tags $ fwt)
 
 instance Show FileWithTags where
   show =
@@ -228,14 +229,8 @@ instance Show FileWithTags where
       (flip (++) " : " . show . file)
       (concatMap show . L.sort . tags)
 
-instance H.Hashable FileWithTags where
-  hash = H.hash . file
-
 fwtFileEqual :: FileWithTags -> FileWithTags -> Bool
 (FileWithTags fx _) `fwtFileEqual` (FileWithTags fy _) = fx == fy
-
-pushTag :: FileWithTags -> Descriptor -> FileWithTags
-pushTag (FileWithTags f ds) d = FileWithTags f (d : ds)
 
 {-
  ____  _____ ____ _____ ____  _____ _____
