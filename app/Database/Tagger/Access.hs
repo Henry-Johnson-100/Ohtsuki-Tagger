@@ -18,10 +18,7 @@ module Database.Tagger.Access
     deleteDescriptor,
     insertDatabaseTag,
     fromDatabaseTag,
-    newSubTags,
-    getsDatabaseSubTags,
     deleteDatabaseTags,
-    fromDatabaseSubTag,
     relate,
     unrelate,
     fetchInfraTree,
@@ -72,29 +69,6 @@ import Database.Tagger.Access.RowMap
     tagCountMapper,
   )
 import Database.Tagger.Type
-  ( DatabaseFileWithTags,
-    DatabaseSubTag (SubTag_),
-    DatabaseTag (Tag_),
-    Descriptor (Descriptor, descriptor, descriptorId),
-    DescriptorKey,
-    DescriptorTree (Infra),
-    File (File, fileId),
-    FileKey,
-    FileWithTags (FileWithTags, tags),
-    MetaDescriptor (..),
-    Representative (Representative, repDescription),
-    SubTag (SubTag),
-    Tag (Tag),
-    TagCount (..),
-    TagKey,
-    databaseFileWithTagsFileKey,
-    databaseFileWithTagsTagKeys,
-    descriptorTreeElem,
-    flattenTree,
-    fwtFileEqual,
-    insertIntoDescriptorTree,
-    tagId,
-  )
 import IO (hPutStrLn, stderr)
 import Util.Core
 
@@ -126,36 +100,22 @@ addFile c f = do
   return . File (fromIntegral insertedId) $ f
 
 insertDatabaseTag :: Connection -> DatabaseTag -> IO ()
-insertDatabaseTag c (Tag_ _ f d) =
+insertDatabaseTag c (Tag_ _ f d Nothing) =
   execute
     c
     "INSERT INTO Tag (fileTagId, descriptorTagId) VALUES (?,?)"
     (f, d)
 
 fromDatabaseTag :: Connection -> DatabaseTag -> MaybeT IO Tag
-fromDatabaseTag c (Tag_ tk fk dk) = do
+fromDatabaseTag c (Tag_ tk fk dk st) = do
   f <- getFile c fk
   d <- getDescriptor c dk
-  return $ Tag tk f d
-
-newSubTags :: Connection -> [DatabaseSubTag] -> IO ()
-newSubTags c =
-  executeMany
-    c
-    "INSERT INTO SubTag (tagId, descriptorId) VALUES (?,?)"
-    . map (\(SubTag_ tid did) -> (tid, did))
-
-fromDatabaseSubTag :: Connection -> DatabaseSubTag -> MaybeT IO SubTag
-fromDatabaseSubTag c (SubTag_ tk dk) = do
-  dt <- getTag c tk
-  t <- fromDatabaseTag c dt
-  d <- getDescriptor c dk
-  return (SubTag t d)
+  return $ Tag tk f d st
 
 deleteDatabaseTags :: Connection -> [DatabaseTag] -> IO ()
 deleteDatabaseTags c =
-  executeMany c "DELETE FROM Tag WHERE fileTagId = ? AND descriptorTagId = ?"
-    . map (\(Tag_ _ fk dk) -> (fk, dk))
+  executeMany c "DELETE FROM Tag WHERE tagId = ?"
+    . map (\(Tag_ tid _ _ _) -> [tid])
 
 -- | Create new descriptor and relate it to #UNRELATED#
 addDescriptor :: Connection -> T.Text -> MaybeT IO Descriptor
@@ -477,16 +437,6 @@ getRepresentative c descriptorId = do
     d <- getDescriptor c . (\(_, k, _) -> k) $ r
     return $ Representative f d Nothing
   return $ rep {repDescription = (\(_, _, d') -> d') r}
-
-getsDatabaseSubTags :: Connection -> DatabaseTag -> IO [DatabaseSubTag]
-getsDatabaseSubTags c (Tag_ tid _ _) =
-  query
-    c
-    "SELECT tagId, descriptorId \
-    \FROM SubTag \
-    \WHERE tagId = ? \
-    \ORDER BY tagId"
-    [tid]
 
 getTag :: Connection -> TagKey -> MaybeT IO DatabaseTag
 getTag c tk = do

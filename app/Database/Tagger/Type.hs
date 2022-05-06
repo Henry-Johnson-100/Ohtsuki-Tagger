@@ -13,9 +13,6 @@ module Database.Tagger.Type
     Tag (..),
     toDatabaseTag,
     DatabaseTag (..),
-    SubTag (..),
-    toDatabaseSubTag,
-    DatabaseSubTag (..),
     MetaDescriptor (..),
     DescriptorTree (..),
     TagCount (..),
@@ -127,28 +124,6 @@ instance PrimaryKey Descriptor where
   getId = descriptorId
 
 {-
- ____  _   _ ____ _____  _    ____
-/ ___|| | | | __ )_   _|/ \  / ___|
-\___ \| | | |  _ \ | | / _ \| |  _
- ___) | |_| | |_) || |/ ___ \ |_| |
-|____/ \___/|____/ |_/_/   \_\____|
--}
-
-data DatabaseSubTag = SubTag_ TagKey DescriptorKey deriving (Show, Eq)
-
-instance FromRow DatabaseSubTag where
-  fromRow = SubTag_ <$> field <*> field
-
-data SubTag = SubTag {subTagTag :: Tag, subTagDescriptor :: Descriptor}
-  deriving (Show, Eq)
-
-toDatabaseSubTag :: SubTag -> DatabaseSubTag
-toDatabaseSubTag st =
-  SubTag_
-    (tagId . subTagTag $ st)
-    (descriptorId . subTagDescriptor $ st)
-
-{-
  _____  _    ____
 |_   _|/ \  / ___|
   | | / _ \| |  _
@@ -156,17 +131,28 @@ toDatabaseSubTag st =
   |_/_/   \_\____|
 -}
 
-data DatabaseTag = Tag_ TagKey FileKey DescriptorKey
+data DatabaseTag = Tag_ !TagKey !FileKey !DescriptorKey !(Maybe TagKey)
   deriving (Show, Eq)
 
 instance FromRow DatabaseTag where
-  fromRow = Tag_ <$> field <*> field <*> field
+  fromRow = Tag_ <$> field <*> field <*> field <*> field
 
-data Tag = Tag {tagId :: Int, tagFile :: File, tagDescriptor :: Descriptor}
+data Tag = Tag
+  { tagId :: !Int,
+    tagFile :: !File,
+    tagDescriptor :: !Descriptor,
+    subTagOfId :: !(Maybe Int)
+  }
   deriving (Show, Eq, Ord)
 
 toDatabaseTag :: Tag -> DatabaseTag
-toDatabaseTag = liftM3 Tag_ tagId (fileId . tagFile) (descriptorId . tagDescriptor)
+toDatabaseTag =
+  liftM4
+    Tag_
+    tagId
+    (fileId . tagFile)
+    (descriptorId . tagDescriptor)
+    subTagOfId
 
 {-
  _____  _    ____ ____  _____ _____  _    ___ _
