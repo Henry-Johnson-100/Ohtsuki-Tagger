@@ -129,10 +129,6 @@ unrelate c i = do
   _x <- runMaybeT . mapM_ (Database.Tagger.Access.unrelate c . descriptorId) $ i
   return ()
 
-getTagCounts :: Connection -> [Descriptor] -> IO [TagCount]
-getTagCounts c ds = do
-  mapM (getTagCount c) ds
-
 doQueryWithCriteria ::
   QueryCriteria ->
   Connection ->

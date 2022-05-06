@@ -45,9 +45,6 @@ instance GetPlainText Descriptor where
 instance GetPlainText FileWithTags where
   getPlainText = getPlainText . file
 
-instance GetPlainText TagCount where
-  getPlainText (d, n) = getPlainText d !++ " (" !++ (T.pack . show) n !++ ")"
-
 stdDelayTooltip :: T.Text -> WidgetNode s e -> WidgetNode s e
 stdDelayTooltip = flip tooltip_ [tooltipDelay 750]
 

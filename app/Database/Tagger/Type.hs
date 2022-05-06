@@ -15,15 +15,10 @@ module Database.Tagger.Type
     DatabaseTag (..),
     MetaDescriptor (..),
     DescriptorTree (..),
-    TagCount (..),
-    TagCountMap (..),
     Representative (..),
     FileKey,
     DescriptorKey,
     TagKey,
-    tagCountUnmap,
-    tagCountMapSumUnion,
-    fileWithTagsToTagCountMap,
     insertIntoDescriptorTree,
     descriptorTreeElem,
     flattenTree,
@@ -36,12 +31,12 @@ module Database.Tagger.Type
   )
 where
 
-import Control.Monad
+import Control.Monad (liftM2, liftM4)
 import qualified Control.Monad
 import qualified Control.Monad.Trans.Class as Trans
 import Control.Monad.Trans.Maybe (MaybeT (MaybeT, runMaybeT))
-import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Hashable as H
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as L
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as M
@@ -50,7 +45,7 @@ import Database.SQLite.Simple (FromRow (..), field)
 import qualified Database.SQLite.Simple.FromRow as FromRow
 import qualified GHC.Generics as Generics
 import qualified IO
-import Util.Core
+import Util.Core (PrimaryKey (getId))
 
 {-
  ______   ___   _
@@ -66,19 +61,7 @@ type DescriptorKey = Int
 
 type TagKey = Int
 
-type TagCount = (Descriptor, Int)
-
-type TagCountMap = HashMap.HashMap Descriptor Int
-
-tagCountUnmap :: TagCountMap -> [TagCount]
-tagCountUnmap = Control.Monad.liftM2 zip HashMap.keys HashMap.elems
-
-tagCountMapSumUnion :: TagCountMap -> TagCountMap -> TagCountMap
-tagCountMapSumUnion = HashMap.unionWith (+)
-
-fileWithTagsToTagCountMap :: FileWithTags -> TagCountMap
-fileWithTagsToTagCountMap (FileWithTags _ ds) =
-  HashMap.fromList . zip (map tagDescriptor ds) . L.repeat $ 1
+type TagMap = IntMap.IntMap Tag
 
 {-
  _____ ___ _     _____

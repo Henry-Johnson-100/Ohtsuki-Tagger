@@ -4,14 +4,13 @@
 
 -- | Defines functions to map rows to types that do not have instances of FromRow.
 module Database.Tagger.Access.RowMap
-  ( tagCountMapper,
-    reduceDbFwtList,
+  ( reduceDbFwtList,
     descriptorOccurrenceMapParser,
   )
 where
 
-import qualified Data.List as L
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.List as L
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as M
 import qualified Data.Text as T
@@ -40,9 +39,6 @@ reduceDbFwtList = fromDbFwtMap . L.foldl' insertDbFwt Map.empty
         tks' (FileWithTags_ _ tks) = tks
     fromDbFwtMap :: DatabaseFWTMap -> [DatabaseFileWithTags]
     fromDbFwtMap = map (uncurry FileWithTags_) . Map.toList
-
-tagCountMapper :: Descriptor -> Only Int -> TagCount
-tagCountMapper d (Only n) = (d, n)
 
 descriptorOccurrenceMapParser :: (Int, Int) -> OccurrenceMap Descriptor
 descriptorOccurrenceMapParser (dk, c) = IntMap.singleton dk c

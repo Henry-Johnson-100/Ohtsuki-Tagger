@@ -27,7 +27,6 @@ module Database.Tagger.Access
     fetchInfraDescriptors,
     getDescriptor,
     getFile,
-    getTagCount,
     getsUntaggedFileWithTags,
     fromDatabaseFileWithTags,
     getRepresentative,
@@ -66,11 +65,28 @@ import Database.SQLite.Simple.ToField (ToField)
 import Database.Tagger.Access.RowMap
   ( descriptorOccurrenceMapParser,
     reduceDbFwtList,
-    tagCountMapper,
   )
 import Database.Tagger.Type
+  ( DatabaseFileWithTags,
+    DatabaseTag (..),
+    Descriptor (..),
+    DescriptorKey,
+    DescriptorTree (Infra),
+    File (File, fileId),
+    FileKey,
+    FileWithTags (FileWithTags),
+    MetaDescriptor (MetaDescriptor),
+    Representative (Representative, repDescription),
+    Tag (Tag),
+    TagKey,
+    databaseFileWithTagsFileKey,
+    databaseFileWithTagsTagKeys,
+    descriptorTreeElem,
+    flattenTree,
+    insertIntoDescriptorTree,
+  )
 import IO (hPutStrLn, stderr)
-import Util.Core
+import Util.Core (OccurrenceMap, head', hoistMaybe)
 
 debug# :: Bool
 debug# = False
@@ -449,11 +465,6 @@ getTag c tk = do
         [tk] ::
       MaybeT IO [DatabaseTag]
   hoistMaybe . head' $ r
-
-getTagCount :: Connection -> Descriptor -> IO TagCount
-getTagCount c d = do
-  result <- query c "SELECT COUNT(*) FROM Tag WHERE descriptorTagId = ?" [descriptorId d]
-  return . tagCountMapper d . fromMaybe (Only 0 :: Only Int) . head' $ result
 
 getDescriptorOccurrenceMap ::
   Connection -> [DescriptorKey] -> IO (OccurrenceMap Descriptor)
