@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
@@ -12,6 +13,10 @@ module Database.Tagger.Type
     databaseFileWithTagsTagKeys,
     Tag (..),
     toDatabaseTag,
+    tagSetToTagMap,
+    tagSetToSubTagMap,
+    tagSetToTagMapTuple,
+    TagSet,
     DatabaseTag (..),
     MetaDescriptor (..),
     DescriptorTree (..),
@@ -35,6 +40,7 @@ import Control.Monad (liftM2, liftM4)
 import qualified Control.Monad
 import qualified Control.Monad.Trans.Class as Trans
 import Control.Monad.Trans.Maybe (MaybeT (MaybeT, runMaybeT))
+import qualified Data.HashSet as HashSet
 import qualified Data.Hashable as H
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as L
@@ -62,6 +68,8 @@ type DescriptorKey = Int
 type TagKey = Int
 
 type TagMap = IntMap.IntMap Tag
+
+type SubTagMap = IntMap.IntMap [Tag]
 
 {-
  _____ ___ _     _____
@@ -126,7 +134,12 @@ data Tag = Tag
     tagDescriptor :: !Descriptor,
     subTagOfId :: !(Maybe Int)
   }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generics.Generic)
+
+instance H.Hashable Tag where
+  hash = H.hash . tagId
+
+type TagSet = HashSet.HashSet Tag
 
 toDatabaseTag :: Tag -> DatabaseTag
 toDatabaseTag =
@@ -136,6 +149,38 @@ toDatabaseTag =
     (fileId . tagFile)
     (descriptorId . tagDescriptor)
     subTagOfId
+
+-- | O(n)
+tagSetToTagMap :: TagSet -> TagMap
+tagSetToTagMap ts =
+  if HashSet.null ts
+    then IntMap.empty
+    else HashSet.foldl' (\m t -> IntMap.insert (tagId t) t m) IntMap.empty ts
+
+-- | Probably close to O(n) in the given TagSet
+tagSetToSubTagMap :: TagSet -> TagMap -> SubTagMap
+tagSetToSubTagMap ts tm =
+  HashSet.foldl'
+    ( \im t ->
+        maybe
+          im
+          ( \subTagOfId' ->
+              IntMap.insertWith
+                (++)
+                subTagOfId'
+                [t]
+                im
+          )
+          (subTagOfId t)
+    )
+    IntMap.empty
+    ts
+
+-- | O(2n)
+tagSetToTagMapTuple :: TagSet -> (TagMap, SubTagMap)
+tagSetToTagMapTuple ts =
+  let !tm = tagSetToTagMap ts
+   in (tm, tagSetToSubTagMap ts tm)
 
 {-
  _____  _    ____ ____  _____ _____  _    ___ _
@@ -205,20 +250,23 @@ instance FromRow DatabaseFileWithTags where
   fromRow = TaggedFile_ <$> field <*> field
 
 data FileWithTags = FileWithTags
-  { file :: File,
-    tags :: [Tag]
+  { file :: !File,
+    tags :: !TagSet
   }
   deriving (Eq, Generics.Generic)
 
 toDatabaseFileWithTags :: FileWithTags -> DatabaseFileWithTags
-toDatabaseFileWithTags fwt = FileWithTags_ (fileId . file $ fwt) (map tagId . tags $ fwt)
+toDatabaseFileWithTags fwt =
+  FileWithTags_
+    (fileId . file $ fwt)
+    (map tagId . HashSet.toList . tags $ fwt)
 
 instance Show FileWithTags where
   show =
     Control.Monad.liftM2
       (++)
       (flip (++) " : " . show . file)
-      (concatMap show . L.sort . tags)
+      (concatMap show . L.sort . HashSet.toList . tags)
 
 fwtFileEqual :: FileWithTags -> FileWithTags -> Bool
 (FileWithTags fx _) `fwtFileEqual` (FileWithTags fy _) = fx == fy

@@ -41,6 +41,7 @@ executable tagger
                       ,DeriveGeneric
                       ,RankNTypes
                       ,ExistentialQuantification
+                      ,TupleSections
 
   ghc-options:         -threaded
 

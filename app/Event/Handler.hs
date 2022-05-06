@@ -18,6 +18,7 @@ import Control.Lens ((%~), (&), (.~), (^.))
 import Control.Monad
 import qualified Control.Monad as CM
 import Control.Monad.Trans.Maybe
+import qualified Data.HashSet as HashSet
 import qualified Data.List as L
 import qualified Data.Maybe as M
 import qualified Data.Text as T
@@ -200,7 +201,7 @@ singleFileEventHandler wenv node model event =
           ( flip
               getDescriptorOccurrenceMap
               ( maybeWithList
-                  (map (descriptorId . tagDescriptor) . tags)
+                  (map (descriptorId . tagDescriptor) . HashSet.toList . tags) -- #FIXME
                   $ model ^. singleFileModel . singleFile
               )
           )

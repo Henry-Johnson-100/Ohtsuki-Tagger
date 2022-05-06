@@ -11,6 +11,7 @@
 module Node.Micro where
 
 import Control.Lens
+import qualified Data.HashSet as HashSet
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as L
 import qualified Data.Text as T
@@ -559,7 +560,7 @@ imageDetailWidget m =
                 . L.sort
                 . zipDecodeOccurrenceMap
                   ( map (\d' -> (descriptorId d', d'))
-                      . maybeWithList (map tagDescriptor . tags)
+                      . maybeWithList (map tagDescriptor . HashSet.toList . tags) -- #FIXME
                       $ (m ^. singleFileModel . singleFile)
                   )
                 $ m ^. singleFileModel . tagCounts
@@ -587,13 +588,13 @@ imageDetailWidget m =
                 -- this is total jank but it works now
                 $ ( let selD =
                           (\xs -> if null xs then [] else L.foldl1' union xs)
-                            . map (map tagDescriptor . tags)
+                            . map (map tagDescriptor . HashSet.toList . tags) -- #FIXME
                             . cCollect
                             $ m ^. fileSelectionModel . fileSelection
                         om =
                           foldOccurrences
                             . map tagDescriptor
-                            . concatMap tags
+                            . concatMap (HashSet.toList . tags) -- #FIXME
                             . cCollect
                             $ m ^. fileSelectionModel . fileSelection
                      in decodeOccurrencesWith selD om

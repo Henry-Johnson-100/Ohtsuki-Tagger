@@ -45,6 +45,7 @@ where
 import Control.Monad (unless, when, (<=<), (>=>))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Maybe (MaybeT (..))
+import qualified Data.HashSet as HashSet
 import qualified Data.IntMap.Strict as IntMap
 import Data.List (foldl', foldl1', isPrefixOf, isSuffixOf)
 import Data.Maybe (catMaybes, fromJust, fromMaybe, maybe)
@@ -288,7 +289,6 @@ fetchInfraDescriptors c did = do
       [did]
   return r
 
--- #TODO query with untaggedDatabaseFileWIthTagsRowParser
 getsUntaggedFileWithTags :: Connection -> IO [FileWithTags]
 getsUntaggedFileWithTags c = do
   r <-
@@ -299,7 +299,7 @@ getsUntaggedFileWithTags c = do
       \  LEFT JOIN Tag t \
       \    ON f.id = t.fileTagId \
       \WHERE t.descriptorTagId IS NULL"
-  return . map (`FileWithTags` []) $ r
+  return . map (`FileWithTags` HashSet.empty) $ r
 
 lookupUntaggedFileWithTags :: Connection -> IO [DatabaseFileWithTags]
 lookupUntaggedFileWithTags c = do
@@ -402,7 +402,7 @@ fromDatabaseFileWithTags c dbfwt = do
       . databaseFileWithTagsTagKeys
       $ dbfwt
   t <- fmap catMaybes . lift . mapM (runMaybeT . fromDatabaseTag c) $ dbt
-  return $ FileWithTags f t
+  return . FileWithTags f . HashSet.fromList $ t
 
 {-
   ____ _____ _____
@@ -460,7 +460,7 @@ getTag c tk = do
     lift $
       query
         c
-        "SELECT id, fileTagId, descriptorTagId \
+        "SELECT id, fileTagId, descriptorTagId, subTagOfId \
         \FROM Tag WHERE id = ?"
         [tk] ::
       MaybeT IO [DatabaseTag]
