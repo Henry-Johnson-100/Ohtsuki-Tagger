@@ -34,6 +34,7 @@ module Database.Tagger.Access
     getsUntaggedFileWithTags,
     fromDatabaseFileWithTags,
     getRepresentative,
+    getDescriptorOccurrenceMap,
     lookupFileWithTagsByInfraRelation,
     lookupFileWithTagsByFilePattern',
     lookupFileWithTagsByTagPattern',
@@ -48,7 +49,8 @@ where
 import Control.Monad (unless, when, (<=<), (>=>))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Maybe (MaybeT (..))
-import Data.List (foldl', isPrefixOf, isSuffixOf)
+import qualified Data.IntMap.Strict as IntMap
+import Data.List (foldl', foldl1', isPrefixOf, isSuffixOf)
 import Data.Maybe (catMaybes, fromJust, fromMaybe, maybe)
 import qualified Data.Text as T
 import Database.SQLite.Simple
@@ -65,7 +67,8 @@ import Database.SQLite.Simple
   )
 import Database.SQLite.Simple.ToField (ToField)
 import Database.Tagger.Access.RowMap
-  ( reduceDbFwtList,
+  ( descriptorOccurrenceMapParser,
+    reduceDbFwtList,
     tagCountMapper,
   )
 import Database.Tagger.Type
@@ -501,3 +504,21 @@ getTagCount :: Connection -> Descriptor -> IO TagCount
 getTagCount c d = do
   result <- query c "SELECT COUNT(*) FROM Tag WHERE descriptorTagId = ?" [descriptorId d]
   return . tagCountMapper d . fromMaybe (Only 0 :: Only Int) . head' $ result
+
+getDescriptorOccurrenceMap ::
+  Connection -> [DescriptorKey] -> IO (OccurrenceMap Descriptor)
+getDescriptorOccurrenceMap c dks = do
+  let q =
+        fmap (map descriptorOccurrenceMapParser)
+          . query
+            c
+            "SELECT d.id, count(d.id) \
+            \FROM Tag t \
+            \  JOIN Descriptor d \
+            \    ON t.descriptorTagId = d.id \
+            \WHERE t.descriptorTagId = ? \
+            \GROUP BY d.id"
+          . Only ::
+          DescriptorKey -> IO [OccurrenceMap Descriptor]
+  r <- fmap concat . mapM q $ dks
+  return . IntMap.unions $ r

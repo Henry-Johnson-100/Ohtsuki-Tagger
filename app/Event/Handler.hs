@@ -22,7 +22,7 @@ import qualified Data.List as L
 import qualified Data.Maybe as M
 import qualified Data.Text as T
 import Database.SQLite.Simple
-import Database.Tagger.Access (activateForeignKeyPragma, lookupDescriptorPattern)
+import Database.Tagger.Access (activateForeignKeyPragma, getDescriptorOccurrenceMap, lookupDescriptorPattern)
 import Database.Tagger.Type
 import Event.Task
 import qualified IO
@@ -197,9 +197,12 @@ singleFileEventHandler wenv node model event =
     SingleFileGetTagCounts ->
       [ dbConnTask
           (DoSingleFileEvent . SingleFilePutTagCounts_)
-          ( flip getTagCounts
-              . maybe [] (map tagDescriptor . tags)
-              $ model ^. (singleFileModel . singleFile)
+          ( flip
+              getDescriptorOccurrenceMap
+              ( maybeWithList
+                  (map (descriptorId . tagDescriptor) . tags)
+                  $ model ^. singleFileModel . singleFile
+              )
           )
           (model ^. dbConn)
       ]

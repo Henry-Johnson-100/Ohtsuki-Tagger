@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Database.Tagger.Type
@@ -38,17 +39,21 @@ module Database.Tagger.Type
   )
 where
 
+import Control.Monad
 import qualified Control.Monad
 import qualified Control.Monad.Trans.Class as Trans
 import Control.Monad.Trans.Maybe (MaybeT (MaybeT, runMaybeT))
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Hashable as H
 import qualified Data.List as L
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as M
 import qualified Data.Text as T
 import Database.SQLite.Simple (FromRow (..), field)
+import qualified Database.SQLite.Simple.FromRow as FromRow
 import qualified GHC.Generics as Generics
 import qualified IO
+import Util.Core
 
 {-
  ______   ___   _
@@ -118,6 +123,9 @@ instance Ord Descriptor where
 instance FromRow Descriptor where
   fromRow = Descriptor <$> field <*> field
 
+instance PrimaryKey Descriptor where
+  getId = descriptorId
+
 {-
  ____  _   _ ____ _____  _    ____
 / ___|| | | | __ )_   _|/ \  / ___|
@@ -158,7 +166,21 @@ data Tag = Tag {tagId :: Int, tagFile :: File, tagDescriptor :: Descriptor}
   deriving (Show, Eq, Ord)
 
 toDatabaseTag :: Tag -> DatabaseTag
-toDatabaseTag t = Tag_ (-1) (fileId . tagFile $ t) (descriptorId . tagDescriptor $ t)
+toDatabaseTag = liftM3 Tag_ tagId (fileId . tagFile) (descriptorId . tagDescriptor)
+
+{-
+ _____  _    ____ ____  _____ _____  _    ___ _
+|_   _|/ \  / ___|  _ \| ____|_   _|/ \  |_ _| |
+  | | / _ \| |  _| | | |  _|   | | / _ \  | || |
+  | |/ ___ \ |_| | |_| | |___  | |/ ___ \ | || |___
+  |_/_/   \_\____|____/|_____| |_/_/   \_\___|_____|
+-}
+
+data TagDetail = TagDetail
+  { tagDetailSubTags :: !(Map.Map TagKey [Descriptor]), -- with this, I might not even need SubTag
+    tagDetailOccurrences :: !(Map.Map Descriptor Int)
+  }
+  deriving (Show, Eq)
 
 {-
  ____  _____ ____

@@ -35,12 +35,14 @@ where
 
 import Control.Lens
 import Control.Monad
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as L
 import Data.Text (Text)
 import Database.Tagger.Access
 import Database.Tagger.Type
 import Type.BufferList
 import Type.Config
+import Util.Core
 
 data TaggerModel = TaggerModel
   { _taggerFileSelectionModel :: !FileSelectionModel,
@@ -95,7 +97,7 @@ data FileSelectionModel = FileSelectionModel
 
 data SingleFileSelectionModel = SingleFileSelectionModel
   { _sfsmSingleFile :: !(Maybe FileWithTags),
-    _sfsmTagCounts :: ![TagCount]
+    _sfsmTagCounts :: !(OccurrenceMap Descriptor)
   }
   deriving (Show, Eq)
 
@@ -210,7 +212,7 @@ data SingleFileEvent
   = SingleFileNextFromFileSelection
   | SingleFilePrevFromFileSelection
   | SingleFilePut !FileWithTags
-  | SingleFilePutTagCounts_ ![TagCount]
+  | SingleFilePutTagCounts_ !(OccurrenceMap Descriptor)
   | SingleFileGetTagCounts
   | SingleFileMaybePut !(Maybe FileWithTags)
   deriving (Show, Eq)
@@ -315,7 +317,7 @@ emptySingleFileSelectionModel :: SingleFileSelectionModel
 emptySingleFileSelectionModel =
   SingleFileSelectionModel
     { _sfsmSingleFile = Nothing,
-      _sfsmTagCounts = []
+      _sfsmTagCounts = IntMap.empty
     }
 
 emptyTaggerModel :: TaggerConfig -> TaggerModel

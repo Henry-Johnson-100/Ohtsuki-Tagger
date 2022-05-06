@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# HLINT ignore "Redundant $" #-}
 {-# HLINT ignore "Use lambda-case" #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -10,6 +11,7 @@
 module Node.Micro where
 
 import Control.Lens
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as L
 import qualified Data.Text as T
 import Database.Tagger.Type
@@ -558,7 +560,12 @@ imageDetailWidget m =
                 . vstack_ []
                 . map imageDetailDescriptor
                 . L.sort
-                $ (m ^. singleFileModel . tagCounts)
+                . zipDecodeOccurrenceMap
+                  ( map (\d' -> (descriptorId d', d'))
+                      . maybeWithList (map tagDescriptor . tags)
+                      $ (m ^. singleFileModel . singleFile)
+                  )
+                $ m ^. singleFileModel . tagCounts
             ]
         ]
     inSelectionWidget :: TaggerWidget
@@ -580,14 +587,25 @@ imageDetailWidget m =
                 . vstack_ []
                 . map imageDetailDescriptor
                 . L.sort
-                . sumSelectionTagCounts
-                . cCollect
-                $ (m ^. fileSelectionModel . fileSelection)
+                -- this is total jank but it works now
+                $ ( let selD =
+                          (\xs -> if null xs then [] else L.foldl1' union xs)
+                            . map (map tagDescriptor . tags)
+                            . cCollect
+                            $ m ^. fileSelectionModel . fileSelection
+                        om =
+                          foldOccurrences
+                            . map tagDescriptor
+                            . concatMap tags
+                            . cCollect
+                            $ m ^. fileSelectionModel . fileSelection
+                     in decodeOccurrencesWith selD om
+                  )
             ]
         ]
     imageDetailDescriptor ::
       (WidgetModel s) =>
-      TagCount ->
+      (Descriptor, Int) ->
       WidgetNode s TaggerEvent
     imageDetailDescriptor (d, c) =
       hgrid_ [] $
@@ -605,13 +623,6 @@ imageDetailWidget m =
             . show
             $ c
         ]
-    sumSelectionTagCounts :: [FileWithTags] -> [TagCount]
-    sumSelectionTagCounts [] = []
-    sumSelectionTagCounts xs =
-      tagCountUnmap
-        . L.foldl1' tagCountMapSumUnion
-        . map fileWithTagsToTagCountMap
-        $ xs
 
 representativeFilePreview :: Maybe Representative -> TaggerWidget
 representativeFilePreview mr =

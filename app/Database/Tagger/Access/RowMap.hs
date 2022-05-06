@@ -6,15 +6,19 @@
 module Database.Tagger.Access.RowMap
   ( tagCountMapper,
     reduceDbFwtList,
+    descriptorOccurrenceMapParser,
   )
 where
 
 import qualified Data.List as L
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as M
 import qualified Data.Text as T
 import Database.SQLite.Simple (Only (Only))
+import qualified Database.SQLite.Simple.FromRow as FromRow
 import Database.Tagger.Type
+import Util.Core
 
 type DatabaseFWTMap = Map.Map FileKey [TagKey]
 
@@ -39,3 +43,6 @@ reduceDbFwtList = fromDbFwtMap . L.foldl' insertDbFwt Map.empty
 
 tagCountMapper :: Descriptor -> Only Int -> TagCount
 tagCountMapper d (Only n) = (d, n)
+
+descriptorOccurrenceMapParser :: (Int, Int) -> OccurrenceMap Descriptor
+descriptorOccurrenceMapParser (dk, c) = IntMap.singleton dk c
