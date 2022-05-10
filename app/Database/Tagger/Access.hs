@@ -17,7 +17,7 @@ module Database.Tagger.Access
     renameDescriptor,
     deleteDescriptor,
     insertDatabaseTag,
-    fromDatabaseTag,
+    derefTagPtr,
     deleteDatabaseSubTags,
     relate,
     unrelate,
@@ -71,8 +71,6 @@ import Database.Tagger.Access.RowMap
   )
 import Database.Tagger.Type
   ( DatabaseFileWithTags,
-    DatabaseTag (..),
-    DatabaseTagNoId (TagNoId_),
     Descriptor (..),
     DescriptorKey,
     DescriptorTree (Infra),
@@ -84,6 +82,8 @@ import Database.Tagger.Type
     Tag (Tag),
     TagKey,
     TagNoId (TagNoId),
+    TagPtr (..),
+    TagPtrNoId (TagNoId_),
     databaseFileWithTagsFileKey,
     databaseFileWithTagsTagKeys,
     descriptorTreeElem,
@@ -121,7 +121,7 @@ addFile c f = do
   insertedId <- lastInsertRowId c
   return . File (fromIntegral insertedId) $ f
 
-insertDatabaseTag :: Connection -> DatabaseTagNoId -> IO TagKey
+insertDatabaseTag :: Connection -> TagPtrNoId -> IO TagKey
 insertDatabaseTag c (TagNoId_ (Tag_ _ f d sid)) = do
   execute
     c
@@ -130,15 +130,15 @@ insertDatabaseTag c (TagNoId_ (Tag_ _ f d sid)) = do
   k <- lastInsertRowId c
   return . fromIntegral $ k
 
-fromDatabaseTag :: Connection -> DatabaseTag -> MaybeT IO Tag
-fromDatabaseTag c (Tag_ tk fk dk st) = do
+derefTagPtr :: Connection -> TagPtr -> MaybeT IO Tag
+derefTagPtr c (Tag_ tk fk dk st) = do
   f <- getFile c fk
   d <- getDescriptor c dk
   return $ Tag tk f d st
 
 -- | Deletes given tags using the tagId
 -- and cascades the deletion to any tag that is a subtag.
-deleteDatabaseSubTags :: Connection -> [DatabaseTag] -> IO ()
+deleteDatabaseSubTags :: Connection -> [TagPtr] -> IO ()
 deleteDatabaseSubTags c dbts = do
   hPutStrLn stderr $ "In access, deleting: " ++ show dbts
   executeMany
@@ -414,12 +414,12 @@ fromDatabaseFileWithTags c dbfwt = do
       . mapM (runMaybeT . getTag c)
       . databaseFileWithTagsTagKeys
       $ dbfwt
-  t <- fmap catMaybes . lift . mapM (runMaybeT . fromDatabaseTag c) $ dbt
+  t <- fmap catMaybes . lift . mapM (runMaybeT . derefTagPtr c) $ dbt
   return . FileWithTags f . HashSet.fromList $ t
 
 -- -- #TODO
 -- pseudoSubTagToDatabaseTags ::
---   Connection -> FileKey -> PseudoSubTag -> MaybeT IO [DatabaseTag]
+--   Connection -> FileKey -> PseudoSubTag -> MaybeT IO [TagPtr]
 -- pseudoSubTagToDatabaseTags c fk (pd, []) = do
 --   d <- hoistMaybe . head' <=< lift . lookupDescriptorPattern c . pseudoDescriptorText $ pd
 --   f <- getFile c fk
@@ -478,7 +478,7 @@ getRepresentative c descriptorId = do
     return $ Representative f d Nothing
   return $ rep {repDescription = (\(_, _, d') -> d') r}
 
-getTag :: Connection -> TagKey -> MaybeT IO DatabaseTag
+getTag :: Connection -> TagKey -> MaybeT IO TagPtr
 getTag c tk = do
   r <-
     lift $
@@ -487,23 +487,23 @@ getTag c tk = do
         "SELECT id, fileTagId, descriptorTagId, subTagOfId \
         \FROM Tag WHERE id = ?"
         [tk] ::
-      MaybeT IO [DatabaseTag]
+      MaybeT IO [TagPtr]
   hoistMaybe . head' $ r
 
 -- | Gets a list of Database tags by searching via
 -- the fileTagId, descriptorTagId, and subTagOfId of a Tag.
 --
 -- A valid tagId is not used.
-getsDatabaseTags :: Connection -> TagNoId -> IO [DatabaseTag]
+getsDatabaseTags :: Connection -> TagNoId -> IO [TagPtr]
 getsDatabaseTags c (TagNoId (Tag _ fid did sid)) =
   query
     c
     "SELECT id, fileTagId, descriptorTagId, subTagOfId \
     \FROM Tag WHERE fileTagId = ? AND descriptorTagId = ? AND subTagOfId IS ?"
     (fileId fid, descriptorId did, sid) ::
-    IO [DatabaseTag]
+    IO [TagPtr]
 
-getsDatabaseTagIds :: Connection -> [DatabaseTagNoId] -> IO [DatabaseTag]
+getsDatabaseTagIds :: Connection -> [TagPtrNoId] -> IO [TagPtr]
 getsDatabaseTagIds c dbts = do
   let q =
         query
@@ -512,7 +512,7 @@ getsDatabaseTagIds c dbts = do
           \FROM Tag \
           \WHERE fileTagId = ? AND descriptorTagId = ? AND subTagOfId IS ?"
           . (\(TagNoId_ (Tag_ _ fid did mstid)) -> (fid, did, mstid)) ::
-          DatabaseTagNoId -> IO [DatabaseTag]
+          TagPtrNoId -> IO [TagPtr]
   fmap concat . mapM q $ dbts
 
 getDescriptorOccurrenceMap ::

@@ -9,18 +9,19 @@ module Database.Tagger.Type
     FileWithTags (..),
     toDatabaseFileWithTags,
     DatabaseFileWithTags (..),
-    DatabaseTagNoId (..),
+    TagPtrNoId (..),
+    tagPtrNoId,
     databaseFileWithTagsFileKey,
     databaseFileWithTagsTagKeys,
     Tag (..),
     TagNoId (..),
     tagNoId,
-    toDatabaseTag,
+    getTagPtr,
     tagSetToTagMap,
     tagSetToSubTagMap,
     tagSetToTagMapTuple,
     TagSet,
-    DatabaseTag (..),
+    TagPtr (..),
     MetaDescriptor (..),
     DescriptorTree (..),
     Representative (..),
@@ -125,14 +126,19 @@ instance PrimaryKey Descriptor where
   |_/_/   \_\____|
 -}
 
-data DatabaseTag = Tag_ !TagKey !FileKey !DescriptorKey !(Maybe TagKey)
+data TagPtr = Tag_ !TagKey !FileKey !DescriptorKey !(Maybe TagKey)
   deriving (Show, Eq)
 
--- | A newtype wrapper for computations using DatabaseTag
+-- | A newtype wrapper for computations using TagPtr
 -- where a valid TagKey is not required.
-newtype DatabaseTagNoId = TagNoId_ DatabaseTag deriving (Show, Eq)
+newtype TagPtrNoId = TagNoId_ TagPtr deriving (Show, Eq)
 
-instance FromRow DatabaseTag where
+-- | A constructor for TagPtrNoId which takes no ID and uses (-1) as an ID placeholder
+-- in Tag_
+tagPtrNoId :: FileKey -> DescriptorKey -> Maybe TagKey -> TagPtrNoId
+tagPtrNoId fk dk tk = TagNoId_ $ Tag_ (-1) fk dk tk
+
+instance FromRow TagPtr where
   fromRow = Tag_ <$> field <*> field <*> field <*> field
 
 data Tag = Tag
@@ -155,8 +161,8 @@ instance H.Hashable Tag where
 
 type TagSet = HashSet.HashSet Tag
 
-toDatabaseTag :: Tag -> DatabaseTag
-toDatabaseTag =
+getTagPtr :: Tag -> TagPtr
+getTagPtr =
   liftM4
     Tag_
     tagId

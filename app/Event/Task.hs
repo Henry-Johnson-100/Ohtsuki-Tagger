@@ -118,13 +118,11 @@ tag c fwts =
           $ pst'
       let mainTagDescriptorId = descriptorId d
           fileId' = fileId . file $ fwt'
-          mainTag = TagNoId_ $ Tag_ (-1) fileId' mainTagDescriptorId Nothing
+          mainTag = tagPtrNoId fileId' mainTagDescriptorId Nothing
       mainTagKey <- lift $ insertDatabaseTag c mainTag
       let subTags =
-            TagNoId_
-              <$> ( Tag_ (-1) fileId'
-                      <$> map descriptorId subDescriptors <*> [Just mainTagKey]
-                  )
+            tagPtrNoId fileId'
+              <$> map descriptorId subDescriptors <*> [Just mainTagKey]
       lift . mapM_ (insertDatabaseTag c) $ subTags
 
 getRefreshedFWTs :: Connection -> [FileWithTags] -> IO [FileWithTags]
@@ -156,7 +154,7 @@ untag c fwts =
           . snd
           $ pst'
       let dbTags' =
-            TagNoId_ . Tag_ (-1) (fileId . file $ fwt') (descriptorId des)
+            tagPtrNoId (fileId . file $ fwt') (descriptorId des)
               <$> ( Nothing :
                     map (Just . descriptorId) subDes
                   )
