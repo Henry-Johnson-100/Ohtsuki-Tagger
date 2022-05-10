@@ -216,6 +216,7 @@ data SingleFileEvent
   | SingleFileGetTagCounts
   | SingleFileMaybePut !(Maybe FileWithTags)
   | SingleFileUntag !Tag
+  | SingleFileAssociateTag !Tag !Tag
   deriving (Show, Eq)
 
 data FileSelectionEvent

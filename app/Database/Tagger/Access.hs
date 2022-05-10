@@ -14,6 +14,7 @@ module Database.Tagger.Access
     addDescriptor,
     addRepresentative,
     updateRepresentativeText,
+    updateTagSubTagOfId,
     renameDescriptor,
     deleteDescriptor,
     insertDatabaseTag,
@@ -138,6 +139,13 @@ derefTagPtr c (Tag_ tk fk dk st) = do
   f <- getFile c fk
   d <- getDescriptor c dk
   return $ Tag tk f d st
+
+updateTagSubTagOfId :: Connection -> TagPtr -> TagKey -> IO ()
+updateTagSubTagOfId c t stid =
+  execute
+    c
+    "UPDATE Tag SET subTagOfId = ? WHERE id = ?"
+    (stid, (\(Tag_ tid _ _ _) -> tid) t)
 
 -- | Deletes given tags using the tagId
 -- and cascades the deletion to any tag that is a subtag.

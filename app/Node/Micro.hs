@@ -597,7 +597,10 @@ imageDetailWidget m =
                 maybe
                   ( hstack_
                       []
-                      [ draggable t
+                      [ dropTarget_
+                          (DoSingleFileEvent . SingleFileAssociateTag t)
+                          [dropTargetStyle [border 1 black]]
+                          . draggable t
                           . flip styleBasic [textColor yuiBlue]
                           . label
                           . descriptor
@@ -608,7 +611,10 @@ imageDetailWidget m =
                   )
                   ( \ts ->
                       hstack_ [] $
-                        ( draggable t
+                        ( dropTarget_
+                            (DoSingleFileEvent . SingleFileAssociateTag t)
+                            [dropTargetStyle [border 1 black]]
+                            . draggable t
                             . flip styleBasic [textColor yuiBlue]
                             . label
                             . descriptor
@@ -629,15 +635,17 @@ imageDetailWidget m =
                                 )
                               $ ts
                           )
-                            ++ [label " } "]
+                            ++ [ label " } ",
+                                 box_ []
+                                   . label
+                                   . T.pack
+                                   . show
+                                   . M.fromMaybe 0
+                                   $ IntMap.lookup (descriptorId . tagDescriptor $ t) om
+                               ]
                         )
                   )
-                  (IntMap.lookup (tagId t) stm),
-              label
-                . T.pack
-                . show
-                . M.fromMaybe 0
-                $ IntMap.lookup (descriptorId . tagDescriptor $ t) om
+                  (IntMap.lookup (tagId t) stm)
             ]
     inSelectionWidget :: TaggerWidget
     inSelectionWidget =

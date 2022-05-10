@@ -212,6 +212,13 @@ singleFileEventHandler wenv node model event =
       [ dbConnTask IOEvent (\c -> untagWithTag c [t]) (model ^. dbConn),
         asyncEvent (DoFileSelectionEvent FileSelectionRefresh_)
       ]
+    SingleFileAssociateTag tWith t ->
+      [ dbConnTask
+          IOEvent
+          (\c -> associateTag c tWith t)
+          (model ^. dbConn),
+        asyncEvent (DoFileSelectionEvent FileSelectionRefresh_)
+      ]
 
 configurationEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->

@@ -94,6 +94,9 @@ addPath c p = do
   addedFiles <- mapM (addFile c) pathsToAdd
   return $ FileWithTags <$> addedFiles <*> []
 
+associateTag :: Connection -> Tag -> Tag -> IO ()
+associateTag c tWith t = updateTagSubTagOfId c (getTagPtr t) (tagId tWith)
+
 tag :: Connection -> [FileWithTags] -> Either ParseError [PseudoSubTag] -> IO ()
 tag c fwts =
   either
