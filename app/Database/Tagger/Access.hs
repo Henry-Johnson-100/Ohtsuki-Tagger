@@ -1,10 +1,10 @@
+{-# HLINT ignore "Redundant return" #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Redundant return" #-}
 
 module Database.Tagger.Access
   ( Connection (..),
@@ -18,7 +18,7 @@ module Database.Tagger.Access
     deleteDescriptor,
     insertDatabaseTag,
     fromDatabaseTag,
-    deleteDatabaseTags,
+    deleteDatabaseSubTags,
     relate,
     unrelate,
     fetchInfraTree,
@@ -28,6 +28,8 @@ module Database.Tagger.Access
     getDescriptor,
     getFile,
     getsUntaggedFileWithTags,
+    getsDatabaseTags,
+    getsDatabaseTagIds,
     fromDatabaseFileWithTags,
     getRepresentative,
     getDescriptorOccurrenceMap,
@@ -55,6 +57,7 @@ import Database.SQLite.Simple
     FromRow,
     Only (Only),
     Query,
+    SQLData (SQLInteger, SQLNull),
     execute,
     executeMany,
     execute_,
@@ -62,7 +65,6 @@ import Database.SQLite.Simple
     query,
     query_,
   )
-import Database.SQLite.Simple.ToField (ToField)
 import Database.Tagger.Access.RowMap
   ( descriptorOccurrenceMapParser,
     reduceDbFwtList,
@@ -70,6 +72,7 @@ import Database.Tagger.Access.RowMap
 import Database.Tagger.Type
   ( DatabaseFileWithTags,
     DatabaseTag (..),
+    DatabaseTagNoId (TagNoId_),
     Descriptor (..),
     DescriptorKey,
     DescriptorTree (Infra),
@@ -80,12 +83,14 @@ import Database.Tagger.Type
     Representative (Representative, repDescription),
     Tag (Tag),
     TagKey,
+    TagNoId (TagNoId),
     databaseFileWithTagsFileKey,
     databaseFileWithTagsTagKeys,
     descriptorTreeElem,
     flattenTree,
     insertIntoDescriptorTree,
   )
+import Event.Parser (PseudoSubTag, pseudoDescriptorText)
 import IO (hPutStrLn, stderr)
 import Util.Core (OccurrenceMap, head', hoistMaybe)
 
@@ -116,12 +121,14 @@ addFile c f = do
   insertedId <- lastInsertRowId c
   return . File (fromIntegral insertedId) $ f
 
-insertDatabaseTag :: Connection -> DatabaseTag -> IO ()
-insertDatabaseTag c (Tag_ _ f d Nothing) =
+insertDatabaseTag :: Connection -> DatabaseTagNoId -> IO TagKey
+insertDatabaseTag c (TagNoId_ (Tag_ _ f d sid)) = do
   execute
     c
-    "INSERT INTO Tag (fileTagId, descriptorTagId) VALUES (?,?)"
-    (f, d)
+    "INSERT INTO Tag (fileTagId, descriptorTagId, subTagOfId) VALUES (?,?,?)"
+    (f, d, sid)
+  k <- lastInsertRowId c
+  return . fromIntegral $ k
 
 fromDatabaseTag :: Connection -> DatabaseTag -> MaybeT IO Tag
 fromDatabaseTag c (Tag_ tk fk dk st) = do
@@ -129,10 +136,16 @@ fromDatabaseTag c (Tag_ tk fk dk st) = do
   d <- getDescriptor c dk
   return $ Tag tk f d st
 
-deleteDatabaseTags :: Connection -> [DatabaseTag] -> IO ()
-deleteDatabaseTags c =
-  executeMany c "DELETE FROM Tag WHERE tagId = ?"
-    . map (\(Tag_ tid _ _ _) -> [tid])
+-- | Deletes given tags using the tagId
+-- and cascades the deletion to any tag that is a subtag.
+deleteDatabaseSubTags :: Connection -> [DatabaseTag] -> IO ()
+deleteDatabaseSubTags c dbts = do
+  hPutStrLn stderr $ "In access, deleting: " ++ show dbts
+  executeMany
+    c
+    "DELETE FROM Tag WHERE id = ? OR subTagOfId IS ?"
+    . map (\(Tag_ tid _ _ _) -> (tid, tid))
+    $ dbts
 
 -- | Create new descriptor and relate it to #UNRELATED#
 addDescriptor :: Connection -> T.Text -> MaybeT IO Descriptor
@@ -404,6 +417,17 @@ fromDatabaseFileWithTags c dbfwt = do
   t <- fmap catMaybes . lift . mapM (runMaybeT . fromDatabaseTag c) $ dbt
   return . FileWithTags f . HashSet.fromList $ t
 
+-- -- #TODO
+-- pseudoSubTagToDatabaseTags ::
+--   Connection -> FileKey -> PseudoSubTag -> MaybeT IO [DatabaseTag]
+-- pseudoSubTagToDatabaseTags c fk (pd, []) = do
+--   d <- hoistMaybe . head' <=< lift . lookupDescriptorPattern c . pseudoDescriptorText $ pd
+--   f <- getFile c fk
+
+--   _
+-- pseudoSubTagToDatabaseTags c fk pst = do
+--   _
+
 {-
   ____ _____ _____
  / ___| ____|_   _|
@@ -465,6 +489,31 @@ getTag c tk = do
         [tk] ::
       MaybeT IO [DatabaseTag]
   hoistMaybe . head' $ r
+
+-- | Gets a list of Database tags by searching via
+-- the fileTagId, descriptorTagId, and subTagOfId of a Tag.
+--
+-- A valid tagId is not used.
+getsDatabaseTags :: Connection -> TagNoId -> IO [DatabaseTag]
+getsDatabaseTags c (TagNoId (Tag _ fid did sid)) =
+  query
+    c
+    "SELECT id, fileTagId, descriptorTagId, subTagOfId \
+    \FROM Tag WHERE fileTagId = ? AND descriptorTagId = ? AND subTagOfId IS ?"
+    (fileId fid, descriptorId did, sid) ::
+    IO [DatabaseTag]
+
+getsDatabaseTagIds :: Connection -> [DatabaseTagNoId] -> IO [DatabaseTag]
+getsDatabaseTagIds c dbts = do
+  let q =
+        query
+          c
+          "SELECT id, fileTagId, descriptorTagId, subTagOfId \
+          \FROM Tag \
+          \WHERE fileTagId = ? AND descriptorTagId = ? AND subTagOfId IS ?"
+          . (\(TagNoId_ (Tag_ _ fid did mstid)) -> (fid, did, mstid)) ::
+          DatabaseTagNoId -> IO [DatabaseTag]
+  fmap concat . mapM q $ dbts
 
 getDescriptorOccurrenceMap ::
   Connection -> [DescriptorKey] -> IO (OccurrenceMap Descriptor)

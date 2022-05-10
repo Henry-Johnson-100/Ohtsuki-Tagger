@@ -25,6 +25,7 @@ import qualified Data.Text as T
 import Database.SQLite.Simple
 import Database.Tagger.Access (activateForeignKeyPragma, getDescriptorOccurrenceMap, lookupDescriptorPattern)
 import Database.Tagger.Type
+import Event.Parser
 import Event.Task
 import qualified IO
 import Monomer
@@ -404,10 +405,13 @@ taggerEventHandler wenv node model event =
       [ dbConnTask
           IOEvent
           ( \activeConn ->
-              (if isUntagMode (model ^. taggingMode) then untag else tag)
+              ( if isUntagMode (model ^. taggingMode)
+                  then untag
+                  else tag
+              )
                 activeConn
                 (M.maybeToList $ model ^. (singleFileModel . singleFile))
-                (T.words $ model ^. tagsString)
+                (parseQuery $ model ^. tagsString)
           )
           (model ^. dbConn),
         asyncEvent (DoFileSelectionEvent FileSelectionRefresh_)
@@ -416,10 +420,13 @@ taggerEventHandler wenv node model event =
       [ dbConnTask
           IOEvent
           ( \activeConn ->
-              (if isUntagMode (model ^. taggingMode) then untag else tag)
+              ( if isUntagMode (model ^. taggingMode)
+                  then untag
+                  else tag
+              )
                 activeConn
                 (cCollect $ model ^. (fileSelectionModel . fileSelection))
-                (T.words $ model ^. tagsString)
+                (parseQuery $ model ^. tagsString)
           )
           (model ^. dbConn),
         asyncEvent (DoFileSelectionEvent FileSelectionRefresh_)

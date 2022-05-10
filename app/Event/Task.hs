@@ -94,16 +94,38 @@ addPath c p = do
   addedFiles <- mapM (addFile c) pathsToAdd
   return $ FileWithTags <$> addedFiles <*> []
 
-tag :: Connection -> [FileWithTags] -> [T.Text] -> IO ()
-tag c fwts dds = do
-  withDescriptors <- fmap concat . mapM (lookupDescriptorPattern c) $ dds
-  let newTags =
-        Tag_ (-1)
-          . (fileId . file)
-          <$> fwts
-          <*> map descriptorId withDescriptors
-          <*> [Nothing]
-  mapM_ (insertDatabaseTag c) newTags
+tag :: Connection -> [FileWithTags] -> Either ParseError [PseudoSubTag] -> IO ()
+tag c fwts =
+  either
+    (hPrint stderr)
+    ( \psts -> do
+        let newTagTuples = (,) <$> fwts <*> psts
+        tags <- mapM (runMaybeT . uncurry tag') newTagTuples
+        return ()
+    )
+  where
+    tag' :: FileWithTags -> PseudoSubTag -> MaybeT IO ()
+    tag' fwt' pst' = do
+      d <-
+        hoistMaybe . head'
+          <=< lift . lookupDescriptorPattern c . pseudoDescriptorText . fst
+          $ pst'
+      subDescriptors <-
+        lift
+          . fmap concat
+          . mapM (lookupDescriptorPattern c . pseudoDescriptorText)
+          . snd
+          $ pst'
+      let mainTagDescriptorId = descriptorId d
+          fileId' = fileId . file $ fwt'
+          mainTag = TagNoId_ $ Tag_ (-1) fileId' mainTagDescriptorId Nothing
+      mainTagKey <- lift $ insertDatabaseTag c mainTag
+      let subTags =
+            TagNoId_
+              <$> ( Tag_ (-1) fileId'
+                      <$> map descriptorId subDescriptors <*> [Just mainTagKey]
+                  )
+      lift . mapM_ (insertDatabaseTag c) $ subTags
 
 getRefreshedFWTs :: Connection -> [FileWithTags] -> IO [FileWithTags]
 getRefreshedFWTs c fwts = do
@@ -111,12 +133,35 @@ getRefreshedFWTs c fwts = do
   refreshedDbFwts <- fmap concat . mapM (lookupFileWithTagsByFileId' c) $ fids
   fmap catMaybes . mapM (runMaybeT . fromDatabaseFileWithTags c) $ refreshedDbFwts
 
-untag :: Connection -> [FileWithTags] -> [T.Text] -> IO ()
-untag c fwts dds = do
-  let fids = map (fileId . file) fwts
-  ds <- fmap (map descriptorId . concat) . mapM (lookupDescriptorPattern c) $ dds
-  let tags = Tag_ (-1) <$> fids <*> ds <*> [Nothing]
-  deleteDatabaseTags c tags
+untag :: Connection -> [FileWithTags] -> Either ParseError [PseudoSubTag] -> IO ()
+untag c fwts =
+  either
+    (hPrint stderr)
+    ( \psts -> do
+        let toDeleteTuples = (,) <$> fwts <*> psts
+        deletedTags <- mapM (runMaybeT . uncurry untag') toDeleteTuples
+        return ()
+    )
+  where
+    untag' :: FileWithTags -> PseudoSubTag -> MaybeT IO ()
+    untag' fwt' pst' = do
+      des <-
+        hoistMaybe . head'
+          <=< lift . lookupDescriptorPattern c . pseudoDescriptorText . fst
+          $ pst'
+      subDes <-
+        lift
+          . fmap concat
+          . mapM (lookupDescriptorPattern c . pseudoDescriptorText)
+          . snd
+          $ pst'
+      let dbTags' =
+            TagNoId_ . Tag_ (-1) (fileId . file $ fwt') (descriptorId des)
+              <$> ( Nothing :
+                    map (Just . descriptorId) subDes
+                  )
+      dbTags <- lift $ getsDatabaseTagIds c dbTags'
+      lift . deleteDatabaseSubTags c $ dbTags
 
 relateTo :: Connection -> [Descriptor] -> [Descriptor] -> IO ()
 relateTo c m i = do

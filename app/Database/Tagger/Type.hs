@@ -9,9 +9,12 @@ module Database.Tagger.Type
     FileWithTags (..),
     toDatabaseFileWithTags,
     DatabaseFileWithTags (..),
+    DatabaseTagNoId (..),
     databaseFileWithTagsFileKey,
     databaseFileWithTagsTagKeys,
     Tag (..),
+    TagNoId (..),
+    tagNoId,
     toDatabaseTag,
     tagSetToTagMap,
     tagSetToSubTagMap,
@@ -125,6 +128,10 @@ instance PrimaryKey Descriptor where
 data DatabaseTag = Tag_ !TagKey !FileKey !DescriptorKey !(Maybe TagKey)
   deriving (Show, Eq)
 
+-- | A newtype wrapper for computations using DatabaseTag
+-- where a valid TagKey is not required.
+newtype DatabaseTagNoId = TagNoId_ DatabaseTag deriving (Show, Eq)
+
 instance FromRow DatabaseTag where
   fromRow = Tag_ <$> field <*> field <*> field <*> field
 
@@ -135,6 +142,13 @@ data Tag = Tag
     subTagOfId :: !(Maybe Int)
   }
   deriving (Show, Eq, Ord, Generics.Generic)
+
+-- | Newtype wrapper for a Tag, for computations where a valid tagId is not required.
+newtype TagNoId = TagNoId Tag deriving (Show, Eq)
+
+-- | Constructor for TagNoId taking no ID and using a (-1) as a placeholder in the Tag.
+tagNoId :: File -> Descriptor -> Maybe Int -> TagNoId
+tagNoId f d s = TagNoId $ Tag (-1) f d s
 
 instance H.Hashable Tag where
   hash = H.hash . tagId

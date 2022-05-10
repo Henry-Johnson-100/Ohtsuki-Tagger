@@ -5,6 +5,7 @@
 module Event.Parser
   ( PseudoDescriptor (..),
     PseudoSubTag (..),
+    ParseError (..),
     parseQuery,
     pseudoDescriptorText,
   )
@@ -27,7 +28,7 @@ import Text.Parsec
   )
 
 parseQuery :: T.Text -> Either ParseError [PseudoSubTag]
-parseQuery = parse pseudoQueryParser "Query"
+parseQuery = parse (spaces' >> pseudoQueryParser) "Query"
 
 -- | A newtype wrapper around Data.Text.Text
 newtype PseudoDescriptor = PDescriptor T.Text deriving (Show, Eq)
