@@ -118,10 +118,16 @@ tag c fwts =
           $ pst'
       let fileId' = fileId . file $ fwt'
           mainTag = tagPtrNoId fileId' (descriptorId d) Nothing
-      mainTagKey <- lift $ insertDatabaseTag c mainTag
+      mainTagKey <- lift $ do
+        maybeExists <- runMaybeT . lookupTagLike c $ tagNoId (file fwt') d Nothing
+        maybe (insertDatabaseTag c mainTag) (pure . (\(Tag_ tk _ _ _) -> tk)) maybeExists
+      tag'' fileId' mainTagKey subDescriptors
+
+    tag'' :: FileKey -> TagKey -> [Descriptor] -> MaybeT IO ()
+    tag'' fileId' mainTagKey' subDescriptors' = do
       let subTags =
             tagPtrNoId fileId'
-              <$> map descriptorId subDescriptors <*> [Just mainTagKey]
+              <$> map descriptorId subDescriptors' <*> [Just mainTagKey']
       lift . mapM_ (insertDatabaseTag c) $ subTags
 
 getRefreshedFWTs :: Connection -> [FileWithTags] -> IO [FileWithTags]

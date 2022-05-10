@@ -39,6 +39,7 @@ module Database.Tagger.Access
     lookupFileWithTagsByDescriptorId',
     lookupFileWithTagsByFileId',
     lookupFileWithTagsBySubTagDescriptorText,
+    lookupTagLike,
     lookupDescriptorPattern,
     hoistMaybe,
     activateForeignKeyPragma,
@@ -142,7 +143,6 @@ derefTagPtr c (Tag_ tk fk dk st) = do
 -- and cascades the deletion to any tag that is a subtag.
 deleteDatabaseSubTags :: Connection -> [TagPtr] -> IO ()
 deleteDatabaseSubTags c dbts = do
-  hPutStrLn stderr $ "In access, deleting: " ++ show dbts
   executeMany
     c
     "DELETE FROM Tag WHERE id = ? OR subTagOfId IS ?"
@@ -454,6 +454,21 @@ fromDatabaseFileWithTags c dbfwt = do
       $ dbfwt
   t <- fmap catMaybes . lift . mapM (runMaybeT . derefTagPtr c) $ dbt
   return . FileWithTags f . HashSet.fromList $ t
+
+lookupTagLike :: Connection -> TagNoId -> MaybeT IO TagPtr
+lookupTagLike c (TagNoId (Tag _ (File fk _) (Descriptor _ dt) mstid)) = do
+  r <-
+    lift $
+      query
+        c
+        "SELECT t.id, t.fileTagId, t.descriptorTagId, t.subTagOfId \
+        \FROM Tag t \
+        \  JOIN Descriptor d \
+        \    ON t.descriptorTagId = d.id \
+        \WHERE t.fileTagId = ? AND d.descriptor LIKE ?"
+        (fk, dt) ::
+      MaybeT IO [TagPtr]
+  hoistMaybe . head' $ r
 
 {-
   ____ _____ _____
