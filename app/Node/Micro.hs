@@ -14,6 +14,7 @@ import Control.Lens
 import qualified Data.HashSet as HashSet
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as L
+import qualified Data.Maybe as M
 import qualified Data.Text as T
 import Database.Tagger.Type
 import Monomer
@@ -547,25 +548,81 @@ imageDetailWidget m =
   where
     detailTagsWidget :: TaggerWidget
     detailTagsWidget =
-      vstack_
-        []
-        [ label "Tags:",
-          hstack_
+      let !tags' = maybe HashSet.empty tags $ m ^. singleFileModel . singleFile
+          !tagMapTuple = tagSetToTagMapTuple tags'
+       in vstack_
             []
-            [ spacer,
-              flip styleBasic [border 1 black]
-                . vscroll_ [wheelRate 50]
-                . vstack_ []
-                . map imageDetailDescriptor
-                . L.sort
-                . zipDecodeOccurrenceMap
-                  ( map (\d' -> (descriptorId d', d'))
-                      . maybeWithList (map tagDescriptor . HashSet.toList . tags) -- #FIXME
-                      $ (m ^. singleFileModel . singleFile)
-                  )
-                $ m ^. singleFileModel . tagCounts
+            [ label "Tags:",
+              hstack_
+                []
+                [ spacer,
+                  flip styleBasic [border 1 black]
+                    . vscroll_ [wheelRate 50]
+                    . vstack_ []
+                    . map
+                      ( \t' ->
+                          showTagAndSubTags
+                            t'
+                            (snd tagMapTuple)
+                            (m ^. singleFileModel . tagCounts)
+                      )
+                    . filter (not . isSubTag)
+                    . IntMap.elems
+                    . fst
+                    $ tagMapTuple
+                ]
             ]
-        ]
+      where
+        showTagAndSubTags :: Tag -> SubTagMap -> OccurrenceMap Descriptor -> TaggerWidget
+        showTagAndSubTags t stm om =
+          hgrid_
+            []
+            [ box_ [alignLeft] $
+                maybe
+                  ( hstack_
+                      []
+                      [ draggable t
+                          . flip styleBasic [textColor yuiBlue]
+                          . label
+                          . descriptor
+                          . tagDescriptor
+                          $ t,
+                        spacer
+                      ]
+                  )
+                  ( \ts ->
+                      hstack_ [] $
+                        ( draggable t
+                            . flip styleBasic [textColor yuiBlue]
+                            . label
+                            . descriptor
+                            . tagDescriptor
+                            $ t
+                        ) :
+                        ( label " { " :
+                          ( L.intersperse (label ", ")
+                              . map
+                                ( \t' ->
+                                    draggable t'
+                                      . flip styleBasic [padding 0]
+                                      . box_ [alignLeft]
+                                      . label
+                                      . descriptor
+                                      . tagDescriptor
+                                      $ t'
+                                )
+                              $ ts
+                          )
+                            ++ [label " } "]
+                        )
+                  )
+                  (IntMap.lookup (tagId t) stm),
+              label
+                . T.pack
+                . show
+                . M.fromMaybe 0
+                $ IntMap.lookup (descriptorId . tagDescriptor $ t) om
+            ]
     inSelectionWidget :: TaggerWidget
     inSelectionWidget =
       vstack_
@@ -588,7 +645,7 @@ imageDetailWidget m =
                 -- this is total jank but it works now
                 $ ( let selD =
                           (\xs -> if null xs then [] else L.foldl1' union xs)
-                            . map (map tagDescriptor . HashSet.toList . tags) -- #FIXME
+                            . map (HashSet.toList . HashSet.map tagDescriptor . tags) -- #FIXME
                             . cCollect
                             $ m ^. fileSelectionModel . fileSelection
                         om =

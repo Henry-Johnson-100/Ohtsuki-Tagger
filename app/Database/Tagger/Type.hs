@@ -14,6 +14,7 @@ module Database.Tagger.Type
     databaseFileWithTagsFileKey,
     databaseFileWithTagsTagKeys,
     Tag (..),
+    isSubTag,
     TagNoId (..),
     tagNoId,
     getTagPtr,
@@ -21,6 +22,8 @@ module Database.Tagger.Type
     tagSetToSubTagMap,
     tagSetToTagMapTuple,
     TagSet,
+    TagMap,
+    SubTagMap,
     TagPtr (..),
     MetaDescriptor (..),
     DescriptorTree (..),
@@ -148,6 +151,9 @@ data Tag = Tag
     subTagOfId :: !(Maybe Int)
   }
   deriving (Show, Eq, Ord, Generics.Generic)
+
+isSubTag :: Tag -> Bool
+isSubTag = M.isJust . subTagOfId
 
 -- | Newtype wrapper for a Tag, for computations where a valid tagId is not required.
 newtype TagNoId = TagNoId Tag deriving (Show, Eq)
