@@ -83,3 +83,30 @@ The buffer will not flush but rather be unioned, intersected, or diffed appropri
 #### 0.2.0.1 -- 2022-05-02
 
  * Fixed a bug with unioning results into a BufferList. Should hopefully no longer union duplicate files into the selection BufferList.
+
+## 0.3.0.0 -- 2022-05-10
+
+* Introduced Subtagging!
+  * Using the image featured in 0.2.0.0, I will demonstrate how subtags may be used.
+  * Subtags are added to an image using curly brackets in the Tag textfield. For instance,
+  I want to tag the character Momo Chiyoda in the above image but I want to also tag the image with
+  descriptors that may only apply to her specifically. For that I will use subtags.
+  ```
+  Chiyoda_Momo{tanned}
+  ```
+  With this, we can see that the tanned keyword is only applied to the Chiyoda_Momo tag.
+* Queries using Subtags.
+  * Querying with subtags can be done normally, as in any file with a queried tag will be part of the new selection.
+  * Querying using subtag notation will fetch a selection that contains only files that have that specific sub-tagging combination.
+    * If I search `tanned` I will get all images with tanned characters. However, if I search `Chiyoda_Momo{tanned}`
+    I will get only the images with that specific combination.
+* Draggable tag association.
+  * In the Image details pane, for tags on a single image only, each tag is draggable.
+    * A new zone has been designated `untag` for these tags. When a tag is drag-and-dropped into that zone,
+    that specific tag will be deleted.
+      * Untagging can still be done via the Tag text field but is less precise and may end up deleting more than you wanted to.
+  * New subtags can be made from existing tags by dragging one tag on top of another, this will place the dragged tag as a 
+  sub tag of the target.
+* Breaking changes:
+  * Any databases created on versions 2.x or lower need to run the Migrate0_2_XTo0_3_X.sql
+  script. Any desired subtags will have to be created manually.
