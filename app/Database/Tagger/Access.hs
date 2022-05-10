@@ -417,17 +417,6 @@ fromDatabaseFileWithTags c dbfwt = do
   t <- fmap catMaybes . lift . mapM (runMaybeT . derefTagPtr c) $ dbt
   return . FileWithTags f . HashSet.fromList $ t
 
--- -- #TODO
--- pseudoSubTagToDatabaseTags ::
---   Connection -> FileKey -> PseudoSubTag -> MaybeT IO [TagPtr]
--- pseudoSubTagToDatabaseTags c fk (pd, []) = do
---   d <- hoistMaybe . head' <=< lift . lookupDescriptorPattern c . pseudoDescriptorText $ pd
---   f <- getFile c fk
-
---   _
--- pseudoSubTagToDatabaseTags c fk pst = do
---   _
-
 {-
   ____ _____ _____
  / ___| ____|_   _|

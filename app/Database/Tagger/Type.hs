@@ -203,20 +203,6 @@ tagSetToTagMapTuple ts =
    in (tm, tagSetToSubTagMap ts tm)
 
 {-
- _____  _    ____ ____  _____ _____  _    ___ _
-|_   _|/ \  / ___|  _ \| ____|_   _|/ \  |_ _| |
-  | | / _ \| |  _| | | |  _|   | | / _ \  | || |
-  | |/ ___ \ |_| | |_| | |___  | |/ ___ \ | || |___
-  |_/_/   \_\____|____/|_____| |_/_/   \_\___|_____|
--}
-
-data TagDetail = TagDetail
-  { tagDetailSubTags :: !(Map.Map TagKey [Descriptor]), -- with this, I might not even need SubTag
-    tagDetailOccurrences :: !(Map.Map Descriptor Int)
-  }
-  deriving (Show, Eq)
-
-{-
  ____  _____ ____
 |  _ \| ____|  _ \
 | |_) |  _| | |_) |

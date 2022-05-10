@@ -116,9 +116,8 @@ tag c fwts =
           . mapM (lookupDescriptorPattern c . pseudoDescriptorText)
           . snd
           $ pst'
-      let mainTagDescriptorId = descriptorId d
-          fileId' = fileId . file $ fwt'
-          mainTag = tagPtrNoId fileId' mainTagDescriptorId Nothing
+      let fileId' = fileId . file $ fwt'
+          mainTag = tagPtrNoId fileId' (descriptorId d) Nothing
       mainTagKey <- lift $ insertDatabaseTag c mainTag
       let subTags =
             tagPtrNoId fileId'
