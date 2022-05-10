@@ -215,6 +215,7 @@ data SingleFileEvent
   | SingleFilePutTagCounts_ !(OccurrenceMap Descriptor)
   | SingleFileGetTagCounts
   | SingleFileMaybePut !(Maybe FileWithTags)
+  | SingleFileUntag !Tag
   deriving (Show, Eq)
 
 data FileSelectionEvent

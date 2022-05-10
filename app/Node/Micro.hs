@@ -558,21 +558,37 @@ imageDetailWidget m =
                 [ spacer,
                   flip styleBasic [border 1 black]
                     . vscroll_ [wheelRate 50]
-                    . vstack_ []
-                    . map
-                      ( \t' ->
-                          showTagAndSubTags
-                            t'
-                            (snd tagMapTuple)
-                            (m ^. singleFileModel . tagCounts)
+                    . vstack_
+                      []
+                    $ ( map
+                          ( \t' ->
+                              showTagAndSubTags
+                                t'
+                                (snd tagMapTuple)
+                                (m ^. singleFileModel . tagCounts)
+                          )
+                          . filter (not . isSubTag)
+                          . IntMap.elems
+                          . fst
+                          $ tagMapTuple
                       )
-                    . filter (not . isSubTag)
-                    . IntMap.elems
-                    . fst
-                    $ tagMapTuple
+                      ++ [singleFileDropTargets]
                 ]
             ]
       where
+        singleFileDropTargets :: TaggerWidget
+        singleFileDropTargets =
+          hgrid_
+            []
+            [ dropTarget_
+                (DoSingleFileEvent . SingleFileUntag)
+                [dropTargetStyle [bgColor yuiYellow]]
+                . flip styleBasic [border 1 black]
+                . box_ [alignMiddle, alignBottom]
+                . flip styleBasic [minHeight 80, maxHeight 81, maxWidth 80]
+                . label
+                $ "Untag"
+            ]
         showTagAndSubTags :: Tag -> SubTagMap -> OccurrenceMap Descriptor -> TaggerWidget
         showTagAndSubTags t stm om =
           hgrid_

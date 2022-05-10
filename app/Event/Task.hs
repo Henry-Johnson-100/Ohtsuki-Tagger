@@ -160,6 +160,9 @@ untag c fwts =
       dbTags <- lift $ getsDatabaseTagIds c dbTags'
       lift . deleteDatabaseSubTags c $ dbTags
 
+untagWithTag :: Connection -> [Tag] -> IO ()
+untagWithTag c = deleteDatabaseSubTags c . map getTagPtr
+
 relateTo :: Connection -> [Descriptor] -> [Descriptor] -> IO ()
 relateTo c m i = do
   let metaDescriptors = MetaDescriptor <$> (descriptorId <$> m) <*> (descriptorId <$> i)
