@@ -275,7 +275,7 @@ fileSelectionEventHandler wenv node model event =
               doQueryWithCriteria
                 (model ^. (fileSelectionModel . queryCriteria))
                 activeDbConn
-                (T.words (model ^. (fileSelectionModel . queryText)))
+                (model ^. (fileSelectionModel . queryText))
           )
           (model ^. dbConn),
         asyncEvent (DoFileSelectionEvent FileSelectionQueryTextClear)

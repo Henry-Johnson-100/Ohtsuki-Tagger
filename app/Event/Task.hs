@@ -174,22 +174,36 @@ unrelate c i = do
 doQueryWithCriteria ::
   QueryCriteria ->
   Connection ->
-  [T.Text] ->
+  T.Text ->
   IO [FileWithTags]
 doQueryWithCriteria qc =
   case qc of
-    ByTag -> queryByTag
-    ByRelation -> queryRelation
-    ByUntagged -> queryUntagged
-    ByPattern -> queryFilePattern
+    ByTag -> \c t -> queryByTag c (parseQuery t)
+    ByRelation -> \c t -> queryRelation c (T.words t)
+    ByUntagged -> \c t -> queryUntagged c (T.words t)
+    ByPattern -> \c t -> queryFilePattern c (T.words t)
   where
     queryByTag ::
       Connection ->
-      [T.Text] ->
+      Either ParseError [PseudoSubTag] ->
       IO [FileWithTags]
-    queryByTag c ts = do
-      dbFwts <- fmap concat . mapM (lookupFileWithTagsByTagPattern' c) $ ts
-      fmap catMaybes . mapM (runMaybeT . fromDatabaseFileWithTags c) $ dbFwts
+    queryByTag c =
+      either
+        (\e -> hPrint stderr e >> return [])
+        (fmap concat . mapM queryByPseudoSubTag)
+      where
+        queryByPseudoSubTag :: PseudoSubTag -> IO [FileWithTags]
+        queryByPseudoSubTag (pd, []) = do
+          dbFwts <- lookupFileWithTagsByDescriptorPattern c . pseudoDescriptorText $ pd
+          fmap catMaybes . mapM (runMaybeT . fromDatabaseFileWithTags c) $ dbFwts
+        queryByPseudoSubTag (pd, spds) = do
+          let mainDes = pseudoDescriptorText pd
+              subDess = map pseudoDescriptorText spds
+          dbFwts <-
+            fmap concat
+              . mapM (lookupFileWithTagsBySubTagDescriptorText c mainDes)
+              $ subDess
+          fmap catMaybes . mapM (runMaybeT . fromDatabaseFileWithTags c) $ dbFwts
     queryRelation ::
       Connection -> [T.Text] -> IO [FileWithTags]
     queryRelation c rs = do

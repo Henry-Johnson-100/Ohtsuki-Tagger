@@ -35,9 +35,10 @@ module Database.Tagger.Access
     getDescriptorOccurrenceMap,
     lookupFileWithTagsByInfraRelation,
     lookupFileWithTagsByFilePattern',
-    lookupFileWithTagsByTagPattern',
+    lookupFileWithTagsByDescriptorPattern,
     lookupFileWithTagsByDescriptorId',
     lookupFileWithTagsByFileId',
+    lookupFileWithTagsBySubTagDescriptorText,
     lookupDescriptorPattern,
     hoistMaybe,
     activateForeignKeyPragma,
@@ -50,6 +51,7 @@ import Control.Monad.Trans.Maybe (MaybeT (..))
 import qualified Data.HashSet as HashSet
 import qualified Data.IntMap.Strict as IntMap
 import Data.List (foldl', foldl1', isPrefixOf, isSuffixOf)
+import qualified Data.List as L
 import Data.Maybe (catMaybes, fromJust, fromMaybe, maybe)
 import qualified Data.Text as T
 import Database.SQLite.Simple
@@ -79,7 +81,7 @@ import Database.Tagger.Type
     FileWithTags (FileWithTags),
     MetaDescriptor (MetaDescriptor),
     Representative (Representative, repDescription),
-    Tag (Tag),
+    Tag (Tag, tagDescriptor),
     TagKey,
     TagNoId (TagNoId),
     TagPtr (..),
@@ -339,8 +341,8 @@ lookupFileWithTagsByFilePattern' c =
   fmap concat . mapM (lookupFileWithTagsByFileId' c . fileId)
     <=< lookupFilePattern c
 
-lookupFileWithTagsByTagPattern' :: Connection -> T.Text -> IO [DatabaseFileWithTags]
-lookupFileWithTagsByTagPattern' c =
+lookupFileWithTagsByDescriptorPattern :: Connection -> T.Text -> IO [DatabaseFileWithTags]
+lookupFileWithTagsByDescriptorPattern c =
   fmap concat . mapM (lookupFileWithTagsByDescriptorId' c . descriptorId)
     <=< lookupDescriptorPattern c
 
@@ -393,6 +395,42 @@ lookupDescriptorPattern conn p = do
       \WHERE descriptor LIKE ?"
       [p]
   return r
+
+-- | A pretty naive function for querying by textual subtags.
+--
+-- Finds the set of fwt's that has the main tag and intersects it with the set of fwt's
+-- that has the sub tag.
+lookupFileWithTagsBySubTagDescriptorText ::
+  Connection ->
+  T.Text ->
+  T.Text ->
+  IO [DatabaseFileWithTags]
+lookupFileWithTagsBySubTagDescriptorText c mainDes subDes = do
+  mainTags <- lookupTagWithDescriptorText mainDes
+  let ts = (,) <$> map (\(Tag_ tk _ _ _) -> tk) mainTags <*> [subDes]
+  subTagPtrs <- fmap concat . mapM lookupSubTag $ ts
+  fmap concat . mapM (lookupFileWithTagsByFileId' c . (\(Tag_ _ fk _ _) -> fk)) $
+    subTagPtrs
+  where
+    lookupTagWithDescriptorText :: T.Text -> IO [TagPtr]
+    lookupTagWithDescriptorText =
+      query
+        c
+        "SELECT t.id, t.fileTagId, t.descriptorTagId, t.subTagOfId \
+        \FROM Tag t \
+        \  JOIN Descriptor d \
+        \    ON t.descriptorTagId = d.id \
+        \WHERE d.descriptor LIKE ?"
+        . Only
+    lookupSubTag :: (TagKey, T.Text) -> IO [TagPtr]
+    lookupSubTag =
+      query
+        c
+        "SELECT t.id, t.fileTagId, t.descriptorTagId, t.subTagOfId \
+        \FROM Tag t \
+        \  JOIN Descriptor d \
+        \    ON t.descriptorTagId = d.id \
+        \WHERE t.subTagOfId = ? AND d.descriptor LIKE ?"
 
 lookupFilePattern :: Connection -> T.Text -> IO [File]
 lookupFilePattern conn p = do
