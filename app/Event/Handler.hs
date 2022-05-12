@@ -499,6 +499,12 @@ taggerEventHandler wenv node model event =
                   )
           )
       ]
+    DatabaseClose ->
+      [ Task
+          ( IOEvent
+              <$> maybe (pure ()) close (connInstance $ model ^. dbConn)
+          )
+      ]
     DropTargetAppendText_ l df d ->
       [Model $ model & l %~ flip T.append (" " `T.append` df d)]
 

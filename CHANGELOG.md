@@ -110,3 +110,14 @@ The buffer will not flush but rather be unioned, intersected, or diffed appropri
 * Breaking changes:
   * Any databases created on versions 2.x or lower need to run the Migrate0_2_XTo0_3_X.sql
   script. Any desired subtags will have to be created manually.
+
+### 0.3.1.0 -- 2022-05-12
+
+* Migrated to Monomer 1.4.0.0-dc848e8ddb76ba6d8339b47f8bc3a0ff3982950c.
+* Introduced a new config option, `style.window.window_scaling_factor`.
+  * A double value that controls the relative size of text and widgets in the window.
+    * Values will most likely be in-between 1.0 and 2.0.
+* Introduced an optional config option `style.window.window_icon`.
+  * Takes a path to .bmp images and uses it as the window icon.
+##### Minor Changes
+* Added a dispose event to close the database connection.

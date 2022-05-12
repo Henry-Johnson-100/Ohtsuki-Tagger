@@ -23,3 +23,5 @@ shell_command = "feh -D10 -zx. -g800x800 -Bwhite"
     maximize = false
     window_size_x = 800
     window_size_y = 600
+    window_scaling_factor = 1.65
+    window_icon = "/path/to/icon.bmp"

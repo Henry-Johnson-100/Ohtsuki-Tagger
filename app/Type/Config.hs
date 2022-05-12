@@ -20,29 +20,6 @@ import qualified Data.Text as T
 import Toml ((.=))
 import qualified Toml
 
-{-
-shell_command = ""
-
-[database]
-  path = ""
-  backup = ""
-  init = ""
-  auto_connect = false
-
-[selection]
-  display_parents = 3
-  buffer_size = 25
-
-[descriptor_tree]
-  main_request = "#META#"
-
-[style]
-  [style.font]
-    regular = "/usr/local/share/fonts/i/iosevka_light.ttf"
-    thin = "/usr/local/share/fonts/i/iosevka_thin.ttf"
-    bold = "/usr/local/share/fonts/i/iosevka_bold.ttf"
--}
-
 data TaggerConfig = TaggerConfig
   { _dbconf :: !DatabaseConfig,
     _selectionconf :: !SelectionConfig,
@@ -114,7 +91,9 @@ styleConfigCodec =
 data WindowConfig = WindowConfig
   { maximize :: !Bool,
     windowSizeX :: !Integer,
-    windowSizeY :: !Integer
+    windowSizeY :: !Integer,
+    windowScalingFactor :: !Double,
+    windowIcon :: !(Maybe T.Text)
   }
   deriving (Show, Eq)
 
@@ -124,6 +103,8 @@ windowConfigCodec =
     <$> Toml.bool "maximize" .= maximize
     <*> Toml.integer "window_size_x" .= windowSizeX
     <*> Toml.integer "window_size_y" .= windowSizeY
+    <*> Toml.double "window_scaling_factor" .= windowScalingFactor
+    <*> Toml.dioptional (Toml.text "window_icon") .= windowIcon
 
 data FontConfig = FontConfig
   { regular :: !T.Text,

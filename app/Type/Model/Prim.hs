@@ -291,6 +291,7 @@ data TaggerEvent
   | DatabaseInitialize
   | DatabaseConnect
   | DatabaseBackup
+  | DatabaseClose
   | DatabaseConnectionPut_ !TaggedConnection
   | ToggleVisibilityMode !ProgramVisibility
   | forall a. DropTargetAppendText_ TextLens (a -> Text) a

@@ -51,7 +51,7 @@ visibility ::
   WidgetNode s e
 visibility m vm = flip nodeVisible (vm == m ^. programVisibility)
 
-themeConfig :: StyleConfig -> [AppConfig e]
+themeConfig :: StyleConfig -> [AppConfig TaggerEvent]
 themeConfig cfg =
   [ appWindowTitle "Tagger",
     appWindowState $
@@ -62,11 +62,14 @@ themeConfig cfg =
             ( fromIntegral . windowSizeX . window $ cfg,
               fromIntegral . windowSizeY . window $ cfg
             ),
+    appScaleFactor . windowScalingFactor . window $ cfg,
     appTheme yuiTheme,
     appFontDef "Regular" (regular . font $ cfg),
     appFontDef "Thin" (thin . font $ cfg),
-    appFontDef "Bold" (bold . font $ cfg)
+    appFontDef "Bold" (bold . font $ cfg),
+    appDisposeEvent DatabaseClose
   ]
+    ++ maybe [] ((: []) . appWindowIcon) (windowIcon . window $ cfg)
 
 yuiTheme :: Theme
 yuiTheme =
