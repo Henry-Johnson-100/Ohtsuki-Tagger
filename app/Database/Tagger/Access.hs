@@ -96,6 +96,7 @@ import Database.Tagger.Type
   )
 import Event.Parser (PseudoSubTag, pseudoDescriptorText)
 import IO (hPutStrLn, stderr)
+import Type.Model
 import Util.Core (OccurrenceMap, head', hoistMaybe)
 
 debug# :: Bool
@@ -464,7 +465,7 @@ fromDatabaseFileWithTags c dbfwt = do
   return . FileWithTags f . HashSet.fromList $ t
 
 lookupTagLike :: Connection -> TagNoId -> MaybeT IO TagPtr
-lookupTagLike c (TagNoId (Tag _ (File fk _) (Descriptor _ dt) mstid)) = do
+lookupTagLike c (TagNoId (Tag _ (File fk _) (Descriptor _ dt) _)) = do
   r <-
     lift $
       query
