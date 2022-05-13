@@ -93,7 +93,6 @@ setArithmeticLiteralParser =
   unionParser
     <|> intersectParser
     <|> diffParser
-    <|> noLiteralParser
   where
     unionParser :: TextFieldParser SetArithmeticLiteral
     unionParser = do
@@ -142,20 +141,61 @@ queryCriteriaParser =
 t.otsuki_yui {r.gym_clothes p.%yui_otsuki% } u| r.machikado_mazoku_characters {t.smile} d| lilith_statue
 -}
 
+querySectionParser ::
+  TextFieldParser [QuerySection (SubList (QueryToken PseudoDescriptor))]
+querySectionParser = do
+  h <- querySectionHeadParser
+  spaces'
+  t <- many querySectionTailParser
+  return $ h : t
+  where
+    querySectionHeadParser ::
+      TextFieldParser (QuerySection (SubList (QueryToken PseudoDescriptor)))
+    querySectionHeadParser = do
+      spaces'
+      a <- setArithmeticLiteralParser <|> return ANoLiteral
+      spaces'
+      sls <-
+        manyTillNoConsume
+          queryTokenEitherParser
+          (eofNoLiteralParser <|> setArithmeticLiteralParser)
+      return $ QuerySection a sls
+
+    querySectionTailParser ::
+      TextFieldParser
+        (QuerySection (SubList (QueryToken PseudoDescriptor)))
+    querySectionTailParser = do
+      spaces'
+      a <- setArithmeticLiteralParser
+      spaces'
+      sls <-
+        manyTillNoConsume
+          queryTokenEitherParser
+          (eofNoLiteralParser <|> setArithmeticLiteralParser)
+      return $ QuerySection a sls
+
+    manyTillNoConsume :: TextFieldParser a -> TextFieldParser b -> TextFieldParser [a]
+    manyTillNoConsume p end = manyTill p (lookAhead end)
+
+    eofNoLiteralParser :: TextFieldParser SetArithmeticLiteral
+    eofNoLiteralParser = do
+      eof
+      return ANoLiteral
+
 spaces' :: TextFieldParser ()
 spaces' = spaces <?> ""
 
-queryTokenParser :: TextFieldParser [SubList (QueryToken PseudoDescriptor)]
-queryTokenParser = many queryTokenEitherParser
-  where
-    queryTokenEitherParser :: TextFieldParser (SubList (QueryToken PseudoDescriptor))
-    queryTokenEitherParser = do
-      qt <-
-        try subTagTokenParser <|> do
-          qt' <- descriptorTokenParser
-          return $ SubList qt' []
-      spaces'
-      return qt
+-- queryTokenParser :: TextFieldParser [SubList (QueryToken PseudoDescriptor)]
+-- queryTokenParser = many queryTokenEitherParser
+--   where
+queryTokenEitherParser :: TextFieldParser (SubList (QueryToken PseudoDescriptor))
+queryTokenEitherParser = do
+  qt <-
+    try subTagTokenParser <|> do
+      qt' <- descriptorTokenParser
+      return $ SubList qt' []
+  spaces'
+  return qt
 
 pseudoQueryParser :: TextFieldParser [PseudoSubTag]
 pseudoQueryParser =
