@@ -11,6 +11,7 @@ module Event.Parser
     PseudoSubTag (..),
     ParseError (..),
     QuerySection (..),
+    QueryToken (..),
     SetArithmeticLiteral (..),
     QueryCriteriaLiteral (..),
     SubList (..),

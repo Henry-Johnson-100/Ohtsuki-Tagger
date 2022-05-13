@@ -1,6 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 {-# HLINT ignore "Use lambda-case" #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -27,6 +26,39 @@ import Type.Model
 import Util.Core
 
 type ConnString = String
+
+queryWithQueryTokenLiteral ::
+  Connection ->
+  QueryCriteria ->
+  QueryToken PseudoDescriptor ->
+  IO [FileWithTags]
+queryWithQueryTokenLiteral c qc (QueryToken (CLiteral crit) ps@(PDescriptor pd)) =
+  case crit of
+    ByTag -> queryByDescriptorLiteral pd
+    ByRelation -> queryByRelationLiteral pd
+    ByPattern -> queryByFilePatternLiteral pd
+    ByUntagged -> returnUntaggedFiles
+  where
+    queryByDescriptorLiteral :: T.Text -> IO [FileWithTags]
+    queryByDescriptorLiteral t = do
+      dbfwts <- lookupFileWithTagsByDescriptorPattern c t
+      fmap catMaybes . mapM (runMaybeT . fromDatabaseFileWithTags c) $ dbfwts
+    queryByRelationLiteral :: T.Text -> IO [FileWithTags]
+    queryByRelationLiteral t = do
+      ds <- lookupDescriptorPattern c t
+      dbfwts <-
+        fmap concat
+          . mapM (lookupFileWithTagsByInfraRelation c . descriptorId)
+          $ ds
+      fmap catMaybes . mapM (runMaybeT . fromDatabaseFileWithTags c) $ dbfwts
+    queryByFilePatternLiteral :: T.Text -> IO [FileWithTags]
+    queryByFilePatternLiteral t = do
+      dbfwts <- lookupFileWithTagsByFilePattern' c t
+      fmap catMaybes . mapM (runMaybeT . fromDatabaseFileWithTags c) $ dbfwts
+    returnUntaggedFiles :: IO [FileWithTags]
+    returnUntaggedFiles = getsUntaggedFileWithTags c
+queryWithQueryTokenLiteral c qc (QueryToken CNoLiteral ps) =
+  queryWithQueryTokenLiteral c qc (QueryToken (CLiteral qc) ps)
 
 getRepresentative :: Connection -> Descriptor -> MaybeT IO Representative
 getRepresentative c = Database.Tagger.Access.getRepresentative c . descriptorId
