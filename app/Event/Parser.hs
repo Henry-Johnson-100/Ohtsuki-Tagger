@@ -18,6 +18,8 @@ module Event.Parser
     parseQuerySections,
     pseudoDescriptorText,
     mapMQuerySection,
+    mapMSubList,
+    mapMQueryToken,
     combineQuerySections,
   )
 where
@@ -25,6 +27,22 @@ where
 import Data.Functor.Identity (Identity)
 import qualified Data.Text as T
 import Text.Parsec
+  ( ParseError,
+    ParsecT,
+    char,
+    eof,
+    lookAhead,
+    many,
+    many1,
+    manyTill,
+    noneOf,
+    oneOf,
+    parse,
+    spaces,
+    try,
+    (<?>),
+    (<|>),
+  )
 import Type.Model.Prim (FileSetArithmetic (..), Intersectable (..), QueryCriteria (..))
 
 parseQuery :: T.Text -> Either ParseError [PseudoSubTag]
@@ -49,6 +67,12 @@ data SubList a = SubList
   }
   deriving (Show, Eq, Functor)
 
+mapMSubList :: Monad m => (t -> m a) -> SubList t -> m (SubList a)
+mapMSubList f (SubList h ts) = do
+  h' <- f h
+  ts' <- mapM f ts
+  return $ SubList h' ts'
+
 type TextFieldParser a = ParsecT T.Text () Identity a
 
 data SetArithmeticLiteral = ALiteral !FileSetArithmetic | ANoLiteral deriving (Show, Eq)
@@ -61,12 +85,6 @@ data QuerySection a = QuerySection
   }
   deriving (Show, Eq, Functor)
 
-data QueryToken a = QueryToken
-  { tokenCriteria :: !QueryCriteriaLiteral,
-    tokenContents :: !a
-  }
-  deriving (Show, Eq, Functor)
-
 instance Foldable QuerySection where
   foldr f acc (QuerySection _ xs) = foldr f acc xs
 
@@ -74,6 +92,17 @@ mapMQuerySection :: Monad m => (a1 -> m a2) -> QuerySection a1 -> m (QuerySectio
 mapMQuerySection fm (QuerySection a xs) = do
   xs' <- mapM fm xs
   return (QuerySection a xs')
+
+data QueryToken a = QueryToken
+  { tokenCriteria :: !QueryCriteriaLiteral,
+    tokenContents :: !a
+  }
+  deriving (Show, Eq, Functor)
+
+mapMQueryToken :: Monad m => (t -> m a) -> QueryToken t -> m (QueryToken a)
+mapMQueryToken f (QueryToken c x) = do
+  x' <- f x
+  return $ QueryToken c x'
 
 -- | Left associative combination of query sections
 --
