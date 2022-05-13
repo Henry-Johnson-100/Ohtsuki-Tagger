@@ -13,6 +13,7 @@ module Event.Parser
     QuerySection (..),
     SetArithmeticLiteral (..),
     QueryCriteriaLiteral (..),
+    SubList (..),
     parseQuery,
     pseudoDescriptorText,
     mapMQuerySection,
@@ -36,6 +37,12 @@ pseudoDescriptorText (PDescriptor t) = t
 
 -- | (PseudoDescriptor, [PseudoDescriptor])
 type PseudoSubTag = (PseudoDescriptor, [PseudoDescriptor])
+
+data SubList a = SubList
+  { subListHead :: !a,
+    subListContents :: ![a]
+  }
+  deriving (Show, Eq, Functor)
 
 type TextFieldParser a = ParsecT T.Text () Identity a
 
@@ -138,6 +145,18 @@ t.otsuki_yui {r.gym_clothes p.%yui_otsuki% } u| r.machikado_mazoku_characters {t
 spaces' :: TextFieldParser ()
 spaces' = spaces <?> ""
 
+queryTokenParser :: TextFieldParser [SubList (QueryToken PseudoDescriptor)]
+queryTokenParser = many queryTokenEitherParser
+  where
+    queryTokenEitherParser :: TextFieldParser (SubList (QueryToken PseudoDescriptor))
+    queryTokenEitherParser = do
+      qt <-
+        try subTagTokenParser <|> do
+          qt' <- descriptorTokenParser
+          return $ SubList qt' []
+      spaces'
+      return qt
+
 pseudoQueryParser :: TextFieldParser [PseudoSubTag]
 pseudoQueryParser =
   many pseudoEitherParser
@@ -158,6 +177,21 @@ descriptorTokenParser = do
 pseudoDescriptorParser :: TextFieldParser PseudoDescriptor
 pseudoDescriptorParser =
   fmap (PDescriptor . T.pack) . many1 . noneOf $ "{} \t\n"
+
+subTagTokenParser :: TextFieldParser (SubList (QueryToken PseudoDescriptor))
+subTagTokenParser = do
+  subHead <- descriptorTokenParser
+  spaces'
+  char '{'
+  spaces'
+  subList <- do
+    many $ do
+      sd'' <- descriptorTokenParser
+      spaces'
+      return sd''
+  char '}'
+  spaces'
+  return (SubList subHead subList)
 
 pseudoSubTagQueryParser :: TextFieldParser PseudoSubTag
 pseudoSubTagQueryParser = do
