@@ -15,6 +15,7 @@ module Event.Parser
     QueryCriteriaLiteral (..),
     SubList (..),
     parseQuery,
+    parseQuerySections,
     pseudoDescriptorText,
     mapMQuerySection,
     combineQuerySections,
@@ -28,6 +29,10 @@ import Type.Model.Prim (FileSetArithmetic (..), Intersectable (..), QueryCriteri
 
 parseQuery :: T.Text -> Either ParseError [PseudoSubTag]
 parseQuery = parse (spaces' >> pseudoQueryParser) "Query"
+
+parseQuerySections ::
+  T.Text -> Either ParseError [QuerySection (SubList (QueryToken PseudoDescriptor))]
+parseQuerySections = parse (spaces' >> querySectionParser) "Query"
 
 -- | A newtype wrapper around Data.Text.Text
 newtype PseudoDescriptor = PDescriptor T.Text deriving (Show, Eq)
@@ -182,20 +187,38 @@ querySectionParser = do
       eof
       return ANoLiteral
 
+    queryTokenEitherParser :: TextFieldParser (SubList (QueryToken PseudoDescriptor))
+    queryTokenEitherParser = do
+      qt <-
+        try subTagTokenParser <|> do
+          qt' <- descriptorTokenParser
+          return $ SubList qt' []
+      spaces'
+      return qt
+
+    subTagTokenParser :: TextFieldParser (SubList (QueryToken PseudoDescriptor))
+    subTagTokenParser = do
+      subHead <- descriptorTokenParser
+      spaces'
+      char '{'
+      spaces'
+      subList <- do
+        many $ do
+          sd'' <- descriptorTokenParser
+          spaces'
+          return sd''
+      char '}'
+      spaces'
+      return (SubList subHead subList)
+
+    descriptorTokenParser :: TextFieldParser (QueryToken PseudoDescriptor)
+    descriptorTokenParser = do
+      tc <- queryCriteriaParser
+      pd <- pseudoDescriptorParser
+      return $ QueryToken tc pd
+
 spaces' :: TextFieldParser ()
 spaces' = spaces <?> ""
-
--- queryTokenParser :: TextFieldParser [SubList (QueryToken PseudoDescriptor)]
--- queryTokenParser = many queryTokenEitherParser
---   where
-queryTokenEitherParser :: TextFieldParser (SubList (QueryToken PseudoDescriptor))
-queryTokenEitherParser = do
-  qt <-
-    try subTagTokenParser <|> do
-      qt' <- descriptorTokenParser
-      return $ SubList qt' []
-  spaces'
-  return qt
 
 pseudoQueryParser :: TextFieldParser [PseudoSubTag]
 pseudoQueryParser =
@@ -207,31 +230,10 @@ pseudoQueryParser =
       spaces
       return pd
 
-descriptorTokenParser :: TextFieldParser (QueryToken PseudoDescriptor)
-descriptorTokenParser = do
-  tc <- queryCriteriaParser
-  pd <- pseudoDescriptorParser
-  return $ QueryToken tc pd
-
 -- | Parses a descriptor
 pseudoDescriptorParser :: TextFieldParser PseudoDescriptor
 pseudoDescriptorParser =
   fmap (PDescriptor . T.pack) . many1 . noneOf $ "{} \t\n"
-
-subTagTokenParser :: TextFieldParser (SubList (QueryToken PseudoDescriptor))
-subTagTokenParser = do
-  subHead <- descriptorTokenParser
-  spaces'
-  char '{'
-  spaces'
-  subList <- do
-    many $ do
-      sd'' <- descriptorTokenParser
-      spaces'
-      return sd''
-  char '}'
-  spaces'
-  return (SubList subHead subList)
 
 pseudoSubTagQueryParser :: TextFieldParser PseudoSubTag
 pseudoSubTagQueryParser = do
