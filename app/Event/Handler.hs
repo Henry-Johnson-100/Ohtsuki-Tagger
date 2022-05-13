@@ -281,12 +281,13 @@ fileSelectionEventHandler wenv node model event =
       ]
     FileSelectionCommitQueryText ->
       [ dbConnTask
-          (DoFileSelectionEvent . FileSelectionUpdate)
+          (DoFileSelectionEvent . FileSelectionPut)
           ( \activeDbConn ->
               runQuery
                 activeDbConn
                 (model ^. fileSelectionModel . setArithmetic)
                 (model ^. fileSelectionModel . queryCriteria)
+                (model ^. fileSelectionModel . fileSelection)
                 (model ^. fileSelectionModel . queryText)
           )
           (model ^. dbConn),

@@ -21,6 +21,7 @@ import Database.Tagger.Type
 import Event.Parser
 import IO
 import qualified Toml
+import Type.BufferList
 import Type.Config
 import Type.Model
 import Util.Core
@@ -31,27 +32,35 @@ runQuery ::
   Connection ->
   FileSetArithmetic ->
   QueryCriteria ->
+  BufferList FileWithTags ->
   T.Text ->
   IO
-    [FileWithTags]
-runQuery c a qc t =
+    (BufferList FileWithTags)
+runQuery c a qc currentSelection t =
   case parseQuerySections t of
     Left ex -> do
       hPrint stderr ex
       empty
-    Right r -> queryWithParseResults c a qc r
+    Right r -> queryWithParseResults c a qc currentSelection r
 
 queryWithParseResults ::
   Traversable t =>
   Connection ->
   FileSetArithmetic ->
   QueryCriteria ->
+  BufferList FileWithTags ->
   [QuerySection (t (SubList (QueryToken PseudoDescriptor)))] ->
-  IO [FileWithTags]
-queryWithParseResults c a qc qss = do
+  IO (BufferList FileWithTags)
+queryWithParseResults c a qc currentBuffer qss = do
   queriedSections <- mapM (queryWithQuerySection c qc) qss
   let combinedResults = combineQueriedSection a queriedSections
-  return . sectionContents $ combinedResults
+  return . bfComb a currentBuffer . cFromList . sectionContents $ combinedResults
+  where
+    bfComb a bf bxs =
+      case a of
+        Union -> unionBy fwtFileEqual bf bxs
+        Intersect -> intersectBy fwtFileEqual bf bxs
+        Diff -> diffBy fwtFileEqual bf bxs
 
 combineQueriedSection ::
   FileSetArithmetic ->
@@ -66,7 +75,7 @@ combineQueriedSection a qqs = L.foldl1' (combine a) qqs
       QuerySection [FileWithTags] ->
       QuerySection [FileWithTags]
     combine a (QuerySection ax sxs) (QuerySection ay sys) =
-      case ax of
+      case ay of
         ANoLiteral -> combine'' a ay sxs sys
         ALiteral a' -> combine'' a' ay sxs sys
       where

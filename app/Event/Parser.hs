@@ -105,24 +105,6 @@ mapMQueryToken f (QueryToken c x) = do
   x' <- f x
   return $ QueryToken c x'
 
--- -- | Left associative combination of query sections
--- --
--- -- Applies the set arithmetic of the first to the set combination function of the two.
--- --
--- -- Resulting QuerySection the right set arithmetic
--- combineQuerySections ::
---   ([a] -> [a] -> [a]) ->
---   (a -> a -> Bool) ->
---   QuerySection a ->
---   QuerySection a ->
---   QuerySection a
--- combineQuerySections defaultCombo f (QuerySection xa xs) (QuerySection ya ys) =
---   case xa of
---     ALiteral Union -> QuerySection ya (unionBy f xs ys)
---     ALiteral Intersect -> QuerySection ya (intersectBy f xs ys)
---     ALiteral Diff -> QuerySection ya (diffBy f xs ys)
---     ANoLiteral -> QuerySection ya $ defaultCombo xs ys
-
 setArithmeticLiteralParser :: TextFieldParser SetArithmeticLiteral
 setArithmeticLiteralParser =
   unionParser
