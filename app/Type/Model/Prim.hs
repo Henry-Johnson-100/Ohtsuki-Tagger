@@ -38,7 +38,7 @@ import Control.Monad
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as L
 import Data.Text (Text)
-import Database.Tagger.Access
+import Database.SQLite.Simple (Connection)
 import Database.Tagger.Type
 import Type.BufferList
 import Type.Config

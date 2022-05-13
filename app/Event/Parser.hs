@@ -26,6 +26,7 @@ import Text.Parsec
     (<?>),
     (<|>),
   )
+import Type.Model.Prim (QueryCriteria (..))
 
 parseQuery :: T.Text -> Either ParseError [PseudoSubTag]
 parseQuery = parse (spaces' >> pseudoQueryParser) "Query"
