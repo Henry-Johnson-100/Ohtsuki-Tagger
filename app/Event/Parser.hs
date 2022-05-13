@@ -21,7 +21,6 @@ module Event.Parser
     mapMQuerySection,
     mapMSubList,
     mapMQueryToken,
-    combineQuerySections,
   )
 where
 
@@ -50,7 +49,7 @@ parseQuery :: T.Text -> Either ParseError [PseudoSubTag]
 parseQuery = parse (spaces' >> pseudoQueryParser) "Query"
 
 parseQuerySections ::
-  T.Text -> Either ParseError [QuerySection (SubList (QueryToken PseudoDescriptor))]
+  T.Text -> Either ParseError [QuerySection [SubList (QueryToken PseudoDescriptor)]]
 parseQuerySections = parse (spaces' >> querySectionParser) "Query"
 
 -- | A newtype wrapper around Data.Text.Text
@@ -82,14 +81,15 @@ data QueryCriteriaLiteral = CLiteral !QueryCriteria | CNoLiteral deriving (Show,
 
 data QuerySection a = QuerySection
   { sectionSetArithmetic :: !SetArithmeticLiteral,
-    sectionContents :: ![a]
+    sectionContents :: !a
   }
   deriving (Show, Eq, Functor)
 
-instance Foldable QuerySection where
-  foldr f acc (QuerySection _ xs) = foldr f acc xs
-
-mapMQuerySection :: Monad m => (a1 -> m a2) -> QuerySection a1 -> m (QuerySection a2)
+mapMQuerySection ::
+  (Monad m, Traversable t) =>
+  (a -> m b) ->
+  QuerySection (t a) ->
+  m (QuerySection (t b))
 mapMQuerySection fm (QuerySection a xs) = do
   xs' <- mapM fm xs
   return (QuerySection a xs')
@@ -105,23 +105,23 @@ mapMQueryToken f (QueryToken c x) = do
   x' <- f x
   return $ QueryToken c x'
 
--- | Left associative combination of query sections
---
--- Applies the set arithmetic of the first to the set combination function of the two.
---
--- Resulting QuerySection the right set arithmetic
-combineQuerySections ::
-  ([a] -> [a] -> [a]) ->
-  (a -> a -> Bool) ->
-  QuerySection a ->
-  QuerySection a ->
-  QuerySection a
-combineQuerySections defaultCombo f (QuerySection xa xs) (QuerySection ya ys) =
-  case xa of
-    ALiteral Union -> QuerySection ya (unionBy f xs ys)
-    ALiteral Intersect -> QuerySection ya (intersectBy f xs ys)
-    ALiteral Diff -> QuerySection ya (diffBy f xs ys)
-    ANoLiteral -> QuerySection ya $ defaultCombo xs ys
+-- -- | Left associative combination of query sections
+-- --
+-- -- Applies the set arithmetic of the first to the set combination function of the two.
+-- --
+-- -- Resulting QuerySection the right set arithmetic
+-- combineQuerySections ::
+--   ([a] -> [a] -> [a]) ->
+--   (a -> a -> Bool) ->
+--   QuerySection a ->
+--   QuerySection a ->
+--   QuerySection a
+-- combineQuerySections defaultCombo f (QuerySection xa xs) (QuerySection ya ys) =
+--   case xa of
+--     ALiteral Union -> QuerySection ya (unionBy f xs ys)
+--     ALiteral Intersect -> QuerySection ya (intersectBy f xs ys)
+--     ALiteral Diff -> QuerySection ya (diffBy f xs ys)
+--     ANoLiteral -> QuerySection ya $ defaultCombo xs ys
 
 setArithmeticLiteralParser :: TextFieldParser SetArithmeticLiteral
 setArithmeticLiteralParser =
@@ -177,7 +177,7 @@ t.otsuki_yui {r.gym_clothes p.%yui_otsuki% } u| r.machikado_mazoku_characters {t
 -}
 
 querySectionParser ::
-  TextFieldParser [QuerySection (SubList (QueryToken PseudoDescriptor))]
+  TextFieldParser [QuerySection [SubList (QueryToken PseudoDescriptor)]]
 querySectionParser = do
   h <- querySectionHeadParser
   spaces'
@@ -185,7 +185,7 @@ querySectionParser = do
   return $ h : t
   where
     querySectionHeadParser ::
-      TextFieldParser (QuerySection (SubList (QueryToken PseudoDescriptor)))
+      TextFieldParser (QuerySection [SubList (QueryToken PseudoDescriptor)])
     querySectionHeadParser = do
       spaces'
       a <- setArithmeticLiteralParser <|> return ANoLiteral
@@ -198,7 +198,7 @@ querySectionParser = do
 
     querySectionTailParser ::
       TextFieldParser
-        (QuerySection (SubList (QueryToken PseudoDescriptor)))
+        (QuerySection [SubList (QueryToken PseudoDescriptor)])
     querySectionTailParser = do
       spaces'
       a <- setArithmeticLiteralParser

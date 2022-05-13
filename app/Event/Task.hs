@@ -27,6 +27,78 @@ import Util.Core
 
 type ConnString = String
 
+runQuery ::
+  Connection ->
+  FileSetArithmetic ->
+  QueryCriteria ->
+  T.Text ->
+  IO
+    [FileWithTags]
+runQuery c a qc t =
+  case parseQuerySections t of
+    Left ex -> do
+      hPrint stderr ex
+      empty
+    Right r -> queryWithParseResults c a qc r
+
+queryWithParseResults ::
+  Traversable t =>
+  Connection ->
+  FileSetArithmetic ->
+  QueryCriteria ->
+  [QuerySection (t (SubList (QueryToken PseudoDescriptor)))] ->
+  IO [FileWithTags]
+queryWithParseResults c a qc qss = do
+  queriedSections <- mapM (queryWithQuerySection c qc) qss
+  let combinedResults = combineQueriedSection a queriedSections
+  return . sectionContents $ combinedResults
+
+combineQueriedSection ::
+  FileSetArithmetic ->
+  [QuerySection [FileWithTags]] ->
+  QuerySection [FileWithTags]
+combineQueriedSection a [] = QuerySection (ALiteral a) []
+combineQueriedSection a qqs = L.foldl1' (combine a) qqs
+  where
+    combine ::
+      FileSetArithmetic ->
+      QuerySection [FileWithTags] ->
+      QuerySection [FileWithTags] ->
+      QuerySection [FileWithTags]
+    combine a (QuerySection ax sxs) (QuerySection ay sys) =
+      case ax of
+        ANoLiteral -> combine'' a ay sxs sys
+        ALiteral a' -> combine'' a' ay sxs sys
+      where
+        combine'' a'' aTo xs'' ys'' = QuerySection aTo $
+          case a'' of
+            Union -> unionBy fwtFileEqual xs'' ys''
+            Intersect -> intersectBy fwtFileEqual xs'' ys''
+            Diff -> diffBy fwtFileEqual xs'' ys''
+
+queryWithQuerySection ::
+  Traversable t =>
+  Connection ->
+  QueryCriteria ->
+  QuerySection (t (SubList (QueryToken PseudoDescriptor))) ->
+  IO (QuerySection [FileWithTags])
+queryWithQuerySection c qc qs@(QuerySection a ss) = do
+  ss' <- fmap concat . mapM (queryWithQueryTokenSubList c qc) $ ss
+  return $ qs {sectionContents = ss'}
+
+queryWithQueryTokenSubList ::
+  Connection ->
+  QueryCriteria ->
+  SubList (QueryToken PseudoDescriptor) ->
+  IO [FileWithTags]
+queryWithQueryTokenSubList c qc (SubList h []) = queryWithQueryTokenLiteral c qc h
+queryWithQueryTokenSubList c qc (SubList h ts) = do
+  h' <- queryWithQueryTokenLiteral c qc h
+  ts' <- mapM (queryWithQueryTokenLiteral c qc) ts
+  -- So that u| t.otsuki_yui {r.smile t.dress} ==
+  --  u| t.otsuki_yui {r.smile} u| t.otsuki {t.dress}
+  return . concatMap (intersectBy fwtFileEqual h') $ ts'
+
 queryWithQueryTokenLiteral ::
   Connection ->
   QueryCriteria ->
