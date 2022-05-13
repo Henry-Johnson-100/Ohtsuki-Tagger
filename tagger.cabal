@@ -39,6 +39,7 @@ executable tagger
                       ,FunctionalDependencies
                       ,MagicHash
                       ,DeriveGeneric
+                      ,DeriveFunctor
                       ,RankNTypes
                       ,ExistentialQuantification
                       ,TupleSections
