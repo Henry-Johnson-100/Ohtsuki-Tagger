@@ -495,9 +495,9 @@ lookupFilesHavingTagKey c tk = do
   r <-
     query
       c
-      "SELECT DISTINCT mainTagFileId \
-      \FROM FileWithTags \
-      \WHERE mainTagId = ?"
+      "SELECT fileId \
+      \FROM Tag \
+      \WHERE id = ?"
       [tk] ::
       IO [TagKey]
   return r
@@ -520,9 +520,9 @@ lookupFilesHavingDescriptorKey c did = do
   r <-
     query
       c
-      "SELECT DISTINCT mainTagFileId \
-      \FROM FileWithTags \
-      \WHERE mainTagDescriptorId = ?"
+      "SELECT DISTINCT fileId \
+      \FROM Tag \
+      \WHERE descriptorId = ?"
       [did] ::
       IO [FileKey]
   return r
@@ -533,10 +533,8 @@ lookupFilesHavingDescriptorPattern c (PDescriptor p) = do
   r <-
     query
       c
-      "SELECT DISTINCT f.id \
+      "SELECT DISTINCT t.fileId \
       \FROM Tag t \
-      \  JOIN File f \
-      \    ON t.fileId = f.id \
       \  Join Descriptor d \
       \    ON t.descriptorId = d.id \
       \WHERE d.Descriptor LIKE ?"
@@ -559,19 +557,17 @@ lookupFilesHavingNoTags c = do
 (&++) :: Query -> Query -> Query
 qx &++ qy = fromString . T.unpack $ fromQuery qx !++ "\n" !++ fromQuery qy
 
--- #FIXME This function runs EXTREMELY slowly.
--- Now it runs 50% faster but still too slowly for me.
-lookupFileWithTagsByFileIdInView ::
-  Connection -> FileKey -> IO [CollectedDatabaseFileWithTags]
-lookupFileWithTagsByFileIdInView c fk = do
+-- | This is between 30-100x faster than before which is cool.
+collectFileWithTagsByFileKey ::
+  Connection -> [FileKey] -> IO [CollectedDatabaseFileWithTags]
+collectFileWithTagsByFileKey c fks = do
   let q =
-        subTagRecursiveCTE
-          &++ "SELECT fileId, id FROM FileWithTags"
+        subTagRecursiveCTEWithFKList (keysToLiteralSQLList fks)
+          &++ "SELECT fileId, id FROM FileWithTags ORDER BY fileId"
   r <-
-    query
+    query_
       c
-      q
-      [fk] ::
+      q ::
       IO [DatabaseFileWithTags]
   return . map CollectedDatabaseFileWithTags . reduceDbFwtList $ r
 
@@ -588,6 +584,9 @@ derefDatabaseFileWithTags c (CollectedDatabaseFileWithTags dbfwt) = do
         derefTagPtr c tPtr
   tags <- lift . fmap catMaybes . mapM (runMaybeT . derefTk) $ tks
   return . FileWithTags f . HashSet.fromList $ tags
+
+keysToLiteralSQLList :: [Int] -> Query
+keysToLiteralSQLList ks = fromString $ "(" ++ (L.intercalate ", " . map show) ks ++ ")"
 
 {-
   ____ _____ _____
@@ -747,3 +746,31 @@ subTagRecursiveCTE =
   \      LEFT JOIN Tag st \
   \        ON fwt.id = st.subTagOfId \
   \)"
+
+subTagRecursiveCTEWithFKList :: Query -> Query
+subTagRecursiveCTEWithFKList q =
+  "WITH RECURSIVE FileWithTags AS ( \
+  \  SELECT \
+  \    t.id \
+  \    ,t.subTagOfId \"subTagOfId\" \
+  \    ,st.id \"subTagId\" \
+  \    ,t.fileId \
+  \    ,t.descriptorId \
+  \    ,st.descriptorId \"subTagDescriptorId\" \
+  \  FROM Tag t \
+  \    LEFT JOIN Tag st \
+  \      ON t.id = st.subTagOfId \
+  \  WHERE t.fileId IN"
+    &++ q
+    &++ "  UNION \
+        \  SELECT \
+        \    fwt.id \
+        \    ,fwt.subTagOfId \
+        \    ,st.id \"subTagId\" \
+        \    ,fwt.fileId \
+        \    ,fwt.descriptorId \
+        \    ,st.descriptorId \"subTagDescriptorId\" \
+        \    FROM FileWithTags fwt \
+        \      LEFT JOIN Tag st \
+        \        ON fwt.id = st.subTagOfId \
+        \)"
