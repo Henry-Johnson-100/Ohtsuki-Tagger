@@ -75,7 +75,7 @@ import Database.Tagger.Access.RowMap
   )
 import Database.Tagger.Type
   ( CollectedDatabaseFileWithTags (CollectedDatabaseFileWithTags),
-    DatabaseFileWithTags,
+    DatabaseFileWithTags (FileWithTags_),
     Descriptor (..),
     DescriptorKey,
     DescriptorTree (Infra),
@@ -506,9 +506,9 @@ lookupFilesHavingFilePattern c p = do
   r <-
     query
       c
-      "SELECT DISTINCT mainTagFileId \
-      \FROM FileWithTags \
-      \WHERE mainTagFilePath LIKE ?"
+      "SELECT id \
+      \FROM File \
+      \WHERE filePath LIKE ?"
       [p] ::
       IO [FileKey]
   return r
@@ -539,14 +539,18 @@ lookupFilesHavingDescriptorPattern c (PDescriptor p) = do
       IO [FileKey]
   return r
 
-lookupFilesHavingNoTags :: Connection -> IO [FileKey]
-lookupFilesHavingNoTags c =
-  query_
-    c
-    "SELECT DISTINCT mainTagFileId FROM \
-    \FileWithTags \
-    \WHERE mainTagId IS NULL"
+lookupFilesHavingNoTags :: Connection -> IO [CollectedDatabaseFileWithTags]
+lookupFilesHavingNoTags c = do
+  r <-
+    query_
+      c
+      "SELECT id \
+      \FROM FILE \
+      \WHERE id NOT IN (SELECT fileTagId FROM Tag)" ::
+      IO [FileKey]
+  return . map (CollectedDatabaseFileWithTags . flip FileWithTags_ []) $ r
 
+-- #FIXME This function runs EXTREMELY slowly.
 lookupFileWithTagsByFileIdInView ::
   Connection -> FileKey -> IO [CollectedDatabaseFileWithTags]
 lookupFileWithTagsByFileIdInView c fk = do
