@@ -582,16 +582,22 @@ lookupFilesHavingNoTags c = do
       IO [FileKey]
   return . map (CollectedDatabaseFileWithTags . flip FileWithTags_ []) $ r
 
--- lookupFilesHavingSubTagRelationship ::
---   Connection ->
---   DescriptorKey ->
---   [DescriptorKey] ->
---   IO [FileKey]
--- lookupFilesHavingSubTagRelationship c mdk sdks = do
---   let q =
---         fromFileWithTagsCTE
---           (_)
---   _
+lookupFilesHavingSubTagRelationship ::
+  Connection ->
+  DescriptorKey ->
+  [DescriptorKey] ->
+  IO [FileKey]
+lookupFilesHavingSubTagRelationship c mdk sdks = do
+  let q =
+        Select "DISTINCT fileId"
+          `fromFileWithTagsCTE` Where
+            ("t.descriptorId = ? AND st.descriptorId IN" &++ keysToLiteralSQLList sdks) ::
+          QueryRequiring (Only DescriptorKey)
+  query
+    c
+    q
+    [mdk] ::
+    IO [FileKey]
 
 -- | SQL injection be damned
 (&++) :: Query -> Query -> Query
