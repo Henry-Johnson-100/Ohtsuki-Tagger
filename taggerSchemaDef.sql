@@ -35,6 +35,12 @@ CREATE TABLE IF NOT EXISTS "Representative" (
   FOREIGN KEY("repDescriptorId") REFERENCES "Descriptor"("id") ON DELETE CASCADE,
   CONSTRAINT "repDescriptorUnique" UNIQUE("repDescriptorId") ON CONFLICT REPLACE
 );
+CREATE TABLE IF NOT EXISTS "TaggerDBInfo" (
+  _tagger INTEGER NOT NULL,
+  version TEXT NOT NULL,
+  lastAccessed TEXT,
+  CONSTRAINT uniqueInfo UNIQUE(_tagger) ON CONFLICT REPLACE
+);
 INSERT INTO Descriptor (descriptor) VALUES ('#ALL#'), ('#META#'),  ('#UNRELATED#');
 -- relate #META# and #UNRELATED# to #ALL#
 INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId)
@@ -43,3 +49,5 @@ INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId)
     id
   FROM Descriptor
   WHERE descriptor IN ('#META#','#UNRELATED#');
+INSERT INTO TaggerDBInfo (_tagger, version, lastAccessed)
+  VALUES (0, '0.3.2.0', datetime());

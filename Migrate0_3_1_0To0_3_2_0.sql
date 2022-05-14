@@ -25,3 +25,11 @@ CREATE TABLE IF NOT EXISTS  "Tag" (
 INSERT INTO Tag (id, fileId, descriptorId, subTagOfId)
   SELECT id, fileTagId, descriptorTagId, subTagOfId FROM NewTag;
 DROP TABLE NewTag;
+CREATE TABLE IF NOT EXISTS "TaggerDBInfo" (
+  _tagger INTEGER NOT NULL,
+  version TEXT NOT NULL,
+  lastAccessed TEXT,
+  CONSTRAINT uniqueInfo UNIQUE(_tagger) ON CONFLICT REPLACE
+);
+INSERT INTO TaggerDBInfo (_tagger, version, lastAccessed)
+  VALUES (0, '0.3.2.0', datetime());
