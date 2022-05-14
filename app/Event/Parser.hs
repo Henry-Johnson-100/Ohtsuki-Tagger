@@ -24,7 +24,9 @@ module Event.Parser
   )
 where
 
+import Control.Monad
 import Data.Functor.Identity (Identity)
+import qualified Data.Maybe as M
 import qualified Data.Text as T
 import Text.Parsec
   ( ParseError,
@@ -36,10 +38,14 @@ import Text.Parsec
     many1,
     manyTill,
     noneOf,
+    notFollowedBy,
     oneOf,
+    optionMaybe,
     parse,
+    space,
     spaces,
     try,
+    unexpected,
     (<?>),
     (<|>),
   )
@@ -107,52 +113,60 @@ mapMQueryToken f (QueryToken c x) = do
 
 setArithmeticLiteralParser :: TextFieldParser SetArithmeticLiteral
 setArithmeticLiteralParser =
-  unionParser
-    <|> intersectParser
-    <|> diffParser
-  where
-    unionParser :: TextFieldParser SetArithmeticLiteral
-    unionParser = do
-      oneOf "uU"
-      char '|'
-      return . ALiteral $ Union
-    intersectParser :: TextFieldParser SetArithmeticLiteral
-    intersectParser = do
-      oneOf "iI"
-      char '|'
-      return . ALiteral $ Intersect
-    diffParser :: TextFieldParser SetArithmeticLiteral
-    diffParser = do
-      oneOf "dD"
-      char '|'
-      return . ALiteral $ Diff
-    noLiteralParser :: TextFieldParser SetArithmeticLiteral
-    noLiteralParser = return ANoLiteral
+  try $
+    unionParser
+      <|> intersectParser
+      <|> diffParser
+
+unionParser :: TextFieldParser SetArithmeticLiteral
+unionParser = do
+  oneOf "uU"
+  char '|'
+  return . ALiteral $ Union
+
+intersectParser :: TextFieldParser SetArithmeticLiteral
+intersectParser = do
+  oneOf "iI"
+  char '|'
+  return . ALiteral $ Intersect
+
+diffParser :: TextFieldParser SetArithmeticLiteral
+diffParser = do
+  oneOf "dD"
+  char '|'
+  return . ALiteral $ Diff
+
+noSetArithmeticLiteralParser :: TextFieldParser SetArithmeticLiteral
+noSetArithmeticLiteralParser = return ANoLiteral
 
 queryCriteriaParser :: TextFieldParser QueryCriteriaLiteral
 queryCriteriaParser =
-  byTagParser
-    <|> byRelationParser
-    <|> byPatternParser
-    <|> noLiteralParser
-  where
-    byTagParser :: TextFieldParser QueryCriteriaLiteral
-    byTagParser = do
-      oneOf "tT"
-      char '.'
-      return . CLiteral $ ByTag
-    byRelationParser :: TextFieldParser QueryCriteriaLiteral
-    byRelationParser = do
-      oneOf "rR"
-      char '.'
-      return . CLiteral $ ByRelation
-    byPatternParser :: TextFieldParser QueryCriteriaLiteral
-    byPatternParser = do
-      oneOf "pP"
-      char '.'
-      return . CLiteral $ ByPattern
-    noLiteralParser :: TextFieldParser QueryCriteriaLiteral
-    noLiteralParser = return CNoLiteral
+  try $
+    byTagParser
+      <|> byRelationParser
+      <|> byPatternParser
+      <|> noQueryCriteriaLiteralParser
+
+byTagParser :: TextFieldParser QueryCriteriaLiteral
+byTagParser = do
+  oneOf "tT"
+  char '.'
+  return . CLiteral $ ByTag
+
+byRelationParser :: TextFieldParser QueryCriteriaLiteral
+byRelationParser = do
+  oneOf "rR"
+  char '.'
+  return . CLiteral $ ByRelation
+
+byPatternParser :: TextFieldParser QueryCriteriaLiteral
+byPatternParser = do
+  oneOf "pP"
+  char '.'
+  return . CLiteral $ ByPattern
+
+noQueryCriteriaLiteralParser :: TextFieldParser QueryCriteriaLiteral
+noQueryCriteriaLiteralParser = return CNoLiteral
 
 {-
 t.otsuki_yui {r.gym_clothes p.%yui_otsuki% } u| r.machikado_mazoku_characters {t.smile} d| lilith_statue
@@ -165,69 +179,86 @@ querySectionParser = do
   spaces'
   t <- many querySectionTailParser
   return $ h : t
-  where
-    querySectionHeadParser ::
-      TextFieldParser (QuerySection [SubList (QueryToken PseudoDescriptor)])
-    querySectionHeadParser = do
-      spaces'
-      a <- setArithmeticLiteralParser <|> return ANoLiteral
-      spaces'
-      sls <-
-        manyTillNoConsume
-          queryTokenEitherParser
-          (eofNoLiteralParser <|> setArithmeticLiteralParser)
-      return $ QuerySection a sls
 
-    querySectionTailParser ::
-      TextFieldParser
-        (QuerySection [SubList (QueryToken PseudoDescriptor)])
-    querySectionTailParser = do
-      spaces'
-      a <- setArithmeticLiteralParser
-      spaces'
-      sls <-
-        manyTillNoConsume
-          queryTokenEitherParser
-          (eofNoLiteralParser <|> setArithmeticLiteralParser)
-      return $ QuerySection a sls
+querySectionHeadParser ::
+  TextFieldParser (QuerySection [SubList (QueryToken PseudoDescriptor)])
+querySectionHeadParser = do
+  spaces'
+  a <- setArithmeticLiteralParser <|> return ANoLiteral
+  spaces'
+  sls <-
+    manyTillNoConsume
+      queryTokenEitherParser
+      (eofNoLiteralParser <|> setArithmeticLiteralParser)
+  return $ QuerySection a sls
 
-    manyTillNoConsume :: TextFieldParser a -> TextFieldParser b -> TextFieldParser [a]
-    manyTillNoConsume p end = manyTill p (lookAhead end)
+querySectionTailParser ::
+  TextFieldParser
+    (QuerySection [SubList (QueryToken PseudoDescriptor)])
+querySectionTailParser = do
+  spaces'
+  a <- setArithmeticLiteralParser
+  spaces'
+  sls <-
+    manyTillNoConsume
+      queryTokenEitherParser
+      (eofNoLiteralParser <|> setArithmeticLiteralParser)
+  return $ QuerySection a sls
 
-    eofNoLiteralParser :: TextFieldParser SetArithmeticLiteral
-    eofNoLiteralParser = do
-      eof
-      return ANoLiteral
+manyTillNoConsume :: TextFieldParser a -> TextFieldParser b -> TextFieldParser [a]
+manyTillNoConsume p end = manyTill p (lookAhead end)
 
-    queryTokenEitherParser :: TextFieldParser (SubList (QueryToken PseudoDescriptor))
-    queryTokenEitherParser = do
-      qt <-
-        try subTagTokenParser <|> do
+eofNoLiteralParser :: TextFieldParser SetArithmeticLiteral
+eofNoLiteralParser = do
+  eof
+  return ANoLiteral
+
+queryTokenEitherParser :: TextFieldParser (SubList (QueryToken PseudoDescriptor))
+queryTokenEitherParser = do
+  qt <-
+    try
+      ( do
           qt' <- descriptorTokenParser
+          notFollowedBy (spaces' >> char '{')
           return $ SubList qt' []
-      spaces'
-      return qt
+      )
+      <|> subTagTokenParser
+  spaces'
+  return qt
 
-    subTagTokenParser :: TextFieldParser (SubList (QueryToken PseudoDescriptor))
-    subTagTokenParser = do
-      subHead <- descriptorTokenParser
+subTagTokenParser :: TextFieldParser (SubList (QueryToken PseudoDescriptor))
+subTagTokenParser = do
+  subHead <- descriptorTokenParser
+  spaces'
+  char '{'
+  spaces'
+  subList <- do
+    many $ do
+      sd'' <- subQueryDescriptorTokenParser
       spaces'
-      char '{'
-      spaces'
-      subList <- do
-        many $ do
-          sd'' <- descriptorTokenParser
-          spaces'
-          return sd''
-      char '}'
-      spaces'
-      return (SubList subHead subList)
+      return sd''
+  char '}'
+  spaces'
+  return (SubList subHead subList)
 
-    descriptorTokenParser :: TextFieldParser (QueryToken PseudoDescriptor)
-    descriptorTokenParser = do
-      tc <- queryCriteriaParser
-      pd <- pseudoDescriptorParser
-      return $ QueryToken tc pd
+descriptorTokenParser :: TextFieldParser (QueryToken PseudoDescriptor)
+descriptorTokenParser = do
+  tc <- queryCriteriaParser
+  pd <- pseudoDescriptorParser
+  return $ QueryToken tc pd
+
+subQueryDescriptorTokenParser :: TextFieldParser (QueryToken PseudoDescriptor)
+subQueryDescriptorTokenParser = do
+  tc <-
+    (try byPatternParser >> unexpected "Pattern QueryCriteriaLiteral 'P.' in SubTag query.")
+      <|> ( setArithmeticLiteralParser
+              >> unexpected "Set Arithmetic literal 'u| i| or d|' in SubTag query"
+          )
+      <|> byTagParser
+      <|> byRelationParser
+      <|> noQueryCriteriaLiteralParser
+  pd <- pseudoDescriptorParser
+  return $ QueryToken tc pd
 
 spaces' :: TextFieldParser ()
 spaces' = spaces <?> ""
