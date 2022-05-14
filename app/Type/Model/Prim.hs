@@ -108,8 +108,8 @@ instance Eq Connection where
   x == y = True
 
 data TaggedConnection = TaggedConnection
-  { connName :: !Text,
-    connInstance :: !(Maybe Connection)
+  { _taggedconnectionConnName :: !Text,
+    _taggedconnectionConnInstance :: !(Maybe Connection)
   }
   deriving (Eq)
 

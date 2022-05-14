@@ -71,11 +71,11 @@ dbConnTask ::
   (Connection -> IO a) ->
   TaggedConnection ->
   EventResponse s TaggerEvent sp ep
-dbConnTask e f =
+dbConnTask e f tc =
   maybe
     (Task (IOEvent <$> IO.hPutStrLn IO.stderr "Database connection not active."))
     (Task . fmap e . f)
-    . connInstance
+    $ tc ^. connInstance
 
 descriptorTreeEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -144,7 +144,7 @@ descriptorTreeEventHandler wenv node model event =
           ( DoDescriptorEvent . RepresentativeFilePut_
               <$> runMaybeT
                 ( do
-                    c <- hoistMaybe . connInstance $ model ^. dbConn
+                    c <- hoistMaybe $ model ^. dbConn . connInstance
                     getRepresentative c d
                 )
           )
@@ -467,7 +467,7 @@ taggerEventHandler wenv node model event =
     DatabaseConnect ->
       [ Task $
           DatabaseConnectionPut_ <$> do
-            maybe (pure ()) close . connInstance $ model ^. dbConn
+            maybe (pure ()) close $ model ^. dbConn . connInstance
             let newConnTag = model ^. (programConfig . dbconf . dbconfPath)
             newConnInstance <- open . T.unpack $ newConnTag
             activateForeignKeyPragma newConnInstance
@@ -482,30 +482,28 @@ taggerEventHandler wenv node model event =
     DatabaseBackup ->
       [ Task
           ( IOEvent
-              <$> ( maybe
-                      ( IO.hPutStrLn
-                          IO.stderr
-                          "Failed to backup, no database is currently connected."
-                      )
-                      ( flip
-                          IO.backupDbConn
-                          ( T.unpack $
-                              model
-                                ^. ( programConfig
-                                       . dbconf
-                                       . dbconfBackup
-                                   )
-                          )
-                      )
-                      . connInstance
-                      $ model ^. dbConn
-                  )
+              <$> maybe
+                ( IO.hPutStrLn
+                    IO.stderr
+                    "Failed to backup, no database is currently connected."
+                )
+                ( flip
+                    IO.backupDbConn
+                    ( T.unpack $
+                        model
+                          ^. ( programConfig
+                                 . dbconf
+                                 . dbconfBackup
+                             )
+                    )
+                )
+                (model ^. dbConn . connInstance)
           )
       ]
     DatabaseClose ->
       [ Task
           ( IOEvent
-              <$> maybe (pure ()) close (connInstance $ model ^. dbConn)
+              <$> maybe (pure ()) close (model ^. dbConn . connInstance)
           )
       ]
     DropTargetAppendText_ l df d ->

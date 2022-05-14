@@ -29,3 +29,5 @@ makeLenses ''SelectionConfig
 makeLenses ''DescriptorTreeConfig
 
 makeLenses ''RootedDescriptorTree
+
+makeLensesWith abbreviatedFields ''TaggedConnection
