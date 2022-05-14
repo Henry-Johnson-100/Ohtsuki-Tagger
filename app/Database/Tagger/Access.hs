@@ -490,6 +490,27 @@ lookupTagLike c (TagNoId (Tag _ (File fk _) (Descriptor _ dt) _)) = do
 |_|      \_/\_/    |_|    \_/  |___|_____|  \_/\_/
 -}
 
+lookupFilesHavingInfraTagRelationship :: Connection -> DescriptorKey -> IO [FileKey]
+lookupFilesHavingInfraTagRelationship c dk = do
+  mmd <- runMaybeT $ getDescriptor c dk
+  maybe
+    (return [])
+    ( \md -> do
+        mdfs <- lookupFilesHavingDescriptorKey c . descriptorId $ md
+        let q =
+              infraTreeRecursiveCTE
+                &++ "SELECT DISTINCT infraDescriptorId FROM MD"
+        infraR <-
+          query
+            c
+            q
+            [descriptorId md] ::
+            IO [DescriptorKey]
+        idfs <- fmap concat . mapM (lookupFilesHavingDescriptorKey c) $ infraR
+        return . L.union mdfs $ idfs
+    )
+    mmd
+
 lookupFilesHavingTagKey :: Connection -> TagKey -> IO [FileKey]
 lookupFilesHavingTagKey c tk = do
   r <-
@@ -522,7 +543,8 @@ lookupFilesHavingDescriptorKey c did = do
       c
       "SELECT DISTINCT fileId \
       \FROM Tag \
-      \WHERE descriptorId = ?"
+      \WHERE descriptorId = ? \
+      \ORDER BY fileId"
       [did] ::
       IO [FileKey]
   return r
@@ -693,7 +715,7 @@ getDescriptorOccurrenceMap c dks = do
   r <- fmap concat . mapM q $ dks
   return . IntMap.unions $ r
 
-infraTreeRecursiveCTE :: QueryRequiring (Only T.Text)
+infraTreeRecursiveCTE :: QueryRequiring (Only DescriptorKey)
 infraTreeRecursiveCTE =
   "WITH RECURSIVE MD AS ( \
   \  SELECT \
@@ -706,7 +728,7 @@ infraTreeRecursiveCTE =
   \      ON meta.metaDescriptorId = md.id \
   \    JOIN Descriptor id \
   \      ON meta.infraDescriptorId = id.id \
-  \  WHERE metaDescriptor LIKE ? \
+  \  WHERE metaDescriptorId = ? \
   \  UNION ALL \
   \  SELECT \
   \    mdv.infraDescriptorId \
