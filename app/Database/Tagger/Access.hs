@@ -102,6 +102,13 @@ import IO (hPutStrLn, stderr)
 import Type.Model
 import Util.Core (OccurrenceMap, head', hoistMaybe, (!++))
 
+-- | A literal WHERE clause, leaving out "WHERE"
+newtype Where = Where Query deriving (Show, Eq)
+
+-- | A literal SELECT clause, leaving out "SELECT" and the "FROM" clause
+-- The FROM clause is set as a literal value in the CTE Query string.
+newtype Select = Select Query deriving (Show, Eq)
+
 debug# :: Bool
 debug# = False
 
@@ -575,6 +582,17 @@ lookupFilesHavingNoTags c = do
       IO [FileKey]
   return . map (CollectedDatabaseFileWithTags . flip FileWithTags_ []) $ r
 
+-- lookupFilesHavingSubTagRelationship ::
+--   Connection ->
+--   DescriptorKey ->
+--   [DescriptorKey] ->
+--   IO [FileKey]
+-- lookupFilesHavingSubTagRelationship c mdk sdks = do
+--   let q =
+--         fromFileWithTagsCTE
+--           (_)
+--   _
+
 -- | SQL injection be damned
 (&++) :: Query -> Query -> Query
 qx &++ qy = fromString . T.unpack $ fromQuery qx !++ "\n" !++ fromQuery qy
@@ -584,8 +602,9 @@ collectFileWithTagsByFileKey ::
   Connection -> [FileKey] -> IO [CollectedDatabaseFileWithTags]
 collectFileWithTagsByFileKey c fks = do
   let q =
-        subTagRecursiveCTEWithFKList (keysToLiteralSQLList fks)
-          &++ "SELECT fileId, id FROM FileWithTags ORDER BY fileId"
+        Select "fileId, id"
+          `fromFileWithTagsCTE` Where
+            ("t.fileId IN" &++ keysToLiteralSQLList fks)
   r <-
     query_
       c
@@ -742,8 +761,23 @@ infraTreeRecursiveCTE =
   \      ON meta.infraDescriptorId = d.id \
   \)"
 
-subTagRecursiveCTE :: QueryRequiring (Only FileKey)
-subTagRecursiveCTE =
+-- | A recursive CTE "FileWithTags" that has a granularity of one row per tag.
+--
+-- Columns:
+--
+-- t.id                                 - TagKey
+--
+-- t.subTagOfId     "subTagOfId"        - TagKey
+--
+-- st.id            "subTagId"          - TagKey
+--
+-- t.fileId                             - FileKey
+--
+-- t.descriptorId                       - DescriptorKey
+--
+-- st.descriptorId "subTagDescriptorId" - DescriptorKey
+fromFileWithTagsCTE :: Select -> Where -> Query
+fromFileWithTagsCTE (Select selectClause) (Where whereClause) =
   "WITH RECURSIVE FileWithTags AS ( \
   \  SELECT \
   \    t.id \
@@ -755,35 +789,8 @@ subTagRecursiveCTE =
   \  FROM Tag t \
   \    LEFT JOIN Tag st \
   \      ON t.id = st.subTagOfId \
-  \  WHERE t.fileId = ? \
-  \  UNION \
-  \  SELECT \
-  \    fwt.id \
-  \    ,fwt.subTagOfId \
-  \    ,st.id \"subTagId\" \
-  \    ,fwt.fileId \
-  \    ,fwt.descriptorId \
-  \    ,st.descriptorId \"subTagDescriptorId\" \
-  \    FROM FileWithTags fwt \
-  \      LEFT JOIN Tag st \
-  \        ON fwt.id = st.subTagOfId \
-  \)"
-
-subTagRecursiveCTEWithFKList :: Query -> Query
-subTagRecursiveCTEWithFKList q =
-  "WITH RECURSIVE FileWithTags AS ( \
-  \  SELECT \
-  \    t.id \
-  \    ,t.subTagOfId \"subTagOfId\" \
-  \    ,st.id \"subTagId\" \
-  \    ,t.fileId \
-  \    ,t.descriptorId \
-  \    ,st.descriptorId \"subTagDescriptorId\" \
-  \  FROM Tag t \
-  \    LEFT JOIN Tag st \
-  \      ON t.id = st.subTagOfId \
-  \  WHERE t.fileId IN"
-    &++ q
+  \WHERE"
+    &++ whereClause
     &++ "  UNION \
         \  SELECT \
         \    fwt.id \
@@ -795,4 +802,7 @@ subTagRecursiveCTEWithFKList q =
         \    FROM FileWithTags fwt \
         \      LEFT JOIN Tag st \
         \        ON fwt.id = st.subTagOfId \
-        \)"
+        \) \
+        \SELECT"
+    &++ selectClause
+    &++ "FROM FileWithTags"
