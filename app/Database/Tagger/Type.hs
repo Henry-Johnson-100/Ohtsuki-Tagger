@@ -9,6 +9,7 @@ module Database.Tagger.Type
     FileWithTags (..),
     toDatabaseFileWithTags,
     DatabaseFileWithTags (..),
+    CollectedDatabaseFileWithTags (..),
     TagPtrNoId (..),
     tagPtrNoId,
     databaseFileWithTagsFileKey,
@@ -30,7 +31,8 @@ module Database.Tagger.Type
     Representative (..),
     FileKey,
     DescriptorKey,
-    TagKey,
+    TagKey (..),
+    QueryRequiring (..),
     insertIntoDescriptorTree,
     descriptorTreeElem,
     flattenTree,
@@ -43,7 +45,7 @@ module Database.Tagger.Type
   )
 where
 
-import Control.Monad (liftM2, liftM4)
+import Control.Monad
 import qualified Control.Monad
 import qualified Control.Monad.Trans.Class as Trans
 import Control.Monad.Trans.Maybe (MaybeT (MaybeT, runMaybeT))
@@ -54,8 +56,10 @@ import qualified Data.List as L
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as M
 import qualified Data.Text as T
-import Database.SQLite.Simple (FromRow (..), field)
+import Database.SQLite.Simple (FromRow (..), Query, ToRow (..), field)
+import qualified Database.SQLite.Simple.FromField as FromField
 import qualified Database.SQLite.Simple.FromRow as FromRow
+import qualified Database.SQLite.Simple.ToField as ToField
 import qualified GHC.Generics as Generics
 import qualified IO
 import Util.Core (PrimaryKey (getId))
@@ -68,11 +72,16 @@ import Util.Core (PrimaryKey (getId))
 |____/ |_| |_| \_|
 -}
 
+type QueryRequiring a = Query
+
 type FileKey = Int
 
 type DescriptorKey = Int
 
 type TagKey = Int
+
+instance FromRow TagKey where
+  fromRow = field
 
 type TagMap = IntMap.IntMap Tag
 
@@ -245,9 +254,15 @@ data MetaDescriptor = MetaDescriptor
 |_|      \_/\_/    |_|
 -}
 
+-- #TODO change [TagKey to IntSet or something better desu]
 data DatabaseFileWithTags
   = TaggedFile_ !FileKey !(Maybe TagKey)
   | FileWithTags_ !FileKey [TagKey]
+  deriving (Show, Eq)
+
+-- | A type-level guarantee that a dbfwt has all of the tags it can possible have.
+newtype CollectedDatabaseFileWithTags
+  = CollectedDatabaseFileWithTags DatabaseFileWithTags
   deriving (Show, Eq)
 
 databaseFileWithTagsFileKey :: DatabaseFileWithTags -> FileKey

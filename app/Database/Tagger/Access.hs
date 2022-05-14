@@ -74,7 +74,8 @@ import Database.Tagger.Access.RowMap
     reduceDbFwtList,
   )
 import Database.Tagger.Type
-  ( DatabaseFileWithTags,
+  ( CollectedDatabaseFileWithTags (CollectedDatabaseFileWithTags),
+    DatabaseFileWithTags,
     Descriptor (..),
     DescriptorKey,
     DescriptorTree (Infra),
@@ -82,6 +83,7 @@ import Database.Tagger.Type
     FileKey,
     FileWithTags (FileWithTags),
     MetaDescriptor (MetaDescriptor),
+    QueryRequiring,
     Representative (Representative, repDescription),
     Tag (Tag, tagDescriptor),
     TagKey,
@@ -94,7 +96,7 @@ import Database.Tagger.Type
     flattenTree,
     insertIntoDescriptorTree,
   )
-import Event.Parser (PseudoSubTag, pseudoDescriptorText)
+import Event.Parser (PseudoDescriptor (PDescriptor), PseudoSubTag, pseudoDescriptorText)
 import IO (hPutStrLn, stderr)
 import Type.Model
 import Util.Core (OccurrenceMap, head', hoistMaybe)
@@ -480,6 +482,99 @@ lookupTagLike c (TagNoId (Tag _ (File fk _) (Descriptor _ dt) _)) = do
   hoistMaybe . head' $ r
 
 {-
+ _______        _________     _____ _______        __
+|  ___\ \      / /_   _\ \   / /_ _| ____\ \      / /
+| |_   \ \ /\ / /  | |  \ \ / / | ||  _|  \ \ /\ / /
+|  _|   \ V  V /   | |   \ V /  | || |___  \ V  V /
+|_|      \_/\_/    |_|    \_/  |___|_____|  \_/\_/
+-}
+
+lookupFilesHavingTagKey :: Connection -> TagKey -> IO [FileKey]
+lookupFilesHavingTagKey c tk = do
+  r <-
+    query
+      c
+      "SELECT DISTINCT mainTagFileId \
+      \FROM FileWithTags \
+      \WHERE mainTagId = ?"
+      [tk] ::
+      IO [TagKey]
+  return r
+
+lookupFilesHavingFilePattern :: Connection -> T.Text -> IO [FileKey]
+lookupFilesHavingFilePattern c p = do
+  r <-
+    query
+      c
+      "SELECT DISTINCT mainTagFileId \
+      \FROM FileWithTags \
+      \WHERE mainTagFilePath LIKE ?"
+      [p] ::
+      IO [FileKey]
+  return r
+
+lookupFilesHavingDescriptorKey ::
+  Connection -> DescriptorKey -> IO [FileKey]
+lookupFilesHavingDescriptorKey c did = do
+  r <-
+    query
+      c
+      "SELECT DISTINCT mainTagFileId \
+      \FROM FileWithTags \
+      \WHERE mainTagDescriptorId = ?"
+      [did] ::
+      IO [FileKey]
+  return r
+
+lookupFilesHavingDescriptorPattern ::
+  Connection -> PseudoDescriptor -> IO [FileKey]
+lookupFilesHavingDescriptorPattern c (PDescriptor p) = do
+  r <-
+    query
+      c
+      "SELECT DISTINCT mainTagFileId \
+      \FROM FileWithTags \
+      \WHERE mainTagDescriptor LIKE ? OR subTagDescriptor LIKE ?"
+      (p, p) ::
+      IO [FileKey]
+  return r
+
+lookupFilesHavingNoTags :: Connection -> IO [FileKey]
+lookupFilesHavingNoTags c =
+  query_
+    c
+    "SELECT DISTINCT mainTagFileId FROM \
+    \FileWithTags \
+    \WHERE mainTagId IS NULL"
+
+lookupFileWithTagsByFileIdInView ::
+  Connection -> FileKey -> IO [CollectedDatabaseFileWithTags]
+lookupFileWithTagsByFileIdInView c fk = do
+  r <-
+    query
+      c
+      "SELECT mainTagFileId, mainTagId \
+      \FROM FileWithTags \
+      \WHERE mainTagFileId = ? OR subTagFileId = ?"
+      (fk, fk) ::
+      IO [DatabaseFileWithTags]
+  return . map CollectedDatabaseFileWithTags . reduceDbFwtList $ r
+
+derefDatabaseFileWithTags ::
+  Connection ->
+  CollectedDatabaseFileWithTags ->
+  MaybeT IO FileWithTags
+derefDatabaseFileWithTags c (CollectedDatabaseFileWithTags dbfwt) = do
+  let tks = databaseFileWithTagsTagKeys dbfwt
+      fk = databaseFileWithTagsFileKey dbfwt
+  f <- getFile c fk
+  let derefTk tk = do
+        tPtr <- getTag c tk
+        derefTagPtr c tPtr
+  tags <- lift . fmap catMaybes . mapM (runMaybeT . derefTk) $ tks
+  return . FileWithTags f . HashSet.fromList $ tags
+
+{-
   ____ _____ _____
  / ___| ____|_   _|
 | |  _|  _|   | |
@@ -583,3 +678,30 @@ getDescriptorOccurrenceMap c dks = do
           DescriptorKey -> IO [OccurrenceMap Descriptor]
   r <- fmap concat . mapM q $ dks
   return . IntMap.unions $ r
+
+infraTreeRecursiveCTE :: QueryRequiring (Only T.Text)
+infraTreeRecursiveCTE =
+  "WITH RECURSIVE MD AS ( \
+  \  SELECT \
+  \    md.id \"metaDescriptorId\" \
+  \    ,md.descriptor \"metaDescriptor\" \
+  \    ,id.id \"infraDescriptorId\" \
+  \    ,id.descriptor \"infraDescriptor\" \
+  \  FROM MetaDescriptor meta \
+  \    JOIN Descriptor md \
+  \      ON meta.metaDescriptorId = md.id \
+  \    JOIN Descriptor id \
+  \      ON meta.infraDescriptorId = id.id \
+  \  WHERE metaDescriptor LIKE ? \
+  \  UNION ALL \
+  \  SELECT \
+  \    mdv.infraDescriptorId \
+  \    ,mdv.infraDescriptor \
+  \    ,d.id \
+  \    ,d.descriptor \
+  \  FROM MD mdv \
+  \    JOIN MetaDescriptor meta \
+  \      ON mdv.infraDescriptorId = meta.metaDescriptorId \
+  \    JOIN Descriptor d \
+  \      ON meta.infraDescriptorId = d.id \
+  \)"
