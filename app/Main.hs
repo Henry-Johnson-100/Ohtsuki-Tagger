@@ -32,7 +32,7 @@ taggerApplicationUI wenv model' =
    in vstack
         [ menubar,
           zstack
-            [ visibility model Config configConfigurationPage,
+            [ visibility model Config (configConfigurationPage model),
               visibility model Database databaseConfigurePage,
               visibility model Selection selectionConfigurePage,
               visibility model ProgramVisibilityDescriptor . descriptorConfigurePage $

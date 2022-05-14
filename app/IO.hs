@@ -15,6 +15,7 @@ where
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
+import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
 import qualified Data.Text as T
 import Data.Time
 import qualified Data.Version as Version
@@ -29,6 +30,7 @@ import System.Random
 import System.Random.Shuffle
 import Toml
 import Type.Config
+import Util.Core
 
 type ConfigException = String
 
@@ -75,7 +77,8 @@ touch = hClose <=< flip openFile WriteMode
 backupDbConn :: Connection -> FilePath -> IO ()
 backupDbConn c backupTo = do
   let currentHandle = connectionHandle c
-  doesFileExist backupTo >>= flip unless (touch backupTo)
+  backupFileExists <- doesFileExist backupTo
+  unless backupFileExists (touch backupTo)
   updateLastBackupDateTime c
   backupHandle <- fmap connectionHandle . open $ backupTo
   backupProcess <- DirectSqlite.backupInit backupHandle "main" currentHandle "main"
@@ -83,19 +86,21 @@ backupDbConn c backupTo = do
   DirectSqlite.backupFinish backupProcess
   hPutStrLn stderr "Backup complete"
 
+taggerDBInfoTableExists :: Connection -> IO Bool
+taggerDBInfoTableExists c = do
+  r <-
+    query_
+      c
+      "SELECT COUNT(*) \
+      \FROM sqlite_master \
+      \WHERE type = 'table' AND name = 'TaggerDBInfo'" ::
+      IO [Only Int]
+  return . Prelude.all ((> 0) . (\(Only n) -> n)) $ r
+
 updateTaggerDBInfo :: Connection -> IO ()
 updateTaggerDBInfo c = do
   currentTime <- getCurrentTime
-  dbInfoTableExists <-
-    fmap
-      (Prelude.all ((> 0) . (\(Only n) -> n)))
-      ( query_
-          c
-          "SELECT COUNT(*) \
-          \FROM sqlite_master \
-          \WHERE type = 'table' AND name = 'TaggerDBInfo'" ::
-          IO [Only Int]
-      )
+  dbInfoTableExists <- taggerDBInfoTableExists c
   when dbInfoTableExists $ do
     execute
       c
@@ -107,6 +112,38 @@ updateLastBackupDateTime :: Connection -> IO ()
 updateLastBackupDateTime c = do
   currentTime <- getCurrentTime
   execute c "UPDATE TaggerDBInfo SET lastBackup = ?" [currentTime]
+
+getLastAccessDateTime :: Connection -> IO T.Text
+getLastAccessDateTime c = do
+  infoTableExists <- taggerDBInfoTableExists c
+  if infoTableExists
+    then do
+      r <-
+        query_
+          c
+          "SELECT lastAccessed \
+          \FROM TaggerDBInfo \
+          \WHERE _tagger = 0" ::
+          IO [Only (Maybe T.Text)]
+      let hr = head' . mapMaybe (\(Only mt) -> mt) $ r
+      return $ fromMaybe "NULL" hr
+    else return "Not Available"
+
+getLastBackupDateTime :: Connection -> IO T.Text
+getLastBackupDateTime c = do
+  infoTableExists <- taggerDBInfoTableExists c
+  if infoTableExists
+    then do
+      r <-
+        query_
+          c
+          "SELECT lastBackup \
+          \FROM TaggerDBInfo \
+          \WHERE _tagger = 0" ::
+          IO [Only (Maybe T.Text)]
+      let hr = head' . mapMaybe (\(Only mt) -> mt) $ r
+      return $ fromMaybe "NEVER" hr
+    else return "Not Available"
 
 taggerVersion :: String
 taggerVersion = Version.showVersion Paths_tagger.version

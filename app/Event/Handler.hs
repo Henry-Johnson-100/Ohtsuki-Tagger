@@ -335,6 +335,17 @@ fileSelectionEventHandler wenv node model event =
       [ model *~ fileSelectionModel . fileSelection %~ emptyBuffer
       ]
 
+taggedConnectionEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  TaggedConnectionEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+taggedConnectionEventHandler wenv node model event =
+  case event of
+    TaggedConnectionPutLastAccess t -> [model *~ dbConn . lastAccessed .~ t]
+    TaggedConnectionPutLastBackup t -> [model *~ dbConn . lastBackup .~ t]
+
 taggerEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
   WidgetNode TaggerModel TaggerEvent ->
@@ -351,6 +362,7 @@ taggerEventHandler wenv node model event =
     DoConfigurationEvent evt -> configurationEventHandler wenv node model evt
     DoFileSelectionEvent evt -> fileSelectionEventHandler wenv node model evt
     DoDescriptorEvent evt -> descriptorTreeEventHandler wenv node model evt
+    DoTaggedConnectionEvent evt -> taggedConnectionEventHandler wenv node model evt
     TagsStringClear -> [model *~ tagsString .~ ""]
     DescriptorCommitNewDescriptorText ->
       [ dbConnTask
@@ -472,7 +484,14 @@ taggerEventHandler wenv node model event =
             newConnInstance <- open . T.unpack $ newConnTag
             activateForeignKeyPragma newConnInstance
             IO.updateTaggerDBInfo newConnInstance
-            return . TaggedConnection newConnTag . Just $ newConnInstance
+            lastAccessed <- IO.getLastAccessDateTime newConnInstance
+            lastBackup <- IO.getLastBackupDateTime newConnInstance
+            return $
+              TaggedConnection
+                newConnTag
+                (Just newConnInstance)
+                lastAccessed
+                lastBackup
       ]
         ++ ( asyncEvent . DoDescriptorEvent
                <$> [ RefreshDescriptorTree mainDescriptorTree,
@@ -480,25 +499,15 @@ taggerEventHandler wenv node model event =
                    ]
            )
     DatabaseBackup ->
-      [ Task
-          ( IOEvent
-              <$> maybe
-                ( IO.hPutStrLn
-                    IO.stderr
-                    "Failed to backup, no database is currently connected."
-                )
-                ( flip
-                    IO.backupDbConn
-                    ( T.unpack $
-                        model
-                          ^. ( programConfig
-                                 . dbconf
-                                 . dbconfBackup
-                             )
-                    )
-                )
-                (model ^. dbConn . connInstance)
+      [ dbConnTask
+          (DoTaggedConnectionEvent . TaggedConnectionPutLastBackup)
+          ( \c -> do
+              IO.backupDbConn
+                c
+                (T.unpack $ model ^. programConfig . dbconf . dbconfBackup)
+              IO.getLastBackupDateTime c
           )
+          (model ^. dbConn)
       ]
     DatabaseClose ->
       [ Task

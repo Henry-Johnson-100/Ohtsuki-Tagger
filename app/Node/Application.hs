@@ -155,12 +155,14 @@ selectionConfigurePage =
         selectionDisplayBufferSizeNumberField
       ]
 
-configConfigurationPage :: (WidgetModel s) => WidgetNode s TaggerEvent
-configConfigurationPage =
+configConfigurationPage :: TaggerModel -> TaggerWidget
+configConfigurationPage m =
   box . flip styleBasic [padding 80]
     . vgrid
     $ [ configurationExportButton,
-        label ("Tagger Version: " !++ T.pack taggerVersion)
+        label ("Tagger Version: " !++ T.pack taggerVersion),
+        label ("Last Accessed: " !++ (m ^. dbConn . lastAccessed)),
+        label ("Last Backup: " !++ (m ^. dbConn . lastBackup))
       ]
 
 descriptorConfigurePage :: TaggerModel -> WidgetNode TaggerModel TaggerEvent

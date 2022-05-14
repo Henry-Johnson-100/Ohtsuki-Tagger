@@ -17,6 +17,7 @@ module Type.Model.Prim
     SingleFileEvent (..),
     ConfigurationEvent (..),
     FileSelectionEvent (..),
+    TaggedConnectionEvent (..),
     DescriptorEvent (..),
     TaggedConnection (..),
     FileSetArithmetic (..),
@@ -109,12 +110,14 @@ instance Eq Connection where
 
 data TaggedConnection = TaggedConnection
   { _taggedconnectionConnName :: !Text,
-    _taggedconnectionConnInstance :: !(Maybe Connection)
+    _taggedconnectionConnInstance :: !(Maybe Connection),
+    _taggedconnectionLastAccessed :: !Text,
+    _taggedconnectionLastBackup :: !Text
   }
   deriving (Eq)
 
 instance Show TaggedConnection where
-  show (TaggedConnection n m) =
+  show (TaggedConnection n m _ _) =
     concat
       [ show n,
         " : ",
@@ -219,6 +222,11 @@ data SingleFileEvent
   | SingleFileAssociateTag !Tag !Tag
   deriving (Show, Eq)
 
+data TaggedConnectionEvent
+  = TaggedConnectionPutLastAccess !Text
+  | TaggedConnectionPutLastBackup !Text
+  deriving (Show, Eq)
+
 data FileSelectionEvent
   = FileSelectionUpdate ![FileWithTags]
   | FileSelectionPut !(BufferList FileWithTags)
@@ -270,6 +278,7 @@ data TaggerEvent
   | DoConfigurationEvent !ConfigurationEvent
   | DoFileSelectionEvent !FileSelectionEvent
   | DoDescriptorEvent !DescriptorEvent
+  | DoTaggedConnectionEvent !TaggedConnectionEvent
   | -- Triggers a functionality like 'cycle'
     ToggleDoSoloTag
   | DescriptorCreateRelation ![Descriptor] ![Descriptor]
@@ -330,7 +339,7 @@ emptyTaggerModel cfg =
       _taggerSingleFileModel = emptySingleFileSelectionModel,
       _taggerDescriptorModel = emptyDescriptorTreeModel,
       _taggerDoSoloTag = False,
-      _taggerDbConn = TaggedConnection ":memory:" Nothing,
+      _taggerDbConn = TaggedConnection ":memory:" Nothing "Not Available" "Not Available",
       _taggerTagsString = "",
       _taggerNewDescriptorText = "",
       _taggerTaggingMode = TagMode,
