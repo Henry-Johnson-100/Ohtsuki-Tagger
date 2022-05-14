@@ -55,12 +55,13 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.List (foldl', foldl1', isPrefixOf, isSuffixOf)
 import qualified Data.List as L
 import Data.Maybe (catMaybes, fromJust, fromMaybe, maybe)
+import Data.String
 import qualified Data.Text as T
 import Database.SQLite.Simple
   ( Connection,
     FromRow,
     Only (Only),
-    Query,
+    Query (fromQuery),
     SQLData (SQLInteger, SQLNull),
     execute,
     executeMany,
@@ -99,7 +100,7 @@ import Database.Tagger.Type
 import Event.Parser (PseudoDescriptor (PDescriptor), PseudoSubTag, pseudoDescriptorText)
 import IO (hPutStrLn, stderr)
 import Type.Model
-import Util.Core (OccurrenceMap, head', hoistMaybe)
+import Util.Core (OccurrenceMap, head', hoistMaybe, (!++))
 
 debug# :: Bool
 debug# = False
@@ -532,10 +533,14 @@ lookupFilesHavingDescriptorPattern c (PDescriptor p) = do
   r <-
     query
       c
-      "SELECT DISTINCT mainTagFileId \
-      \FROM FileWithTags \
-      \WHERE mainTagDescriptor LIKE ? OR subTagDescriptor LIKE ?"
-      (p, p) ::
+      "SELECT DISTINCT f.id \
+      \FROM Tag t \
+      \  JOIN File f \
+      \    ON t.fileId = f.id \
+      \  Join Descriptor d \
+      \    ON t.descriptorId = d.id \
+      \WHERE d.Descriptor LIKE ?"
+      [p] ::
       IO [FileKey]
   return r
 
@@ -550,17 +555,23 @@ lookupFilesHavingNoTags c = do
       IO [FileKey]
   return . map (CollectedDatabaseFileWithTags . flip FileWithTags_ []) $ r
 
+-- | SQL injection be damned
+(&++) :: Query -> Query -> Query
+qx &++ qy = fromString . T.unpack $ fromQuery qx !++ "\n" !++ fromQuery qy
+
 -- #FIXME This function runs EXTREMELY slowly.
+-- Now it runs 50% faster but still too slowly for me.
 lookupFileWithTagsByFileIdInView ::
   Connection -> FileKey -> IO [CollectedDatabaseFileWithTags]
 lookupFileWithTagsByFileIdInView c fk = do
+  let q =
+        subTagRecursiveCTE
+          &++ "SELECT fileId, id FROM FileWithTags"
   r <-
     query
       c
-      "SELECT mainTagFileId, mainTagId \
-      \FROM FileWithTags \
-      \WHERE mainTagFileId = ? OR subTagFileId = ?"
-      (fk, fk) ::
+      q
+      [fk] ::
       IO [DatabaseFileWithTags]
   return . map CollectedDatabaseFileWithTags . reduceDbFwtList $ r
 
