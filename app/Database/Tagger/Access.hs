@@ -132,7 +132,7 @@ insertDatabaseTag :: Connection -> TagPtrNoId -> IO TagKey
 insertDatabaseTag c (TagNoId_ (Tag_ _ f d sid)) = do
   execute
     c
-    "INSERT INTO Tag (fileTagId, descriptorTagId, subTagOfId) VALUES (?,?,?)"
+    "INSERT INTO Tag (fileId, descriptorId, subTagOfId) VALUES (?,?,?)"
     (f, d, sid)
   k <- lastInsertRowId c
   return . fromIntegral $ k
@@ -323,8 +323,8 @@ getsUntaggedFileWithTags c = do
       "SELECT f.id, f.filePath \
       \FROM File f \
       \  LEFT JOIN Tag t \
-      \    ON f.id = t.fileTagId \
-      \WHERE t.descriptorTagId IS NULL"
+      \    ON f.id = t.fileId \
+      \WHERE t.descriptorId IS NULL"
   return . map (`FileWithTags` HashSet.empty) $ r
 
 lookupUntaggedFileWithTags :: Connection -> IO [DatabaseFileWithTags]
@@ -335,8 +335,8 @@ lookupUntaggedFileWithTags c = do
       "SELECT f.id, NULL \
       \FROM File f \
       \  LEFT JOIN Tag t \
-      \    ON f.id = t.fileTagId \
-      \WHERE t.descriptorTagId IS NULL" ::
+      \    ON f.id = t.fileId \
+      \WHERE t.descriptorId IS NULL" ::
       IO [DatabaseFileWithTags]
   return . reduceDbFwtList $ r
 
@@ -366,8 +366,8 @@ lookupFileWithTagsByDescriptorId' c dk = do
       "SELECT f.id, NULL \
       \FROM Tag t \
       \  JOIN File f \
-      \    ON f.id = t.fileTagId \
-      \WHERE t.descriptorTagId = ? \
+      \    ON f.id = t.fileId \
+      \WHERE t.descriptorId = ? \
       \ORDER BY f.filePath"
       [dk] ::
       IO [DatabaseFileWithTags]
@@ -389,7 +389,7 @@ lookupFileWithTagsByFileId' c fk = do
       "SELECT f.id, t.id \
       \FROM File f \
       \  LEFT JOIN Tag t \
-      \    ON f.id = t.fileTagId \
+      \    ON f.id = t.fileId \
       \WHERE f.id = ? \
       \ORDER BY f.filePath"
       [fk] ::
@@ -427,20 +427,20 @@ lookupFileWithTagsBySubTagDescriptorText c mainDes subDes = do
     lookupTagWithDescriptorText =
       query
         c
-        "SELECT t.id, t.fileTagId, t.descriptorTagId, t.subTagOfId \
+        "SELECT t.id, t.fileId, t.descriptorId, t.subTagOfId \
         \FROM Tag t \
         \  JOIN Descriptor d \
-        \    ON t.descriptorTagId = d.id \
+        \    ON t.descriptorId = d.id \
         \WHERE d.descriptor LIKE ?"
         . Only
     lookupSubTag :: (TagKey, T.Text) -> IO [TagPtr]
     lookupSubTag =
       query
         c
-        "SELECT t.id, t.fileTagId, t.descriptorTagId, t.subTagOfId \
+        "SELECT t.id, t.fileId, t.descriptorId, t.subTagOfId \
         \FROM Tag t \
         \  JOIN Descriptor d \
-        \    ON t.descriptorTagId = d.id \
+        \    ON t.descriptorId = d.id \
         \WHERE t.subTagOfId = ? AND d.descriptor LIKE ?"
 
 lookupFilePattern :: Connection -> T.Text -> IO [File]
@@ -472,11 +472,11 @@ lookupTagLike c (TagNoId (Tag _ (File fk _) (Descriptor _ dt) _)) = do
     lift $
       query
         c
-        "SELECT t.id, t.fileTagId, t.descriptorTagId, t.subTagOfId \
+        "SELECT t.id, t.fileId, t.descriptorId, t.subTagOfId \
         \FROM Tag t \
         \  JOIN Descriptor d \
-        \    ON t.descriptorTagId = d.id \
-        \WHERE t.fileTagId = ? AND d.descriptor LIKE ?"
+        \    ON t.descriptorId = d.id \
+        \WHERE t.fileId = ? AND d.descriptor LIKE ?"
         (fk, dt) ::
       MaybeT IO [TagPtr]
   hoistMaybe . head' $ r
@@ -546,7 +546,7 @@ lookupFilesHavingNoTags c = do
       c
       "SELECT id \
       \FROM FILE \
-      \WHERE id NOT IN (SELECT fileTagId FROM Tag)" ::
+      \WHERE id NOT IN (SELECT fileId FROM Tag)" ::
       IO [FileKey]
   return . map (CollectedDatabaseFileWithTags . flip FileWithTags_ []) $ r
 
@@ -634,22 +634,22 @@ getTag c tk = do
     lift $
       query
         c
-        "SELECT id, fileTagId, descriptorTagId, subTagOfId \
+        "SELECT id, fileId, descriptorId, subTagOfId \
         \FROM Tag WHERE id = ?"
         [tk] ::
       MaybeT IO [TagPtr]
   hoistMaybe . head' $ r
 
 -- | Gets a list of Database tags by searching via
--- the fileTagId, descriptorTagId, and subTagOfId of a Tag.
+-- the fileId, descriptorId, and subTagOfId of a Tag.
 --
 -- A valid tagId is not used.
 getsDatabaseTags :: Connection -> TagNoId -> IO [TagPtr]
 getsDatabaseTags c (TagNoId (Tag _ fid did sid)) =
   query
     c
-    "SELECT id, fileTagId, descriptorTagId, subTagOfId \
-    \FROM Tag WHERE fileTagId = ? AND descriptorTagId = ? AND subTagOfId IS ?"
+    "SELECT id, fileId, descriptorId, subTagOfId \
+    \FROM Tag WHERE fileId = ? AND descriptorId = ? AND subTagOfId IS ?"
     (fileId fid, descriptorId did, sid) ::
     IO [TagPtr]
 
@@ -658,9 +658,9 @@ getsDatabaseTagIds c dbts = do
   let q =
         query
           c
-          "SELECT id, fileTagId, descriptorTagId, subTagOfId \
+          "SELECT id, fileId, descriptorId, subTagOfId \
           \FROM Tag \
-          \WHERE fileTagId = ? AND descriptorTagId = ? AND subTagOfId IS ?"
+          \WHERE fileId = ? AND descriptorId = ? AND subTagOfId IS ?"
           . (\(TagNoId_ (Tag_ _ fid did mstid)) -> (fid, did, mstid)) ::
           TagPtrNoId -> IO [TagPtr]
   fmap concat . mapM q $ dbts
@@ -675,8 +675,8 @@ getDescriptorOccurrenceMap c dks = do
             "SELECT d.id, count(d.id) \
             \FROM Tag t \
             \  JOIN Descriptor d \
-            \    ON t.descriptorTagId = d.id \
-            \WHERE t.descriptorTagId = ? \
+            \    ON t.descriptorId = d.id \
+            \WHERE t.descriptorId = ? \
             \GROUP BY d.id"
           . Only ::
           DescriptorKey -> IO [OccurrenceMap Descriptor]
@@ -708,4 +708,31 @@ infraTreeRecursiveCTE =
   \      ON mdv.infraDescriptorId = meta.metaDescriptorId \
   \    JOIN Descriptor d \
   \      ON meta.infraDescriptorId = d.id \
+  \)"
+
+subTagRecursiveCTE :: QueryRequiring (Only FileKey)
+subTagRecursiveCTE =
+  "WITH RECURSIVE FileWithTags AS ( \
+  \  SELECT \
+  \    t.id \
+  \    ,t.subTagOfId \"subTagOfId\" \
+  \    ,st.id \"subTagId\" \
+  \    ,t.fileId \
+  \    ,t.descriptorId \
+  \    ,st.descriptorId \"subTagDescriptorId\" \
+  \  FROM Tag t \
+  \    LEFT JOIN Tag st \
+  \      ON t.id = st.subTagOfId \
+  \  WHERE t.fileId = ? \
+  \  UNION \
+  \  SELECT \
+  \    fwt.id \
+  \    ,fwt.subTagOfId \
+  \    ,st.id \"subTagId\" \
+  \    ,fwt.fileId \
+  \    ,fwt.descriptorId \
+  \    ,st.descriptorId \"subTagDescriptorId\" \
+  \    FROM FileWithTags fwt \
+  \      LEFT JOIN Tag st \
+  \        ON fwt.id = st.subTagOfId \
   \)"
