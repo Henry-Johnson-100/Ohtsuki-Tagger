@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS  "NewTag" (
   FOREIGN KEY("fileTagId") REFERENCES "File"("id") ON DELETE CASCADE,
   FOREIGN KEY("descriptorTagId") REFERENCES "Descriptor"("id") ON DELETE CASCADE
 );
-INSERT INTO TempTag (id, fileTagId, descriptorTagId, subTagOfId)
+INSERT INTO NewTag (id, fileTagId, descriptorTagId, subTagOfId)
   SELECT id, fileTagId, descriptorTagId, subTagOfId FROM Tag;
 DROP TABLE Tag;
 CREATE TABLE IF NOT EXISTS  "Tag" (
@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS "TaggerDBInfo" (
   _tagger INTEGER NOT NULL,
   version TEXT NOT NULL,
   lastAccessed TEXT,
+  lastBackup TEXT,
   CONSTRAINT uniqueInfo UNIQUE(_tagger) ON CONFLICT REPLACE
 );
 INSERT INTO TaggerDBInfo (_tagger, version, lastAccessed)
