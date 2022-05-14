@@ -30,6 +30,7 @@ import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as L
 import qualified Data.Text as T
 import Database.Tagger.Type
+import IO (taggerVersion)
 import Monomer
 import Monomer.Core.Themes.BaseTheme
 import Node.Color
@@ -158,7 +159,9 @@ configConfigurationPage :: (WidgetModel s) => WidgetNode s TaggerEvent
 configConfigurationPage =
   box . flip styleBasic [padding 80]
     . vgrid
-    $ [configurationExportButton]
+    $ [ configurationExportButton,
+        label ("Tagger Version: " !++ T.pack taggerVersion)
+      ]
 
 descriptorConfigurePage :: TaggerModel -> WidgetNode TaggerModel TaggerEvent
 descriptorConfigurePage model =

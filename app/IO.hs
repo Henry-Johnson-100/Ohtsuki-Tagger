@@ -16,8 +16,11 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import qualified Data.Text as T
+import Data.Time
+import qualified Data.Version as Version
 import Database.SQLite.Simple
 import qualified Database.SQLite3 as DirectSqlite
+import qualified Paths_tagger
 import System.Directory
 import System.Environment
 import System.IO
@@ -73,8 +76,37 @@ backupDbConn :: Connection -> FilePath -> IO ()
 backupDbConn c backupTo = do
   let currentHandle = connectionHandle c
   doesFileExist backupTo >>= flip unless (touch backupTo)
+  updateLastBackupDateTime c
   backupHandle <- fmap connectionHandle . open $ backupTo
   backupProcess <- DirectSqlite.backupInit backupHandle "main" currentHandle "main"
   DirectSqlite.backupStep backupProcess (-1)
   DirectSqlite.backupFinish backupProcess
   hPutStrLn stderr "Backup complete"
+
+updateTaggerDBInfo :: Connection -> IO ()
+updateTaggerDBInfo c = do
+  currentTime <- getCurrentTime
+  dbInfoTableExists <-
+    fmap
+      (Prelude.all ((> 0) . (\(Only n) -> n)))
+      ( query_
+          c
+          "SELECT COUNT(*) \
+          \FROM sqlite_master \
+          \WHERE type = 'table' AND name = 'TaggerDBInfo'" ::
+          IO [Only Int]
+      )
+  when dbInfoTableExists $ do
+    execute
+      c
+      "INSERT INTO TaggerDBInfo (_tagger, version, lastAccessed) \
+      \VALUES (0, ?, ?)"
+      (taggerVersion, currentTime)
+
+updateLastBackupDateTime :: Connection -> IO ()
+updateLastBackupDateTime c = do
+  currentTime <- getCurrentTime
+  execute c "UPDATE TaggerDBInfo SET lastBackup = ?" [currentTime]
+
+taggerVersion :: String
+taggerVersion = Version.showVersion Paths_tagger.version

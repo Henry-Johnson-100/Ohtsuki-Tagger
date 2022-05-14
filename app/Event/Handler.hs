@@ -471,6 +471,7 @@ taggerEventHandler wenv node model event =
             let newConnTag = model ^. (programConfig . dbconf . dbconfPath)
             newConnInstance <- open . T.unpack $ newConnTag
             activateForeignKeyPragma newConnInstance
+            IO.updateTaggerDBInfo newConnInstance
             return . TaggedConnection newConnTag . Just $ newConnInstance
       ]
         ++ ( asyncEvent . DoDescriptorEvent

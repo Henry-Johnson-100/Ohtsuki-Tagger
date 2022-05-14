@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS "TaggerDBInfo" (
   _tagger INTEGER NOT NULL,
   version TEXT NOT NULL,
   lastAccessed TEXT,
+  lastBackup TEXT,
   CONSTRAINT uniqueInfo UNIQUE(_tagger) ON CONFLICT REPLACE
 );
 INSERT INTO Descriptor (descriptor) VALUES ('#ALL#'), ('#META#'),  ('#UNRELATED#');
