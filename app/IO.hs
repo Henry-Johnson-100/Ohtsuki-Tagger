@@ -102,10 +102,10 @@ updateTaggerDBInfo c = do
   currentTime <- getCurrentTime
   dbInfoTableExists <- taggerDBInfoTableExists c
   when dbInfoTableExists $ do
+    backupTimeString <- getLastBackupDateTime c
     execute
       c
-      "INSERT INTO TaggerDBInfo (_tagger, version, lastAccessed) \
-      \VALUES (0, ?, ?)"
+      "UPDATE TaggerDBInfo SET version = ?, lastAccessed = ?"
       (taggerVersion, currentTime)
 
 updateLastBackupDateTime :: Connection -> IO ()

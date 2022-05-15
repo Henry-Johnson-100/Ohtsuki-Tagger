@@ -187,3 +187,7 @@ Some restrictions:
   * `something {p.%filepattern%}`
 * You can not do set arithmetic inside a subtag search, though this is planned as a future feature. By default, all results from individual subtags are unioned together.
   * `something {this d| that}` fails to parse and prints a parse error.
+
+#### 0.3.2.1 -- 2022-05-15
+
+* Fixed a bug that would cause the lastBackup time string to get reset in the database whenever it's connected to.
