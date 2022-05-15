@@ -221,7 +221,14 @@ queryTokenEitherParser = do
           notFollowedBy (spaces' >> char '{')
           return $ SubList qt' []
       )
-      <|> subTagTokenParser
+      <|> ( do
+              try byPatternParser
+                >> unexpected
+                  "Pattern QueryCriteriaLiteral 'P.' Preceding SubTag query.\n\
+                  \\tOnly Descriptors and Descriptor Relations can be queried using SubTags.\n\
+                  \\tTry 'T.' or 'R.' when querying SubTags using {} notation."
+              <|> subTagTokenParser
+          )
   spaces'
   return qt
 
@@ -250,10 +257,19 @@ subQueryDescriptorTokenParser :: TextFieldParser (QueryToken PseudoDescriptor)
 subQueryDescriptorTokenParser = do
   tc <-
     ( try byPatternParser
-        >> unexpected "Pattern QueryCriteriaLiteral 'P.' in SubTag query."
+        >> unexpected
+          "Pattern QueryCriteriaLiteral 'P.' in SubTag query.\n\
+          \\tOnly Descriptors or Descriptor Relations can be used to query subtags.\n\
+          \\tTry 'T.' or 'R.' when querying SubTags using {} notation."
       )
       <|> ( setArithmeticLiteralParser
-              >> unexpected "Set Arithmetic literal 'u| i| or d|' in SubTag query"
+              >> unexpected
+                "Set Arithmetic literal 'u| i| or d|' in SubTag query\n\
+                \\tSet arithmetic can not be performed inside SubTag queries.\n\
+                \\tThe default behavior is like a union.\n\
+                \\t\tThe query \'portrait {happy smile}\' is asking: \
+                \Find all files tagged with 'portrait' \
+                \where 'portrait' is subtagged by either 'happy' OR 'smile'"
           )
       <|> byTagParser
       <|> byRelationParser
