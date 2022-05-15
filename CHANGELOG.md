@@ -121,3 +121,69 @@ The buffer will not flush but rather be unioned, intersected, or diffed appropri
   * Takes a path to .bmp images and uses it as the window icon.
 ##### Minor Changes
 * Added a dispose event to close the database connection.
+
+### 0.3.2.0 -- 2022-05-14
+
+##### Breaking Changes
+
+* Changed some column names in Tag.
+* Added a new TaggerDBInfo table for database-level version tracking.
+
+To upgrade, run the script `Migrate0_3_1_0To0_3_2_0.sql` on a database that is up-to-date with tagger v0.3.1.0
+
+#### Non-breaking changes:
+
+* Implemented a new SDL query language to use in the Query textfield!
+  * Normal queries as they have been previously written still work.
+  * With the new language, you can fit many unions, intersections, and differences in to one query
+  * You can also query by Descriptor, Relation, and Pattern in one query.
+
+### Tagger Query Language:
+
+Previously, file patterns, descriptor patterns, and descriptor relation trees could be queried all by text input
+in the Query textfield. But if you wanted to search for a tag relationship then difference that by a file pattern query, you had to run two separate queries and interact with the GUI dropdowns to change set arithmetic. With the Tagger Query Language, you can now combine many queries into one.
+
+The rules are simple: Tag search, Relation search, or Pattern search can now specified per-token by prepending a specific operator to the front of the token. For instance, if you wanted to search for files that contain the string "roughdraft" in them, you would normally select the Pattern option from the dropdown then query with the token "%roughdraft%". But with the Tagger Query Language, this can be written as "p.%roughdraft%" and tagger will search by file pattern, regardless of what the current dropdown selection is.
+
+The tokens for these searches are: 
+```
+Tag      -> t.
+Relation -> r.
+Pattern  -> p.
+```
+
+Unions, intersections, and differences work similary. These tokens are placed inbetween query sections to describe how they are combined together.
+
+The tokens for these operations are:
+```
+union      -> u|
+intersect  -> i|
+difference -> d|
+```
+
+Here are some examples.
+
+I want to find all files that are tagged with 'Rough_Draft' and are in a folder called 'documents'
+```
+t.Rough_Draft i| p.%documents%
+```
+
+I want to find all files that are related to the tag 'Work' but not the files tagged with 'Side_Project'
+```
+r.Work d| t.Side_Project
+```
+
+I want to find find all images of Yui Otsuki that are subtagged with 'dress' or 'cute' that are not seasonal and do not have white backgrounds
+```
+t.otsuki_yui {dress r.cute} d| r.seasonal d| image_background{white}
+```
+
+From these examples, you can see that the search tokens are optional, if they are not specified, then Tagger uses whatever is selected in the relevant dropdown.
+
+Some restrictions:
+* You can not precede a subtag search with a pattern query.
+  * `p.%filepattern% {something}` will fail to parse and output a parse error.
+* You can not use pattern queries inside subtag searches.
+  * `something {p.%filepattern%}`
+* You can not do set arithmetic inside a subtag search, though this is planned as a future feature. By default, all results from individual subtags are unioned together.
+  * `something {this d| that}` fails to parse and prints a parse error.
