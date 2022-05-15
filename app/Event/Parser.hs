@@ -140,11 +140,12 @@ noSetArithmeticLiteralParser = return ANoLiteral
 
 queryCriteriaParser :: TextFieldParser QueryCriteriaLiteral
 queryCriteriaParser =
-  try $
-    byTagParser
-      <|> byRelationParser
-      <|> byPatternParser
-      <|> noQueryCriteriaLiteralParser
+  try
+    ( byTagParser
+        <|> byRelationParser
+        <|> byPatternParser
+    )
+    <|> noQueryCriteriaLiteralParser
 
 byTagParser :: TextFieldParser QueryCriteriaLiteral
 byTagParser = do
@@ -225,7 +226,8 @@ queryTokenEitherParser = do
               try byPatternParser
                 >> unexpected
                   "Pattern QueryCriteriaLiteral 'P.' Preceding SubTag query.\n\
-                  \\tOnly Descriptors and Descriptor Relations can be queried using SubTags.\n\
+                  \\tOnly Descriptors and Descriptor Relations \
+                  \can be queried using SubTags.\n\
                   \\tTry 'T.' or 'R.' when querying SubTags using {} notation."
               <|> subTagTokenParser
           )
@@ -262,6 +264,7 @@ subQueryDescriptorTokenParser = do
           \\tOnly Descriptors or Descriptor Relations can be used to query subtags.\n\
           \\tTry 'T.' or 'R.' when querying SubTags using {} notation."
       )
+      -- #TODO implement set arithmetic in subtag queries in the future
       <|> ( setArithmeticLiteralParser
               >> unexpected
                 "Set Arithmetic literal 'u| i| or d|' in SubTag query\n\
@@ -271,8 +274,10 @@ subQueryDescriptorTokenParser = do
                 \Find all files tagged with 'portrait' \
                 \where 'portrait' is subtagged by either 'happy' OR 'smile'"
           )
-      <|> byTagParser
-      <|> byRelationParser
+      <|> ( try
+              byTagParser
+              <|> byRelationParser
+          )
       <|> noQueryCriteriaLiteralParser
   pd <- pseudoDescriptorParser
   return $ QueryToken tc pd
