@@ -102,11 +102,40 @@ queryWithQueryTokenSubList ::
   IO [FileWithTags]
 queryWithQueryTokenSubList c qc (SubList h []) = queryWithQueryTokenLiteral c qc h
 queryWithQueryTokenSubList c qc (SubList h ts) = do
-  h' <- queryWithQueryTokenLiteral c qc h
-  ts' <- mapM (queryWithQueryTokenLiteral c qc) ts
-  -- So that u| t.otsuki_yui {r.smile t.dress} ==
-  --  u| t.otsuki_yui {r.smile} u| t.otsuki {t.dress}
-  return . concatMap (intersectBy fwtFileEqual h') $ ts'
+  fks <- fmap concat . mapM (queryWithSingleSubTagQuery h) $ ts
+  dbfwts <- collectFileWithTagsByFileKey c fks
+  fmap catMaybes . mapM (runMaybeT . derefDatabaseFileWithTags c) $ dbfwts
+  where
+    queryWithSingleSubTagQuery ::
+      QueryToken PseudoDescriptor -> QueryToken PseudoDescriptor -> IO [FileKey]
+    queryWithSingleSubTagQuery
+      qtH@(QueryToken ctH pdH@(PDescriptor dH))
+      qtT@(QueryToken ctT pdT@(PDescriptor dT)) = do
+        headKeys <- getDescriptorKeysFromLiteralPattern c qc qtH
+        tailKeys <- getDescriptorKeysFromLiteralPattern c qc qtT
+        fmap concat
+          . mapM (flip (lookupFilesHavingSubTagRelationship c) tailKeys)
+          $ headKeys
+
+    getDescriptorKeysFromLiteralPattern ::
+      Connection ->
+      QueryCriteria ->
+      QueryToken PseudoDescriptor ->
+      IO [DescriptorKey]
+    getDescriptorKeysFromLiteralPattern c qc qt@(QueryToken CNoLiteral _) =
+      getDescriptorKeysFromLiteralPattern c qc (qt {tokenCriteria = CLiteral qc})
+    getDescriptorKeysFromLiteralPattern
+      c
+      qc
+      qt@(QueryToken (CLiteral crit) ps@(PDescriptor pd)) =
+        case crit of
+          ByTag -> map descriptorId <$> lookupDescriptorPattern c pd
+          ByRelation -> do
+            dks <- map descriptorId <$> lookupDescriptorPattern c pd
+            idks <- L.foldl1' L.union <$> mapM (getsExclusiveInfraDescriptorKeys c) dks
+            return $ L.union dks idks
+          ByPattern -> return []
+          ByUntagged -> return []
 
 queryWithQueryTokenLiteral ::
   Connection ->
@@ -122,20 +151,26 @@ queryWithQueryTokenLiteral c qc (QueryToken (CLiteral crit) ps@(PDescriptor pd))
   where
     queryByDescriptorLiteral :: T.Text -> IO [FileWithTags]
     queryByDescriptorLiteral t = do
-      dbfwts <- lookupFileWithTagsByDescriptorPattern c t
-      fmap catMaybes . mapM (runMaybeT . fromDatabaseFileWithTags c) $ dbfwts
+      fks <- lookupFilesHavingDescriptorPattern c (PDescriptor t)
+      dbfwts <- collectFileWithTagsByFileKey c fks
+      fmap catMaybes . mapM (runMaybeT . derefDatabaseFileWithTags c) $ dbfwts
     queryByRelationLiteral :: T.Text -> IO [FileWithTags]
     queryByRelationLiteral t = do
-      ds <- lookupDescriptorPattern c t
-      dbfwts <-
-        fmap concat
-          . mapM (lookupFileWithTagsByInfraRelation c . descriptorId)
-          $ ds
-      fmap catMaybes . mapM (runMaybeT . fromDatabaseFileWithTags c) $ dbfwts
+      -- Can actually just be a mapM honestly
+      md <- fmap head' . lookupDescriptorPattern c $ t
+      maybe
+        (return [])
+        ( \d -> do
+            fks <- lookupFilesHavingInfraTagRelationship c . descriptorId $ d
+            dbfwts <- collectFileWithTagsByFileKey c fks
+            fmap catMaybes . mapM (runMaybeT . derefDatabaseFileWithTags c) $ dbfwts
+        )
+        md
     queryByFilePatternLiteral :: T.Text -> IO [FileWithTags]
     queryByFilePatternLiteral t = do
-      dbfwts <- lookupFileWithTagsByFilePattern' c t
-      fmap catMaybes . mapM (runMaybeT . fromDatabaseFileWithTags c) $ dbfwts
+      fks <- lookupFilesHavingFilePattern c t
+      dbfwts <- collectFileWithTagsByFileKey c fks
+      fmap catMaybes . mapM (runMaybeT . derefDatabaseFileWithTags c) $ dbfwts
     returnUntaggedFiles :: IO [FileWithTags]
     returnUntaggedFiles = getsUntaggedFileWithTags c
 queryWithQueryTokenLiteral c qc (QueryToken CNoLiteral ps) =

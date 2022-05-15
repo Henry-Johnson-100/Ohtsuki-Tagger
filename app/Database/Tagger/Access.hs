@@ -31,6 +31,7 @@ module Database.Tagger.Access
     getsUntaggedFileWithTags,
     getsDatabaseTags,
     getsDatabaseTagIds,
+    getsExclusiveInfraDescriptorKeys,
     fromDatabaseFileWithTags,
     getRepresentative,
     getDescriptorOccurrenceMap,
@@ -44,6 +45,15 @@ module Database.Tagger.Access
     lookupDescriptorPattern,
     hoistMaybe,
     activateForeignKeyPragma,
+    lookupFilesHavingInfraTagRelationship,
+    lookupFilesHavingTagKey,
+    lookupFilesHavingFilePattern,
+    lookupFilesHavingDescriptorKey,
+    lookupFilesHavingDescriptorPattern,
+    lookupFilesHavingNoTags,
+    lookupFilesHavingSubTagRelationship,
+    collectFileWithTagsByFileKey,
+    derefDatabaseFileWithTags,
   )
 where
 
@@ -323,6 +333,7 @@ fetchInfraDescriptors c did = do
       [did]
   return r
 
+-- This one is pobably better than the 'having' fks -> deref route
 getsUntaggedFileWithTags :: Connection -> IO [FileWithTags]
 getsUntaggedFileWithTags c = do
   r <-
@@ -739,6 +750,19 @@ getDescriptorOccurrenceMap c dks = do
           DescriptorKey -> IO [OccurrenceMap Descriptor]
   r <- fmap concat . mapM q $ dks
   return . IntMap.unions $ r
+
+getsExclusiveInfraDescriptorKeys :: Connection -> DescriptorKey -> IO [DescriptorKey]
+getsExclusiveInfraDescriptorKeys c dk = do
+  let q =
+        infraTreeRecursiveCTE
+          &++ "SELECT DISTINCT infraDescriptorId \
+              \FROM MD" ::
+          QueryRequiring (Only DescriptorKey)
+  query
+    c
+    q
+    [dk] ::
+    IO [DescriptorKey]
 
 infraTreeRecursiveCTE :: QueryRequiring (Only DescriptorKey)
 infraTreeRecursiveCTE =
