@@ -24,13 +24,11 @@ module Event.Parser
   )
 where
 
-import Control.Monad
-import Data.Functor.Identity (Identity)
 import qualified Data.Maybe as M
 import qualified Data.Text as T
 import Text.Parsec
   ( ParseError,
-    ParsecT,
+    Parsec,
     char,
     eof,
     lookAhead,
@@ -40,16 +38,17 @@ import Text.Parsec
     noneOf,
     notFollowedBy,
     oneOf,
-    optionMaybe,
     parse,
-    space,
     spaces,
     try,
     unexpected,
     (<?>),
     (<|>),
   )
-import Type.Model.Prim (FileSetArithmetic (..), Intersectable (..), QueryCriteria (..))
+import Type.Model.Prim
+  ( FileSetArithmetic (..),
+    QueryCriteria (ByPattern, ByRelation, ByTag),
+  )
 
 parseQuery :: T.Text -> Either ParseError [PseudoSubTag]
 parseQuery = parse (spaces' >> pseudoQueryParser) "Query"
@@ -79,7 +78,7 @@ mapMSubList f (SubList h ts) = do
   ts' <- mapM f ts
   return $ SubList h' ts'
 
-type TextFieldParser a = ParsecT T.Text () Identity a
+type TextFieldParser a = Parsec T.Text () a
 
 data SetArithmeticLiteral = ALiteral !FileSetArithmetic | ANoLiteral deriving (Show, Eq)
 
@@ -250,7 +249,9 @@ descriptorTokenParser = do
 subQueryDescriptorTokenParser :: TextFieldParser (QueryToken PseudoDescriptor)
 subQueryDescriptorTokenParser = do
   tc <-
-    (try byPatternParser >> unexpected "Pattern QueryCriteriaLiteral 'P.' in SubTag query.")
+    ( try byPatternParser
+        >> unexpected "Pattern QueryCriteriaLiteral 'P.' in SubTag query."
+      )
       <|> ( setArithmeticLiteralParser
               >> unexpected "Set Arithmetic literal 'u| i| or d|' in SubTag query"
           )
@@ -267,7 +268,7 @@ pseudoQueryParser :: TextFieldParser [PseudoSubTag]
 pseudoQueryParser =
   many pseudoEitherParser
   where
-    pseudoEitherParser :: ParsecT T.Text () Identity PseudoSubTag
+    pseudoEitherParser :: Parsec T.Text () PseudoSubTag
     pseudoEitherParser = do
       pd <- try pseudoSubTagQueryParser <|> fmap (,[]) pseudoDescriptorParser
       spaces
