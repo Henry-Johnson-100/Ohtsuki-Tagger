@@ -6,6 +6,7 @@ module IO
     module System.IO,
     module System.Environment,
     module System.Directory,
+    module System.FilePath,
     module System.Process,
     module System.Random,
     module System.Random.Shuffle,
@@ -24,6 +25,7 @@ import qualified Database.SQLite3 as DirectSqlite
 import qualified Paths_tagger
 import System.Directory
 import System.Environment
+import System.FilePath
 import System.IO
 import System.Process
 import System.Random

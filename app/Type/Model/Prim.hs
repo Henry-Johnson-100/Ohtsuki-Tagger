@@ -304,6 +304,7 @@ data TaggerEvent
   | DatabaseConnectionPut_ !TaggedConnection
   | ToggleVisibilityMode !ProgramVisibility
   | forall a. DropTargetAppendText_ TextLens (a -> Text) a
+  | UpdateWindowTitleConnectionString !Text !Bool
 
 emptyDescriptorTreeModel :: DescriptorModel
 emptyDescriptorTreeModel =

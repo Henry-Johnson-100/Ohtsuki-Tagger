@@ -194,4 +194,6 @@ Some restrictions:
 
 #### 0.3.2.2 -- 2022-05-16
 
+* Added a connection string to the window that shows what database tagger is connected to
+and if it has connected yet.
 * Migrated Monomer to the official release of 1.4.1.0

@@ -356,8 +356,16 @@ taggerEventHandler wenv node model event =
   case event of
     TaggerInit ->
       if model ^. (programConfig . dbconf . dbconfAutoConnect)
-        then [asyncEvent DatabaseConnect]
-        else []
+        then [Event DatabaseConnect]
+        else
+          [ Event
+              ( UpdateWindowTitleConnectionString
+                  ( T.pack . IO.takeFileName . T.unpack $
+                      model ^. programConfig . dbconf . dbconfPath
+                  )
+                  False
+              )
+          ]
     DoSingleFileEvent evt -> singleFileEventHandler wenv node model evt
     DoConfigurationEvent evt -> configurationEventHandler wenv node model evt
     DoFileSelectionEvent evt -> fileSelectionEventHandler wenv node model evt
@@ -475,20 +483,28 @@ taggerEventHandler wenv node model event =
       [ let currentVM = model ^. programVisibility
          in model *~ programVisibility .~ (if currentVM == vm then Main else vm)
       ]
-    DatabaseConnectionPut_ tc -> [model *~ dbConn .~ tc]
+    DatabaseConnectionPut_ tc ->
+      [ model *~ dbConn .~ tc,
+        Event
+          ( UpdateWindowTitleConnectionString
+              (tc ^. connName)
+              (M.isJust $ tc ^. connInstance)
+          )
+      ]
     DatabaseConnect ->
       [ Task $
           DatabaseConnectionPut_ <$> do
             maybe (pure ()) close $ model ^. dbConn . connInstance
-            let newConnTag = model ^. (programConfig . dbconf . dbconfPath)
-            newConnInstance <- open . T.unpack $ newConnTag
+            let newConnTag = T.unpack $ model ^. (programConfig . dbconf . dbconfPath)
+                newConnName = IO.takeFileName newConnTag
+            newConnInstance <- open newConnTag
             activateForeignKeyPragma newConnInstance
             IO.updateTaggerDBInfo newConnInstance
             lastAccessed <- IO.getLastAccessDateTime newConnInstance
             lastBackup <- IO.getLastBackupDateTime newConnInstance
             return $
               TaggedConnection
-                newConnTag
+                (T.pack newConnName)
                 (Just newConnInstance)
                 lastAccessed
                 lastBackup
@@ -517,6 +533,13 @@ taggerEventHandler wenv node model event =
       ]
     DropTargetAppendText_ l df d ->
       [Model $ model & l %~ flip T.append (" " `T.append` df d)]
+    UpdateWindowTitleConnectionString t active ->
+      [ Request . UpdateWindow . WindowSetTitle $
+          "tagger | In database: "
+            !++ t
+            !++ " | Active: "
+            !++ if active then "Yes" else "No"
+      ]
 
 -- I will never understand how the stupid fixity stuff works
 infixl 3 *~
