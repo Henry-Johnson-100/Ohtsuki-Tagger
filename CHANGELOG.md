@@ -191,3 +191,7 @@ Some restrictions:
 #### 0.3.2.1 -- 2022-05-15
 
 * Fixed a bug that would cause the lastBackup time string to get reset in the database whenever it's connected to.
+
+#### 0.3.2.2 -- 2022-05-16
+
+* Migrated Monomer to the official release of 1.4.1.0

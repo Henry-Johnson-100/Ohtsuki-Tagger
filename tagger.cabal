@@ -1,7 +1,7 @@
 cabal-version:       2.4
 
 name:                tagger
-version:             0.3.2.1
+version:             0.3.2.2
 synopsis:            A file/image tagger that connects to or initializes sqlite databases.
 -- description:
 -- bug-reports:
@@ -47,7 +47,7 @@ executable tagger
   ghc-options:         -threaded
 
   build-depends:       base ^>=4.13.0.0
-                      ,monomer
+                      ,monomer == 1.4.1.0
                       ,lens == 5.1
                       ,text == 1.2.4.0
                       ,transformers == 0.5.6.2
