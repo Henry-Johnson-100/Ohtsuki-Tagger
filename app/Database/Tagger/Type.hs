@@ -323,10 +323,7 @@ instance Ord DescriptorTree where
     case trb of
       NullTree -> True
       Infra db -> (not . null) cs || d <= db
-      Meta db csb ->
-        if null cs
-          then null csb && (d <= db)
-          else null csb || (length cs >= length csb)
+      Meta db csb -> d <= db
 
 sortChildren :: DescriptorTree -> DescriptorTree
 sortChildren tr =

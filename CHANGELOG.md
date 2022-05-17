@@ -203,3 +203,5 @@ and if it has connected yet.
 * Added some sorting options to the tags "In Selection" in the image detail pane.
   * Can sort by tag alphabetically, or number of tags in the selection.
   * Ascending and Descending ordering.
+* Adjusted ordering of DescriptorTrees so that Meta trees now sort by alphabetical value
+of their descriptors instead of the length of their children lists.
