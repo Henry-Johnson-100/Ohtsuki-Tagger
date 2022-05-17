@@ -51,30 +51,16 @@ queryWithParseResults ::
   BufferList FileWithTags ->
   [QuerySection (t (SubList (QueryToken PseudoDescriptor)))] ->
   IO (BufferList FileWithTags)
-queryWithParseResults c a ByUntagged currentBuffer qss = do
-  byUntaggedResults <-
-    queryWithQueryTokenLiteral
-      c
-      ByUntagged
-      (QueryToken (CLiteral ByUntagged) (PDescriptor "Untagged Search"))
-  let untaggedQuerySections = QuerySection (ALiteral a) byUntaggedResults
-  return . bfComb a currentBuffer . cFromList . sectionContents $ untaggedQuerySections
 queryWithParseResults c a qc currentBuffer qss = do
   queriedSections <- mapM (queryWithQuerySection c qc) qss
   let combinedResults = combineQueriedSection a queriedSections
   return . bfComb a currentBuffer . cFromList . sectionContents $ combinedResults
-
-bfComb ::
-  Intersectable l =>
-  FileSetArithmetic ->
-  l FileWithTags ->
-  l FileWithTags ->
-  l FileWithTags
-bfComb a bf bxs =
-  case a of
-    Union -> unionBy fwtFileEqual bf bxs
-    Intersect -> intersectBy fwtFileEqual bf bxs
-    Diff -> diffBy fwtFileEqual bf bxs
+  where
+    bfComb a bf bxs =
+      case a of
+        Union -> unionBy fwtFileEqual bf bxs
+        Intersect -> intersectBy fwtFileEqual bf bxs
+        Diff -> diffBy fwtFileEqual bf bxs
 
 combineQueriedSection ::
   FileSetArithmetic ->
