@@ -198,7 +198,7 @@ Some restrictions:
 and if it has connected yet.
 * Migrated Monomer to the official release of 1.4.1.0
 
-#### 0.3.2.3 -- 2022-05-17
+#### 0.3.2.3 -- ????-??-??
 
 * Changed the hotkeys used in the operation widget to apply globally,
 not just when a widget in the operation widget is in focus. The hotkeys are described below.
