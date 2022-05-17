@@ -320,6 +320,7 @@ data TaggerEvent
   | ToggleVisibilityMode !ProgramVisibility
   | forall a. DropTargetAppendText_ TextLens (a -> Text) a
   | UpdateWindowTitleConnectionString !Text !Bool
+  | RefreshApplication
 
 emptyDescriptorTreeModel :: DescriptorModel
 emptyDescriptorTreeModel =

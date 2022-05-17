@@ -200,8 +200,25 @@ and if it has connected yet.
 
 #### 0.3.2.3 -- 2022-05-17
 
+* Changed the hotkeys used in the operation widget to apply globally,
+not just when a widget in the operation widget is in focus. The hotkeys are described below.
 * Added some sorting options to the tags "In Selection" in the image detail pane.
   * Can sort by tag alphabetically, or number of tags in the selection.
   * Ascending and Descending ordering.
 * Adjusted ordering of DescriptorTrees so that Meta trees now sort by alphabetical value
 of their descriptors instead of the length of their children lists.
+
+| Hotkey       | Event                                                                                                                                |
+|--------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| Ctrl-y       | Clears the file selection, with the selection buffer.                                                                                |
+| Ctrl-u       | Runs the given shell cmd as specified in the `Cmd` textfield.                                                                        |
+| Ctrl-i       | Previews the next image in the file selection. Consumes selection and adds to the buffer.                                            |
+| Ctrl-k       | Previews the previous image in the file selection. Consumes the buffer and pushes it back to the selection.                          |
+| Ctrl-j       | Changes the query's set arithmetic to the next value e.g. Union -> Intersect -> Diff                                                 |
+| Ctrl-Shift-j | Changes the query's arithmetic to the previous value e.g. Union -> Diff -> Intersect                                                 |
+| Ctrl-l       | Changes the query's query criteria to the next value e.g. Tag -> Pattern -> Relation -> Untagged                                     |
+| Ctrl-Shift-l | Changes the query's query criteria to the previous value e.g. Tag -> Untagged -> Relation -> Pattern                                 |
+| Ctrl-o       | Toggles between Tag and Untag mode                                                                                                   |
+| Ctrl-Shift-o | Toggles between Tag and Untag mode but in the opposite direction :^)                                                                 |
+| Ctrl-r       | Refreshes the application, searching for tag updates in the database, refreshing descriptor trees, and re-putting the image preview. |
+| Ctrl-t       | Toggles `Solo Tagging Mode`                                                                                                          |

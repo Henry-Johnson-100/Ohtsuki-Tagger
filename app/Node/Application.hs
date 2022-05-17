@@ -22,6 +22,7 @@ module Node.Application
     menubar,
     visibility,
     operationWidget,
+    globalKeystrokes,
   )
 where
 
@@ -281,25 +282,30 @@ fileSingleWidget m =
       where
         maybeDraggable ss = maybe id (`draggable_` ss)
 
+globalKeystrokes :: TaggerWidget -> TaggerWidget
+globalKeystrokes =
+  flip
+    keystroke_
+    [ignoreChildrenEvts]
+    [ ("Ctrl-y", DoFileSelectionEvent FileSelectionClear),
+      ("Ctrl-u", ShellCmd),
+      ("Ctrl-i", DoSingleFileEvent SingleFilePrevFromFileSelection),
+      ("Ctrl-k", DoSingleFileEvent SingleFileNextFromFileSelection),
+      ("Ctrl-j", DoFileSelectionEvent FileSelectionNextSetArithmetic),
+      ("Ctrl-Shift-j", DoFileSelectionEvent FileSelectionPrevSetArithmetic),
+      ("Ctrl-l", DoFileSelectionEvent FileSelectionNextQueryCriteria),
+      ("Ctrl-Shift-l", DoFileSelectionEvent FileSelectionPrevQueryCriteria),
+      ("Ctrl-o", TaggingModeNext),
+      ("Ctrl-Shift-o", TaggingModePrev),
+      ("Ctrl-r", RefreshApplication),
+      ("Ctrl-t", ToggleDoSoloTag)
+    ]
+
 operationWidget ::
   WidgetNode TaggerModel TaggerEvent
 operationWidget =
   flip styleBasic [border 1 black]
     . box_ [alignTop]
-    . flip
-      keystroke_
-      [ignoreChildrenEvts]
-      [ ("Ctrl-y", DoFileSelectionEvent FileSelectionClear),
-        ("Ctrl-u", ShellCmd),
-        ("Ctrl-i", DoSingleFileEvent SingleFilePrevFromFileSelection),
-        ("Ctrl-k", DoSingleFileEvent SingleFileNextFromFileSelection),
-        ("Ctrl-j", DoFileSelectionEvent FileSelectionNextSetArithmetic),
-        ("Ctrl-Shift-j", DoFileSelectionEvent FileSelectionPrevSetArithmetic),
-        ("Ctrl-l", DoFileSelectionEvent FileSelectionNextQueryCriteria),
-        ("Ctrl-Shift-l", DoFileSelectionEvent FileSelectionPrevQueryCriteria),
-        ("Ctrl-o", TaggingModeNext),
-        ("Ctrl-Shift-o", TaggingModePrev)
-      ]
     . vstack_ []
     $ [ selectionOperatorWidget,
         separatorLine,

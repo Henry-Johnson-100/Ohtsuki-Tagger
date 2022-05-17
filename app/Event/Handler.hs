@@ -549,6 +549,11 @@ taggerEventHandler wenv node model event =
             !++ " | Active: "
             !++ if active then "Yes" else "No"
       ]
+    RefreshApplication ->
+      [ Event (DoDescriptorEvent (RefreshDescriptorTree mainDescriptorTree)),
+        Event (DoDescriptorEvent (RefreshDescriptorTree unrelatedDescriptorTree)),
+        Event (DoFileSelectionEvent FileSelectionRefresh_)
+      ]
 
 -- I will never understand how the stupid fixity stuff works
 infixl 3 *~

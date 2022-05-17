@@ -27,48 +27,48 @@ taggerApplicationUI ::
   WidgetEnv TaggerModel TaggerEvent ->
   TaggerModel ->
   WidgetNode TaggerModel TaggerEvent
-taggerApplicationUI wenv model' =
-  let !model = model'
-   in vstack
-        [ menubar,
-          zstack
-            [ visibility model Config (configConfigurationPage model),
-              visibility model Database databaseConfigurePage,
-              visibility model Selection selectionConfigurePage,
-              visibility model ProgramVisibilityDescriptor . descriptorConfigurePage $
-                model,
-              visibility model Main
-                . vsplit_ [splitIgnoreChildResize True]
-                $ ( fileSingleWidget model,
-                    box_ [alignBottom] $
-                      hgrid
-                        [ vstack
-                            [ descriptorTreeQuadrantWidget
-                                ( model
-                                    ^. ( programConfig
-                                           . descriptorTreeConf
-                                       )
-                                )
-                                ( model
-                                    ^. ( descriptorModel
-                                           . mainDescriptorTree
-                                           . rootTree
-                                       )
-                                )
-                                ( model
-                                    ^. ( descriptorModel
-                                           . unrelatedDescriptorTree
-                                           . rootTree
-                                       )
-                                )
-                            ],
-                          operationWidget,
-                          fileSelectionWidget model
-                        ]
-                  )
-            ]
-        ]
-        `styleBasic` [padding 0]
+taggerApplicationUI wenv model =
+  globalKeystrokes
+    . flip styleBasic [padding 0]
+    . vstack
+    $ [ menubar,
+        zstack
+          [ visibility model Config (configConfigurationPage model),
+            visibility model Database databaseConfigurePage,
+            visibility model Selection selectionConfigurePage,
+            visibility model ProgramVisibilityDescriptor . descriptorConfigurePage $
+              model,
+            visibility model Main
+              . vsplit_ [splitIgnoreChildResize True]
+              $ ( fileSingleWidget model,
+                  box_ [alignBottom] $
+                    hgrid
+                      [ vstack
+                          [ descriptorTreeQuadrantWidget
+                              ( model
+                                  ^. ( programConfig
+                                         . descriptorTreeConf
+                                     )
+                              )
+                              ( model
+                                  ^. ( descriptorModel
+                                         . mainDescriptorTree
+                                         . rootTree
+                                     )
+                              )
+                              ( model
+                                  ^. ( descriptorModel
+                                         . unrelatedDescriptorTree
+                                         . rootTree
+                                     )
+                              )
+                          ],
+                        operationWidget,
+                        fileSelectionWidget model
+                      ]
+                )
+          ]
+      ]
 
 taggerApplicationConfig :: TaggerConfig -> [AppConfig TaggerEvent]
 taggerApplicationConfig cfg =
