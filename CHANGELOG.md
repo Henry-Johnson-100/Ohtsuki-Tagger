@@ -207,6 +207,7 @@ not just when a widget in the operation widget is in focus. The hotkeys are desc
   * Ascending and Descending ordering.
 * Adjusted ordering of DescriptorTrees so that Meta trees now sort by alphabetical value
 of their descriptors instead of the length of their children lists.
+* Fixed a bug where querying by untagged files would return 0 files if an empty query string was used.
 
 | Hotkey       | Event                                                                                                                                |
 |--------------|--------------------------------------------------------------------------------------------------------------------------------------|
