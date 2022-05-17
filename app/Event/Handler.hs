@@ -334,6 +334,15 @@ fileSelectionEventHandler wenv node model event =
     LazyBufferFlush ->
       [ model *~ fileSelectionModel . fileSelection %~ emptyBuffer
       ]
+    FlipInSelectionOrdering ->
+      [ model *~ fileSelectionModel . selectionDetailsOrdering
+          %~ (\(OrderingMode b d) -> OrderingMode b (next d))
+      ]
+    CycleInSelectionOrderingBy ->
+      [ model
+          *~ fileSelectionModel . selectionDetailsOrdering
+            %~ (\(OrderingMode b d) -> OrderingMode (next b) d)
+      ]
 
 taggedConnectionEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->

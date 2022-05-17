@@ -197,3 +197,9 @@ Some restrictions:
 * Added a connection string to the window that shows what database tagger is connected to
 and if it has connected yet.
 * Migrated Monomer to the official release of 1.4.1.0
+
+#### 0.3.2.3 -- 2022-05-17
+
+* Added some sorting options to the tags "In Selection" in the image detail pane.
+  * Can sort by tag alphabetically, or number of tags in the selection.
+  * Ascending and Descending ordering.

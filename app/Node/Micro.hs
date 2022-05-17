@@ -237,6 +237,19 @@ treeLeafButtonRequestDescriptorTree d =
     )
     (descriptor d)
 
+flipInSelectionOrderingButton :: OrdDirection -> TaggerWidget
+flipInSelectionOrderingButton =
+  styledButton
+    (DoFileSelectionEvent FlipInSelectionOrdering)
+    . T.pack
+    . show
+
+cycleInSelectionOrderingByButton :: OrderingBy -> TaggerWidget
+cycleInSelectionOrderingByButton o =
+  styledButton
+    (DoFileSelectionEvent CycleInSelectionOrderingBy)
+    (case o of Alphabetical -> "ABC"; _ -> "123")
+
 {-
  _____ _______  _______ _____ ___ _____ _     ____  ____
 |_   _| ____\ \/ /_   _|  ___|_ _| ____| |   |  _ \/ ___|
@@ -651,12 +664,22 @@ imageDetailWidget m =
     inSelectionWidget =
       vstack_
         []
-        [ label $
-            "In Selection: "
-              !++ "("
-              !++ (T.pack . show . length . cCollect)
-                (m ^. fileSelectionModel . fileSelection)
-              !++ ")",
+        [ hstack_
+            []
+            [ label $
+                "In Selection: "
+                  !++ "("
+                  !++ (T.pack . show . length . cCollect)
+                    (m ^. fileSelectionModel . fileSelection)
+                  !++ ")",
+              spacer,
+              cycleInSelectionOrderingByButton
+                . (\(OrderingMode b _) -> b)
+                $ m ^. fileSelectionModel . selectionDetailsOrdering,
+              flipInSelectionOrderingButton
+                . (\(OrderingMode _ d) -> d)
+                $ m ^. fileSelectionModel . selectionDetailsOrdering
+            ],
           spacer,
           hstack_
             []
@@ -665,7 +688,8 @@ imageDetailWidget m =
                 . vscroll_ [wheelRate 50]
                 . vstack_ []
                 . map imageDetailDescriptor
-                . L.sort
+                . sortDescriptorIntTuple
+                  (m ^. fileSelectionModel . selectionDetailsOrdering)
                 -- this is total jank but it works now
                 $ ( let selD =
                           (\xs -> if null xs then [] else L.foldl1' union xs)
@@ -682,6 +706,13 @@ imageDetailWidget m =
                   )
             ]
         ]
+      where
+        sortDescriptorIntTuple ::
+          OrderingMode -> [(Descriptor, Int)] -> [(Descriptor, Int)]
+        sortDescriptorIntTuple (OrderingMode b d) xs =
+          case b of
+            Alphabetical -> if d == Asc then L.sortOn fst xs else L.sortOn (Down . fst) xs
+            Numerical -> if d == Asc then L.sortOn snd xs else L.sortOn (Down . snd) xs
     imageDetailDescriptor ::
       (WidgetModel s) =>
       (Descriptor, Int) ->

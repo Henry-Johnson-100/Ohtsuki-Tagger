@@ -28,6 +28,11 @@ module Type.Model.Prim
     Listable (..),
     Intersectable (..),
     DescriptorModelTreeLens (..),
+    OrderingBy (..),
+    OrdDirection (..),
+    OrderingMode (..),
+    O.Down (..),
+    O.comparing,
     emptyTaggerModel,
     isUntagMode,
     plantTree,
@@ -38,6 +43,7 @@ import Control.Lens
 import Control.Monad
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as L
+import qualified Data.Ord as O
 import Data.Text (Text)
 import Database.SQLite.Simple (Connection)
 import Database.Tagger.Type
@@ -92,7 +98,8 @@ data FileSelectionModel = FileSelectionModel
   { _fsmFileSelection :: !(BufferList FileWithTags),
     _fsmSetArithmetic :: !FileSetArithmetic,
     _fsmQueryCriteria :: !QueryCriteria,
-    _fsmQueryText :: !Text
+    _fsmQueryText :: !Text,
+    _fsmSelectionDetailsOrdering :: !OrderingMode
   }
   deriving (Show, Eq)
 
@@ -101,6 +108,12 @@ data SingleFileSelectionModel = SingleFileSelectionModel
     _sfsmTagCounts :: !(OccurrenceMap Descriptor)
   }
   deriving (Show, Eq)
+
+data OrdDirection = Asc | Desc deriving (Show, Eq, Bounded, Enum, Cyclic)
+
+data OrderingBy = Alphabetical | Numerical deriving (Show, Eq, Bounded, Enum, Cyclic)
+
+data OrderingMode = OrderingMode !OrderingBy !OrdDirection deriving (Show, Eq, Bounded)
 
 instance Show Connection where
   show _ = "Sqlite Connection"
@@ -246,6 +259,8 @@ data FileSelectionEvent
   | LazyBufferLoad
   | LazyBufferLoadAll
   | LazyBufferFlush
+  | FlipInSelectionOrdering
+  | CycleInSelectionOrderingBy
   deriving (Show, Eq)
 
 data ConfigurationEvent
@@ -323,7 +338,8 @@ emptyFileSelectionModel =
     { _fsmFileSelection = emptyBufferList,
       _fsmSetArithmetic = Union,
       _fsmQueryCriteria = ByTag,
-      _fsmQueryText = ""
+      _fsmQueryText = "",
+      _fsmSelectionDetailsOrdering = OrderingMode Alphabetical Asc
     }
 
 emptySingleFileSelectionModel :: SingleFileSelectionModel
