@@ -36,12 +36,14 @@ module Type.Model.Prim
     emptyTaggerModel,
     isUntagMode,
     plantTree,
+    setArithmeticToIntersectable,
   )
 where
 
 import Control.Lens
 import Control.Monad
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.IntSet as IntSet
 import qualified Data.List as L
 import qualified Data.Ord as O
 import Data.Text (Text)
@@ -372,3 +374,16 @@ isUntagMode _ = False
 
 plantTree :: DescriptorTree -> RootedDescriptorTree
 plantTree = RootedDescriptorTree "#ALL#"
+
+setArithmeticToIntersectable ::
+  Intersectable l =>
+  FileSetArithmetic ->
+  (a -> a -> Bool) ->
+  l a ->
+  l a ->
+  l a
+setArithmeticToIntersectable a =
+  case a of
+    Union -> unionBy
+    Intersect -> intersectBy
+    Diff -> diffBy
