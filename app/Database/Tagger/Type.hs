@@ -99,7 +99,7 @@ data File = File {fileId :: Int, filePath :: T.Text}
   deriving (Show, Eq, Generics.Generic)
 
 instance H.Hashable File where
-  hash (File i f) = H.hash $ show i ++ show f
+  hash (File i f) = H.hashWithSalt i f
 
 instance Ord File where
   compare (File _ px) (File _ py) = compare px py

@@ -35,6 +35,7 @@ executable tagger
                       ,Paths_tagger
 
   other-extensions:    OverloadedStrings
+                      ,OverloadedLists
                       ,TemplateHaskell
                       ,FlexibleInstances
                       ,FunctionalDependencies
