@@ -238,7 +238,7 @@ runShellCmds cs fwtString = do
           pProc = (\(_, _, _, p') -> p') p
       hReadMaybe stdout pout
       hReadMaybe stderr perr
-      print <=< waitForProcess $ pProc
+      hPrint stderr <=< waitForProcess $ pProc
       where
         hReadMaybe oh mh =
           maybe (pure ()) (hGetContents >=> hPutStrLn oh) mh

@@ -229,3 +229,7 @@ of their descriptors instead of the length of their children lists.
 * Introducing some command line arguments.
   * -v, --version remains
   * -q, --query will take a query string written in TaggerQL and return a list of file paths.
+
+#### ?.?.?.? -- ????-??-??
+
+* Changed the ShellCMD functionality to output ExitSuccess or other messages from completed commands to stderr instead of stdout.
