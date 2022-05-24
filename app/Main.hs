@@ -16,6 +16,7 @@ import Control.Monad.Trans.Except (runExceptT)
 import qualified Data.Text as T
 import Database.SQLite.Simple (Connection, close, open)
 import Database.Tagger.Access (activateForeignKeyPragma)
+import Event.CLI
 import Event.Handler (taggerEventHandler)
 import IO
 import Monomer
@@ -85,6 +86,9 @@ runTaggerWindow cfg =
 main :: IO ()
 main = do
   rawArgs <- getArgs
+  let opts = getTaggerOpt rawArgs
+  showOptErrors opts
+  print opts
   let hasVersionFlag = or $ flip elem rawArgs <$> ["-v", "--version"]
   when hasVersionFlag (putStrLn taggerVersion)
   unless hasVersionFlag $ do

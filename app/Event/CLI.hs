@@ -1,10 +1,13 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Event.CLI
-  (
+  ( module Event.CLI.Type,
+    showOptErrors,
+    cliQuery,
   )
 where
 
+import Control.Monad
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import Database.Tagger.Access (Connection)
@@ -17,10 +20,18 @@ import Type.Model.Prim
 
 -- | Return True if there are no errors
 showOptErrors :: TaggerOpts -> IO Bool
-showOptErrors (TaggerOpts _ _ es) =
-  if null es
-    then mapM_ (IO.hPutStrLn IO.stderr) es >> return False
-    else return True
+showOptErrors (TaggerOpts _ ns es) = do
+  unless
+    (null ns)
+    ( IO.hPutStrLn IO.stderr "Non-options:"
+        >> mapM_ (IO.hPutStrLn IO.stderr . (++) "\t") ns
+    )
+  unless
+    (null es)
+    ( IO.hPutStrLn IO.stderr "Option errors:"
+        >> mapM_ (IO.hPutStrLn IO.stderr . (++) "\t") es
+    )
+  return . or $ not . null <$> [ns, es]
 
 -- |
 -- Runs the supplied query and prints the output filepaths
