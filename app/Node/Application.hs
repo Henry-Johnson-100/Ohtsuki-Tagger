@@ -220,7 +220,7 @@ fileSelectionWidget m =
           ]
       ]
   where
-    lazyBufferWidget :: [FileWithTags] -> TaggerWidget
+    lazyBufferWidget :: [File] -> TaggerWidget
     lazyBufferWidget =
       flip styleBasic [maxWidth 10000]
         . vscroll_ [wheelRate 50]
@@ -230,14 +230,14 @@ fileSelectionWidget m =
               (m ^. programConfig . selectionconf . selectionDisplayParents)
           )
       where
-        fileWithTagsWidget :: Int -> FileWithTags -> TaggerWidget
-        fileWithTagsWidget n fwt =
-          draggable fwt
-            . flip styleBasic [textColor (if null . tags $ fwt then black else yuiBlue)]
+        fileWithTagsWidget :: Int -> File -> TaggerWidget
+        fileWithTagsWidget n f =
+          draggable f
+            . flip styleBasic []
             . flip label_ [ellipsis]
             . getPathComponents n
             . getPlainText
-            $ fwt
+            $ f
 
 fileSingleWidget ::
   TaggerModel -> TaggerWidget
