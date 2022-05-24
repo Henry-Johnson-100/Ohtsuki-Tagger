@@ -1,49 +1,58 @@
 cradle:
   cabal:
-    - path: "app/Main.hs"
+    - path: "./app/Main.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/Node/Application.hs"
+    - path: "./app/Node/Application.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/Node/Color.hs"
+    - path: "./app/Node/Color.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/Node/Micro.hs"
+    - path: "./app/Node/Micro.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/Event/Task.hs"
+    - path: "./app/Event/Task.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/Event/Handler.hs"
+    - path: "./app/Event/Handler.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/Event/Parser.hs"
+    - path: "./app/Event/Parser.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/Type/Model.hs"
+    - path: "./app/Event/CLI.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/Type/Model/Prim.hs"
+    - path: "./app/Event/CLI/Type.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/Type/Config.hs"
+    - path: "./app/Type/Model.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/Type/BufferList.hs"
+    - path: "./app/Type/Model/Prim.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/Database/Tagger/Type.hs"
+    - path: "./app/Type/Config.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/Database/Tagger/Access.hs"
+    - path: "./app/Type/BufferList.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/Database/Tagger/Access/RowMap.hs"
+    - path: "./app/Database/Tagger/Type.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/IO.hs"
+    - path: "./app/Database/Tagger/Access.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/Util/Core.hs"
+    - path: "./app/Database/Tagger/Access/RowMap.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "./app/IO.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "./app/Util/Core.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "./app/Paths_tagger.hs"
       component: "tagger:exe:tagger"

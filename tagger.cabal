@@ -22,6 +22,8 @@ executable tagger
                       ,Event.Task
                       ,Event.Handler
                       ,Event.Parser
+                      ,Event.CLI
+                      ,Event.CLI.Type
                       ,Type.Model
                       ,Type.Model.Prim
                       ,Type.Config

@@ -4,6 +4,7 @@
 module IO
   ( module IO,
     module System.IO,
+    module System.Console.GetOpt,
     module System.Environment,
     module System.Directory,
     module System.FilePath,
@@ -23,6 +24,7 @@ import qualified Data.Version as Version
 import Database.SQLite.Simple
 import qualified Database.SQLite3 as DirectSqlite
 import qualified Paths_tagger
+import System.Console.GetOpt
 import System.Directory
 import System.Environment
 import System.FilePath
