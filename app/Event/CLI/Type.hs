@@ -2,11 +2,28 @@
 
 module Event.CLI.Type
   ( CLIFlag (..),
+    TaggerOpts (..),
     getTaggerOpt,
   )
 where
 
 import qualified IO
+
+-- |
+-- optionArguments -> [CLIFlag]
+--
+-- nonOptions -> [String]
+--
+-- optionErrors -> [String]
+data TaggerOpts = TaggerOpts
+  { optionArguments :: ![CLIFlag],
+    nonOptions :: ![String],
+    optionErrors :: ![String]
+  }
+  deriving (Show, Eq)
+
+uncurryOpts :: ([CLIFlag], [String], [String]) -> TaggerOpts
+uncurryOpts (cs, ns, es) = TaggerOpts cs ns es
 
 data CLIFlag
   = Version
@@ -30,5 +47,5 @@ cliFlags =
       \Ex. \"otsuki_yui {r.cute} d| r.season i| sweater\""
   ]
 
-getTaggerOpt :: [String] -> ([CLIFlag], [String], [String])
-getTaggerOpt = IO.getOpt IO.RequireOrder cliFlags
+getTaggerOpt :: [String] -> TaggerOpts
+getTaggerOpt = uncurryOpts . IO.getOpt IO.RequireOrder cliFlags
