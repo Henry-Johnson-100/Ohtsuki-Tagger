@@ -224,4 +224,8 @@ of their descriptors instead of the length of their children lists.
 | Ctrl-r       | Refreshes the application, searching for tag updates in the database, refreshing descriptor trees, and re-putting the image preview. |
 | Ctrl-t       | Toggles `Solo Tagging Mode`                                                                                                          |
 
-### 0.3.3.0 -- ????-??-??
+### 0.3.3.0 -- 2022-05-24
+
+* Introducing some command line arguments.
+  * -v, --version remains
+  * -q, --query will take a query string written in TaggerQL and return a list of file paths.
