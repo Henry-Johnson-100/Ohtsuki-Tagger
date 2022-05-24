@@ -223,3 +223,5 @@ of their descriptors instead of the length of their children lists.
 | Ctrl-Shift-o | Toggles between Tag and Untag mode but in the opposite direction :^)                                                                 |
 | Ctrl-r       | Refreshes the application, searching for tag updates in the database, refreshing descriptor trees, and re-putting the image preview. |
 | Ctrl-t       | Toggles `Solo Tagging Mode`                                                                                                          |
+
+### 0.3.3.0 -- ????-??-??
