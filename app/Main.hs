@@ -2,7 +2,6 @@
 {-# HLINT ignore "Use <&>" #-}
 {-# HLINT ignore "Redundant flip" #-}
 {-# HLINT ignore "Redundant $" #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
@@ -13,6 +12,7 @@ module Main where
 import Control.Lens ((^.))
 import Control.Monad
 import Control.Monad.Trans.Except (runExceptT)
+import Data.Maybe (fromJust)
 import qualified Data.Text as T
 import Database.SQLite.Simple (Connection, close, open)
 import Database.Tagger.Access (activateForeignKeyPragma)
@@ -85,14 +85,24 @@ runTaggerWindow cfg =
 
 main :: IO ()
 main = do
-  rawArgs <- getArgs
-  let opts = getTaggerOpt rawArgs
-  showOptErrors opts
-  print opts
-  let hasVersionFlag = or $ flip elem rawArgs <$> ["-v", "--version"]
-  when hasVersionFlag (putStrLn taggerVersion)
-  unless hasVersionFlag $ do
-    configPath <- getConfigPath
-    try' (getConfig configPath) runTaggerWindow
+  configPath <- getConfigPath
+  let configExcept = getConfig configPath
+  try' configExcept $ \config -> do
+    rawArgs <- getArgs
+    let opts@(TaggerOpts fls _ _) = getTaggerOpt rawArgs
+    hasOptErrors <- showOptErrors opts
+    unless hasOptErrors $ do
+      if nullOpts opts
+        then do
+          runTaggerWindow config
+        else do
+          when (Version `elem` fls) (putStrLn taggerVersion)
+          when
+            (hasQueryFlag opts)
+            ( do
+                c <- open . T.unpack $ config ^. dbconf . dbconfPath
+                cliQuery c . fromJust . getQuery $ opts
+                close c
+            )
   where
     try' e c = runExceptT e >>= either (hPutStrLn stderr) c

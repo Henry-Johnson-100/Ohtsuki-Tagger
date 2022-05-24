@@ -18,7 +18,7 @@ import qualified IO
 import Type.BufferList
 import Type.Model.Prim
 
--- | Return True if there are no errors
+-- | Return True if there are errors
 showOptErrors :: TaggerOpts -> IO Bool
 showOptErrors (TaggerOpts _ ns es) = do
   unless
