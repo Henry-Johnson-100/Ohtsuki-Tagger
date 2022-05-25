@@ -1,8 +1,8 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Use <&>" #-}
+{-# OPTIONS_GHC -Wno-partial-type-signatures #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Type.BufferList
   ( BufferList (..),
@@ -17,6 +17,7 @@ module Type.BufferList
   )
 where
 
+import Control.Lens (Lens', lens)
 import Control.Lens.TH (makeLenses)
 import qualified Data.List as L
 import IO
@@ -46,7 +47,11 @@ data BufferList a = BufferList
   }
   deriving (Show, Eq, Ord)
 
-makeLenses ''BufferList
+buffer :: Lens' (BufferList a) [a]
+buffer = lens _buffer (\a b -> a {_buffer = b})
+
+list :: Lens' (BufferList a) [a]
+list = lens _list (\a b -> a {_list = b})
 
 emptyBufferList :: BufferList a
 emptyBufferList = BufferList [] []
