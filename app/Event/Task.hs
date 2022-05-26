@@ -6,25 +6,96 @@
 
 module Event.Task where
 
-import Control.Applicative
-import Control.Lens
-import Control.Monad
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Maybe
-import Data.Char
+import Control.Applicative (Alternative (empty))
+import Control.Monad (unless, (<=<), (>=>))
+import Control.Monad.Trans.Class (MonadTrans (lift))
+import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
 import qualified Data.List as L
-import Data.Maybe
+import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Text as T
-import Database.SQLite.Simple
+import Database.SQLite.Simple (Connection)
 import Database.Tagger.Access
+  ( DescriptorKey,
+    FileKey,
+    addDescriptor,
+    addFile,
+    addRepresentative,
+    collectFileWithTagsByFileKey,
+    deleteDatabaseSubTags,
+    deleteDescriptor,
+    derefDatabaseFileWithTags,
+    fetchInfraTree,
+    fetchMetaDescriptors,
+    fromDatabaseFileWithTags,
+    getRepresentative,
+    getsDatabaseTagIds,
+    getsExclusiveInfraDescriptorKeys,
+    getsUntaggedFileWithTags,
+    hoistMaybe,
+    insertDatabaseTag,
+    lookupDescriptorPattern,
+    lookupFileWithTagsByFileId',
+    lookupFilesHavingDescriptorPattern,
+    lookupFilesHavingFilePattern,
+    lookupFilesHavingInfraTagRelationship,
+    lookupFilesHavingSubTagRelationship,
+    lookupTagLike,
+    relate,
+    renameDescriptor,
+    unrelate,
+    updateRepresentativeText,
+    updateTagSubTagOfId,
+  )
 import Database.Tagger.Type
+  ( Descriptor (descriptorId),
+    DescriptorTree (NullTree),
+    File (fileId),
+    FileWithTags (FileWithTags, file),
+    MetaDescriptor (MetaDescriptor),
+    Representative (Representative),
+    Tag (tagId),
+    TagKey,
+    TagPtr (Tag_),
+    fwtFileEqual,
+    getNode,
+    getPathsToAdd,
+    getTagPtr,
+    tagNoId,
+    tagPtrNoId,
+  )
 import Event.Parser
+  ( ParseError,
+    PseudoDescriptor (..),
+    PseudoSubTag,
+    QueryCriteriaLiteral (CLiteral, CNoLiteral),
+    QuerySection (QuerySection, sectionContents),
+    QueryToken (QueryToken, tokenCriteria),
+    SetArithmeticLiteral (ALiteral, ANoLiteral),
+    SubList (SubList),
+    parseQuerySections,
+    pseudoDescriptorText,
+  )
 import IO
+  ( CreateProcess (delegate_ctlc, new_session),
+    createProcess,
+    getConfigPath,
+    hGetContents,
+    hPrint,
+    hPutStrLn,
+    proc,
+    stderr,
+    stdout,
+    waitForProcess,
+  )
 import qualified Toml
-import Type.BufferList
-import Type.Config
+import Type.BufferList (BufferList, Cycleable (cFromList))
+import Type.Config (TaggerConfig, taggerConfigCodec)
 import Type.Model
-import Util.Core
+  ( FileSetArithmetic (..),
+    Intersectable (diffBy, intersectBy, unionBy),
+    QueryCriteria (..),
+  )
+import Util.Core (head', tail')
 
 type ConnString = String
 
@@ -51,7 +122,7 @@ queryWithParseResults ::
   BufferList FileWithTags ->
   [QuerySection (t (SubList (QueryToken PseudoDescriptor)))] ->
   IO (BufferList FileWithTags)
-queryWithParseResults c a ByUntagged currentBuffer qss = do
+queryWithParseResults c a ByUntagged currentBuffer _ = do
   byUntaggedResults <-
     queryWithQueryTokenLiteral
       c
@@ -88,7 +159,7 @@ combineQueriedSection a qqs = L.foldl1' (combine a) qqs
       QuerySection [FileWithTags] ->
       QuerySection [FileWithTags] ->
       QuerySection [FileWithTags]
-    combine a (QuerySection ax sxs) (QuerySection ay sys) =
+    combine a (QuerySection _ sxs) (QuerySection ay sys) =
       case ay of
         ANoLiteral -> combine'' a ay sxs sys
         ALiteral a' -> combine'' a' ay sxs sys
@@ -105,7 +176,7 @@ queryWithQuerySection ::
   QueryCriteria ->
   QuerySection (t (SubList (QueryToken PseudoDescriptor))) ->
   IO (QuerySection [FileWithTags])
-queryWithQuerySection c qc qs@(QuerySection a ss) = do
+queryWithQuerySection c qc qs@(QuerySection _ ss) = do
   ss' <- fmap concat . mapM (queryWithQueryTokenSubList c qc) $ ss
   return $ qs {sectionContents = ss'}
 
@@ -123,8 +194,8 @@ queryWithQueryTokenSubList c qc (SubList h ts) = do
     queryWithSingleSubTagQuery ::
       QueryToken PseudoDescriptor -> QueryToken PseudoDescriptor -> IO [FileKey]
     queryWithSingleSubTagQuery
-      qtH@(QueryToken ctH pdH@(PDescriptor dH))
-      qtT@(QueryToken ctT pdT@(PDescriptor dT)) = do
+      qtH@(QueryToken _ (PDescriptor _))
+      qtT@(QueryToken _ (PDescriptor _)) = do
         headKeys <- getDescriptorKeysFromLiteralPattern c qc qtH
         tailKeys <- getDescriptorKeysFromLiteralPattern c qc qtT
         fmap concat
@@ -140,8 +211,8 @@ queryWithQueryTokenSubList c qc (SubList h ts) = do
       getDescriptorKeysFromLiteralPattern c qc (qt {tokenCriteria = CLiteral qc})
     getDescriptorKeysFromLiteralPattern
       c
-      qc
-      qt@(QueryToken (CLiteral crit) ps@(PDescriptor pd)) =
+      _
+      (QueryToken (CLiteral crit) (PDescriptor pd)) =
         case crit of
           ByTag -> map descriptorId <$> lookupDescriptorPattern c pd
           ByRelation -> do
@@ -156,7 +227,7 @@ queryWithQueryTokenLiteral ::
   QueryCriteria ->
   QueryToken PseudoDescriptor ->
   IO [FileWithTags]
-queryWithQueryTokenLiteral c qc (QueryToken (CLiteral crit) ps@(PDescriptor pd)) =
+queryWithQueryTokenLiteral c _ (QueryToken (CLiteral crit) (PDescriptor pd)) =
   case crit of
     ByTag -> queryByDescriptorLiteral pd
     ByRelation -> queryByRelationLiteral pd
@@ -202,13 +273,6 @@ updateRepresentativeText :: Connection -> Descriptor -> T.Text -> IO ()
 updateRepresentativeText c =
   Database.Tagger.Access.updateRepresentativeText c . descriptorId
 
-shuffle :: [a] -> IO [a]
-shuffle [] = pure []
-shuffle xs = do
-  g <- initStdGen
-  let shuffled = shuffle' xs (length xs) g
-  return shuffled
-
 renameDescriptor :: Connection -> Descriptor -> T.Text -> IO ()
 renameDescriptor = Database.Tagger.Access.renameDescriptor
 
@@ -242,7 +306,6 @@ runShellCmds cs fwtString = do
       where
         hReadMaybe oh mh =
           maybe (pure ()) (hGetContents >=> hPutStrLn oh) mh
-        hCloseMaybe = maybe (pure ()) hClose
 
 exportConfig :: TaggerConfig -> IO ()
 exportConfig tc = do
@@ -265,8 +328,7 @@ tag c fwts =
     (hPrint stderr)
     ( \psts -> do
         let newTagTuples = (,) <$> fwts <*> psts
-        tags <- mapM (runMaybeT . uncurry tag') newTagTuples
-        return ()
+        mapM_ (runMaybeT . uncurry tag') newTagTuples
     )
   where
     tag' :: FileWithTags -> PseudoSubTag -> MaybeT IO ()
@@ -307,8 +369,7 @@ untag c fwts =
     (hPrint stderr)
     ( \psts -> do
         let toDeleteTuples = (,) <$> fwts <*> psts
-        deletedTags <- mapM (runMaybeT . uncurry untag') toDeleteTuples
-        return ()
+        mapM_ (runMaybeT . uncurry untag') toDeleteTuples
     )
   where
     untag' :: FileWithTags -> PseudoSubTag -> MaybeT IO ()
@@ -345,67 +406,6 @@ unrelate c i = do
   _x <- runMaybeT . mapM_ (Database.Tagger.Access.unrelate c . descriptorId) $ i
   return ()
 
-doQueryWithCriteria ::
-  QueryCriteria ->
-  Connection ->
-  T.Text ->
-  IO [FileWithTags]
-doQueryWithCriteria qc =
-  case qc of
-    ByTag -> \c t -> queryByTag c (parseQuery t)
-    ByRelation -> \c t -> queryRelation c (T.words t)
-    ByUntagged -> \c t -> queryUntagged c (T.words t)
-    ByPattern -> \c t -> queryFilePattern c (T.words t)
-  where
-    queryByTag ::
-      Connection ->
-      Either ParseError [PseudoSubTag] ->
-      IO [FileWithTags]
-    queryByTag c =
-      either
-        (\e -> hPrint stderr e >> return [])
-        (fmap concat . mapM queryByPseudoSubTag)
-      where
-        queryByPseudoSubTag :: PseudoSubTag -> IO [FileWithTags]
-        queryByPseudoSubTag (pd, []) = do
-          dbFwts <- lookupFileWithTagsByDescriptorPattern c . pseudoDescriptorText $ pd
-          fmap catMaybes . mapM (runMaybeT . fromDatabaseFileWithTags c) $ dbFwts
-        queryByPseudoSubTag (pd, spds) = do
-          let mainDes = pseudoDescriptorText pd
-              subDess = map pseudoDescriptorText spds
-          dbFwts <-
-            fmap concat
-              . mapM (lookupFileWithTagsBySubTagDescriptorText c mainDes)
-              $ subDess
-          fmap catMaybes . mapM (runMaybeT . fromDatabaseFileWithTags c) $ dbFwts
-    queryRelation ::
-      Connection -> [T.Text] -> IO [FileWithTags]
-    queryRelation c rs = do
-      ds <- fmap concat . mapM (lookupDescriptorPattern c) $ rs
-      dbfwts <-
-        fmap concat
-          . mapM
-            ( lookupFileWithTagsByInfraRelation c
-                . descriptorId
-            )
-          $ ds
-      fmap catMaybes . mapM (runMaybeT . fromDatabaseFileWithTags c) $ dbfwts
-    queryUntagged ::
-      Connection -> [T.Text] -> IO [FileWithTags]
-    queryUntagged c ns = do
-      untaggedFwts <- getsUntaggedFileWithTags c
-      case ns of
-        [] -> return untaggedFwts
-        (n : _) ->
-          if T.all isDigit n
-            then return . take (read . T.unpack $ n) $ untaggedFwts
-            else return untaggedFwts
-    queryFilePattern ::
-      Connection -> [T.Text] -> IO [FileWithTags]
-    queryFilePattern c ps = do
-      dbFwts <- fmap concat . mapM (lookupFileWithTagsByFilePattern' c) $ ps
-      fmap catMaybes . mapM (runMaybeT . fromDatabaseFileWithTags c) $ dbFwts
-
 lookupInfraDescriptorTree ::
   Connection -> T.Text -> IO DescriptorTree
 lookupInfraDescriptorTree c dT = do
@@ -432,17 +432,6 @@ getALLInfraTree c = do
                 . lookupDescriptorPattern c
               $ "#ALL#"
           fetchInfraTree c . descriptorId $ allDescriptor
-      )
-  return . fromMaybe NullTree $ result
-
-getUnrelatedInfraTree :: Connection -> IO DescriptorTree
-getUnrelatedInfraTree c = do
-  result <-
-    runMaybeT
-      ( do
-          unrelatedDescriptor <-
-            hoistMaybe . head' <=< lift . lookupDescriptorPattern c $ "#UNRELATED#"
-          fetchInfraTree c . descriptorId $ unrelatedDescriptor
       )
   return . fromMaybe NullTree $ result
 

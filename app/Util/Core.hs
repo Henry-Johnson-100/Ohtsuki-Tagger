@@ -2,10 +2,9 @@
 
 module Util.Core where
 
-import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Maybe (MaybeT (MaybeT))
 import qualified Data.IntMap.Strict as IntMap
-import qualified Data.Map.Strict as Map
-import Data.Maybe
+import Data.Maybe (mapMaybe)
 import qualified Data.Text as T
 
 type OccurrenceMap a = IntMap.IntMap Int

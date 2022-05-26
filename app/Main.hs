@@ -14,8 +14,7 @@ import Control.Monad
 import Control.Monad.Trans.Except (runExceptT)
 import Data.Maybe (fromJust)
 import qualified Data.Text as T
-import Database.SQLite.Simple (Connection, close, open)
-import Database.Tagger.Access (activateForeignKeyPragma)
+import Database.SQLite.Simple (close, open)
 import Event.CLI
 import Event.Handler (taggerEventHandler)
 import IO
@@ -28,7 +27,7 @@ taggerApplicationUI ::
   WidgetEnv TaggerModel TaggerEvent ->
   TaggerModel ->
   WidgetNode TaggerModel TaggerEvent
-taggerApplicationUI wenv model =
+taggerApplicationUI _ model =
   globalKeystrokes
     . flip styleBasic [padding 0]
     . vstack

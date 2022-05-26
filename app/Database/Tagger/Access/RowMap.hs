@@ -14,11 +14,13 @@ import qualified Data.IntSet as IntSet
 import qualified Data.List as L
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as M
-import qualified Data.Text as T
-import Database.SQLite.Simple (Only (Only))
-import qualified Database.SQLite.Simple.FromRow as FromRow
 import Database.Tagger.Type
-import Util.Core
+  ( DatabaseFileWithTags (..),
+    Descriptor,
+    FileKey,
+    TagKey,
+  )
+import Util.Core (OccurrenceMap)
 
 type KeySet a = IntSet.IntSet
 

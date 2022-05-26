@@ -14,14 +14,25 @@ module IO
   )
 where
 
-import Control.Monad
-import Control.Monad.Trans.Class
+import Control.Monad (unless, when, (<=<))
+import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except
-import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
+  ( ExceptT,
+    except,
+    throwE,
+    withExceptT,
+  )
+import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Text as T
-import Data.Time
+import Data.Time (getCurrentTime)
 import qualified Data.Version as Version
 import Database.SQLite.Simple
+  ( Connection (connectionHandle),
+    Only (Only),
+    execute,
+    open,
+    query_,
+  )
 import qualified Database.SQLite3 as DirectSqlite
 import qualified Paths_tagger
 import System.Console.GetOpt
@@ -32,9 +43,9 @@ import System.IO
 import System.Process
 import System.Random
 import System.Random.Shuffle
-import Toml
-import Type.Config
-import Util.Core
+import Toml (decodeFileEither, prettyTomlDecodeErrors)
+import Type.Config (TaggerConfig, taggerConfigCodec)
+import Util.Core (head')
 
 type ConfigException = String
 
@@ -86,7 +97,7 @@ backupDbConn c backupTo = do
   updateLastBackupDateTime c
   backupHandle <- fmap connectionHandle . open $ backupTo
   backupProcess <- DirectSqlite.backupInit backupHandle "main" currentHandle "main"
-  DirectSqlite.backupStep backupProcess (-1)
+  _ <- DirectSqlite.backupStep backupProcess (-1)
   DirectSqlite.backupFinish backupProcess
   hPutStrLn stderr "Backup complete"
 
@@ -106,7 +117,7 @@ updateTaggerDBInfo c = do
   currentTime <- getCurrentTime
   dbInfoTableExists <- taggerDBInfoTableExists c
   when dbInfoTableExists $ do
-    backupTimeString <- getLastBackupDateTime c
+    _ <- getLastBackupDateTime c
     execute
       c
       "UPDATE TaggerDBInfo SET version = ?, lastAccessed = ?"

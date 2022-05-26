@@ -15,53 +15,128 @@ module Event.Handler
 where
 
 import Control.Lens ((%~), (&), (.~), (^.))
-import Control.Monad
-import qualified Control.Monad as CM
-import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
 import qualified Data.HashSet as HashSet
-import qualified Data.List as L
 import qualified Data.Maybe as M
 import qualified Data.Text as T
-import Database.SQLite.Simple
-import Database.Tagger.Access (activateForeignKeyPragma, getDescriptorOccurrenceMap, lookupDescriptorPattern)
+import Database.SQLite.Simple (Connection, close, open)
+import Database.Tagger.Access
+  ( activateForeignKeyPragma,
+    getDescriptorOccurrenceMap,
+    lookupDescriptorPattern,
+  )
 import Database.Tagger.Type
-import Event.Parser
+  ( Descriptor (descriptor, descriptorId),
+    File (filePath),
+    FileWithTags (file, tags),
+    Tag (tagDescriptor),
+    fwtFileEqual,
+    getNode,
+  )
+import Event.Parser (parseQuery)
 import Event.Task
+  ( addPath,
+    associateTag,
+    createNewDescriptors,
+    createRepresentative,
+    deleteDescriptor,
+    exportConfig,
+    getParentDescriptorTree,
+    getRefreshedFWTs,
+    getRepresentative,
+    lookupInfraDescriptorTree,
+    relateTo,
+    renameDescriptor,
+    runQuery,
+    runShellCmds,
+    tag,
+    unrelate,
+    untag,
+    untagWithTag,
+  )
 import qualified IO
 import Monomer
+  ( AppEventResponse,
+    EventResponse (Event, Model, Request, Task),
+    WidgetEnv,
+    WidgetNode,
+    WidgetRequest (UpdateWindow),
+    WindowRequest (WindowSetTitle),
+  )
 import Type.BufferList
-import Type.Config
+  ( BufferList (_buffer, _list),
+    Cycleable (cCollect, cDequeue, cFromList, cHead, cPop),
+    buffer,
+    emptyBuffer,
+    emptyBufferList,
+    list,
+    shuffleBufferList,
+    takeToBuffer,
+    toBuffer,
+  )
 import Type.Model
-import Util.Core
-
-fwtUnion :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]
-fwtUnion = unionBy fwtFileEqual
-
-fwtIntersect :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]
-fwtIntersect = intersectBy fwtFileEqual
-
-fwtDiff :: [FileWithTags] -> [FileWithTags] -> [FileWithTags]
-fwtDiff = diffBy fwtFileEqual
+  ( ConfigurationEvent (..),
+    Cyclic (next, prev),
+    DescriptorEvent (..),
+    FileSelectionEvent (..),
+    FileSetArithmetic (..),
+    HasConnInstance (connInstance),
+    HasConnName (connName),
+    HasDbConn (dbConn),
+    HasDescriptorModel (descriptorModel),
+    HasDoSoloTag (doSoloTag),
+    HasFileSelection (fileSelection),
+    HasFileSelectionModel (fileSelectionModel),
+    HasLastAccessed (lastAccessed),
+    HasLastBackup (lastBackup),
+    HasMainDescriptorTree (mainDescriptorTree),
+    HasNewDescriptorText (newDescriptorText),
+    HasNewFileText (newFileText),
+    HasProgramConfig (programConfig),
+    HasProgramVisibility (programVisibility),
+    HasQueryCriteria (queryCriteria),
+    HasQueryText (queryText),
+    HasRenameDescriptorFrom (renameDescriptorFrom),
+    HasRenameDescriptorTo (renameDescriptorTo),
+    HasRepresentativeFile (representativeFile),
+    HasSelectionDetailsOrdering (selectionDetailsOrdering),
+    HasSetArithmetic (setArithmetic),
+    HasSingleFile (singleFile),
+    HasSingleFileModel (singleFileModel),
+    HasTagCounts (tagCounts),
+    HasTaggingMode (taggingMode),
+    HasTagsString (tagsString),
+    HasUnrelatedDescriptorTree (unrelatedDescriptorTree),
+    Intersectable (diffBy, intersectBy, unionBy),
+    OrderingMode (OrderingMode),
+    ProgramVisibility (Main),
+    SingleFileEvent (..),
+    TaggedConnection (TaggedConnection),
+    TaggedConnectionEvent (..),
+    TaggerEvent (..),
+    TaggerModel,
+    dbconf,
+    dbconfAutoConnect,
+    dbconfBackup,
+    dbconfInit,
+    dbconfPath,
+    isUntagMode,
+    rootName,
+    rootTree,
+    selectionBufferSize,
+    selectionconf,
+    shellCmd,
+  )
+import Util.Core (head', hoistMaybe, maybeWithList, (!++))
 
 doSetAction ::
-  FileSetArithmetic ->
-  [FileWithTags] ->
-  [FileWithTags] ->
-  [FileWithTags]
-doSetAction a s o =
-  case a of
-    Union -> s `fwtUnion` o
-    Intersect -> s `fwtIntersect` o
-    Diff -> s `fwtDiff` o
-
-doSetAction' ::
   Intersectable l =>
   FileSetArithmetic ->
   (a -> a -> Bool) ->
   l a ->
   l a ->
   l a
-doSetAction' a f = case a of
+doSetAction a f = case a of
   Union -> unionBy f
   Intersect -> intersectBy f
   Diff -> diffBy f
@@ -83,7 +158,7 @@ descriptorTreeEventHandler ::
   TaggerModel ->
   DescriptorEvent ->
   [AppEventResponse TaggerModel TaggerEvent]
-descriptorTreeEventHandler wenv node model event =
+descriptorTreeEventHandler _ _ model event =
   case event of
     DescriptorTreePut mLens toPut ->
       [ model *~ (descriptorModel . mLens . rootTree) .~ toPut
@@ -155,9 +230,9 @@ descriptorTreeEventHandler wenv node model event =
           (\c -> createRepresentative c f d Nothing)
           (model ^. dbConn)
       ]
-
-maybeM_ :: Monad m => (a -> m ()) -> Maybe a -> m ()
-maybeM_ = M.maybe (pure ())
+  where
+    maybeM_ :: Monad m => (a -> m ()) -> Maybe a -> m ()
+    maybeM_ = M.maybe (pure ())
 
 singleFileEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -165,7 +240,7 @@ singleFileEventHandler ::
   TaggerModel ->
   SingleFileEvent ->
   [AppEventResponse TaggerModel TaggerEvent]
-singleFileEventHandler wenv node model event =
+singleFileEventHandler _ _ model event =
   case event of
     SingleFilePut fwt ->
       [ model *~ (singleFileModel . singleFile) .~ Just fwt,
@@ -226,7 +301,7 @@ configurationEventHandler ::
   TaggerModel ->
   ConfigurationEvent ->
   [AppEventResponse TaggerModel TaggerEvent]
-configurationEventHandler wenv node model event =
+configurationEventHandler _ _ model event =
   case event of
     ExportAll -> [Task (IOEvent <$> exportConfig (model ^. programConfig))]
 
@@ -236,11 +311,11 @@ fileSelectionEventHandler ::
   TaggerModel ->
   FileSelectionEvent ->
   [AppEventResponse TaggerModel TaggerEvent]
-fileSelectionEventHandler wenv node model event =
+fileSelectionEventHandler _ _ model event =
   case event of
     FileSelectionUpdate fwts ->
       [ model *~ (fileSelectionModel . fileSelection)
-          .~ ( doSetAction'
+          .~ ( doSetAction
                  (model ^. (fileSelectionModel . setArithmetic))
                  fwtFileEqual
                  (model ^. (fileSelectionModel . fileSelection))
@@ -350,7 +425,7 @@ taggedConnectionEventHandler ::
   TaggerModel ->
   TaggedConnectionEvent ->
   [AppEventResponse TaggerModel TaggerEvent]
-taggedConnectionEventHandler wenv node model event =
+taggedConnectionEventHandler _ _ model event =
   case event of
     TaggedConnectionPutLastAccess t -> [model *~ dbConn . lastAccessed .~ t]
     TaggedConnectionPutLastBackup t -> [model *~ dbConn . lastBackup .~ t]
@@ -560,12 +635,6 @@ infixl 3 *~
 
 (*~) :: a -> (a -> s) -> EventResponse s e sp ep
 m *~ a = Model $ m & a
-
--- | Replaces "%file" in the first list with the entirety of the second.
-putFileArgs :: [String] -> [String] -> [String]
-putFileArgs args files =
-  let !atFileArg = L.break (L.isInfixOf "%file") args
-   in fst atFileArg ++ files ++ (tail' . snd $ atFileArg)
 
 asyncEvent :: e -> EventResponse s e sp ep
 asyncEvent = Task . flip (<$) emptyM

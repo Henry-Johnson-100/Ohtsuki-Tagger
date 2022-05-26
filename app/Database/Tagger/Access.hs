@@ -35,12 +35,7 @@ module Database.Tagger.Access
     fromDatabaseFileWithTags,
     getRepresentative,
     getDescriptorOccurrenceMap,
-    lookupFileWithTagsByInfraRelation,
-    lookupFileWithTagsByFilePattern',
-    lookupFileWithTagsByDescriptorPattern,
-    lookupFileWithTagsByDescriptorId',
     lookupFileWithTagsByFileId',
-    lookupFileWithTagsBySubTagDescriptorText,
     lookupTagLike,
     lookupDescriptorPattern,
     hoistMaybe,
@@ -57,22 +52,20 @@ module Database.Tagger.Access
   )
 where
 
-import Control.Monad (unless, when, (<=<), (>=>))
+import Control.Monad (unless, when, (>=>))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Maybe (MaybeT (..))
 import qualified Data.HashSet as HashSet
 import qualified Data.IntMap.Strict as IntMap
-import Data.List (foldl', foldl1', isPrefixOf, isSuffixOf)
+import Data.List (foldl', isPrefixOf, isSuffixOf)
 import qualified Data.List as L
-import Data.Maybe (catMaybes, fromJust, fromMaybe, maybe)
-import Data.String
+import Data.Maybe (catMaybes)
+import Data.String (IsString (fromString))
 import qualified Data.Text as T
 import Database.SQLite.Simple
   ( Connection,
-    FromRow,
     Only (Only),
     Query (fromQuery),
-    SQLData (SQLInteger, SQLNull),
     execute,
     executeMany,
     execute_,
@@ -96,7 +89,7 @@ import Database.Tagger.Type
     MetaDescriptor (MetaDescriptor),
     QueryRequiring,
     Representative (Representative, repDescription),
-    Tag (Tag, tagDescriptor),
+    Tag (Tag),
     TagKey,
     TagNoId (TagNoId),
     TagPtr (..),
@@ -104,12 +97,10 @@ import Database.Tagger.Type
     databaseFileWithTagsFileKey,
     databaseFileWithTagsTagKeys,
     descriptorTreeElem,
-    flattenTree,
     insertIntoDescriptorTree,
   )
-import Event.Parser (PseudoDescriptor (PDescriptor), PseudoSubTag, pseudoDescriptorText)
+import Event.Parser (PseudoDescriptor (PDescriptor))
 import IO (hPutStrLn, stderr)
-import Type.Model
 import Util.Core (OccurrenceMap, head', hoistMaybe, (!++))
 
 -- | A literal WHERE clause, leaving out "WHERE"
@@ -125,9 +116,6 @@ debug# = False
 errout# :: String -> IO ()
 errout# = when debug# . hPutStrLn stderr
 
-erroutConcat# :: String -> String -> IO ()
-erroutConcat# loc msg = errout# $ loc ++ msg
-
 liftErroutConcat# :: MonadTrans t => String -> String -> t IO ()
 liftErroutConcat# loc msg = lift . errout# $ loc ++ msg
 
@@ -138,7 +126,7 @@ activateForeignKeyPragma c = execute_ c "PRAGMA foreign_keys = on"
 -- Performs no checking of the validity of a path.
 addFile :: Connection -> T.Text -> IO File
 addFile c f = do
-  r <-
+  _ <-
     execute
       c
       "INSERT INTO File (filePath) VALUES (?)"
@@ -248,7 +236,7 @@ deleteDescriptor c d = do
     (*#) $ "in deleteDescriptor: found unrelated " ++ show unrelatedDescriptor
     infraRelations <- fetchInfraDescriptors c . descriptorId $ d
     (*#) $ "in deleteDescriptor: found infra relations: " ++ show infraRelations
-    runMaybeT . mapM_ (unrelate c . descriptorId) $ infraRelations
+    _ <- runMaybeT . mapM_ (unrelate c . descriptorId) $ infraRelations
     (*#) "in deleteDescriptor: unrelated infra relations"
     execute c "DELETE FROM Descriptor WHERE id = ?" [descriptorId d]
 
@@ -276,16 +264,16 @@ relate c md =
         )
       return ()
 
-deleteWhereIsInfraRelated :: Connection -> DescriptorKey -> IO ()
-deleteWhereIsInfraRelated c =
-  execute c "DELETE FROM MetaDescriptor WHERE infraDescriptorId = ?" . Only
+-- deleteWhereIsInfraRelated :: Connection -> DescriptorKey -> IO ()
+-- deleteWhereIsInfraRelated c =
+--   execute c "DELETE FROM MetaDescriptor WHERE infraDescriptorId = ?" . Only
 
 -- | Delete all relations where a given key appears as infra (should only be 1)
 -- And relate it to #UNRELATED#
 unrelate :: Connection -> DescriptorKey -> MaybeT IO ()
 unrelate c dk = do
   unrelatedDescriptor <- getUnrelatedDescriptor c
-  result <- lift $ execute c "DELETE FROM MetaDescriptor WHERE infraDescriptorId = ?" [dk]
+  _ <- lift $ execute c "DELETE FROM MetaDescriptor WHERE infraDescriptorId = ?" [dk]
   relate c (MetaDescriptor (descriptorId unrelatedDescriptor) dk)
 
 fetchMetaTree :: Connection -> DescriptorKey -> MaybeT IO DescriptorTree
@@ -346,60 +334,6 @@ getsUntaggedFileWithTags c = do
       \WHERE t.descriptorId IS NULL"
   return . map (`FileWithTags` HashSet.empty) $ r
 
-lookupUntaggedFileWithTags :: Connection -> IO [DatabaseFileWithTags]
-lookupUntaggedFileWithTags c = do
-  r <-
-    query_
-      c
-      "SELECT f.id, NULL \
-      \FROM File f \
-      \  LEFT JOIN Tag t \
-      \    ON f.id = t.fileId \
-      \WHERE t.descriptorId IS NULL" ::
-      IO [DatabaseFileWithTags]
-  return . reduceDbFwtList $ r
-
-lookupFileWithTagsByInfraRelation ::
-  Connection -> DescriptorKey -> IO [DatabaseFileWithTags]
-lookupFileWithTagsByInfraRelation c dk = do
-  relationTree <- runMaybeT . fetchInfraTree c $ dk
-  let maybeTags = map descriptorId . maybe [] flattenTree $ relationTree
-  fmap concat . mapM (lookupFileWithTagsByDescriptorId' c) $ maybeTags
-
-lookupFileWithTagsByFilePattern' :: Connection -> T.Text -> IO [DatabaseFileWithTags]
-lookupFileWithTagsByFilePattern' c =
-  fmap concat . mapM (lookupFileWithTagsByFileId' c . fileId)
-    <=< lookupFilePattern c
-
-lookupFileWithTagsByDescriptorPattern :: Connection -> T.Text -> IO [DatabaseFileWithTags]
-lookupFileWithTagsByDescriptorPattern c =
-  fmap concat . mapM (lookupFileWithTagsByDescriptorId' c . descriptorId)
-    <=< lookupDescriptorPattern c
-
-lookupFileWithTagsByDescriptorId' ::
-  Connection -> DescriptorKey -> IO [DatabaseFileWithTags]
-lookupFileWithTagsByDescriptorId' c dk = do
-  r <-
-    query
-      c
-      "SELECT f.id, NULL \
-      \FROM Tag t \
-      \  JOIN File f \
-      \    ON f.id = t.fileId \
-      \WHERE t.descriptorId = ? \
-      \ORDER BY f.filePath"
-      [dk] ::
-      IO [DatabaseFileWithTags]
-  r' <-
-    fmap concat
-      . mapM
-        ( lookupFileWithTagsByFileId' c
-            . databaseFileWithTagsFileKey
-        )
-      . reduceDbFwtList
-      $ r
-  return . reduceDbFwtList $ r'
-
 lookupFileWithTagsByFileId' :: Connection -> FileKey -> IO [DatabaseFileWithTags]
 lookupFileWithTagsByFileId' c fk = do
   r <-
@@ -423,53 +357,6 @@ lookupDescriptorPattern conn p = do
       "SELECT id, descriptor \
       \FROM Descriptor \
       \WHERE descriptor LIKE ?"
-      [p]
-  return r
-
--- | A pretty naive function for querying by textual subtags.
---
--- Finds the set of fwt's that has the main tag and intersects it with the set of fwt's
--- that has the sub tag.
-lookupFileWithTagsBySubTagDescriptorText ::
-  Connection ->
-  T.Text ->
-  T.Text ->
-  IO [DatabaseFileWithTags]
-lookupFileWithTagsBySubTagDescriptorText c mainDes subDes = do
-  mainTags <- lookupTagWithDescriptorText mainDes
-  let ts = (,) <$> map (\(Tag_ tk _ _ _) -> tk) mainTags <*> [subDes]
-  subTagPtrs <- fmap concat . mapM lookupSubTag $ ts
-  fmap concat . mapM (lookupFileWithTagsByFileId' c . (\(Tag_ _ fk _ _) -> fk)) $
-    subTagPtrs
-  where
-    lookupTagWithDescriptorText :: T.Text -> IO [TagPtr]
-    lookupTagWithDescriptorText =
-      query
-        c
-        "SELECT t.id, t.fileId, t.descriptorId, t.subTagOfId \
-        \FROM Tag t \
-        \  JOIN Descriptor d \
-        \    ON t.descriptorId = d.id \
-        \WHERE d.descriptor LIKE ?"
-        . Only
-    lookupSubTag :: (TagKey, T.Text) -> IO [TagPtr]
-    lookupSubTag =
-      query
-        c
-        "SELECT t.id, t.fileId, t.descriptorId, t.subTagOfId \
-        \FROM Tag t \
-        \  JOIN Descriptor d \
-        \    ON t.descriptorId = d.id \
-        \WHERE t.subTagOfId = ? AND d.descriptor LIKE ?"
-
-lookupFilePattern :: Connection -> T.Text -> IO [File]
-lookupFilePattern conn p = do
-  r <-
-    query
-      conn
-      "SELECT id, filePath \
-      \FROM File \
-      \WHERE filePath LIKE ?"
       [p]
   return r
 
@@ -645,19 +532,6 @@ derefDatabaseFileWithTags c (CollectedDatabaseFileWithTags dbfwt) = do
 
 keysToLiteralSQLList :: [Int] -> Query
 keysToLiteralSQLList ks = fromString $ "(" ++ (L.intercalate ", " . map show) ks ++ ")"
-
-{-
-  ____ _____ _____
- / ___| ____|_   _|
-| |  _|  _|   | |
-| |_| | |___  | |
- \____|_____| |_|
-
-Get functions take some primitive db value, either a key or link type like Tag
- and return a single MaybeT IO a of another primitive db value.
-
-Gets functions take a list of primitive values and return IO [a] of another value.
--}
 
 getDescriptor :: Connection -> DescriptorKey -> MaybeT IO Descriptor
 getDescriptor c did = do

@@ -3,8 +3,8 @@
 {-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Use <$>" #-}
+{-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
 module Event.Parser
   ( PseudoDescriptor (..),
@@ -24,7 +24,6 @@ module Event.Parser
   )
 where
 
-import qualified Data.Maybe as M
 import qualified Data.Text as T
 import Text.Parsec
   ( ParseError,
@@ -135,9 +134,6 @@ diffParser = do
   char '|'
   return . ALiteral $ Diff
 
-noSetArithmeticLiteralParser :: TextFieldParser SetArithmeticLiteral
-noSetArithmeticLiteralParser = return ANoLiteral
-
 queryCriteriaParser :: TextFieldParser QueryCriteriaLiteral
 queryCriteriaParser =
   try
@@ -167,10 +163,6 @@ byPatternParser = do
 
 noQueryCriteriaLiteralParser :: TextFieldParser QueryCriteriaLiteral
 noQueryCriteriaLiteralParser = return CNoLiteral
-
-{-
-t.otsuki_yui {r.gym_clothes p.%yui_otsuki% } u| r.machikado_mazoku_characters {t.smile} d| lilith_statue
--}
 
 querySectionParser ::
   TextFieldParser [QuerySection [SubList (QueryToken PseudoDescriptor)]]

@@ -18,10 +18,9 @@ module Type.BufferList
 where
 
 import Control.Lens (Lens', lens)
-import Control.Lens.TH (makeLenses)
 import qualified Data.List as L
-import IO
-import Util.Core
+import IO (initStdGen, shuffle')
+import Util.Core (head', init', last', tail')
 
 class Cycleable c where
   -- | Take the head item and move it to the back
@@ -101,7 +100,7 @@ instance Cycleable [] where
   cDequeue xs = maybe [] (\x -> x : init' xs) . last' $ xs
   cHead = head'
   cTail [] = Nothing
-  cTail (x : xs) = Just xs
+  cTail (_ : xs) = Just xs
   cCollect = id
   cFromList = id
 
@@ -125,8 +124,8 @@ instance Cycleable BufferList where
   cHead (BufferList bs xs) = head' $ if null bs then xs else bs
 
   cTail (BufferList [] []) = Nothing
-  cTail (BufferList [] (x : xs)) = Just (BufferList [] xs)
-  cTail (BufferList (b : bs) xs) = Just (BufferList bs xs)
+  cTail (BufferList [] (_ : xs)) = Just (BufferList [] xs)
+  cTail (BufferList (_ : bs) xs) = Just (BufferList bs xs)
 
   cCollect = _totalList
 

@@ -46,20 +46,15 @@ module Database.Tagger.Type
 where
 
 import Control.Monad
-import qualified Control.Monad
 import qualified Control.Monad.Trans.Class as Trans
 import Control.Monad.Trans.Maybe (MaybeT (MaybeT, runMaybeT))
 import qualified Data.HashSet as HashSet
 import qualified Data.Hashable as H
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as L
-import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as M
 import qualified Data.Text as T
-import Database.SQLite.Simple (FromRow (..), Query, ToRow (..), field)
-import qualified Database.SQLite.Simple.FromField as FromField
-import qualified Database.SQLite.Simple.FromRow as FromRow
-import qualified Database.SQLite.Simple.ToField as ToField
+import Database.SQLite.Simple (FromRow (..), Query, field)
 import qualified GHC.Generics as Generics
 import qualified IO
 import Util.Core (PrimaryKey (getId))
@@ -194,7 +189,7 @@ tagSetToTagMap ts =
 
 -- | Probably close to O(n) in the given TagSet
 tagSetToSubTagMap :: TagSet -> TagMap -> SubTagMap
-tagSetToSubTagMap ts tm =
+tagSetToSubTagMap ts _ =
   HashSet.foldl'
     ( \im t ->
         maybe
@@ -323,7 +318,7 @@ instance Ord DescriptorTree where
     case trb of
       NullTree -> True
       Infra db -> (not . null) cs || d <= db
-      Meta db csb -> d <= db
+      Meta db _ -> d <= db
 
 sortChildren :: DescriptorTree -> DescriptorTree
 sortChildren tr =
@@ -341,8 +336,8 @@ insertIntoDescriptorTree mt it =
 descriptorTreeChildren :: DescriptorTree -> [DescriptorTree]
 descriptorTreeChildren tr =
   case tr of
-    Infra mk -> []
-    Meta mk cs -> cs
+    Infra _ -> []
+    Meta _ cs -> cs
     NullTree -> []
 
 descriptorTreeElem :: Descriptor -> DescriptorTree -> Bool

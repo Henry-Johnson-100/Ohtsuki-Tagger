@@ -10,19 +10,193 @@
 
 module Node.Micro where
 
-import Control.Lens
+import Control.Lens ((^.))
 import qualified Data.HashSet as HashSet
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as L
 import qualified Data.Maybe as M
 import qualified Data.Text as T
 import Database.Tagger.Type
+  ( Descriptor (descriptor, descriptorId),
+    DescriptorTree (..),
+    File (filePath),
+    FileWithTags (file, tags),
+    Representative (repDescriptorId, repFileId),
+    SubTagMap,
+    Tag (tagDescriptor, tagId),
+    getNode,
+    isSubTag,
+    sortChildren,
+    tagSetToTagMapTuple,
+  )
 import Monomer
-import Node.Color
-import Type.BufferList
-import Type.Config
+  ( CmbAlignBottom (alignBottom),
+    CmbAlignCenter (alignCenter),
+    CmbAlignLeft (alignLeft),
+    CmbAlignMiddle (alignMiddle),
+    CmbAlignTop (alignTop),
+    CmbBgColor (bgColor),
+    CmbBorder (border),
+    CmbBorderL (borderL),
+    CmbEllipsis (ellipsis),
+    CmbFitHeight (fitHeight),
+    CmbMaxHeight (maxHeight),
+    CmbMaxWidth (maxWidth),
+    CmbMinHeight (minHeight),
+    CmbPadding (padding),
+    CmbPaddingL (paddingL),
+    CmbRangeWidth (rangeWidth),
+    CmbStyleBasic (styleBasic),
+    CmbStyleHover (styleHover),
+    CmbTextColor (textColor),
+    CmbTextFont (textFont),
+    CmbTextLeft (textLeft),
+    CmbTextSize (textSize),
+    CmbWheelRate (wheelRate),
+    Color (Color),
+    StyleState,
+    WidgetEvent,
+    WidgetModel,
+    WidgetNode,
+    black,
+    blue,
+    box,
+    box_,
+    button,
+    draggable,
+    draggable_,
+    dropTarget,
+    dropTargetStyle,
+    dropTarget_,
+    dropdown,
+    hgrid_,
+    hstack,
+    hstack_,
+    image_,
+    keystroke,
+    keystroke_,
+    label,
+    label_,
+    labeledCheckbox,
+    lightGray,
+    nodeVisible,
+    numericField,
+    scroll_,
+    separatorLine,
+    spacer,
+    splitIgnoreChildResize,
+    textField,
+    textField_,
+    tooltipDelay,
+    tooltip_,
+    vscroll_,
+    vsplit,
+    vsplit_,
+    vstack,
+    vstack_,
+    white,
+  )
+import Node.Color (yuiBlue, yuiOrange, yuiYellow)
+import Type.BufferList (Cycleable (cCollect))
+import Type.Config (DescriptorTreeConfig, TaggerConfig)
 import Type.Model
+  ( ConfigurationEvent (ExportAll),
+    DescriptorEvent
+      ( DescriptorTreePutParent,
+        RefreshDescriptorTree,
+        RenameDescriptor,
+        RepresentativeCreate,
+        RepresentativeFileLookup,
+        RequestDescriptorTree
+      ),
+    Down (Down),
+    FileSelectionEvent
+      ( CycleInSelectionOrderingBy,
+        FileSelectionClear,
+        FileSelectionCommitQueryText,
+        FileSelectionShuffle,
+        FileSelectionUpdate,
+        FlipInSelectionOrdering,
+        LazyBufferFlush,
+        LazyBufferLoad,
+        LazyBufferLoadAll
+      ),
+    FileSetArithmetic (Diff, Intersect, Union),
+    HasDescriptorModel (descriptorModel),
+    HasDoSoloTag (doSoloTag),
+    HasFileSelection (fileSelection),
+    HasFileSelectionModel (fileSelectionModel),
+    HasMainDescriptorTree (mainDescriptorTree),
+    HasNewDescriptorText (..),
+    HasNewFileText (..),
+    HasProgramConfig (..),
+    HasQueryCriteria (queryCriteria),
+    HasQueryText (queryText),
+    HasRenameDescriptorFrom (renameDescriptorFrom),
+    HasRenameDescriptorTo (renameDescriptorTo),
+    HasSelectionDetailsOrdering (selectionDetailsOrdering),
+    HasSetArithmetic (setArithmetic),
+    HasSingleFile (singleFile),
+    HasSingleFileModel (singleFileModel),
+    HasTagCounts (tagCounts),
+    HasTaggingMode (..),
+    HasTagsString (tagsString),
+    HasUnrelatedDescriptorTree (unrelatedDescriptorTree),
+    Intersectable (union),
+    OrdDirection (Asc),
+    OrderingBy (..),
+    OrderingMode (..),
+    ProgramVisibility
+      ( Config,
+        Database,
+        ProgramVisibilityDescriptor,
+        Selection
+      ),
+    QueryCriteria (ByPattern, ByRelation, ByTag, ByUntagged),
+    SingleFileEvent
+      ( SingleFileAssociateTag,
+        SingleFileNextFromFileSelection,
+        SingleFilePrevFromFileSelection,
+        SingleFilePut,
+        SingleFileUntag
+      ),
+    TaggerEvent
+      ( DatabaseBackup,
+        DatabaseConnect,
+        DatabaseInitialize,
+        DescriptorCommitNewDescriptorText,
+        DescriptorCreateRelation,
+        DescriptorDelete,
+        DescriptorUnrelate,
+        DoConfigurationEvent,
+        DoDescriptorEvent,
+        DoFileSelectionEvent,
+        DoSingleFileEvent,
+        DropTargetAppendText_,
+        IOEvent,
+        NewFileTextCommit,
+        ShellCmd,
+        TagCommitTagsString,
+        ToggleVisibilityMode
+      ),
+    TaggerModel,
+    TaggingMode (..),
+    dbconf,
+    dbconfAutoConnect,
+    dbconfBackup,
+    dbconfPath,
+    descriptorTreeConf,
+    descriptorTreeMainRequest,
+    selectionBufferSize,
+    selectionDisplayParents,
+    selectionconf,
+    shellCmd,
+  )
 import Util.Core
+  ( OccurrenceMap,
+    PrimaryKey (decodeOccurrencesWith, foldOccurrences),
+    (!++),
+  )
 
 type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
@@ -435,7 +609,7 @@ generalDescriptorTreeWidget ::
   (Descriptor -> WidgetNode TaggerModel TaggerEvent) ->
   DescriptorTreeConfig ->
   WidgetNode TaggerModel TaggerEvent
-generalDescriptorTreeWidget tr bs dAction dtrConf =
+generalDescriptorTreeWidget tr bs dAction _ =
   flip styleBasic [border 1 black] . box_ [alignTop, alignLeft] $
     hstack_
       []

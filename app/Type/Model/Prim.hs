@@ -39,17 +39,27 @@ module Type.Model.Prim
   )
 where
 
-import Control.Lens
-import Control.Monad
+import Control.Lens (Lens')
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as L
 import qualified Data.Ord as O
 import Data.Text (Text)
 import Database.SQLite.Simple (Connection)
 import Database.Tagger.Type
+  ( Descriptor,
+    DescriptorTree (NullTree),
+    File,
+    FileWithTags,
+    Representative,
+    Tag,
+  )
 import Type.BufferList
-import Type.Config
-import Util.Core
+  ( BufferList (BufferList),
+    Cycleable (cCollect, cFromList),
+    emptyBufferList,
+  )
+import Type.Config (TaggerConfig)
+import Util.Core (OccurrenceMap)
 
 data TaggerModel = TaggerModel
   { _taggerFileSelectionModel :: !FileSelectionModel,
@@ -119,7 +129,7 @@ instance Show Connection where
   show _ = "Sqlite Connection"
 
 instance Eq Connection where
-  x == y = True
+  _ == _ = True
 
 data TaggedConnection = TaggedConnection
   { _taggedconnectionConnName :: !Text,
