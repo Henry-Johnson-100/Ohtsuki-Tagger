@@ -108,7 +108,10 @@ import Util.Core (head', tail')
 
 type ConnString = String
 
-newtype TaskException = TaskException String deriving (Show, Eq)
+newtype TaskException = TaskException String deriving (Eq)
+
+instance Show TaskException where
+  show (TaskException msg) = "Task exception: " ++ msg
 
 instance Exception TaskException where
   liftEx = TaskException

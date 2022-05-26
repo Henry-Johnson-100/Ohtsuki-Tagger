@@ -24,6 +24,7 @@ import Control.Monad.Trans.Except
     throwE,
     withExceptT,
   )
+import Control.Monad.Trans.Maybe
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Text as T
 import Data.Time (getCurrentTime)
@@ -61,6 +62,11 @@ instance Exception String where
 
 guardException :: (Monad m, Exception e) => String -> Bool -> ExceptT e m ()
 guardException msg b = unless b $ throwE . liftEx $ msg
+
+maybeException :: (Monad m, Exception e) => String -> MaybeT m a -> ExceptT e m a
+maybeException msg m = do
+  x <- lift . runMaybeT $ m
+  maybe (throwE . liftEx $ msg) return x
 
 validateFilePath :: FilePath -> ExceptT ConfigException IO FilePath
 validateFilePath p = do

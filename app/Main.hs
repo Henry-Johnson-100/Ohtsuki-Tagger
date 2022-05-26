@@ -12,7 +12,6 @@ module Main where
 import Control.Lens ((^.))
 import Control.Monad
 import Control.Monad.Trans.Except (runExceptT)
-import Data.Maybe (fromJust)
 import qualified Data.Text as T
 import Database.SQLite.Simple (close, open)
 import Event.CLI
@@ -88,20 +87,15 @@ main = do
   let configExcept = getConfig configPath
   try' configExcept $ \config -> do
     rawArgs <- getArgs
-    let opts@(TaggerOpts fls _ _) = getTaggerOpt rawArgs
+    let opts = getTaggerOpt rawArgs
     hasOptErrors <- showOptErrors opts
     unless hasOptErrors $ do
       if nullOpts opts
         then do
           runTaggerWindow config
         else do
-          when (Version `elem` fls) (putStrLn taggerVersion)
-          when
-            (hasQueryFlag opts)
-            ( do
-                c <- open . T.unpack $ config ^. dbconf . dbconfPath
-                cliQuery c . fromJust . getQuery $ opts
-                close c
-            )
+          c <- open . T.unpack $ config ^. dbconf . dbconfPath
+          runOpt c . last . optionArguments $ opts
+          close c
   where
     try' e c = runExceptT e >>= either (hPutStrLn stderr) c

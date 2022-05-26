@@ -28,6 +28,7 @@ data TaggerOpts = TaggerOpts
 data CLIFlag
   = Version
   | Query !String
+  | Move !String
   deriving (Show, Eq)
 
 cliFlags :: [IO.OptDescr CLIFlag]
@@ -44,5 +45,12 @@ cliFlags =
       "Query the database using TaggerQL and \
       \a list of file paths. \
       \Implicit query criteria tokens default to 'Tag'.\n\
-      \Ex. \"otsuki_yui {r.cute} d| r.season i| sweater\""
+      \Ex. \"otsuki_yui {r.cute} d| r.season i| sweater\"",
+    IO.Option
+      ['m']
+      ["move"]
+      (IO.ReqArg Move "MOVE")
+      "Move/rename a file in both the database and filesystem. \
+      \The renaming will fail in the event that file does not exist in either the \
+      \database or filesystem."
   ]
