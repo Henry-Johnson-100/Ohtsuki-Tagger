@@ -9,7 +9,12 @@ type ColorMap = Map String Color
 newMap :: [Color] -> ColorMap
 newMap xs =
   fromList [("Color_black", black), ("Color_white", white)]
-    <> (fromList . zipWith (\cix color -> ("Color_" ++ show cix, color)) [2 ..] $ xs)
+    <> ( fromList
+           . zipWith
+             (\cix color -> ("Color_" ++ show cix, color))
+             [2 :: Integer ..]
+           $ xs
+       )
 
 yuiMap :: ColorMap
 yuiMap =

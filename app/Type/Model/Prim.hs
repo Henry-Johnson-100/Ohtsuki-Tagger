@@ -27,7 +27,7 @@ module Type.Model.Prim
     Cyclic (..),
     Listable (..),
     Intersectable (..),
-    DescriptorModelTreeLens (..),
+    DescriptorModelTreeLens,
     OrderingBy (..),
     OrdDirection (..),
     OrderingMode (..),

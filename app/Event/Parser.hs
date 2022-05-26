@@ -8,8 +8,8 @@
 
 module Event.Parser
   ( PseudoDescriptor (..),
-    PseudoSubTag (..),
-    ParseError (..),
+    PseudoSubTag,
+    ParseError,
     QuerySection (..),
     QueryToken (..),
     SetArithmeticLiteral (..),

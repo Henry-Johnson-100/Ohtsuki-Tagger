@@ -622,10 +622,10 @@ generalDescriptorTreeWidget tr bs dAction _ =
       DescriptorTree ->
       (Descriptor -> WidgetNode TaggerModel TaggerEvent) ->
       WidgetNode TaggerModel TaggerEvent
-    descriptorTreeWidget tr dAction =
+    descriptorTreeWidget descriptorTreeWidgetTr descriptorTreeWidgetDAction =
       box . stdScroll . flip styleBasic [textFont "Regular"]
-        . buildTreeWidget dAction
-        $ tr
+        . buildTreeWidget descriptorTreeWidgetDAction
+        $ descriptorTreeWidgetTr
       where
         buildTreeWidget ::
           (Descriptor -> WidgetNode TaggerModel TaggerEvent) ->
@@ -639,8 +639,8 @@ generalDescriptorTreeWidget tr bs dAction _ =
               (Descriptor -> WidgetNode TaggerModel TaggerEvent) ->
               DescriptorTree ->
               WidgetNode TaggerModel TaggerEvent
-            buildTreeWidgetAccum l acc action tr =
-              case tr of
+            buildTreeWidgetAccum l acc buildTreeWidgetAccumAction buildTreeWidgetAccumTr =
+              case buildTreeWidgetAccumTr of
                 NullTree -> acc
                 Infra d ->
                   vstack
@@ -649,7 +649,7 @@ generalDescriptorTreeWidget tr bs dAction _ =
                         black
                         l
                         d
-                        action
+                        buildTreeWidgetAccumAction
                     ]
                 Meta d cs ->
                   appendVStack
@@ -660,7 +660,7 @@ generalDescriptorTreeWidget tr bs dAction _ =
                                 yuiBlue
                                 l
                                 d
-                                action
+                                buildTreeWidgetAccumAction
                             ]
                         ]
                     )
@@ -673,13 +673,13 @@ generalDescriptorTreeWidget tr bs dAction _ =
                                     black
                                     (l + 1)
                                     d'
-                                    action
+                                    buildTreeWidgetAccumAction
                                 Meta d' _ ->
                                   treeLeafDescriptorWidget
                                     yuiBlue
                                     (l + 1)
                                     d'
-                                    action
+                                    buildTreeWidgetAccumAction
                                 NullTree ->
                                   spacer
                                     `styleBasic` [padding 0, border 0 white]

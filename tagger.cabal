@@ -47,15 +47,7 @@ executable tagger
                       ,TupleSections
 
   ghc-options:         -threaded
-                      -Wunused-binds
-                      -Wunused-do-bind
-                      -Wunused-foralls
-                      -Wunused-imports
-                      -Wunused-local-binds
-                      -Wunused-matches
-                      -Wunused-pattern-binds
-                      -Wunused-top-binds
-                      -Wunused-type-patterns
+                       -Wall
 
   build-depends:       base ^>=4.13.0.0
                       ,monomer == 1.4.1.0

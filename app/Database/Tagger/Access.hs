@@ -7,9 +7,9 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Database.Tagger.Access
-  ( Connection (..),
-    FileKey (..),
-    DescriptorKey (..),
+  ( Connection,
+    FileKey,
+    DescriptorKey,
     addFile,
     addDescriptor,
     addRepresentative,

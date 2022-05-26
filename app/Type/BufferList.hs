@@ -79,7 +79,7 @@ shuffleBufferList (BufferList bs xs) = do
   return $ BufferList bsh xsh
   where
     shuffle'' [] = pure []
-    shuffle'' xs = initStdGen >>= return . shuffle' xs (length xs)
+    shuffle'' xs' = initStdGen >>= return . shuffle' xs' (length xs')
 
 instance Foldable BufferList where
   foldr f a = foldr f a . cCollect
