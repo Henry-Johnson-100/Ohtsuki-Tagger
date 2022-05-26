@@ -584,14 +584,14 @@ taggerEventHandler wenv node model event =
             newConnInstance <- open newConnTag
             activateForeignKeyPragma newConnInstance
             IO.updateTaggerDBInfo newConnInstance
-            lastAccessed <- IO.getLastAccessDateTime newConnInstance
-            lastBackup <- IO.getLastBackupDateTime newConnInstance
+            lastAccessedDT <- IO.getLastAccessDateTime newConnInstance
+            lastBackupDT <- IO.getLastBackupDateTime newConnInstance
             return $
               TaggedConnection
                 (T.pack newConnName)
                 (Just newConnInstance)
-                lastAccessed
-                lastBackup
+                lastAccessedDT
+                lastBackupDT
       ]
         ++ ( asyncEvent . DoDescriptorEvent
                <$> [ RefreshDescriptorTree mainDescriptorTree,

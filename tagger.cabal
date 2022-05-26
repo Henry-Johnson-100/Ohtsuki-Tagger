@@ -48,6 +48,7 @@ executable tagger
 
   ghc-options:         -threaded
                        -Wall
+                       -Wno-orphans
 
   build-depends:       base ^>=4.13.0.0
                       ,monomer == 1.4.1.0

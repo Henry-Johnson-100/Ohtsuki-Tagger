@@ -553,7 +553,7 @@ getUnrelatedDescriptor =
   lift . flip lookupDescriptorPattern "#UNRELATED#" >=> hoistMaybe . head'
 
 getRepresentative :: Connection -> DescriptorKey -> MaybeT IO Representative
-getRepresentative c descriptorId = do
+getRepresentative c dk = do
   r' <-
     lift $
       query
@@ -561,7 +561,7 @@ getRepresentative c descriptorId = do
         "SELECT repFileId, repDescriptorId, description \
         \FROM Representative \
         \WHERE repDescriptorId = ?"
-        [descriptorId] ::
+        [dk] ::
       MaybeT IO [(Int, Int, Maybe T.Text)]
   r <- hoistMaybe . head' $ r'
   rep <- do

@@ -379,10 +379,10 @@ getPathsToAdd p = do
     validated
   where
     returnDirContents :: String -> IO [T.Text]
-    returnDirContents p = do
+    returnDirContents dirPath = do
       cwd <- IO.getCurrentDirectory
-      IO.setCurrentDirectory p
-      dirContents <- IO.listDirectory p
+      IO.setCurrentDirectory dirPath
+      dirContents <- IO.listDirectory dirPath
       validatedPaths <- mapM (getPathsToAdd . T.pack) dirContents
       IO.setCurrentDirectory cwd
       return . concat $ validatedPaths
