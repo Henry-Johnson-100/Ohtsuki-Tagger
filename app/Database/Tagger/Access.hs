@@ -1,5 +1,6 @@
 {-# HLINT ignore "Redundant return" #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
@@ -49,6 +50,8 @@ module Database.Tagger.Access
     lookupFilesHavingSubTagRelationship,
     collectFileWithTagsByFileKey,
     derefDatabaseFileWithTags,
+    uniqueDatabaseFileExists,
+    renameDatabaseFile,
   )
 where
 
@@ -100,7 +103,7 @@ import Database.Tagger.Type
     insertIntoDescriptorTree,
   )
 import Event.Parser (PseudoDescriptor (PDescriptor))
-import IO (hPutStrLn, stderr)
+import IO (Exception (liftEx), hPutStrLn, stderr)
 import Util.Core (OccurrenceMap, head', hoistMaybe, (!++))
 
 -- | A literal WHERE clause, leaving out "WHERE"
@@ -109,6 +112,11 @@ newtype Where = Where Query deriving (Show, Eq)
 -- | A literal SELECT clause, leaving out "SELECT" and the "FROM" clause
 -- The FROM clause is set as a literal value in the CTE Query string.
 newtype Select = Select Query deriving (Show, Eq)
+
+newtype TaggerDBException = TaggerDBException String deriving (Show, Eq)
+
+instance Exception TaggerDBException where
+  liftEx = TaggerDBException
 
 debug# :: Bool
 debug# = False
@@ -212,6 +220,27 @@ renameDescriptor c d n =
     c
     "UPDATE Descriptor SET descriptor = ? WHERE id = ?"
     (n, descriptorId d)
+
+-- |
+-- Renames a file in the database.
+--
+-- Do not call this without also calling 'mv' on the file in the filesystem!
+renameDatabaseFile :: Connection -> FileKey -> T.Text -> IO ()
+renameDatabaseFile c fk t = execute c "UPDATE File SET filePath = ? WHERE id = ?" (t, fk)
+
+-- There is a use-case for exceptions in this module but this is not one of them.
+uniqueDatabaseFileExists ::
+  Connection ->
+  File ->
+  IO Bool
+uniqueDatabaseFileExists c (File fid fpath) = do
+  r <-
+    query
+      c
+      "SELECT id FROM File WHERE id = ? AND filePath = ?"
+      (fid, fpath) ::
+      IO [FileKey]
+  return . (==) 1 . length $ r
 
 -- | Delete a descriptor from Descriptor.
 -- Operates on (descriptorId :: Descriptor -> DescriptorKey)

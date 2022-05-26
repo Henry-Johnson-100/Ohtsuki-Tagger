@@ -1,4 +1,6 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module IO
@@ -48,6 +50,17 @@ import Type.Config (TaggerConfig, taggerConfigCodec)
 import Util.Core (head')
 
 type ConfigException = String
+
+class Show e => Exception e where
+  exMsg :: e -> String
+  exMsg = show
+  liftEx :: String -> e
+
+instance Exception String where
+  liftEx = id
+
+guardException :: (Monad m, Exception e) => String -> Bool -> ExceptT e m ()
+guardException msg b = unless b $ throwE . liftEx $ msg
 
 validateFilePath :: FilePath -> ExceptT ConfigException IO FilePath
 validateFilePath p = do
@@ -162,3 +175,9 @@ getLastBackupDateTime c = do
 
 taggerVersion :: String
 taggerVersion = Version.showVersion Paths_tagger.version
+
+renameFileSystemFile :: T.Text -> T.Text -> IO ()
+renameFileSystemFile p to = do
+  let pPath = T.unpack p
+      toPath = T.unpack to
+  renameFile pPath toPath

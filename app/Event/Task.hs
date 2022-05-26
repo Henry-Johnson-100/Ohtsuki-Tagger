@@ -9,6 +9,7 @@ module Event.Task where
 import Control.Applicative (Alternative (empty))
 import Control.Monad (unless, (<=<), (>=>))
 import Control.Monad.Trans.Class (MonadTrans (lift))
+import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
 import qualified Data.List as L
 import Data.Maybe (catMaybes, fromMaybe)
@@ -41,7 +42,9 @@ import Database.Tagger.Access
     lookupFilesHavingSubTagRelationship,
     lookupTagLike,
     relate,
+    renameDatabaseFile,
     renameDescriptor,
+    uniqueDatabaseFileExists,
     unrelate,
     updateRepresentativeText,
     updateTagSubTagOfId,
@@ -49,7 +52,7 @@ import Database.Tagger.Access
 import Database.Tagger.Type
   ( Descriptor (descriptorId),
     DescriptorTree (NullTree),
-    File (fileId),
+    File (File, fileId),
     FileWithTags (FileWithTags, file),
     MetaDescriptor (MetaDescriptor),
     Representative (Representative),
@@ -77,12 +80,18 @@ import Event.Parser
   )
 import IO
   ( CreateProcess (delegate_ctlc, new_session),
+    Exception (liftEx),
     createProcess,
+    doesDirectoryExist,
+    doesFileExist,
+    dropFileName,
     getConfigPath,
+    guardException,
     hGetContents,
     hPrint,
     hPutStrLn,
     proc,
+    renameFileSystemFile,
     stderr,
     stdout,
     waitForProcess,
@@ -98,6 +107,11 @@ import Type.Model
 import Util.Core (head', tail')
 
 type ConnString = String
+
+newtype TaskException = TaskException String deriving (Show, Eq)
+
+instance Exception TaskException where
+  liftEx = TaskException
 
 runQuery ::
   Connection ->
@@ -465,3 +479,26 @@ createNewDescriptors c ts = do
 
 deleteDescriptor :: Connection -> Descriptor -> IO ()
 deleteDescriptor = Database.Tagger.Access.deleteDescriptor
+
+renameTaggerFile :: Connection -> File -> T.Text -> ExceptT TaskException IO ()
+renameTaggerFile c f@(File fk p) to = do
+  let pPath = T.unpack p
+      toPath = T.unpack to
+  guardException ("Unique file, " ++ show f ++ " Not found in the database.")
+    <=< lift . uniqueDatabaseFileExists c
+    $ f
+  guardException ("File \"" ++ pPath ++ "\" does not exist.")
+    <=< lift . doesFileExist
+    $ pPath
+  guardException ("File with name \"" ++ toPath ++ "\" already exists.")
+    <=< fmap not . lift . doesFileExist
+    $ toPath
+  guardException
+    ( "The destination directory, \""
+        ++ dropFileName toPath
+        ++ "\" Does not exist."
+    )
+    <=< lift . doesDirectoryExist . dropFileName
+    $ toPath
+  lift $ renameDatabaseFile c fk to
+  lift $ renameFileSystemFile p to
