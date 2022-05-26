@@ -159,12 +159,13 @@ combineQueriedSection a qqs = L.foldl1' (combine a) qqs
       QuerySection [FileWithTags] ->
       QuerySection [FileWithTags] ->
       QuerySection [FileWithTags]
-    combine a (QuerySection _ sxs) (QuerySection ay sys) =
+    combine setArithmetic (QuerySection _ sxs) (QuerySection ay sys) =
       case ay of
-        ANoLiteral -> combine'' a ay sxs sys
-        ALiteral a' -> combine'' a' ay sxs sys
+        ANoLiteral -> combineIntersectable setArithmetic ay sxs sys
+        ALiteral fromLiteralSetArithmetic ->
+          combineIntersectable fromLiteralSetArithmetic ay sxs sys
       where
-        combine'' a'' aTo xs'' ys'' = QuerySection aTo $
+        combineIntersectable a'' aTo xs'' ys'' = QuerySection aTo $
           case a'' of
             Union -> unionBy fwtFileEqual xs'' ys''
             Intersect -> intersectBy fwtFileEqual xs'' ys''
@@ -207,17 +208,17 @@ queryWithQueryTokenSubList c qc (SubList h ts) = do
       QueryCriteria ->
       QueryToken PseudoDescriptor ->
       IO [DescriptorKey]
-    getDescriptorKeysFromLiteralPattern c qc qt@(QueryToken CNoLiteral _) =
-      getDescriptorKeysFromLiteralPattern c qc (qt {tokenCriteria = CLiteral qc})
+    getDescriptorKeysFromLiteralPattern c' qc' qt@(QueryToken CNoLiteral _) =
+      getDescriptorKeysFromLiteralPattern c' qc' (qt {tokenCriteria = CLiteral qc})
     getDescriptorKeysFromLiteralPattern
-      c
+      c'
       _
       (QueryToken (CLiteral crit) (PDescriptor pd)) =
         case crit of
-          ByTag -> map descriptorId <$> lookupDescriptorPattern c pd
+          ByTag -> map descriptorId <$> lookupDescriptorPattern c' pd
           ByRelation -> do
-            dks <- map descriptorId <$> lookupDescriptorPattern c pd
-            idks <- L.foldl1' L.union <$> mapM (getsExclusiveInfraDescriptorKeys c) dks
+            dks <- map descriptorId <$> lookupDescriptorPattern c' pd
+            idks <- L.foldl1' L.union <$> mapM (getsExclusiveInfraDescriptorKeys c') dks
             return $ L.union dks idks
           ByPattern -> return []
           ByUntagged -> return []
