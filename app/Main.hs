@@ -9,9 +9,10 @@
 
 module Main where
 
-import Control.Lens ((^.))
+import Control.Lens ((%~), (&), (^.))
 import Control.Monad
 import Control.Monad.Trans.Except (runExceptT)
+import qualified Data.Foldable as F
 import qualified Data.Text as T
 import Database.SQLite.Simple (close, open)
 import Event.CLI
@@ -83,19 +84,17 @@ runTaggerWindow cfg =
 
 main :: IO ()
 main = do
+  rawArgs <- getArgs
+  opts <- getOptionRecord rawArgs
   configPath <- getConfigPath
   let configExcept = getConfig configPath
-  try' configExcept $ \config -> do
-    rawArgs <- getArgs
-    let opts = getTaggerOpt rawArgs
-    hasOptErrors <- showOptErrors opts
-    unless hasOptErrors $ do
-      if nullOpts opts
-        then do
-          runTaggerWindow config
-        else do
-          c <- open . T.unpack $ config ^. dbconf . dbconfPath
-          runOpt c . last . optionArguments $ opts
-          close c
+  try' configExcept $ \config' -> do
+    let config =
+          config' & dbconf . dbconfPath
+            %~ (maybe id (const . T.pack) . optionDatabasePath $ opts)
+    conn <- open . T.unpack $ config ^. dbconf . dbconfPath
+    F.sequenceA_ $ [printVersion, cliQuery conn] <*> [opts]
+    close conn
+    when (optionRunTagger opts) $ runTaggerWindow config
   where
     try' e c = runExceptT e >>= either (hPrint stderr) c
