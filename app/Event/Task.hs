@@ -22,6 +22,7 @@ import Database.Tagger.Access
     addFile,
     addRepresentative,
     collectFileWithTagsByFileKey,
+    deleteDatabaseFile,
     deleteDatabaseSubTags,
     deleteDescriptor,
     derefDatabaseFileWithTags,
@@ -80,13 +81,15 @@ import Event.Parser
   )
 import IO
   ( CreateProcess (delegate_ctlc, new_session),
-    Exception (liftEx),
+    Exception (eLabel, liftEx),
     createProcess,
-    doesDirectoryExist,
-    doesFileExist,
+    deleteFileSystemFile,
     dropFileName,
     getConfigPath,
+    guardDirectoryExists,
     guardException,
+    guardFileDoesNotExist,
+    guardFileExists,
     hGetContents,
     hPrint,
     hPutStrLn,
@@ -115,6 +118,7 @@ instance Show TaskException where
 
 instance Exception TaskException where
   liftEx = TaskException
+  eLabel f (TaskException m) = f m
 
 runQuery ::
   Connection ->
@@ -490,18 +494,30 @@ renameTaggerFile c f@(File fk p) to = do
   guardException ("Unique file, " ++ show f ++ " Not found in the database.")
     <=< lift . uniqueDatabaseFileExists c
     $ f
-  guardException ("File \"" ++ pPath ++ "\" does not exist.")
-    <=< lift . doesFileExist
-    $ pPath
-  guardException ("File with name \"" ++ toPath ++ "\" already exists.")
-    <=< fmap not . lift . doesFileExist
-    $ toPath
-  guardException
-    ( "The destination directory, \""
-        ++ dropFileName toPath
-        ++ "\" Does not exist."
-    )
-    <=< lift . doesDirectoryExist . dropFileName
-    $ toPath
-  lift $ renameDatabaseFile c fk to
+  guardFileExists pPath
+  guardFileDoesNotExist toPath
+  guardDirectoryExists . dropFileName $ toPath
   lift $ renameFileSystemFile p to
+  lift $ renameDatabaseFile c fk to
+
+-- -- |
+-- -- A special case of renameTaggerFile that keeps the path but
+-- -- changes just the file basename.
+-- renameTaggerFileBaseName :: Connection -> File -> T.Text -> ExceptT TaskException IO ()
+-- renameTaggerFileBaseName c f@(File _ p) to = do
+--   let fileDir = dropFileName . T.unpack $ p
+--   renameTaggerFile c f (fileDir <~> to)
+
+-- |
+-- A special case of renameTaggerFile that preserves the basename but moves the path.
+moveTaggerFile :: Connection -> File -> T.Text -> ExceptT TaskException IO ()
+moveTaggerFile c f to = undefined
+
+deleteTaggerFile :: Connection -> File -> ExceptT TaskException IO ()
+deleteTaggerFile c f@(File fk p) = do
+  guardException ("Unique file, " ++ show f ++ " not found in the database.")
+    <=< lift . uniqueDatabaseFileExists c
+    $ f
+  guardFileExists . T.unpack $ p
+  lift $ deleteFileSystemFile p
+  lift $ deleteDatabaseFile c fk

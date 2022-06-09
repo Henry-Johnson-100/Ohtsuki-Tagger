@@ -50,15 +50,28 @@ import Toml (decodeFileEither, prettyTomlDecodeErrors)
 import Type.Config (TaggerConfig, taggerConfigCodec)
 import Util.Core (head')
 
-type ConfigException = String
-
 class Show e => Exception e where
+  liftEx :: String -> e
   exMsg :: e -> String
   exMsg = show
-  liftEx :: String -> e
+
+  -- Change kind of exception
+  eLabel :: Exception e1 => (String -> e1) -> e -> e1
+  emap :: (String -> String) -> e -> e
+  emap f = liftEx . f . exMsg
+
+newtype ConfigException = ConfigException String deriving (Eq)
+
+instance Show ConfigException where
+  show (ConfigException m) = "Configuration exception: " ++ m
+
+instance Exception ConfigException where
+  liftEx = ConfigException
+  eLabel f (ConfigException m) = f m
 
 instance Exception String where
   liftEx = id
+  eLabel f s = f s
 
 guardException :: (Monad m, Exception e) => String -> Bool -> ExceptT e m ()
 guardException msg b = unless b $ throwE . liftEx $ msg
@@ -68,23 +81,51 @@ maybeException msg m = do
   x <- lift . runMaybeT $ m
   maybe (throwE . liftEx $ msg) return x
 
+-- |
+-- Throw exception if the given file path does not point to a file.
+guardFileExists :: Exception e => [Char] -> ExceptT e IO ()
+guardFileExists p =
+  guardException ("File \"" ++ p ++ "\" does not exist")
+    <=< lift . doesFileExist
+    $ p
+
+-- |
+-- Throw exception if the given path points to a file.
+--
+-- Used before copying or renaming to ensure the destination is not already occupied.
+guardFileDoesNotExist :: Exception e => [Char] -> ExceptT e IO ()
+guardFileDoesNotExist p =
+  guardException ("File \"" ++ p ++ "\" Already exists")
+    <=< fmap not . lift . doesFileExist
+    $ p
+
+guardDirectoryExists :: Exception e => [Char] -> ExceptT e IO ()
+guardDirectoryExists p =
+  guardException ("Directory \"" ++ p ++ "\" Does not exist")
+    <=< lift . doesDirectoryExist
+    $ p
+
 validateFilePath :: FilePath -> ExceptT ConfigException IO FilePath
 validateFilePath p = do
   isFile <- lift . doesFileExist $ p
-  if isFile then lift . makeAbsolute $ p else throwE $ "File not found: " ++ p
+  if isFile
+    then lift . makeAbsolute $ p
+    else
+      throwE . ConfigException $
+        "File not found: " ++ p
 
 validateDirPath :: FilePath -> ExceptT ConfigException IO FilePath
 validateDirPath p = do
   isDir <- lift . doesDirectoryExist $ p
-  if isDir then lift . makeAbsolute $ p else throwE $ "Directory not found: " ++ p
+  if isDir
+    then lift . makeAbsolute $ p
+    else throwE . ConfigException $ "Directory not found: " ++ p
 
-getConfig :: String -> ExceptT String IO TaggerConfig
-getConfig =
-  withExceptT
-    (T.unpack . prettyTomlDecodeErrors)
-    . except
-    <=< decodeFileEither taggerConfigCodec
-    <=< validateFilePath
+getConfig :: FilePath -> ExceptT ConfigException IO TaggerConfig
+getConfig p = do
+  validatedPath <- validateFilePath p
+  decoded <- decodeFileEither taggerConfigCodec validatedPath
+  withExceptT (liftEx . T.unpack . prettyTomlDecodeErrors) . except $ decoded
 
 getConfigPath :: IO FilePath
 getConfigPath = do
@@ -94,7 +135,7 @@ getConfigPath = do
 getConfigDbConn :: FilePath -> ExceptT ConfigException IO FilePath
 getConfigDbConn =
   withExceptT
-    ("Configuration error when opening database connection:\n" ++)
+    (emap ("Configuration error when opening database connection:\n" ++))
     . validateFilePath
 
 runInitScript :: FilePath -> Connection -> IO ()
@@ -187,3 +228,6 @@ renameFileSystemFile p to = do
   let pPath = T.unpack p
       toPath = T.unpack to
   renameFile pPath toPath
+
+deleteFileSystemFile :: T.Text -> IO ()
+deleteFileSystemFile = removeFile . T.unpack

@@ -1,4 +1,5 @@
 {-# LANGUAGE TupleSections #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Util.Core where
 

@@ -98,4 +98,4 @@ main = do
           runOpt c . last . optionArguments $ opts
           close c
   where
-    try' e c = runExceptT e >>= either (hPutStrLn stderr) c
+    try' e c = runExceptT e >>= either (hPrint stderr) c

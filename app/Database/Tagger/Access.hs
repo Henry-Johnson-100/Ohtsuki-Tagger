@@ -1,6 +1,5 @@
 {-# HLINT ignore "Redundant return" #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
@@ -52,6 +51,7 @@ module Database.Tagger.Access
     derefDatabaseFileWithTags,
     uniqueDatabaseFileExists,
     renameDatabaseFile,
+    deleteDatabaseFile,
   )
 where
 
@@ -103,7 +103,7 @@ import Database.Tagger.Type
     insertIntoDescriptorTree,
   )
 import Event.Parser (PseudoDescriptor (PDescriptor))
-import IO (Exception (liftEx), hPutStrLn, stderr)
+import IO (Exception (eLabel, liftEx), hPutStrLn, stderr)
 import Util.Core (OccurrenceMap, head', hoistMaybe, (!++))
 
 -- | A literal WHERE clause, leaving out "WHERE"
@@ -117,6 +117,7 @@ newtype TaggerDBException = TaggerDBException String deriving (Show, Eq)
 
 instance Exception TaggerDBException where
   liftEx = TaggerDBException
+  eLabel f (TaggerDBException m) = f m
 
 debug# :: Bool
 debug# = False
@@ -227,6 +228,9 @@ renameDescriptor c d n =
 -- Do not call this without also calling 'mv' on the file in the filesystem!
 renameDatabaseFile :: Connection -> FileKey -> T.Text -> IO ()
 renameDatabaseFile c fk t = execute c "UPDATE File SET filePath = ? WHERE id = ?" (t, fk)
+
+deleteDatabaseFile :: Connection -> FileKey -> IO ()
+deleteDatabaseFile c fk = execute c "DELETE FROM File WHERE id = ?" [fk]
 
 -- There is a use-case for exceptions in this module but this is not one of them.
 uniqueDatabaseFileExists ::
