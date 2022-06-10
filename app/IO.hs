@@ -73,6 +73,9 @@ instance Exception String where
   liftEx = id
   eLabel f s = f s
 
+whenJust :: (Monad m, Monoid (m ())) => Maybe a -> (a -> m ()) -> m ()
+whenJust ma f = maybe mempty f ma
+
 guardException :: (Monad m, Exception e) => String -> Bool -> ExceptT e m ()
 guardException msg b = unless b $ throwE . liftEx $ msg
 

@@ -1,16 +1,22 @@
+{-# HLINT ignore "Use lambda-case" #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Use lambda-case" #-}
-
 module Event.CLI.Type
   ( OptionRecord (..),
+    OptionException (..),
     baseOptionRecord,
     optionRecordFlags,
   )
 where
 
 import qualified IO
+
+newtype OptionException = OptionException String deriving (Eq, IO.Exception)
+
+instance Show OptionException where
+  show (OptionException e) = "Option Exception: " ++ e
 
 data OptionRecord = OptionRecord
   { optionQuery :: !(Maybe String),

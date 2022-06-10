@@ -93,7 +93,7 @@ main = do
           config' & dbconf . dbconfPath
             %~ (maybe id (const . T.pack) . optionDatabasePath $ opts)
     conn <- open . T.unpack $ config ^. dbconf . dbconfPath
-    F.sequenceA_ $ [printVersion, cliQuery conn] <*> [opts]
+    F.sequenceA_ $ [printVersion, cliQuery conn, cliOperateOnFile conn] <*> [opts]
     close conn
     when (optionRunTagger opts) $ runTaggerWindow config
   where
