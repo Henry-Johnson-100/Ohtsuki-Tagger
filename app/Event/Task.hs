@@ -521,3 +521,16 @@ deleteTaggerFile c f@(File fk p) = do
   guardFileExists . T.unpack $ p
   lift $ deleteFileSystemFile p
   lift $ deleteDatabaseFile c fk
+
+-- |
+-- Like deleteTaggerFile but only removes the file from the database
+-- and NOT the filesystem.
+--
+-- Does not check if a file exists in the filesystem,
+-- but only checks for a unique file in the database.
+removeTaggerFile :: Connection -> File -> ExceptT TaskException IO ()
+removeTaggerFile c f@(File fk _) = do
+  guardException ("Unique file, " ++ show f ++ " not found in the database")
+    <=< lift . uniqueDatabaseFileExists c
+    $ f
+  lift $ deleteDatabaseFile c fk

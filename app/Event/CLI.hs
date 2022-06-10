@@ -7,6 +7,7 @@ module Event.CLI
   ( module Event.CLI.Type,
     getOptionRecord,
     printVersion,
+    printHelp,
     cliQuery,
     cliOperateOnFile,
   )
@@ -22,7 +23,7 @@ import qualified Data.Text.IO as T.IO
 import Database.Tagger.Access (Connection, getFile, lookupFilesHavingFilePattern)
 import Database.Tagger.Type (File (filePath), FileWithTags (file))
 import Event.CLI.Type
-import Event.Task (renameTaggerFile, runQuery)
+import Event.Task (removeTaggerFile, renameTaggerFile, runQuery)
 import IO
   ( ArgOrder (RequireOrder),
     getOpt,
@@ -31,6 +32,7 @@ import IO
     maybeException,
     stderr,
     taggerVersion,
+    usageInfo,
     whenJust,
   )
 import System.Exit (exitFailure)
@@ -53,6 +55,18 @@ getOptionRecord args = do
 printVersion :: OptionRecord -> IO ()
 printVersion OptionRecord {optionVersion} = when optionVersion $ putStrLn taggerVersion
 
+printHelp :: OptionRecord -> IO ()
+printHelp OptionRecord {optionHelp} =
+  when optionHelp . putStrLn
+    . usageInfo
+      "Tagger is a GUI file tagger and database querying program.\n\
+      \Some operations can be performed via CLI.\n\
+      \Any option specified with (no-run) will cause the GUI to not launch.\n\
+      \Running with no options or only options \
+      \not marked with (no-run) will launch the GUI.\n\
+      \USAGE:\ttagger [options]"
+    $ optionRecordFlags
+
 -- |
 -- Perform operations on the fixed databasefile given with -f.
 -- If a unique file is found then a sequence of possible actions given the OptionRecord
@@ -68,7 +82,7 @@ cliOperateOnFile c opts@OptionRecord {optionDatabaseFile} =
             (const exitFailure <=< IO.hPrint IO.stderr)
             ( \f ->
                 F.sequenceA_ $
-                  [cliRenameTaggerFile c f] <*> [opts]
+                  [cliRemoveFile c f, cliRenameTaggerFile c f] <*> [opts]
             )
             uniqueDatabaseFile
     )
@@ -104,6 +118,11 @@ cliOperateOnFile c opts@OptionRecord {optionDatabaseFile} =
             e <- runExceptT $ renameTaggerFile c' f (T.pack moveTo)
             either (IO.hPrint IO.stderr) (const mempty) e
         )
+
+    cliRemoveFile :: Connection -> File -> OptionRecord -> IO ()
+    cliRemoveFile c' f OptionRecord {optionRemove} = when optionRemove $ do
+      e <- runExceptT $ removeTaggerFile c' f
+      either (const exitFailure <=< IO.hPrint IO.stderr) return e
 
 cliQuery :: Connection -> OptionRecord -> IO ()
 cliQuery c OptionRecord {optionQuery} =
