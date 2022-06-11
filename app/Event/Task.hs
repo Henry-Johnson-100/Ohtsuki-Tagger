@@ -11,6 +11,7 @@ import Control.Monad (unless, (<=<), (>=>))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
+import qualified Data.HashSet as HashSet
 import qualified Data.List as L
 import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Text as T
@@ -339,7 +340,7 @@ addPath :: Connection -> T.Text -> IO [FileWithTags]
 addPath c p = do
   pathsToAdd <- getPathsToAdd p
   addedFiles <- mapM (addFile c) pathsToAdd
-  return $ FileWithTags <$> addedFiles <*> []
+  return $ flip FileWithTags HashSet.empty <$> addedFiles
 
 associateTag :: Connection -> Tag -> Tag -> IO ()
 associateTag c tWith t = updateTagSubTagOfId c (getTagPtr t) (tagId tWith)

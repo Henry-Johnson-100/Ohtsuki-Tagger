@@ -8,6 +8,7 @@ module Event.CLI.Type
     OptionException (..),
     baseOptionRecord,
     optionRecordFlags,
+    setDontRun,
   )
 where
 
@@ -65,7 +66,7 @@ optionRecordFlags =
       ['q']
       ["query"]
       (IO.ReqArg (\s opts -> setDontRun opts {optionQuery = Just s}) "QUERY")
-      "Query the database using TaggerQL and \
+      "Query the database using TaggerQL and returns \
       \a list of file paths. \
       \Implicit query criteria tokens default to 'Tag'.\n\
       \Ex. \"otsuki_yui {r.cute} d| r.season i| sweater\"\n\
@@ -80,11 +81,12 @@ optionRecordFlags =
           "DATABASE_FILE"
       )
       "Specify a single database file to run actions on.\n\
-      \Actions run on the database file are specified with the -d, -r, or -m flags.\n\
+      \Actions run on the database file are specified with the --delete, \
+      \ -r, or -m flags.\n\
       \If no operations are specified, then nothing happens to the database file. \
       \(no-run).",
     IO.Option
-      ['d']
+      []
       ["delete"]
       (IO.NoArg (\opts -> setDontRun opts {optionDelete = True}))
       "Delete the file specified with -f from both the database AND the system.\n\
@@ -105,7 +107,11 @@ optionRecordFlags =
       ['a']
       ["add"]
       (IO.ReqArg (\s opts -> setDontRun opts {optionAdd = s : optionAdd opts}) "ADD")
-      "Add the file(s) at the given path to the database (no-run).",
+      "Add the file(s) at the given path to the database.\n\
+      \Can be specified multiple times to add multiple paths at once.\n\
+      \Displays a list of the files entered, \
+      \regardless of whether or not they were actually inserted.\n\
+      \(no-run).",
     IO.Option
       ['p']
       ["database-path"]

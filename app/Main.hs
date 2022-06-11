@@ -22,6 +22,7 @@ import Monomer
 import Node.Application
 import Type.Config
 import Type.Model
+import Database.Tagger.Access (activateForeignKeyPragma)
 
 taggerApplicationUI ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -93,7 +94,17 @@ main = do
           config' & dbconf . dbconfPath
             %~ (maybe id (const . T.pack) . optionDatabasePath $ opts)
     conn <- open . T.unpack $ config ^. dbconf . dbconfPath
-    F.sequenceA_ $ [printHelp, printVersion, cliQuery conn, cliOperateOnFile conn] <*> [opts]
+    activateForeignKeyPragma conn
+    F.sequenceA_ $
+      [ printHelp,
+        printVersion,
+        --adding takes precedence over querying so
+        --querying by untagged will show the added files.
+        cliAddFile conn,
+        cliQuery conn,
+        cliOperateOnFile conn
+      ]
+        <*> [opts]
     close conn
     when (optionRunTagger opts) $ runTaggerWindow config
   where

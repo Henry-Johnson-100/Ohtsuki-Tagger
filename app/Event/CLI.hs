@@ -9,11 +9,12 @@ module Event.CLI
     printVersion,
     printHelp,
     cliQuery,
+    cliAddFile,
     cliOperateOnFile,
   )
 where
 
-import Control.Monad (when, (<=<))
+import Control.Monad (unless, when, (<=<))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
 import qualified Data.Foldable as F
@@ -23,7 +24,7 @@ import qualified Data.Text.IO as T.IO
 import Database.Tagger.Access (Connection, getFile, lookupFilesHavingFilePattern)
 import Database.Tagger.Type (File (filePath), FileWithTags (file))
 import Event.CLI.Type
-import Event.Task (removeTaggerFile, renameTaggerFile, runQuery)
+import Event.Task (addPath, deleteTaggerFile, removeTaggerFile, renameTaggerFile, runQuery)
 import IO
   ( ArgOrder (RequireOrder),
     getOpt,
@@ -48,9 +49,12 @@ getOptionRecord args = do
   let finalOptRecord = case actions of
         [] -> baseOptionRecord
         _ -> L.foldl1' (.) actions baseOptionRecord
-  mapM_ (IO.hPutStrLn IO.stderr) errs
-  mapM_ (IO.hPutStrLn IO.stderr) nonOptionErrs
-  return finalOptRecord
+  if null nonOptionErrs && null errs
+    then return finalOptRecord
+    else do
+      mapM_ (IO.hPutStrLn IO.stderr) errs
+      mapM_ (IO.hPutStrLn IO.stderr) nonOptionErrs
+      return . setDontRun $ finalOptRecord
 
 printVersion :: OptionRecord -> IO ()
 printVersion OptionRecord {optionVersion} = when optionVersion $ putStrLn taggerVersion
@@ -82,7 +86,11 @@ cliOperateOnFile c opts@OptionRecord {optionDatabaseFile} =
             (const exitFailure <=< IO.hPrint IO.stderr)
             ( \f ->
                 F.sequenceA_ $
-                  [cliRemoveFile c f, cliRenameTaggerFile c f] <*> [opts]
+                  [ cliRemoveFile c f,
+                    cliDeleteFile c f,
+                    cliRenameTaggerFile c f
+                  ]
+                    <*> [opts]
             )
             uniqueDatabaseFile
     )
@@ -96,7 +104,7 @@ cliOperateOnFile c opts@OptionRecord {optionDatabaseFile} =
             maybeException
               "Unable to retrieve file from filekey, \
               \though the given pattern corresponds to exactly one file. \
-              \Something is very wrong for this to happen"
+              \Something is very wrong for this to happen."
               $ getFile c f
           [] ->
             throwE
@@ -114,7 +122,7 @@ cliOperateOnFile c opts@OptionRecord {optionDatabaseFile} =
     cliRenameTaggerFile c' f OptionRecord {optionMove} =
       IO.whenJust
         optionMove
-        ( \moveTo -> do
+        ( \moveTo -> unless (null moveTo) $ do
             e <- runExceptT $ renameTaggerFile c' f (T.pack moveTo)
             either (IO.hPrint IO.stderr) (const mempty) e
         )
@@ -122,6 +130,11 @@ cliOperateOnFile c opts@OptionRecord {optionDatabaseFile} =
     cliRemoveFile :: Connection -> File -> OptionRecord -> IO ()
     cliRemoveFile c' f OptionRecord {optionRemove} = when optionRemove $ do
       e <- runExceptT $ removeTaggerFile c' f
+      either (const exitFailure <=< IO.hPrint IO.stderr) return e
+
+    cliDeleteFile :: Connection -> File -> OptionRecord -> IO ()
+    cliDeleteFile c' f OptionRecord {optionDelete} = when optionDelete $ do
+      e <- runExceptT $ deleteTaggerFile c' f
       either (const exitFailure <=< IO.hPrint IO.stderr) return e
 
 cliQuery :: Connection -> OptionRecord -> IO ()
@@ -136,3 +149,12 @@ cliQuery c OptionRecord {optionQuery} =
           then hPutStrLn stderr "0 results" >> exitFailure
           else mapM_ T.IO.putStrLn fs
     )
+
+cliAddFile :: Connection -> OptionRecord -> IO ()
+cliAddFile c OptionRecord {optionAdd} =
+  if null optionAdd
+    then mempty
+    else do
+      addedFiles <- mapM (addPath c . T.pack) optionAdd
+      let addedPaths = map (filePath . file) . concat $ addedFiles
+      mapM_ T.IO.putStrLn addedPaths
