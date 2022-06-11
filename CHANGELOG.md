@@ -227,9 +227,21 @@ of their descriptors instead of the length of their children lists.
 ### 0.3.3.0 -- 2022-05-24
 
 * Introducing some command line arguments.
-  * -v, --version remains
-  * -q, --query will take a query string written in TaggerQL and return a list of file paths.
+  * -v, --version, remains
+  * -q, --query [query], will take a query string written in TaggerQL and return a list of file paths.
 
-### 0.3.4.0 -- ????-??-??
+### 0.3.4.0 -- 2022-06-11
 
+* Added some new command line options.
+  * -h, --help, displays usage info.
+  * -f, --database-file [path], sets a file to perform operations on. Possible operations are:
+    * -r, --remove, removes the file from the database.
+    * -m, --move [path], specify a path to move the given file to.
+    * --delete deletes, a file from both the database and the system.
+    It is recommended to remove a file then delete it, but deleting a file with this option
+    should be completely safe.
+  * -a, --add [path], a files at the given path to the database.
+  * -p, --database-path [path], specifies the database for tagger to open.
+  Specifying this option will temporarily override the database path given in tagger's config
+  and any CLI options or operations done with tagger's GUI will use the database specified with this option.
 * Changed the ShellCMD functionality to output ExitSuccess or other messages from completed commands to stderr instead of stdout.
