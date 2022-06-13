@@ -245,3 +245,7 @@ of their descriptors instead of the length of their children lists.
   Specifying this option will temporarily override the database path given in tagger's config
   and any CLI options or operations done with tagger's GUI will use the database specified with this option.
 * Changed the ShellCMD functionality to output ExitSuccess or other messages from completed commands to stderr instead of stdout.
+
+#### 0.3.4.1 -- 2022-06-13
+
+* Moved to Fossil from git for VCS
