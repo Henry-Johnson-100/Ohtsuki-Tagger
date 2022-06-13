@@ -1,126 +1,90 @@
-# Revision history for TaggerGUI
+# Revision history for Tagger
 
-## 0.1.0.0 -- 2022-04-23
+# Unreleased
 
-* First version. Released on an unsuspecting world.
-
-### 0.1.1.0 -- 2022-04-25
-
-* Added a new configuration table and field: 
-  * [descriptor_tree]
-    * main_request
-      * A text field with the name of a descriptor for the main descriptor tree widget 
-      to request when the refresh button is pushed.
-* Also added a 'Descriptor' configuration page.
-  * Can change the value of descriptor_tree.main_request there.
-  * Can also view a similar version of the main descriptor tree widget there.
-* Stopped the descriptors in the #UNRELATED# tree widget from sending request events
-to the main tree widget when clicked.
-
-### 0.1.2.0 -- 2022-04-26
-
-* Adjusted the Cmd so that, if Solo Tagging Mode is enabled, the shell cmd
-will take the file currently previewed as the command's only argument.
-If Solo Tagging Mode is not enabled or there is no file previewed then all files in the
-selection are arguments to the shell cmd.
-  * The argument substitution keyword is still '`%file`'
-
-#### 0.1.2.1 -- 2022-04-27
-
-* Added a command line option `-v, --version` to see the program version.
-
-### 0.1.3.0 -- 2022-04-27
-
-* Added a field to rename descriptors.
-  * In the Descriptor configuration page.
-
-### 0.1.4.0 -- 2022-04-30
-
-* Added the FileSelection widget back in.
-  * It uses a lazy buffer that can be loaded or flushed for a more responsive GUI.
-  * Uses a new config field ```selection.buffer_size = int``` to determine how many elements to load.
-  * Added buttons to load, load all, flush, and shuffle the file selection.
-* Improved styling of the ImagePreview widget.
-  * Added a filename to the top left.
-  * Made it a drop target for FileWithTags.
-    * Dropping a file from the fileSelection Widget into the image preview widget will open a preview of that file.
-      * Does not change the order in which images are cycled via Ctrl-i or -k.
-  * Made it a draggable FileWithTags.
-    * There aren't currently any other widgets that are drop targets for this message type.
-
-#### 0.1.4.1 -- 2022-04-30
-
-* Fixed a bug with the lazy selection that would flush the buffer when an image was tagged.
-* Fixed a bug where shuffling an empty selection would result in an infinite hang.
+* Enhancing the file selection to either only File's or FileKey's
+  * This will help improve the memory footprint of tagger and hopefully
+  make some node logic easier to maintain.
 
 ------
 
-## 0.2.0.0 -- 2022-05-01
+#### 0.3.4.2 -- ????-??-??
 
-![image](Doc/doc_tan.jpg)
-* Added a new Representative File feature:
-  * Added a new table `Representative`
-    * This table creates links between a descriptor and an image. The purpose of creating
-    Representative links is to provide a quintessential example of what a descriptor is meant
-    to convey when it tags a file. It is meant to be used as an aid for tagging, rather than querying.
-    Shell commands cannot be performed on a Representative file that is being previewed, nor can it be tagged.
-  * Representative files are viewed in the `Descriptor` config page.
-    * From the Descriptor tree structure of the database, drag a descriptor into the Representative box.
-    If there is a representative file for a given Descriptor it will be displayed, otherwise nothing will happen.
-  * To create a Representative file, in the main page of the application, drag an image or filename from either the active image preview or the image selection buffer.
-    Then drop it onto the descriptor, in the Main descriptor widget on the bottom left, that you want to create a representative link for.
-    A box will appear around a given descriptor as you drag a file over it to show you which descriptor a link will be created for.
-* Minor fixes involving the lazy selection buffer. When unioning, intersecting, or diffing a new query.
-The buffer will not flush but rather be unioned, intersected, or diffed appropriately with the contents of the new query selection.
-* Added new fields to the config file: `style`, `style.font`, and `style.window`.
-  * `style.font` takes three keys, `regular`, `thin`, and `bold`. These are paths to a font for tagger to use.
-  * `style.window` takes three keys. `maximize`, `window_size_x`, and `window_size_y`.
-    * `maximize` is a boolean, if true the window is maximized on start-up.
-    The other two keys are the x and y sizes to use for the window if false.
-* Moved the `Shell Command` used on startup to the config file under the key `shell_command`.
-  * Exporting the config will now export the current shell command as well.
+------
 
-#### 0.2.0.1 -- 2022-05-02
+#### 0.3.4.1 -- 2022-06-13
 
- * Fixed a bug with unioning results into a BufferList. Should hopefully no longer union duplicate files into the selection BufferList.
+* Changed VCS from git to fossil.
 
-## 0.3.0.0 -- 2022-05-10
+------
 
-* Introduced Subtagging!
-  * Using the image featured in 0.2.0.0, I will demonstrate how subtags may be used.
-  * Subtags are added to an image using curly brackets in the Tag textfield. For instance,
-  I want to tag the character Momo Chiyoda in the above image but I want to also tag the image with
-  descriptors that may only apply to her specifically. For that I will use subtags.
-  ```
-  Chiyoda_Momo{tanned}
-  ```
-  With this, we can see that the tanned keyword is only applied to the Chiyoda_Momo tag.
-* Queries using Subtags.
-  * Querying with subtags can be done normally, as in any file with a queried tag will be part of the new selection.
-  * Querying using subtag notation will fetch a selection that contains only files that have that specific sub-tagging combination.
-    * If I search `tanned` I will get all images with tanned characters. However, if I search `Chiyoda_Momo{tanned}`
-    I will get only the images with that specific combination.
-* Draggable tag association.
-  * In the Image details pane, for tags on a single image only, each tag is draggable.
-    * A new zone has been designated `untag` for these tags. When a tag is drag-and-dropped into that zone,
-    that specific tag will be deleted.
-      * Untagging can still be done via the Tag text field but is less precise and may end up deleting more than you wanted to.
-  * New subtags can be made from existing tags by dragging one tag on top of another, this will place the dragged tag as a 
-  sub tag of the target.
-* Breaking changes:
-  * Any databases created on versions 2.x or lower need to run the Migrate0_2_XTo0_3_X.sql
-  script. Any desired subtags will have to be created manually.
+### 0.3.4.0 -- 2022-06-11
 
-### 0.3.1.0 -- 2022-05-12
+* Added some new command line options.
+  * -h, --help, displays usage info.
+  * -f, --database-file [path], sets a file to perform operations on. Possible operations are:
+    * -r, --remove, removes the file from the database.
+    * -m, --move [path], specify a path to move the given file to.
+    * --delete deletes, a file from both the database and the system.
+    It is recommended to remove a file then delete it, but deleting a file with this option
+    should be completely safe.
+  * -a, --add [path], a files at the given path to the database.
+  * -p, --database-path [path], specifies the database for tagger to open.
+  Specifying this option will temporarily override the database path given in tagger's config
+  and any CLI options or operations done with tagger's GUI will use the database specified with this option.
+* Changed the ShellCMD functionality to output ExitSuccess or other messages from completed commands to stderr instead of stdout.
 
-* Migrated to Monomer 1.4.0.0-dc848e8ddb76ba6d8339b47f8bc3a0ff3982950c.
-* Introduced a new config option, `style.window.window_scaling_factor`.
-  * A double value that controls the relative size of text and widgets in the window.
-    * Values will most likely be in-between 1.0 and 2.0.
-* Introduced an optional config option `style.window.window_icon`.
-  * Takes a path to .bmp images and uses it as the window icon.
-##### Minor Changes
-* Added a dispose event to close the database connection.
+------
+
+### 0.3.3.0 -- 2022-05-24
+
+* Introducing some command line arguments.
+  * -v, --version, remains
+  * -q, --query [query], will take a query string written in TaggerQL and return a list of file paths.
+
+------
+
+#### 0.3.2.3 -- 2022-05-17
+
+* Changed the hotkeys used in the operation widget to apply globally,
+not just when a widget in the operation widget is in focus. The hotkeys are described below.
+* Added some sorting options to the tags "In Selection" in the image detail pane.
+  * Can sort by tag alphabetically, or number of tags in the selection.
+  * Ascending and Descending ordering.
+* Adjusted ordering of DescriptorTrees so that Meta trees now sort by alphabetical value
+of their descriptors instead of the length of their children lists.
+* Fixed a bug where querying by untagged files would return 0 files if an empty query string was used.
+
+| Hotkey       | Event                                                                                                                                |
+|--------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| Ctrl-y       | Clears the file selection, with the selection buffer.                                                                                |
+| Ctrl-u       | Runs the given shell cmd as specified in the `Cmd` textfield.                                                                        |
+| Ctrl-i       | Previews the next image in the file selection. Consumes selection and adds to the buffer.                                            |
+| Ctrl-k       | Previews the previous image in the file selection. Consumes the buffer and pushes it back to the selection.                          |
+| Ctrl-j       | Changes the query's set arithmetic to the next value e.g. Union -> Intersect -> Diff                                                 |
+| Ctrl-Shift-j | Changes the query's arithmetic to the previous value e.g. Union -> Diff -> Intersect                                                 |
+| Ctrl-l       | Changes the query's query criteria to the next value e.g. Tag -> Pattern -> Relation -> Untagged                                     |
+| Ctrl-Shift-l | Changes the query's query criteria to the previous value e.g. Tag -> Untagged -> Relation -> Pattern                                 |
+| Ctrl-o       | Toggles between Tag and Untag mode                                                                                                   |
+| Ctrl-Shift-o | Toggles between Tag and Untag mode but in the opposite direction :^)                                                                 |
+| Ctrl-r       | Refreshes the application, searching for tag updates in the database, refreshing descriptor trees, and re-putting the image preview. |
+| Ctrl-t       | Toggles `Solo Tagging Mode`                                                                                                          |
+
+------
+
+#### 0.3.2.2 -- 2022-05-16
+
+* Added a connection string to the window that shows what database tagger is connected to
+and if it has connected yet.
+* Migrated Monomer to the official release of 1.4.1.0
+
+------
+
+#### 0.3.2.1 -- 2022-05-15
+
+* Fixed a bug that would cause the lastBackup time string to get reset in the database whenever it's connected to.
+
+------
 
 ### 0.3.2.0 -- 2022-05-14
 
@@ -188,64 +152,144 @@ Some restrictions:
 * You can not do set arithmetic inside a subtag search, though this is planned as a future feature. By default, all results from individual subtags are unioned together.
   * `something {this d| that}` fails to parse and prints a parse error.
 
-#### 0.3.2.1 -- 2022-05-15
+------
 
-* Fixed a bug that would cause the lastBackup time string to get reset in the database whenever it's connected to.
+### 0.3.1.0 -- 2022-05-12
 
-#### 0.3.2.2 -- 2022-05-16
+* Migrated to Monomer 1.4.0.0-dc848e8ddb76ba6d8339b47f8bc3a0ff3982950c.
+* Introduced a new config option, `style.window.window_scaling_factor`.
+  * A double value that controls the relative size of text and widgets in the window.
+    * Values will most likely be in-between 1.0 and 2.0.
+* Introduced an optional config option `style.window.window_icon`.
+  * Takes a path to .bmp images and uses it as the window icon.
+##### Minor Changes
+* Added a dispose event to close the database connection.
 
-* Added a connection string to the window that shows what database tagger is connected to
-and if it has connected yet.
-* Migrated Monomer to the official release of 1.4.1.0
+------
 
-#### 0.3.2.3 -- 2022-05-17
+## 0.3.0.0 -- 2022-05-10
 
-* Changed the hotkeys used in the operation widget to apply globally,
-not just when a widget in the operation widget is in focus. The hotkeys are described below.
-* Added some sorting options to the tags "In Selection" in the image detail pane.
-  * Can sort by tag alphabetically, or number of tags in the selection.
-  * Ascending and Descending ordering.
-* Adjusted ordering of DescriptorTrees so that Meta trees now sort by alphabetical value
-of their descriptors instead of the length of their children lists.
-* Fixed a bug where querying by untagged files would return 0 files if an empty query string was used.
+* Introduced Subtagging!
+  * Using the image featured in 0.2.0.0, I will demonstrate how subtags may be used.
+  * Subtags are added to an image using curly brackets in the Tag textfield. For instance,
+  I want to tag the character Momo Chiyoda in the above image but I want to also tag the image with
+  descriptors that may only apply to her specifically. For that I will use subtags.
+  ```
+  Chiyoda_Momo{tanned}
+  ```
+  With this, we can see that the tanned keyword is only applied to the Chiyoda_Momo tag.
+* Queries using Subtags.
+  * Querying with subtags can be done normally, as in any file with a queried tag will be part of the new selection.
+  * Querying using subtag notation will fetch a selection that contains only files that have that specific sub-tagging combination.
+    * If I search `tanned` I will get all images with tanned characters. However, if I search `Chiyoda_Momo{tanned}`
+    I will get only the images with that specific combination.
+* Draggable tag association.
+  * In the Image details pane, for tags on a single image only, each tag is draggable.
+    * A new zone has been designated `untag` for these tags. When a tag is drag-and-dropped into that zone,
+    that specific tag will be deleted.
+      * Untagging can still be done via the Tag text field but is less precise and may end up deleting more than you wanted to.
+  * New subtags can be made from existing tags by dragging one tag on top of another, this will place the dragged tag as a 
+  sub tag of the target.
+* Breaking changes:
+  * Any databases created on versions 2.x or lower need to run the Migrate0_2_XTo0_3_X.sql
+  script. Any desired subtags will have to be created manually.
 
-| Hotkey       | Event                                                                                                                                |
-|--------------|--------------------------------------------------------------------------------------------------------------------------------------|
-| Ctrl-y       | Clears the file selection, with the selection buffer.                                                                                |
-| Ctrl-u       | Runs the given shell cmd as specified in the `Cmd` textfield.                                                                        |
-| Ctrl-i       | Previews the next image in the file selection. Consumes selection and adds to the buffer.                                            |
-| Ctrl-k       | Previews the previous image in the file selection. Consumes the buffer and pushes it back to the selection.                          |
-| Ctrl-j       | Changes the query's set arithmetic to the next value e.g. Union -> Intersect -> Diff                                                 |
-| Ctrl-Shift-j | Changes the query's arithmetic to the previous value e.g. Union -> Diff -> Intersect                                                 |
-| Ctrl-l       | Changes the query's query criteria to the next value e.g. Tag -> Pattern -> Relation -> Untagged                                     |
-| Ctrl-Shift-l | Changes the query's query criteria to the previous value e.g. Tag -> Untagged -> Relation -> Pattern                                 |
-| Ctrl-o       | Toggles between Tag and Untag mode                                                                                                   |
-| Ctrl-Shift-o | Toggles between Tag and Untag mode but in the opposite direction :^)                                                                 |
-| Ctrl-r       | Refreshes the application, searching for tag updates in the database, refreshing descriptor trees, and re-putting the image preview. |
-| Ctrl-t       | Toggles `Solo Tagging Mode`                                                                                                          |
+------
 
-### 0.3.3.0 -- 2022-05-24
+#### 0.2.0.1 -- 2022-05-02
 
-* Introducing some command line arguments.
-  * -v, --version, remains
-  * -q, --query [query], will take a query string written in TaggerQL and return a list of file paths.
+ * Fixed a bug with unioning results into a BufferList. Should hopefully no longer union duplicate files into the selection BufferList.
 
-### 0.3.4.0 -- 2022-06-11
+------
 
-* Added some new command line options.
-  * -h, --help, displays usage info.
-  * -f, --database-file [path], sets a file to perform operations on. Possible operations are:
-    * -r, --remove, removes the file from the database.
-    * -m, --move [path], specify a path to move the given file to.
-    * --delete deletes, a file from both the database and the system.
-    It is recommended to remove a file then delete it, but deleting a file with this option
-    should be completely safe.
-  * -a, --add [path], a files at the given path to the database.
-  * -p, --database-path [path], specifies the database for tagger to open.
-  Specifying this option will temporarily override the database path given in tagger's config
-  and any CLI options or operations done with tagger's GUI will use the database specified with this option.
-* Changed the ShellCMD functionality to output ExitSuccess or other messages from completed commands to stderr instead of stdout.
+## 0.2.0.0 -- 2022-05-01
 
-#### 0.3.4.1 -- 2022-06-13
+![image](Doc/doc_tan.jpg)
+* Added a new Representative File feature:
+  * Added a new table `Representative`
+    * This table creates links between a descriptor and an image. The purpose of creating
+    Representative links is to provide a quintessential example of what a descriptor is meant
+    to convey when it tags a file. It is meant to be used as an aid for tagging, rather than querying.
+    Shell commands cannot be performed on a Representative file that is being previewed, nor can it be tagged.
+  * Representative files are viewed in the `Descriptor` config page.
+    * From the Descriptor tree structure of the database, drag a descriptor into the Representative box.
+    If there is a representative file for a given Descriptor it will be displayed, otherwise nothing will happen.
+  * To create a Representative file, in the main page of the application, drag an image or filename from either the active image preview or the image selection buffer.
+    Then drop it onto the descriptor, in the Main descriptor widget on the bottom left, that you want to create a representative link for.
+    A box will appear around a given descriptor as you drag a file over it to show you which descriptor a link will be created for.
+* Minor fixes involving the lazy selection buffer. When unioning, intersecting, or diffing a new query.
+The buffer will not flush but rather be unioned, intersected, or diffed appropriately with the contents of the new query selection.
+* Added new fields to the config file: `style`, `style.font`, and `style.window`.
+  * `style.font` takes three keys, `regular`, `thin`, and `bold`. These are paths to a font for tagger to use.
+  * `style.window` takes three keys. `maximize`, `window_size_x`, and `window_size_y`.
+    * `maximize` is a boolean, if true the window is maximized on start-up.
+    The other two keys are the x and y sizes to use for the window if false.
+* Moved the `Shell Command` used on startup to the config file under the key `shell_command`.
+  * Exporting the config will now export the current shell command as well.
 
-* Changed VCS from git to fossil.
+------
+
+#### 0.1.4.1 -- 2022-04-30
+
+* Fixed a bug with the lazy selection that would flush the buffer when an image was tagged.
+* Fixed a bug where shuffling an empty selection would result in an infinite hang.
+
+------
+
+### 0.1.4.0 -- 2022-04-30
+
+* Added the FileSelection widget back in.
+  * It uses a lazy buffer that can be loaded or flushed for a more responsive GUI.
+  * Uses a new config field ```selection.buffer_size = int``` to determine how many elements to load.
+  * Added buttons to load, load all, flush, and shuffle the file selection.
+* Improved styling of the ImagePreview widget.
+  * Added a filename to the top left.
+  * Made it a drop target for FileWithTags.
+    * Dropping a file from the fileSelection Widget into the image preview widget will open a preview of that file.
+      * Does not change the order in which images are cycled via Ctrl-i or -k.
+  * Made it a draggable FileWithTags.
+    * There aren't currently any other widgets that are drop targets for this message type.
+
+------
+
+### 0.1.3.0 -- 2022-04-27
+
+* Added a field to rename descriptors.
+  * In the Descriptor configuration page.
+
+------
+
+#### 0.1.2.1 -- 2022-04-27
+
+* Added a command line option `-v, --version` to see the program version.
+
+------
+
+### 0.1.2.0 -- 2022-04-26
+
+* Adjusted the Cmd so that, if Solo Tagging Mode is enabled, the shell cmd
+will take the file currently previewed as the command's only argument.
+If Solo Tagging Mode is not enabled or there is no file previewed then all files in the
+selection are arguments to the shell cmd.
+  * The argument substitution keyword is still '`%file`'
+
+------
+
+### 0.1.1.0 -- 2022-04-25
+
+* Added a new configuration table and field: 
+  * [descriptor_tree]
+    * main_request
+      * A text field with the name of a descriptor for the main descriptor tree widget 
+      to request when the refresh button is pushed.
+* Also added a 'Descriptor' configuration page.
+  * Can change the value of descriptor_tree.main_request there.
+  * Can also view a similar version of the main descriptor tree widget there.
+* Stopped the descriptors in the #UNRELATED# tree widget from sending request events
+to the main tree widget when clicked.
+
+------
+
+## 0.1.0.0 -- 2022-04-23
+
+* First version. Released on an unsuspecting world.
