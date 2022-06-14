@@ -72,5 +72,15 @@ executable tagger
                       ,time == 1.9.3
                       ,type-iso
                       ,raw-strings-qq
+                      ,tagger-lib
   hs-source-dirs:      app
+  default-language:    Haskell2010
+
+library tagger-lib
+  exposed-modules:     Database.Tagger
+  -- other-modules:
+  -- other-extensions:
+  hs-source-dirs:      lib
+  ghc-options:         -Wall
+  build-depends:       base ^>=4.13.0.0
   default-language:    Haskell2010
