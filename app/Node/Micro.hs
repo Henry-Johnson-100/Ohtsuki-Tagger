@@ -853,32 +853,33 @@ imageDetailWidget m =
               flipInSelectionOrderingButton
                 . (\(OrderingMode _ d) -> d)
                 $ m ^. fileSelectionModel . selectionDetailsOrdering
-            ],
-          spacer,
-          hstack_
-            []
-            [ spacer,
-              flip styleBasic [border 1 black]
-                . vscroll_ [wheelRate 50]
-                . vstack_ []
-                . map imageDetailDescriptor
-                . sortDescriptorIntTuple
-                  (m ^. fileSelectionModel . selectionDetailsOrdering)
-                -- this is total jank but it works now
-                $ ( let selD =
-                          (\xs -> if null xs then [] else L.foldl1' union xs)
-                            . map (HashSet.toList . HashSet.map tagDescriptor . tags) -- #FIXME
-                            . cCollect
-                            $ m ^. fileSelectionModel . fileSelection
-                        om =
-                          foldOccurrences
-                            . map tagDescriptor
-                            . concatMap (HashSet.toList . tags) -- #FIXME
-                            . cCollect
-                            $ m ^. fileSelectionModel . fileSelection
-                     in decodeOccurrencesWith selD om
-                  )
             ]
+          --   ,
+          -- spacer,
+          -- hstack_
+          --   []
+          --   [ spacer,
+          --     flip styleBasic [border 1 black]
+          --       . vscroll_ [wheelRate 50]
+          --       . vstack_ []
+          --       . map imageDetailDescriptor
+          --       . sortDescriptorIntTuple
+          --         (m ^. fileSelectionModel . selectionDetailsOrdering)
+          --       -- this is total jank but it works now
+          --       $ ( let selD =
+          --                 (\xs -> if null xs then [] else L.foldl1' union xs)
+          --                   . map (HashSet.toList . HashSet.map tagDescriptor . tags) -- #FIXME
+          --                   . cCollect
+          --                   $ m ^. fileSelectionModel . fileSelection
+          --               om =
+          --                 foldOccurrences
+          --                   . map tagDescriptor
+          --                   . concatMap (HashSet.toList . tags) -- #FIXME
+          --                   . cCollect
+          --                   $ m ^. fileSelectionModel . fileSelection
+          --            in decodeOccurrencesWith selD om
+          --         )
+          --   ]
         ]
       where
         sortDescriptorIntTuple ::

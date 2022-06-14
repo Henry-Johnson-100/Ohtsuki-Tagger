@@ -105,7 +105,7 @@ instance Ord RootedDescriptorTree where
   compare trx try = compare (_rootTree trx) (_rootTree try)
 
 data FileSelectionModel = FileSelectionModel
-  { _fsmFileSelection :: !(BufferList FileWithTags),
+  { _fsmFileSelection :: !(BufferList File),
     _fsmSetArithmetic :: !FileSetArithmetic,
     _fsmQueryCriteria :: !QueryCriteria,
     _fsmQueryText :: !Text,

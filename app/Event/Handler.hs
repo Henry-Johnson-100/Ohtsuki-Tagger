@@ -250,26 +250,26 @@ singleFileEventHandler _ _ model event =
       [ model *~ (singleFileModel . singleFile) .~ mfwt,
         asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
       ]
-    SingleFileNextFromFileSelection ->
-      let !ps = cPop $ model ^. fileSelectionModel . fileSelection
-          !mi = cHead ps
-       in [ Model
-              . ((fileSelectionModel . fileSelection) .~ ps)
-              . ((singleFileModel . singleFile) .~ mi)
-              . (doSoloTag .~ True)
-              $ model,
-            asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
-          ]
-    SingleFilePrevFromFileSelection ->
-      let !ps = cDequeue $ model ^. fileSelectionModel . fileSelection
-          !mi = cHead ps
-       in [ Model
-              . ((fileSelectionModel . fileSelection) .~ ps)
-              . ((singleFileModel . singleFile) .~ mi)
-              . (doSoloTag .~ True)
-              $ model,
-            asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
-          ]
+    -- SingleFileNextFromFileSelection -> --#FIXME
+    --   let !ps = cPop $ model ^. fileSelectionModel . fileSelection
+    --       !mi = cHead ps
+    --    in [ Model
+    --           . ((fileSelectionModel . fileSelection) .~ ps)
+    --           . ((singleFileModel . singleFile) .~ mi)
+    --           . (doSoloTag .~ True)
+    --           $ model,
+    --         asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
+    --       ]
+    -- SingleFilePrevFromFileSelection ->
+    --   let !ps = cDequeue $ model ^. fileSelectionModel . fileSelection
+    --       !mi = cHead ps
+    --    in [ Model
+    --           . ((fileSelectionModel . fileSelection) .~ ps)
+    --           . ((singleFileModel . singleFile) .~ mi)
+    --           . (doSoloTag .~ True)
+    --           $ model,
+    --         asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
+    --       ]
     SingleFilePutTagCounts_ tcs -> [model *~ (singleFileModel . tagCounts) .~ tcs]
     SingleFileGetTagCounts ->
       [ dbConnTask
@@ -313,61 +313,61 @@ fileSelectionEventHandler ::
   [AppEventResponse TaggerModel TaggerEvent]
 fileSelectionEventHandler _ _ model event =
   case event of
-    FileSelectionUpdate fwts ->
-      [ model *~ (fileSelectionModel . fileSelection)
-          .~ ( doSetAction
-                 (model ^. (fileSelectionModel . setArithmetic))
-                 fwtFileEqual
-                 (model ^. (fileSelectionModel . fileSelection))
-                 . cFromList
-                 $ fwts
-             )
-      ]
-    FileSelectionPut bfwts ->
-      [ model *~ (fileSelectionModel . fileSelection) .~ bfwts
-      ]
-    FileSelectionBufferPut fwts ->
-      [ model *~ fileSelectionModel . fileSelection . buffer .~ fwts
-      ]
-    FileSelectionListPut fwts ->
-      [ model *~ fileSelectionModel . fileSelection . list .~ fwts
-      ]
-    FileSelectionRefresh_ ->
-      [ dbConnTask
-          (DoFileSelectionEvent . FileSelectionBufferPut)
-          (flip getRefreshedFWTs $ model ^. fileSelectionModel . fileSelection . buffer)
-          (model ^. dbConn),
-        dbConnTask
-          (DoFileSelectionEvent . FileSelectionListPut)
-          (flip getRefreshedFWTs $ model ^. fileSelectionModel . fileSelection . list)
-          (model ^. dbConn),
-        dbConnTask
-          (DoSingleFileEvent . SingleFileMaybePut)
-          ( \activeConn ->
-              do
-                mrefreshed <-
-                  M.maybe
-                    (return [])
-                    (getRefreshedFWTs activeConn . (: []))
-                    (model ^. (singleFileModel . singleFile))
-                return . head' $ mrefreshed
-          )
-          (model ^. dbConn)
-      ]
-    FileSelectionCommitQueryText ->
-      [ dbConnTask
-          (DoFileSelectionEvent . FileSelectionPut)
-          ( \activeDbConn ->
-              runQuery
-                activeDbConn
-                (model ^. fileSelectionModel . setArithmetic)
-                (model ^. fileSelectionModel . queryCriteria)
-                (model ^. fileSelectionModel . fileSelection)
-                (model ^. fileSelectionModel . queryText)
-          )
-          (model ^. dbConn),
-        asyncEvent (DoFileSelectionEvent FileSelectionQueryTextClear)
-      ]
+    -- FileSelectionUpdate fwts -> -- #FIXME
+    --   [ model *~ (fileSelectionModel . fileSelection)
+    --       .~ ( doSetAction
+    --              (model ^. (fileSelectionModel . setArithmetic))
+    --              fwtFileEqual
+    --              (model ^. (fileSelectionModel . fileSelection))
+    --              . cFromList
+    --              $ fwts
+    --          )
+    --   ]
+    -- FileSelectionPut bfwts -> --#FIXME
+    --   [ model *~ (fileSelectionModel . fileSelection) .~ bfwts
+    --   ]
+    -- FileSelectionBufferPut fwts ->
+    --   [ model *~ fileSelectionModel . fileSelection . buffer .~ fwts
+    --   ]
+    -- FileSelectionListPut fwts ->
+    --   [ model *~ fileSelectionModel . fileSelection . list .~ fwts
+    --   ]
+    -- FileSelectionRefresh_ ->
+    --   [ dbConnTask
+    --       (DoFileSelectionEvent . FileSelectionBufferPut)
+    --       (flip getRefreshedFWTs $ model ^. fileSelectionModel . fileSelection . buffer)
+    --       (model ^. dbConn),
+    --     dbConnTask
+    --       (DoFileSelectionEvent . FileSelectionListPut)
+    --       (flip getRefreshedFWTs $ model ^. fileSelectionModel . fileSelection . list)
+    --       (model ^. dbConn),
+    --     dbConnTask
+    --       (DoSingleFileEvent . SingleFileMaybePut)
+    --       ( \activeConn ->
+    --           do
+    --             mrefreshed <-
+    --               M.maybe
+    --                 (return [])
+    --                 (getRefreshedFWTs activeConn . (: []))
+    --                 (model ^. (singleFileModel . singleFile))
+    --             return . head' $ mrefreshed
+    --       )
+    --       (model ^. dbConn)
+    --   ]
+    -- FileSelectionCommitQueryText ->
+    --   [ dbConnTask
+    --       (DoFileSelectionEvent . FileSelectionPut)
+    --       ( \activeDbConn ->
+    --           runQuery
+    --             activeDbConn
+    --             (model ^. fileSelectionModel . setArithmetic)
+    --             (model ^. fileSelectionModel . queryCriteria)
+    --             (model ^. fileSelectionModel . fileSelection)
+    --             (model ^. fileSelectionModel . queryText)
+    --       )
+    --       (model ^. dbConn),
+    --     asyncEvent (DoFileSelectionEvent FileSelectionQueryTextClear)
+    --   ]
     FileSelectionClear ->
       [ model *~ (fileSelectionModel . fileSelection) .~ emptyBufferList,
         asyncEvent (DoFileSelectionEvent FileSelectionQueryTextClear)
@@ -385,20 +385,20 @@ fileSelectionEventHandler _ _ model event =
       [model *~ (fileSelectionModel . queryCriteria) %~ next]
     FileSelectionPrevQueryCriteria ->
       [model *~ (fileSelectionModel . queryCriteria) %~ prev]
-    FileSelectionShuffle ->
-      let !shuffledBufferList =
-            shuffleBufferList $ model ^. fileSelectionModel . fileSelection
-       in [ Task
-              ( DoFileSelectionEvent
-                  . FileSelectionBufferPut
-                  <$> fmap _buffer shuffledBufferList
-              ),
-            Task
-              ( DoFileSelectionEvent
-                  . FileSelectionListPut
-                  <$> fmap _list shuffledBufferList
-              )
-          ]
+    -- FileSelectionShuffle -> -- #FIXME
+    --   let !shuffledBufferList =
+    --         shuffleBufferList $ model ^. fileSelectionModel . fileSelection
+    --    in [ Task
+    --           ( DoFileSelectionEvent
+    --               . FileSelectionBufferPut
+    --               <$> fmap _buffer shuffledBufferList
+    --           ),
+    --         Task
+    --           ( DoFileSelectionEvent
+    --               . FileSelectionListPut
+    --               <$> fmap _list shuffledBufferList
+    --           )
+    --       ]
     LazyBufferLoad ->
       [ model *~ fileSelectionModel . fileSelection
           %~ takeToBuffer (model ^. programConfig . selectionconf . selectionBufferSize)
@@ -493,23 +493,23 @@ taggerEventHandler wenv node model event =
            )
     ToggleDoSoloTag ->
       [model *~ (doSoloTag .~ not (model ^. doSoloTag))]
-    ShellCmd ->
-      [ Task
-          ( IOEvent
-              <$> runShellCmds
-                (words . T.unpack $ model ^. programConfig . shellCmd)
-                ( if model ^. doSoloTag && M.isJust singlefwt
-                    then (: []) . fwtPath . M.fromJust $ singlefwt
-                    else selectionFwts
-                )
-          )
-      ]
-      where
-        fwtPath = T.unpack . filePath . file
-        selectionFwts =
-          map fwtPath . cCollect $
-            model ^. fileSelectionModel . fileSelection
-        singlefwt = model ^. singleFileModel . singleFile
+    -- ShellCmd -> -- #FIXME
+    --   [ Task
+    --       ( IOEvent
+    --           <$> runShellCmds
+    --             (words . T.unpack $ model ^. programConfig . shellCmd)
+    --             ( if model ^. doSoloTag && M.isJust singlefwt
+    --                 then (: []) . fwtPath . M.fromJust $ singlefwt
+    --                 else selectionFwts
+    --             )
+    --       )
+    --   ]
+    --   where
+    --     fwtPath = T.unpack . filePath . file
+    --     selectionFwts =
+    --       map fwtPath . cCollect $
+    --         model ^. fileSelectionModel . fileSelection
+    --     singlefwt = model ^. singleFileModel . singleFile
     IOEvent _ -> []
     TagCommitTagsString ->
       [ asyncEvent $
@@ -533,21 +533,21 @@ taggerEventHandler wenv node model event =
           (model ^. dbConn),
         asyncEvent (DoFileSelectionEvent FileSelectionRefresh_)
       ]
-    TagCommitTagsStringDoSelection ->
-      [ dbConnTask
-          IOEvent
-          ( \activeConn ->
-              ( if isUntagMode (model ^. taggingMode)
-                  then untag
-                  else tag
-              )
-                activeConn
-                (cCollect $ model ^. (fileSelectionModel . fileSelection))
-                (parseQuery $ model ^. tagsString)
-          )
-          (model ^. dbConn),
-        asyncEvent (DoFileSelectionEvent FileSelectionRefresh_)
-      ]
+    -- TagCommitTagsStringDoSelection -> -- #FIXME
+    --   [ dbConnTask
+    --       IOEvent
+    --       ( \activeConn ->
+    --           ( if isUntagMode (model ^. taggingMode)
+    --               then untag
+    --               else tag
+    --           )
+    --             activeConn
+    --             (cCollect $ model ^. (fileSelectionModel . fileSelection))
+    --             (parseQuery $ model ^. tagsString)
+    --       )
+    --       (model ^. dbConn),
+    --     asyncEvent (DoFileSelectionEvent FileSelectionRefresh_)
+    --   ]
     TaggingModeNext -> [model *~ taggingMode %~ next]
     TaggingModePrev -> [model *~ taggingMode %~ prev]
     NewFileTextCommit ->
