@@ -214,9 +214,9 @@ databaseConfigurePage =
         "Database to load:"
         dbPathTextField,
       spacer,
-      labeledWidget
-        "Database to backup to:"
-        dbBackupTextField,
+      -- labeledWidget -- #FIXME related to the new backup scheme
+      --   "Database to backup to:"
+      --   dbBackupTextField,
       spacer,
       dbAutoConnectCheckBox,
       databaseConnectButton,

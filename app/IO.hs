@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module IO
@@ -16,7 +15,7 @@ module IO
   )
 where
 
-import Control.Monad (unless, when, (<=<))
+import Control.Monad (unless, void, when, (<=<))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except
   ( ExceptT,
@@ -37,6 +36,7 @@ import Database.SQLite.Simple
     query_,
   )
 import qualified Database.SQLite3 as DirectSqlite
+import Database.Tagger.Script (runScript, schemaDefinition)
 import qualified Paths_tagger
 import System.Console.GetOpt
 import System.Directory
@@ -47,7 +47,7 @@ import System.Process
 import System.Random
 import System.Random.Shuffle
 import Toml (decodeFileEither, prettyTomlDecodeErrors)
-import Type.Config (TaggerConfig, taggerConfigCodec)
+import Type.Config
 import Util.Core (head')
 
 class Show e => Exception e where
@@ -141,28 +141,55 @@ getConfigDbConn =
     (emap ("Configuration error when opening database connection:\n" ++))
     . validateFilePath
 
-runInitScript :: FilePath -> Connection -> IO ()
-runInitScript pathToScript c = do
-  let cHandle = connectionHandle c
-  initHandle <- openFile pathToScript ReadMode
-  initContents <- hGetContents initHandle
-  DirectSqlite.exec cHandle . T.pack $ initContents
-  hClose initHandle
+runInitScript :: Connection -> IO ()
+runInitScript = runScript schemaDefinition
 
 touch :: FilePath -> IO ()
 touch = hClose <=< flip openFile WriteMode
 
-backupDbConn :: Connection -> FilePath -> IO ()
-backupDbConn c backupTo = do
-  let currentHandle = connectionHandle c
-  backupFileExists <- doesFileExist backupTo
-  unless backupFileExists (touch backupTo)
-  updateLastBackupDateTime c
-  backupHandle <- fmap connectionHandle . open $ backupTo
-  backupProcess <- DirectSqlite.backupInit backupHandle "main" currentHandle "main"
-  _ <- DirectSqlite.backupStep backupProcess (-1)
+-- |
+-- Gets the backup filepath from the database config.
+-- Shouldn't need to check if it actually exists or not.
+getBackupFilePath :: DatabaseConfig -> String
+getBackupFilePath dbConf =
+  if _dbconfInMemory dbConf
+    then T.unpack . _dbconfPath $ dbConf
+    else (T.unpack . _dbconfPath $ dbConf) <.> ".backup"
+
+-- | Backup the first database to the second.
+--
+-- Does not update any backup times or anything.
+directBackup :: DirectSqlite.Database -> DirectSqlite.Database -> IO ()
+directBackup m b = do
+  backupProcess <- DirectSqlite.backupInit b "main" m "main"
+  void $ DirectSqlite.backupStep backupProcess (-1)
   DirectSqlite.backupFinish backupProcess
-  hPutStrLn stderr "Backup complete"
+
+-- | Automatically backup the connection based on the database path and whether or not
+-- the database is in memory.
+saveToBackup :: Connection -> DatabaseConfig -> IO ()
+saveToBackup c = saveToPath c . getBackupFilePath
+
+-- | Backup the connection to any given path.
+saveToPath :: Connection -> FilePath -> IO ()
+saveToPath c backupPath = do
+  let currentHandle = connectionHandle c
+  updateLastBackupDateTime c
+  backupHandle <- fmap connectionHandle . open $ backupPath
+  directBackup currentHandle backupHandle
+  hPutStrLn stderr $ "Save to: " ++ backupPath ++ " complete."
+
+loadFromBackup :: Connection -> DatabaseConfig -> IO ()
+loadFromBackup c = loadFromPath c . getBackupFilePath
+
+loadFromPath :: Connection -> FilePath -> IO ()
+loadFromPath c backupPath = do
+  let currentHandle = connectionHandle c
+  backupExists <- doesFileExist backupPath
+  when backupExists $ do
+    backupHandle <- fmap connectionHandle . open $ backupPath
+    directBackup backupHandle currentHandle
+    hPutStrLn stderr $ "Loaded database from: " ++ backupPath
 
 taggerDBInfoTableExists :: Connection -> IO Bool
 taggerDBInfoTableExists c = do

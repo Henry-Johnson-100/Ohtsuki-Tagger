@@ -40,9 +40,8 @@ taggerConfigCodec =
 
 data DatabaseConfig = DatabaseConfig
   { _dbconfPath :: !T.Text,
-    _dbconfBackup :: !T.Text,
-    _dbconfInit :: !T.Text,
-    _dbconfAutoConnect :: !Bool
+    _dbconfAutoConnect :: !Bool,
+    _dbconfInMemory :: !Bool
   }
   deriving (Show, Eq)
 
@@ -50,9 +49,8 @@ databaseConfigCodec :: Toml.TomlCodec DatabaseConfig
 databaseConfigCodec =
   DatabaseConfig
     <$> Toml.text "path" .= _dbconfPath
-    <*> Toml.text "backup" .= _dbconfBackup
-    <*> Toml.text "init" .= _dbconfInit
     <*> Toml.bool "auto_connect" .= _dbconfAutoConnect
+    <*> Toml.bool "in_memory" .= _dbconfInMemory
 
 data SelectionConfig = SelectionConfig
   { _selectionDisplayParents :: !Int,

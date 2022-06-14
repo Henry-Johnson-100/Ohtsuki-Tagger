@@ -31,6 +31,7 @@ executable tagger
                       ,Database.Tagger.Type
                       ,Database.Tagger.Access
                       ,Database.Tagger.Access.RowMap
+                      ,Database.Tagger.Script
                       ,IO
                       ,Util.Core
                       ,Paths_tagger
@@ -70,5 +71,6 @@ executable tagger
                       ,parsec == 3.1.14.0
                       ,time == 1.9.3
                       ,type-iso
+                      ,raw-strings-qq
   hs-source-dirs:      app
   default-language:    Haskell2010

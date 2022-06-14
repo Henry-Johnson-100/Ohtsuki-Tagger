@@ -92,7 +92,6 @@ import Type.Model
     HasTagsString (tagsString),
     HasUnrelatedDescriptorTree (unrelatedDescriptorTree),
     Intersectable (diffBy, intersectBy, unionBy),
-    OrderingMode (OrderingMode),
     ProgramVisibility (Main),
     TaggedConnection (TaggedConnection),
     TaggedConnectionEvent (..),
@@ -100,10 +99,7 @@ import Type.Model
     TaggerModel,
     dbconf,
     dbconfAutoConnect,
-    dbconfBackup,
-    dbconfInit,
     dbconfPath,
-    isUntagMode,
     rootName,
     rootTree,
     selectionBufferSize,
@@ -543,7 +539,7 @@ taggerEventHandler wenv node model event =
     DatabaseInitialize ->
       [ dbConnTask
           IOEvent
-          (IO.runInitScript (T.unpack $ model ^. (programConfig . dbconf . dbconfInit)))
+          IO.runInitScript
           (model ^. dbConn)
       ]
     ToggleVisibilityMode vm ->
@@ -581,17 +577,17 @@ taggerEventHandler wenv node model event =
                      RefreshDescriptorTree unrelatedDescriptorTree
                    ]
            )
-    DatabaseBackup ->
-      [ dbConnTask
-          (DoTaggedConnectionEvent . TaggedConnectionPutLastBackup)
-          ( \c -> do
-              IO.backupDbConn
-                c
-                (T.unpack $ model ^. programConfig . dbconf . dbconfBackup)
-              IO.getLastBackupDateTime c
-          )
-          (model ^. dbConn)
-      ]
+    -- DatabaseBackup -> -- #FIXME related to the new database backup scheme, see the Unreleased CHANGELOG entry.
+    --   [ dbConnTask
+    --       (DoTaggedConnectionEvent . TaggedConnectionPutLastBackup)
+    --       ( \c -> do
+    --           IO.saveToBackup
+    --             c
+    --             (T.unpack $ model ^. programConfig . dbconf . dbconfBackup)
+    --           IO.getLastBackupDateTime c
+    --       )
+    --       (model ^. dbConn)
+    --   ]
     DatabaseClose ->
       [ Task
           ( IOEvent

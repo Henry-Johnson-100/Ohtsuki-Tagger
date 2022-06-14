@@ -48,6 +48,9 @@ cradle:
     - path: "./app/Database/Tagger/Access/RowMap.hs"
       component: "tagger:exe:tagger"
 
+    - path: "./app/Database/Tagger/Script.hs"
+      component: "tagger:exe:tagger"
+
     - path: "./app/IO.hs"
       component: "tagger:exe:tagger"
 

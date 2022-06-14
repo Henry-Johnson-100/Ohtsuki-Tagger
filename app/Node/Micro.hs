@@ -326,9 +326,9 @@ dbPathTextField ::
   WidgetNode s TaggerEvent
 dbPathTextField = textField (programConfig . dbconf . dbconfPath)
 
-dbBackupTextField ::
-  (WidgetModel s, HasProgramConfig s TaggerConfig) => WidgetNode s TaggerEvent
-dbBackupTextField = textField (programConfig . dbconf . dbconfBackup)
+-- dbBackupTextField :: -- #FIXME Related to the new backup scheme.
+--   (WidgetModel s, HasProgramConfig s TaggerConfig) => WidgetNode s TaggerEvent
+-- dbBackupTextField = textField (programConfig . dbconf . dbconfBackup)
 
 dbAutoConnectCheckBox ::
   (WidgetModel s, HasProgramConfig s TaggerConfig) =>
