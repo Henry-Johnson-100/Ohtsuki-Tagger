@@ -9,12 +9,19 @@ module Type.Model
 where
 
 import Control.Lens
+  ( abbreviatedFields,
+    makeLenses,
+    makeLensesWith,
+  )
 import Type.Config
+  ( DatabaseConfig,
+    DescriptorTreeConfig,
+    SelectionConfig,
+    TaggerConfig,
+  )
 import Type.Model.Prim
 
 makeLensesWith abbreviatedFields ''TaggerModel
-
-makeLensesWith abbreviatedFields ''SingleFileSelectionModel
 
 makeLensesWith abbreviatedFields ''FileSelectionModel
 
@@ -29,5 +36,7 @@ makeLenses ''SelectionConfig
 makeLenses ''DescriptorTreeConfig
 
 makeLenses ''RootedDescriptorTree
+
+makeLenses ''OccurrenceMap
 
 makeLensesWith abbreviatedFields ''TaggedConnection

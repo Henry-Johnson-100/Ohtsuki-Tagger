@@ -41,7 +41,8 @@ taggerApplicationUI _ model =
               model,
             visibility model Main
               . vsplit_ [splitIgnoreChildResize True]
-              $ ( fileSingleWidget model,
+              $ ( label "fileSingleWidget WIP lol", -- #FIXME
+                -- fileSingleWidget model,
                   box_ [alignBottom] $
                     hgrid
                       [ vstack

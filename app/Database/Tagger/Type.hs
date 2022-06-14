@@ -57,7 +57,6 @@ import qualified Data.Text as T
 import Database.SQLite.Simple (FromRow (..), Query, field)
 import qualified GHC.Generics as Generics
 import qualified IO
-import Util.Core (PrimaryKey (getId))
 
 {-
  ______   ___   _
@@ -121,9 +120,6 @@ instance Ord Descriptor where
 
 instance FromRow Descriptor where
   fromRow = Descriptor <$> field <*> field
-
-instance PrimaryKey Descriptor where
-  getId = descriptorId
 
 {-
  _____  _    ____

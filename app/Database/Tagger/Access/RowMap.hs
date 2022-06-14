@@ -5,7 +5,7 @@
 -- | Defines functions to map rows to types that do not have instances of FromRow.
 module Database.Tagger.Access.RowMap
   ( reduceDbFwtList,
-    descriptorOccurrenceMapParser,
+    -- descriptorOccurrenceMapParser,
   )
 where
 
@@ -20,7 +20,7 @@ import Database.Tagger.Type
     FileKey,
     TagKey,
   )
-import Util.Core (OccurrenceMap)
+import Util.Core
 
 type KeySet a = IntSet.IntSet
 
@@ -49,5 +49,5 @@ reduceDbFwtList = fromDbFwtMap . L.foldl' insertDbFwt Map.empty
     fromDbFwtMap = map (uncurry FileWithTags_ . biFunctor IntSet.toList) . Map.toList
     biFunctor f (x, y) = (x, f y)
 
-descriptorOccurrenceMapParser :: (Int, Int) -> OccurrenceMap Descriptor
-descriptorOccurrenceMapParser (dk, c) = IntMap.singleton dk c
+-- descriptorOccurrenceMapParser :: (Int, Int) -> OccurrenceMap Descriptor
+-- descriptorOccurrenceMapParser (dk, c) = IntMap.singleton dk c

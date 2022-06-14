@@ -9,12 +9,12 @@
 
 module Type.Model.Prim
   ( TaggerModel (..),
-    SingleFileSelectionModel (..),
     FileSelectionModel (..),
+    OccurrenceMap (..),
     DescriptorModel (..),
     RootedDescriptorTree (..),
     TaggerEvent (..),
-    SingleFileEvent (..),
+    -- SingleFileEvent (..),
     ConfigurationEvent (..),
     FileSelectionEvent (..),
     TaggedConnectionEvent (..),
@@ -40,7 +40,7 @@ module Type.Model.Prim
 where
 
 import Control.Lens (Lens')
-import qualified Data.IntMap.Strict as IntMap
+import qualified Data.HashMap.Strict as Map
 import qualified Data.List as L
 import qualified Data.Ord as O
 import Data.Text (Text)
@@ -51,17 +51,15 @@ import Database.Tagger.Type
     File,
     FileWithTags,
     Representative,
-    Tag,
   )
 import Type.BufferList
   ( BufferList,
   )
 import Type.Config (TaggerConfig)
-import Util.Core (OccurrenceMap)
 
 data TaggerModel = TaggerModel
   { _taggerFileSelectionModel :: !FileSelectionModel,
-    _taggerSingleFileModel :: !SingleFileSelectionModel,
+    -- _taggerSingleFileModel :: !SingleFileSelectionModel,
     _taggerDescriptorModel :: !DescriptorModel,
     _taggerDoSoloTag :: !Bool,
     _taggerDbConn :: !TaggedConnection,
@@ -104,16 +102,23 @@ instance Ord RootedDescriptorTree where
 
 data FileSelectionModel = FileSelectionModel
   { _fsmFileSelection :: !(BufferList File),
+    _fsmFilePreview :: !(Maybe FileWithTags),
+    _fsmDescriptorOccurrenceMap :: !(OccurrenceMap Text Descriptor),
     _fsmSetArithmetic :: !FileSetArithmetic,
     _fsmQueryCriteria :: !QueryCriteria,
-    _fsmQueryText :: !Text,
-    _fsmSelectionDetailsOrdering :: !OrderingMode
+    _fsmQueryText :: !Text
   }
   deriving (Show, Eq)
 
-data SingleFileSelectionModel = SingleFileSelectionModel
-  { _sfsmSingleFile :: !(Maybe FileWithTags),
-    _sfsmTagCounts :: !(OccurrenceMap Descriptor)
+-- data SingleFileSelectionModel = SingleFileSelectionModel
+--   { _sfsmSingleFile :: !(Maybe FileWithTags),
+--     _sfsmTagCounts :: !(OccurrenceMap Descriptor)
+--   }
+--   deriving (Show, Eq)
+
+data OccurrenceMap a b = OccurrenceMap
+  { _occurrenceMap :: Map.HashMap a b,
+    _occurrenceMapOrdering :: !OrderingMode
   }
   deriving (Show, Eq)
 
@@ -237,16 +242,16 @@ data ProgramVisibility
   | ProgramVisibilityDescriptor
   deriving (Eq, Show, Enum, Bounded, Cyclic)
 
-data SingleFileEvent
-  = SingleFileNextFromFileSelection
-  | SingleFilePrevFromFileSelection
-  | SingleFilePut !FileWithTags
-  | SingleFilePutTagCounts_ !(OccurrenceMap Descriptor)
-  | SingleFileGetTagCounts
-  | SingleFileMaybePut !(Maybe FileWithTags)
-  | SingleFileUntag !Tag
-  | SingleFileAssociateTag !Tag !Tag
-  deriving (Show, Eq)
+-- data SingleFileEvent
+--   = SingleFileNextFromFileSelection
+--   | SingleFilePrevFromFileSelection
+--   | SingleFilePut !FileWithTags
+--   | -- | SingleFilePutTagCounts_ !(OccurrenceMap Descriptor)
+--     SingleFileGetTagCounts
+--   | SingleFileMaybePut !(Maybe FileWithTags)
+--   | SingleFileUntag !Tag
+--   | SingleFileAssociateTag !Tag !Tag
+--   deriving (Show, Eq)
 
 data TaggedConnectionEvent
   = TaggedConnectionPutLastAccess !Text
@@ -302,21 +307,17 @@ type TextLens = Lens' TaggerModel Text
 
 data TaggerEvent
   = TaggerInit
-  | DoSingleFileEvent !SingleFileEvent
-  | DoConfigurationEvent !ConfigurationEvent
+  | -- | DoSingleFileEvent !SingleFileEvent
+    DoConfigurationEvent !ConfigurationEvent
   | DoFileSelectionEvent !FileSelectionEvent
   | DoDescriptorEvent !DescriptorEvent
   | DoTaggedConnectionEvent !TaggedConnectionEvent
-  | -- Triggers a functionality like 'cycle'
-    ToggleDoSoloTag
+  | ToggleDoSoloTag
   | DescriptorCreateRelation ![Descriptor] ![Descriptor]
   | DescriptorUnrelate ![Descriptor]
-  | -- Run the text as shell cmd
-    ShellCmd
-  | -- Receives nothing and does nothing
-    IOEvent !()
-  | -- Tag the selection with the current tagsString
-    TagCommitTagsString
+  | ShellCmd
+  | IOEvent !()
+  | TagCommitTagsString
   | TagCommitTagsStringDoSolo
   | TagCommitTagsStringDoSelection
   | TaggingModeNext
@@ -353,21 +354,22 @@ emptyFileSelectionModel =
       _fsmSetArithmetic = Union,
       _fsmQueryCriteria = ByTag,
       _fsmQueryText = "",
-      _fsmSelectionDetailsOrdering = OrderingMode Alphabetical Asc
+      _fsmFilePreview = Nothing,
+      _fsmDescriptorOccurrenceMap = emptyOccurrenceMap
     }
 
-emptySingleFileSelectionModel :: SingleFileSelectionModel
-emptySingleFileSelectionModel =
-  SingleFileSelectionModel
-    { _sfsmSingleFile = Nothing,
-      _sfsmTagCounts = IntMap.empty
-    }
+-- emptySingleFileSelectionModel :: SingleFileSelectionModel
+-- emptySingleFileSelectionModel =
+--   SingleFileSelectionModel
+--     { _sfsmSingleFile = Nothing,
+--       _sfsmTagCounts = IntMap.empty
+--     }
 
 emptyTaggerModel :: TaggerConfig -> TaggerModel
 emptyTaggerModel cfg =
   TaggerModel
     { _taggerFileSelectionModel = emptyFileSelectionModel,
-      _taggerSingleFileModel = emptySingleFileSelectionModel,
+      -- _taggerSingleFileModel = emptySingleFileSelectionModel,
       _taggerDescriptorModel = emptyDescriptorTreeModel,
       _taggerDoSoloTag = False,
       _taggerDbConn = TaggedConnection ":memory:" Nothing "Not Available" "Not Available",
@@ -385,3 +387,6 @@ isUntagMode _ = False
 
 plantTree :: DescriptorTree -> RootedDescriptorTree
 plantTree = RootedDescriptorTree "#ALL#"
+
+emptyOccurrenceMap :: OccurrenceMap a b
+emptyOccurrenceMap = OccurrenceMap Map.empty (OrderingMode Alphabetical Asc)

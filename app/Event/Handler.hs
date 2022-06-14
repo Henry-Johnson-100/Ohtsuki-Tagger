@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# HLINT ignore "Use ?~" #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# HLINT ignore "Redundant <$>" #-}
@@ -22,7 +21,6 @@ import qualified Data.Text as T
 import Database.SQLite.Simple (Connection, close, open)
 import Database.Tagger.Access
   ( activateForeignKeyPragma,
-    getDescriptorOccurrenceMap,
     lookupDescriptorPattern,
   )
 import Database.Tagger.Type
@@ -89,18 +87,13 @@ import Type.Model
     HasRenameDescriptorFrom (renameDescriptorFrom),
     HasRenameDescriptorTo (renameDescriptorTo),
     HasRepresentativeFile (representativeFile),
-    HasSelectionDetailsOrdering (selectionDetailsOrdering),
     HasSetArithmetic (setArithmetic),
-    HasSingleFile (singleFile),
-    HasSingleFileModel (singleFileModel),
-    HasTagCounts (tagCounts),
     HasTaggingMode (taggingMode),
     HasTagsString (tagsString),
     HasUnrelatedDescriptorTree (unrelatedDescriptorTree),
     Intersectable (diffBy, intersectBy, unionBy),
     OrderingMode (OrderingMode),
     ProgramVisibility (Main),
-    SingleFileEvent (..),
     TaggedConnection (TaggedConnection),
     TaggedConnectionEvent (..),
     TaggerEvent (..),
@@ -223,66 +216,66 @@ descriptorTreeEventHandler _ _ model event =
     maybeM_ :: Monad m => (a -> m ()) -> Maybe a -> m ()
     maybeM_ = M.maybe (pure ())
 
-singleFileEventHandler ::
-  WidgetEnv TaggerModel TaggerEvent ->
-  WidgetNode TaggerModel TaggerEvent ->
-  TaggerModel ->
-  SingleFileEvent ->
-  [AppEventResponse TaggerModel TaggerEvent]
-singleFileEventHandler _ _ model event =
-  case event of
-    SingleFilePut fwt ->
-      [ model *~ (singleFileModel . singleFile) .~ Just fwt,
-        asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
-      ]
-    SingleFileMaybePut mfwt ->
-      [ model *~ (singleFileModel . singleFile) .~ mfwt,
-        asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
-      ]
-    -- SingleFileNextFromFileSelection -> --#FIXME
-    --   let !ps = cPop $ model ^. fileSelectionModel . fileSelection
-    --       !mi = cHead ps
-    --    in [ Model
-    --           . ((fileSelectionModel . fileSelection) .~ ps)
-    --           . ((singleFileModel . singleFile) .~ mi)
-    --           . (doSoloTag .~ True)
-    --           $ model,
-    --         asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
-    --       ]
-    -- SingleFilePrevFromFileSelection ->
-    --   let !ps = cDequeue $ model ^. fileSelectionModel . fileSelection
-    --       !mi = cHead ps
-    --    in [ Model
-    --           . ((fileSelectionModel . fileSelection) .~ ps)
-    --           . ((singleFileModel . singleFile) .~ mi)
-    --           . (doSoloTag .~ True)
-    --           $ model,
-    --         asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
-    --       ]
-    SingleFilePutTagCounts_ tcs -> [model *~ (singleFileModel . tagCounts) .~ tcs]
-    SingleFileGetTagCounts ->
-      [ dbConnTask
-          (DoSingleFileEvent . SingleFilePutTagCounts_)
-          ( flip
-              getDescriptorOccurrenceMap
-              ( maybeWithList
-                  (map (descriptorId . tagDescriptor) . HashSet.toList . tags) -- #FIXME
-                  $ model ^. singleFileModel . singleFile
-              )
-          )
-          (model ^. dbConn)
-      ]
-    SingleFileUntag t ->
-      [ dbConnTask IOEvent (\c -> untagWithTag c [t]) (model ^. dbConn),
-        asyncEvent (DoFileSelectionEvent FileSelectionRefresh_)
-      ]
-    SingleFileAssociateTag tWith t ->
-      [ dbConnTask
-          IOEvent
-          (\c -> associateTag c tWith t)
-          (model ^. dbConn),
-        asyncEvent (DoFileSelectionEvent FileSelectionRefresh_)
-      ]
+-- singleFileEventHandler ::
+--   WidgetEnv TaggerModel TaggerEvent ->
+--   WidgetNode TaggerModel TaggerEvent ->
+--   TaggerModel ->
+--   SingleFileEvent ->
+--   [AppEventResponse TaggerModel TaggerEvent]
+-- singleFileEventHandler _ _ model event =
+--   case event of
+--     SingleFilePut fwt ->
+--       [ model *~ (singleFileModel . singleFile) .~ Just fwt,
+--         asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
+--       ]
+--     SingleFileMaybePut mfwt ->
+--       [ model *~ (singleFileModel . singleFile) .~ mfwt,
+--         asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
+--       ]
+--     -- SingleFileNextFromFileSelection -> --#FIXME
+--     --   let !ps = cPop $ model ^. fileSelectionModel . fileSelection
+--     --       !mi = cHead ps
+--     --    in [ Model
+--     --           . ((fileSelectionModel . fileSelection) .~ ps)
+--     --           . ((singleFileModel . singleFile) .~ mi)
+--     --           . (doSoloTag .~ True)
+--     --           $ model,
+--     --         asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
+--     --       ]
+--     -- SingleFilePrevFromFileSelection ->
+--     --   let !ps = cDequeue $ model ^. fileSelectionModel . fileSelection
+--     --       !mi = cHead ps
+--     --    in [ Model
+--     --           . ((fileSelectionModel . fileSelection) .~ ps)
+--     --           . ((singleFileModel . singleFile) .~ mi)
+--     --           . (doSoloTag .~ True)
+--     --           $ model,
+--     --         asyncEvent (DoSingleFileEvent SingleFileGetTagCounts)
+--     --       ]
+--     SingleFilePutTagCounts_ tcs -> [model *~ (singleFileModel . tagCounts) .~ tcs]
+--     SingleFileGetTagCounts ->
+--       [ dbConnTask
+--           (DoSingleFileEvent . SingleFilePutTagCounts_)
+--           ( flip
+--               getDescriptorOccurrenceMap
+--               ( maybeWithList
+--                   (map (descriptorId . tagDescriptor) . HashSet.toList . tags) -- #FIXME
+--                   $ model ^. singleFileModel . singleFile
+--               )
+--           )
+--           (model ^. dbConn)
+--       ]
+--     SingleFileUntag t ->
+--       [ dbConnTask IOEvent (\c -> untagWithTag c [t]) (model ^. dbConn),
+--         asyncEvent (DoFileSelectionEvent FileSelectionRefresh_)
+--       ]
+--     SingleFileAssociateTag tWith t ->
+--       [ dbConnTask
+--           IOEvent
+--           (\c -> associateTag c tWith t)
+--           (model ^. dbConn),
+--         asyncEvent (DoFileSelectionEvent FileSelectionRefresh_)
+--       ]
 
 configurationEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -398,15 +391,16 @@ fileSelectionEventHandler _ _ model event =
     LazyBufferFlush ->
       [ model *~ fileSelectionModel . fileSelection %~ emptyBuffer
       ]
-    FlipInSelectionOrdering ->
-      [ model *~ fileSelectionModel . selectionDetailsOrdering
-          %~ (\(OrderingMode b d) -> OrderingMode b (next d))
-      ]
-    CycleInSelectionOrderingBy ->
-      [ model
-          *~ fileSelectionModel . selectionDetailsOrdering
-            %~ (\(OrderingMode b d) -> OrderingMode (next b) d)
-      ]
+
+-- FlipInSelectionOrdering -> -- #FIXME
+--   [ model *~ fileSelectionModel . selectionDetailsOrdering
+--       %~ (\(OrderingMode b d) -> OrderingMode b (next d))
+--   ]
+-- CycleInSelectionOrderingBy ->
+--   [ model
+--       *~ fileSelectionModel . selectionDetailsOrdering
+--         %~ (\(OrderingMode b d) -> OrderingMode (next b) d)
+--   ]
 
 taggedConnectionEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -439,7 +433,7 @@ taggerEventHandler wenv node model event =
                   False
               )
           ]
-    DoSingleFileEvent evt -> singleFileEventHandler wenv node model evt
+    -- DoSingleFileEvent evt -> singleFileEventHandler wenv node model evt
     DoConfigurationEvent evt -> configurationEventHandler wenv node model evt
     DoFileSelectionEvent evt -> fileSelectionEventHandler wenv node model evt
     DoDescriptorEvent evt -> descriptorTreeEventHandler wenv node model evt
@@ -507,21 +501,21 @@ taggerEventHandler wenv node model event =
             else TagCommitTagsStringDoSelection,
         asyncEvent TagsStringClear
       ]
-    TagCommitTagsStringDoSolo ->
-      [ dbConnTask
-          IOEvent
-          ( \activeConn ->
-              ( if isUntagMode (model ^. taggingMode)
-                  then untag
-                  else tag
-              )
-                activeConn
-                (M.maybeToList $ model ^. (singleFileModel . singleFile))
-                (parseQuery $ model ^. tagsString)
-          )
-          (model ^. dbConn),
-        asyncEvent (DoFileSelectionEvent FileSelectionRefresh_)
-      ]
+    -- TagCommitTagsStringDoSolo -> -- #FIXME
+    --   [ dbConnTask
+    --       IOEvent
+    --       ( \activeConn ->
+    --           ( if isUntagMode (model ^. taggingMode)
+    --               then untag
+    --               else tag
+    --           )
+    --             activeConn
+    --             (M.maybeToList $ model ^. (singleFileModel . singleFile))
+    --             (parseQuery $ model ^. tagsString)
+    --       )
+    --       (model ^. dbConn),
+    --     asyncEvent (DoFileSelectionEvent FileSelectionRefresh_)
+    --   ]
     -- TagCommitTagsStringDoSelection -> -- #FIXME
     --   [ dbConnTask
     --       IOEvent

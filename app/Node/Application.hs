@@ -13,7 +13,7 @@
 module Node.Application
   ( themeConfig,
     fileSelectionWidget,
-    fileSingleWidget,
+    -- fileSingleWidget,
     descriptorTreeQuadrantWidget,
     databaseConfigurePage,
     selectionConfigurePage,
@@ -32,22 +32,14 @@ import Database.Tagger.Type (DescriptorTree)
 import IO (taggerVersion)
 import Monomer
   ( AppConfig,
-    CmbAlignCenter (alignCenter),
     CmbAlignLeft (alignLeft),
-    CmbAlignMiddle (alignMiddle),
     CmbAlignTop (alignTop),
-    CmbBgColor (bgColor),
     CmbBorder (border),
-    CmbFitHeight (fitHeight),
     CmbIgnoreChildrenEvts (ignoreChildrenEvts),
-    CmbMaxHeight (maxHeight),
-    CmbOnClick (onClick),
     CmbPadding (padding),
-    CmbPaddingB (paddingB),
     CmbPaddingT (paddingT),
     CmbStyleBasic (styleBasic),
     CmbTextSize (textSize),
-    CmbTransparency (transparency),
     MainWindowState (MainWindowMaximized, MainWindowNormal),
     Theme,
     WidgetModel,
@@ -63,14 +55,11 @@ import Monomer
     box,
     box_,
     button,
-    draggable_,
-    dropTarget_,
     hgrid,
     hgrid_,
     hsplit_,
     hstack,
     hstack_,
-    image_,
     keystroke_,
     label,
     lightThemeColors,
@@ -82,8 +71,6 @@ import Monomer
     vgrid_,
     vstack,
     vstack_,
-    white,
-    zstack,
   )
 import Monomer.Core.Themes.BaseTheme
   ( BaseThemeColors
@@ -117,54 +104,6 @@ import Node.Color
     yuiYellow,
   )
 import Node.Micro
-  ( GetPlainText (getPlainText),
-    TaggerWidget,
-    buttonStylingBasic,
-    clearSelectionButton,
-    configurationExportButton,
-    databaseBackupButton,
-    databaseConnectButton,
-    dbAutoConnectCheckBox,
-    dbBackupTextField,
-    dbPathTextField,
-    descriptorDeleteWidget,
-    descriptorNewTextField,
-    descriptorTreeConfigureMainRequestTextField,
-    doShellCmdButton,
-    fileSelectionShuffleButton,
-    fileSingleNextFromFileSelectionButton,
-    fileSinglePrevFromFileSelectionButton,
-    generalDescriptorTreeWidget,
-    getPathComponents,
-    imageDetailWidget,
-    initializeDatabaseButton,
-    labeledWidget,
-    lazyBufferFlushButton,
-    lazyBufferLoadAllButton,
-    lazyBufferLoadButton,
-    mainDescriptorTreeWidget,
-    newFileTextCommitButton,
-    newFileTextField,
-    parentDescriptorTreeButton,
-    queryTextField,
-    renameDescriptorWidget,
-    representativeFilePreview,
-    resetDescriptorTreeToButton,
-    selectionDisplayBufferSizeNumberField,
-    selectionDisplayParentsNumberField,
-    setArithmeticDropdown,
-    setQueryCriteriaDropdown,
-    shellCmdTextField,
-    stdDelayTooltip,
-    taggingModeDropdown,
-    tagsStringTextField,
-    toggleConfigConfigureVisibility,
-    toggleDatabaseConfigureVisibility,
-    toggleDescriptorConfigureVisibility,
-    toggleSelectionConfigureVisibility,
-    treeLeafButtonRequestDescriptorTree,
-    unrelatedDescriptorTreeWidget,
-  )
 import Type.BufferList (buffer, totalBufferList)
 import Type.Config
   ( DescriptorTreeConfig,
@@ -179,52 +118,6 @@ import Type.Config
       ),
   )
 import Type.Model
-  ( FileSelectionEvent
-      ( FileSelectionClear,
-        FileSelectionCommitQueryText,
-        FileSelectionNextQueryCriteria,
-        FileSelectionNextSetArithmetic,
-        FileSelectionPrevQueryCriteria,
-        FileSelectionPrevSetArithmetic
-      ),
-    HasDbConn (dbConn),
-    HasDescriptorModel (descriptorModel),
-    HasDoSoloTag,
-    HasFileSelection (fileSelection),
-    HasFileSelectionModel (fileSelectionModel),
-    HasLastAccessed (lastAccessed),
-    HasLastBackup (lastBackup),
-    HasMainDescriptorTree (mainDescriptorTree),
-    HasNewDescriptorText,
-    HasProgramConfig (programConfig),
-    HasProgramVisibility (..),
-    HasRepresentativeFile (representativeFile),
-    HasSingleFile (singleFile),
-    HasSingleFileModel (singleFileModel),
-    ProgramVisibility,
-    SingleFileEvent
-      ( SingleFileNextFromFileSelection,
-        SingleFilePrevFromFileSelection,
-        SingleFilePut
-      ),
-    TaggerEvent
-      ( DatabaseClose,
-        DescriptorCommitNewDescriptorText,
-        DoFileSelectionEvent,
-        DoSingleFileEvent,
-        RefreshApplication,
-        ShellCmd,
-        TagCommitTagsString,
-        TaggingModeNext,
-        TaggingModePrev,
-        ToggleDoSoloTag
-      ),
-    TaggerModel,
-    descriptorTreeConf,
-    rootTree,
-    selectionDisplayParents,
-    selectionconf,
-  )
 import Util.Core ((!++))
 
 visibility ::
@@ -426,48 +319,48 @@ fileSelectionWidget m =
     --         . getPlainText
     --         $ fwt
 
-fileSingleWidget ::
-  TaggerModel -> TaggerWidget
-fileSingleWidget m =
-  flip styleBasic [maxHeight 10000]
-    . box_ [alignTop, alignMiddle]
-    . hsplit_ [splitIgnoreChildResize True]
-    $ ( imagePreview . fmap getPlainText $ (m ^. singleFileModel . singleFile),
-        imageDetailWidget m
-      )
-  where
-    imagePreview ::
-      (WidgetModel s, HasDoSoloTag s Bool) =>
-      Maybe T.Text ->
-      WidgetNode s TaggerEvent
-    imagePreview mt =
-      box_ [onClick ToggleDoSoloTag]
-        . maybeDraggable [transparency 0.3] (m ^. singleFileModel . singleFile)
-        . flip dropTarget_ [] (DoSingleFileEvent . SingleFilePut)
-        . zstack
-        $ [ maybe
-              (label "No Preview")
-              ( flip styleBasic [paddingB 3, paddingT 3]
-                  . flip image_ [fitHeight, alignCenter]
-              )
-              $ mt
-          ]
-          ++ maybe
-            []
-            ( (: [])
-                . box_ [alignTop, alignLeft]
-                . flip styleBasic [bgColor white]
-                . label
-                . getPathComponents
-                  ( m
-                      ^. programConfig
-                        . selectionconf
-                        . selectionDisplayParents
-                  )
-            )
-            mt
-      where
-        maybeDraggable ss = maybe id (`draggable_` ss)
+-- fileSingleWidget :: -- #FIXME
+--   TaggerModel -> TaggerWidget
+-- fileSingleWidget m =
+--   flip styleBasic [maxHeight 10000]
+--     . box_ [alignTop, alignMiddle]
+--     . hsplit_ [splitIgnoreChildResize True]
+--     $ ( imagePreview . fmap getPlainText $ (m ^. singleFileModel . singleFile),
+--         imageDetailWidget m
+--       )
+--   where
+--     imagePreview ::
+--       (WidgetModel s, HasDoSoloTag s Bool) =>
+--       Maybe T.Text ->
+--       WidgetNode s TaggerEvent
+--     imagePreview mt =
+--       box_ [onClick ToggleDoSoloTag]
+--         . maybeDraggable [transparency 0.3] (m ^. singleFileModel . singleFile)
+--         . flip dropTarget_ [] (DoSingleFileEvent . SingleFilePut)
+--         . zstack
+--         $ [ maybe
+--               (label "No Preview")
+--               ( flip styleBasic [paddingB 3, paddingT 3]
+--                   . flip image_ [fitHeight, alignCenter]
+--               )
+--               $ mt
+--           ]
+--           ++ maybe
+--             []
+--             ( (: [])
+--                 . box_ [alignTop, alignLeft]
+--                 . flip styleBasic [bgColor white]
+--                 . label
+--                 . getPathComponents
+--                   ( m
+--                       ^. programConfig
+--                         . selectionconf
+--                         . selectionDisplayParents
+--                   )
+--             )
+--             mt
+--       where
+--         maybeDraggable ss = maybe id (`draggable_` ss)
 
 globalKeystrokes :: TaggerWidget -> TaggerWidget
 globalKeystrokes =
@@ -476,8 +369,8 @@ globalKeystrokes =
     [ignoreChildrenEvts]
     [ ("Ctrl-y", DoFileSelectionEvent FileSelectionClear),
       ("Ctrl-u", ShellCmd),
-      ("Ctrl-i", DoSingleFileEvent SingleFilePrevFromFileSelection),
-      ("Ctrl-k", DoSingleFileEvent SingleFileNextFromFileSelection),
+      -- ("Ctrl-i", DoSingleFileEvent SingleFilePrevFromFileSelection), -- #FIXME
+      -- ("Ctrl-k", DoSingleFileEvent SingleFileNextFromFileSelection),
       ("Ctrl-j", DoFileSelectionEvent FileSelectionNextSetArithmetic),
       ("Ctrl-Shift-j", DoFileSelectionEvent FileSelectionPrevSetArithmetic),
       ("Ctrl-l", DoFileSelectionEvent FileSelectionNextQueryCriteria),
@@ -561,13 +454,13 @@ operationWidget =
                   [ stdDelayTooltip "Ctrl-y" clearSelectionButton,
                     stdDelayTooltip "Ctrl-u" doShellCmdButton
                   ],
-                stdDelayTooltip "Ctrl-i" fileSinglePrevFromFileSelectionButton,
+                -- stdDelayTooltip "Ctrl-i" fileSinglePrevFromFileSelectionButton, -- #FIXME
                 stdDelayTooltip "Ctrl-o" taggingModeDropdown
               ],
             hgrid_
               []
               [ stdDelayTooltip "Ctrl-j" setArithmeticDropdown,
-                stdDelayTooltip "Ctrl-k" fileSingleNextFromFileSelectionButton,
+                -- stdDelayTooltip "Ctrl-k" fileSingleNextFromFileSelectionButton, -- #FIXME
                 stdDelayTooltip "Ctrl-l" setQueryCriteriaDropdown
               ]
           ]

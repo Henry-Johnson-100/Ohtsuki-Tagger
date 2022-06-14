@@ -34,7 +34,6 @@ module Database.Tagger.Access
     getsExclusiveInfraDescriptorKeys,
     fromDatabaseFileWithTags,
     getRepresentative,
-    getDescriptorOccurrenceMap,
     lookupFileWithTagsByFileId',
     lookupTagLike,
     lookupDescriptorPattern,
@@ -59,7 +58,6 @@ import Control.Monad (unless, when, (>=>))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Maybe (MaybeT (..))
 import qualified Data.HashSet as HashSet
-import qualified Data.IntMap.Strict as IntMap
 import Data.List (foldl', isPrefixOf, isSuffixOf)
 import qualified Data.List as L
 import Data.Maybe (catMaybes)
@@ -67,8 +65,8 @@ import Data.String (IsString (fromString))
 import qualified Data.Text as T
 import Database.SQLite.Simple
   ( Connection,
-    Only (Only),
-    Query (fromQuery),
+    Only,
+    Query (..),
     execute,
     executeMany,
     execute_,
@@ -76,10 +74,7 @@ import Database.SQLite.Simple
     query,
     query_,
   )
-import Database.Tagger.Access.RowMap
-  ( descriptorOccurrenceMapParser,
-    reduceDbFwtList,
-  )
+import Database.Tagger.Access.RowMap (reduceDbFwtList)
 import Database.Tagger.Type
   ( CollectedDatabaseFileWithTags (CollectedDatabaseFileWithTags),
     DatabaseFileWithTags (FileWithTags_),
@@ -104,7 +99,7 @@ import Database.Tagger.Type
   )
 import Event.Parser (PseudoDescriptor (PDescriptor))
 import IO (Exception (eLabel, liftEx), hPutStrLn, stderr)
-import Util.Core (OccurrenceMap, head', hoistMaybe, (!++))
+import Util.Core (head', hoistMaybe, (!++))
 
 -- | A literal WHERE clause, leaving out "WHERE"
 newtype Where = Where Query deriving (Show, Eq)
@@ -639,24 +634,6 @@ getsDatabaseTagIds c dbts = do
           . (\(TagNoId_ (Tag_ _ fid did mstid)) -> (fid, did, mstid)) ::
           TagPtrNoId -> IO [TagPtr]
   fmap concat . mapM q $ dbts
-
-getDescriptorOccurrenceMap ::
-  Connection -> [DescriptorKey] -> IO (OccurrenceMap Descriptor)
-getDescriptorOccurrenceMap c dks = do
-  let q =
-        fmap (map descriptorOccurrenceMapParser)
-          . query
-            c
-            "SELECT d.id, count(d.id) \
-            \FROM Tag t \
-            \  JOIN Descriptor d \
-            \    ON t.descriptorId = d.id \
-            \WHERE t.descriptorId = ? \
-            \GROUP BY d.id"
-          . Only ::
-          DescriptorKey -> IO [OccurrenceMap Descriptor]
-  r <- fmap concat . mapM q $ dks
-  return . IntMap.unions $ r
 
 getsExclusiveInfraDescriptorKeys :: Connection -> DescriptorKey -> IO [DescriptorKey]
 getsExclusiveInfraDescriptorKeys c dk = do

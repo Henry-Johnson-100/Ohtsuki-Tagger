@@ -11,41 +11,26 @@
 module Node.Micro where
 
 import Control.Lens ((^.))
-import qualified Data.HashSet as HashSet
-import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as L
-import qualified Data.Maybe as M
 import qualified Data.Text as T
 import Database.Tagger.Type
-  ( Descriptor (descriptor, descriptorId),
+  ( Descriptor (descriptor),
     DescriptorTree (..),
     File (filePath),
-    FileWithTags (file, tags),
+    FileWithTags (file),
     Representative (repDescriptorId, repFileId),
-    SubTagMap,
-    Tag (tagDescriptor, tagId),
     getNode,
-    isSubTag,
     sortChildren,
-    tagSetToTagMapTuple,
   )
 import Monomer
-  ( CmbAlignBottom (alignBottom),
-    CmbAlignCenter (alignCenter),
+  ( CmbAlignCenter (alignCenter),
     CmbAlignLeft (alignLeft),
-    CmbAlignMiddle (alignMiddle),
     CmbAlignTop (alignTop),
     CmbBgColor (bgColor),
     CmbBorder (border),
-    CmbBorderL (borderL),
     CmbEllipsis (ellipsis),
     CmbFitHeight (fitHeight),
-    CmbMaxHeight (maxHeight),
-    CmbMaxWidth (maxWidth),
-    CmbMinHeight (minHeight),
     CmbPadding (padding),
-    CmbPaddingL (paddingL),
-    CmbRangeWidth (rangeWidth),
     CmbStyleBasic (styleBasic),
     CmbStyleHover (styleHover),
     CmbTextColor (textColor),
@@ -64,12 +49,10 @@ import Monomer
     box_,
     button,
     draggable,
-    draggable_,
     dropTarget,
     dropTargetStyle,
     dropTarget_,
     dropdown,
-    hgrid_,
     hstack,
     hstack_,
     image_,
@@ -79,19 +62,15 @@ import Monomer
     label_,
     labeledCheckbox,
     lightGray,
-    nodeVisible,
     numericField,
     scroll_,
     separatorLine,
     spacer,
-    splitIgnoreChildResize,
     textField,
     textField_,
     tooltipDelay,
     tooltip_,
-    vscroll_,
     vsplit,
-    vsplit_,
     vstack,
     vstack_,
     white,
@@ -100,100 +79,8 @@ import Node.Color (yuiBlue, yuiOrange, yuiYellow)
 import Type.BufferList
 import Type.Config (DescriptorTreeConfig, TaggerConfig)
 import Type.Model
-  ( ConfigurationEvent (ExportAll),
-    DescriptorEvent
-      ( DescriptorTreePutParent,
-        RefreshDescriptorTree,
-        RenameDescriptor,
-        RepresentativeCreate,
-        RepresentativeFileLookup,
-        RequestDescriptorTree
-      ),
-    Down (Down),
-    FileSelectionEvent
-      ( CycleInSelectionOrderingBy,
-        FileSelectionClear,
-        FileSelectionCommitQueryText,
-        FileSelectionShuffle,
-        FileSelectionUpdate,
-        FlipInSelectionOrdering,
-        LazyBufferFlush,
-        LazyBufferLoad,
-        LazyBufferLoadAll
-      ),
-    FileSetArithmetic (Diff, Intersect, Union),
-    HasDescriptorModel (descriptorModel),
-    HasDoSoloTag (doSoloTag),
-    HasFileSelection (fileSelection),
-    HasFileSelectionModel (fileSelectionModel),
-    HasMainDescriptorTree (mainDescriptorTree),
-    HasNewDescriptorText (..),
-    HasNewFileText (..),
-    HasProgramConfig (..),
-    HasQueryCriteria (queryCriteria),
-    HasQueryText (queryText),
-    HasRenameDescriptorFrom (renameDescriptorFrom),
-    HasRenameDescriptorTo (renameDescriptorTo),
-    HasSelectionDetailsOrdering (selectionDetailsOrdering),
-    HasSetArithmetic (setArithmetic),
-    HasSingleFile (singleFile),
-    HasSingleFileModel (singleFileModel),
-    HasTagCounts (tagCounts),
-    HasTaggingMode (..),
-    HasTagsString (tagsString),
-    HasUnrelatedDescriptorTree (unrelatedDescriptorTree),
-    OrdDirection (Asc),
-    OrderingBy (..),
-    OrderingMode (..),
-    ProgramVisibility
-      ( Config,
-        Database,
-        ProgramVisibilityDescriptor,
-        Selection
-      ),
-    QueryCriteria (ByPattern, ByRelation, ByTag, ByUntagged),
-    SingleFileEvent
-      ( SingleFileAssociateTag,
-        SingleFileNextFromFileSelection,
-        SingleFilePrevFromFileSelection,
-        SingleFilePut,
-        SingleFileUntag
-      ),
-    TaggerEvent
-      ( DatabaseBackup,
-        DatabaseConnect,
-        DatabaseInitialize,
-        DescriptorCommitNewDescriptorText,
-        DescriptorCreateRelation,
-        DescriptorDelete,
-        DescriptorUnrelate,
-        DoConfigurationEvent,
-        DoDescriptorEvent,
-        DoFileSelectionEvent,
-        DoSingleFileEvent,
-        DropTargetAppendText_,
-        IOEvent,
-        NewFileTextCommit,
-        ShellCmd,
-        TagCommitTagsString,
-        ToggleVisibilityMode
-      ),
-    TaggerModel,
-    TaggingMode (..),
-    dbconf,
-    dbconfAutoConnect,
-    dbconfBackup,
-    dbconfPath,
-    descriptorTreeConf,
-    descriptorTreeMainRequest,
-    selectionBufferSize,
-    selectionDisplayParents,
-    selectionconf,
-    shellCmd,
-  )
 import Util.Core
-  ( OccurrenceMap,
-    (!++),
+  ( (!++),
   )
 
 type TaggerWidget = WidgetNode TaggerModel TaggerEvent
@@ -359,21 +246,21 @@ selectButton =
     . FileSelectionUpdate
     . (: [])
 
-previewButton ::
-  (WidgetModel s) =>
-  FileWithTags ->
-  WidgetNode s TaggerEvent
-previewButton = flip styledButton "Preview" . DoSingleFileEvent . SingleFilePut
+-- previewButton :: -- #FIXME
+--   (WidgetModel s) =>
+--   FileWithTags ->
+--   WidgetNode s TaggerEvent
+-- previewButton = flip styledButton "Preview" . DoSingleFileEvent . SingleFilePut
 
-fileSingleNextFromFileSelectionButton ::
-  (WidgetModel s) => WidgetNode s TaggerEvent
-fileSingleNextFromFileSelectionButton =
-  styledButton (DoSingleFileEvent SingleFileNextFromFileSelection) "Next"
+-- fileSingleNextFromFileSelectionButton ::
+--   (WidgetModel s) => WidgetNode s TaggerEvent
+-- fileSingleNextFromFileSelectionButton =
+--   styledButton (DoSingleFileEvent SingleFileNextFromFileSelection) "Next"
 
-fileSinglePrevFromFileSelectionButton ::
-  (WidgetModel s) => WidgetNode s TaggerEvent
-fileSinglePrevFromFileSelectionButton =
-  styledButton (DoSingleFileEvent SingleFilePrevFromFileSelection) "Prev"
+-- fileSinglePrevFromFileSelectionButton ::
+--   (WidgetModel s) => WidgetNode s TaggerEvent
+-- fileSinglePrevFromFileSelectionButton =
+--   styledButton (DoSingleFileEvent SingleFilePrevFromFileSelection) "Prev"
 
 clearSelectionButton ::
   (WidgetModel s) =>
@@ -714,198 +601,199 @@ generalDescriptorTreeWidget tr bs dAction _ =
                 $ d
             ]
 
-imageDetailWidget ::
-  TaggerModel -> TaggerWidget
-imageDetailWidget m =
-  flip styleBasic [borderL 1 black, rangeWidth 160 800]
-    . box_ [alignLeft]
-    . vstack_ []
-    $ [ label "Details:",
-        spacer,
-        label "Solo Tagging Mode"
-          `styleBasic` [textColor yuiOrange]
-          `nodeVisible` (m ^. doSoloTag),
-        spacer,
-        vsplit_
-          [splitIgnoreChildResize True]
-          (detailTagsWidget, inSelectionWidget)
-      ]
-  where
-    detailTagsWidget :: TaggerWidget
-    detailTagsWidget =
-      let !tags' = maybe HashSet.empty tags $ m ^. singleFileModel . singleFile
-          !tagMapTuple = tagSetToTagMapTuple tags'
-       in vstack_
-            []
-            [ label "Tags:",
-              hstack_
-                []
-                [ spacer,
-                  flip styleBasic [border 1 black]
-                    . vscroll_ [wheelRate 50]
-                    . vstack_
-                      []
-                    $ ( map
-                          ( \t' ->
-                              showTagAndSubTags
-                                t'
-                                (snd tagMapTuple)
-                                (m ^. singleFileModel . tagCounts)
-                          )
-                          . filter (not . isSubTag)
-                          . IntMap.elems
-                          . fst
-                          $ tagMapTuple
-                      )
-                      ++ [singleFileDropTargets]
-                ]
-            ]
-      where
-        singleFileDropTargets :: TaggerWidget
-        singleFileDropTargets =
-          hgrid_
-            []
-            [ dropTarget_
-                (DoSingleFileEvent . SingleFileUntag)
-                [dropTargetStyle [bgColor yuiYellow]]
-                . flip styleBasic [border 1 black]
-                . box_ [alignMiddle, alignBottom]
-                . flip styleBasic [minHeight 80, maxHeight 81, maxWidth 80]
-                . label
-                $ "Untag"
-            ]
-        showTagAndSubTags :: Tag -> SubTagMap -> OccurrenceMap Descriptor -> TaggerWidget
-        showTagAndSubTags t stm om =
-          hgrid_
-            []
-            [ box_ [alignLeft] $
-                maybe
-                  ( hstack_
-                      []
-                      [ dropTarget_
-                          (DoSingleFileEvent . SingleFileAssociateTag t)
-                          [dropTargetStyle [border 1 black]]
-                          . draggable t
-                          . flip styleBasic [textColor yuiBlue]
-                          . label
-                          . descriptor
-                          . tagDescriptor
-                          $ t,
-                        spacer
-                      ]
-                  )
-                  ( \ts ->
-                      hstack_ [] $
-                        ( dropTarget_
-                            (DoSingleFileEvent . SingleFileAssociateTag t)
-                            [dropTargetStyle [border 1 black]]
-                            . draggable t
-                            . flip styleBasic [textColor yuiBlue]
-                            . label
-                            . descriptor
-                            . tagDescriptor
-                            $ t
-                        ) :
-                        ( label " { " :
-                          ( L.intersperse (label ", ")
-                              . map
-                                ( \t' ->
-                                    draggable t'
-                                      . flip styleBasic [padding 0]
-                                      . box_ [alignLeft]
-                                      . label
-                                      . descriptor
-                                      . tagDescriptor
-                                      $ t'
-                                )
-                              $ ts
-                          )
-                            ++ [ label " } ",
-                                 box_ []
-                                   . label
-                                   . T.pack
-                                   . show
-                                   . M.fromMaybe 0
-                                   $ IntMap.lookup (descriptorId . tagDescriptor $ t) om
-                               ]
-                        )
-                  )
-                  (IntMap.lookup (tagId t) stm)
-            ]
-    inSelectionWidget :: TaggerWidget
-    inSelectionWidget =
-      vstack_
-        []
-        [ hstack_
-            []
-            [ label $
-                "In Selection: "
-                  !++ "("
-                  !++ (T.pack . show . length . totalBufferList)
-                    (m ^. fileSelectionModel . fileSelection)
-                  !++ ")",
-              spacer,
-              cycleInSelectionOrderingByButton
-                . (\(OrderingMode b _) -> b)
-                $ m ^. fileSelectionModel . selectionDetailsOrdering,
-              flipInSelectionOrderingButton
-                . (\(OrderingMode _ d) -> d)
-                $ m ^. fileSelectionModel . selectionDetailsOrdering
-            ]
-            --   ,
-            -- spacer,
-            -- hstack_
-            --   []
-            --   [ spacer,
-            --     flip styleBasic [border 1 black]
-            --       . vscroll_ [wheelRate 50]
-            --       . vstack_ []
-            --       . map imageDetailDescriptor
-            --       . sortDescriptorIntTuple
-            --         (m ^. fileSelectionModel . selectionDetailsOrdering)
-            --       -- this is total jank but it works now
-            --       $ ( let selD =
-            --                 (\xs -> if null xs then [] else L.foldl1' union xs)
-            --                   . map (HashSet.toList . HashSet.map tagDescriptor . tags) -- #FIXME
-            --                   . cCollect
-            --                   $ m ^. fileSelectionModel . fileSelection
-            --               om =
-            --                 foldOccurrences
-            --                   . map tagDescriptor
-            --                   . concatMap (HashSet.toList . tags) -- #FIXME
-            --                   . cCollect
-            --                   $ m ^. fileSelectionModel . fileSelection
-            --            in decodeOccurrencesWith selD om
-            --         )
-            --   ]
-        ]
-      where
-        sortDescriptorIntTuple ::
-          OrderingMode -> [(Descriptor, Int)] -> [(Descriptor, Int)]
-        sortDescriptorIntTuple (OrderingMode b d) xs =
-          case b of
-            Alphabetical -> if d == Asc then L.sortOn fst xs else L.sortOn (Down . fst) xs
-            Numerical -> if d == Asc then L.sortOn snd xs else L.sortOn (Down . snd) xs
-    imageDetailDescriptor ::
-      (WidgetModel s) =>
-      (Descriptor, Int) ->
-      WidgetNode s TaggerEvent
-    imageDetailDescriptor (d, c) =
-      hgrid_ [] $
-        [ draggable_ d []
-            . box_ [alignLeft]
-            . flip styleBasic [textColor yuiBlue]
-            . label
-            . getPlainText
-            $ d,
-          flip styleBasic [paddingL 15]
-            . box_ [alignLeft]
-            . flip styleBasic [textColor yuiBlue]
-            . label
-            . T.pack
-            . show
-            $ c
-        ]
+-- imageDetailWidget :: -- #FIXME this one definition is TOO LONG!
+--   TaggerModel -> TaggerWidget
+-- imageDetailWidget m =
+--   flip styleBasic [borderL 1 black, rangeWidth 160 800]
+--     . box_ [alignLeft]
+--     . vstack_ []
+--     $ [ label "Details:",
+--         spacer,
+--         label "Solo Tagging Mode"
+--           `styleBasic` [textColor yuiOrange]
+--           `nodeVisible` (m ^. doSoloTag),
+--         spacer
+--         ,
+--         vsplit_
+--           [splitIgnoreChildResize True]
+--           (detailTagsWidget, inSelectionWidget)
+--       ]
+--   where
+--     -- detailTagsWidget :: TaggerWidget
+--     -- detailTagsWidget =
+--     --   let !tags' = maybe HashSet.empty tags $ m ^. singleFileModel . singleFile
+--     --       !tagMapTuple = tagSetToTagMapTuple tags'
+--     --    in vstack_
+--     --         []
+--     --         [ label "Tags:",
+--     --           hstack_
+--     --             []
+--     --             [ spacer,
+--     --               flip styleBasic [border 1 black]
+--     --                 . vscroll_ [wheelRate 50]
+--     --                 . vstack_
+--     --                   []
+--     --                 $ ( map
+--     --                       ( \t' ->
+--     --                           showTagAndSubTags
+--     --                             t'
+--     --                             (snd tagMapTuple)
+--     --                             (m ^. singleFileModel . tagCounts)
+--     --                       )
+--     --                       . filter (not . isSubTag)
+--     --                       . IntMap.elems
+--     --                       . fst
+--     --                       $ tagMapTuple
+--     --                   )
+--     --                   ++ [singleFileDropTargets]
+--     --             ]
+--     --         ]
+--     --   where
+--     --     singleFileDropTargets :: TaggerWidget
+--     --     singleFileDropTargets =
+--     --       hgrid_
+--     --         []
+--     --         [ dropTarget_
+--     --             (DoSingleFileEvent . SingleFileUntag)
+--     --             [dropTargetStyle [bgColor yuiYellow]]
+--     --             . flip styleBasic [border 1 black]
+--     --             . box_ [alignMiddle, alignBottom]
+--     --             . flip styleBasic [minHeight 80, maxHeight 81, maxWidth 80]
+--     --             . label
+--     --             $ "Untag"
+--     --         ]
+--         -- showTagAndSubTags :: Tag -> SubTagMap -> OccurrenceMap Descriptor -> TaggerWidget
+--         -- showTagAndSubTags t stm om =
+--         --   hgrid_
+--         --     []
+--         --     [ box_ [alignLeft] $
+--         --         maybe
+--         --           ( hstack_
+--         --               []
+--         --               [ dropTarget_
+--         --                   (DoSingleFileEvent . SingleFileAssociateTag t)
+--         --                   [dropTargetStyle [border 1 black]]
+--         --                   . draggable t
+--         --                   . flip styleBasic [textColor yuiBlue]
+--         --                   . label
+--         --                   . descriptor
+--         --                   . tagDescriptor
+--         --                   $ t,
+--         --                 spacer
+--         --               ]
+--         --           )
+--         --           ( \ts ->
+--         --               hstack_ [] $
+--         --                 ( dropTarget_
+--         --                     (DoSingleFileEvent . SingleFileAssociateTag t)
+--         --                     [dropTargetStyle [border 1 black]]
+--         --                     . draggable t
+--         --                     . flip styleBasic [textColor yuiBlue]
+--         --                     . label
+--         --                     . descriptor
+--         --                     . tagDescriptor
+--         --                     $ t
+--         --                 ) :
+--         --                 ( label " { " :
+--         --                   ( L.intersperse (label ", ")
+--         --                       . map
+--         --                         ( \t' ->
+--         --                             draggable t'
+--         --                               . flip styleBasic [padding 0]
+--         --                               . box_ [alignLeft]
+--         --                               . label
+--         --                               . descriptor
+--         --                               . tagDescriptor
+--         --                               $ t'
+--         --                         )
+--         --                       $ ts
+--         --                   )
+--         --                     ++ [ label " } ",
+--         --                          box_ []
+--         --                            . label
+--         --                            . T.pack
+--         --                            . show
+--         --                            . M.fromMaybe 0
+--         --                            $ IntMap.lookup (descriptorId . tagDescriptor $ t) om
+--         --                        ]
+--         --                 )
+--         --           )
+--         --           (IntMap.lookup (tagId t) stm)
+--         --     ]
+--     inSelectionWidget :: TaggerWidget
+--     inSelectionWidget =
+--       vstack_
+--         []
+--         [ hstack_
+--             []
+--             [ label $
+--                 "In Selection: "
+--                   !++ "("
+--                   !++ (T.pack . show . length . totalBufferList)
+--                     (m ^. fileSelectionModel . fileSelection)
+--                   !++ ")",
+--               spacer,
+--               cycleInSelectionOrderingByButton
+--                 . (\(OrderingMode b _) -> b)
+--                 $ m ^. fileSelectionModel . selectionDetailsOrdering,
+--               flipInSelectionOrderingButton
+--                 . (\(OrderingMode _ d) -> d)
+--                 $ m ^. fileSelectionModel . selectionDetailsOrdering
+--             ]
+--             --   ,
+--             -- spacer,
+--             -- hstack_
+--             --   []
+--             --   [ spacer,
+--             --     flip styleBasic [border 1 black]
+--             --       . vscroll_ [wheelRate 50]
+--             --       . vstack_ []
+--             --       . map imageDetailDescriptor
+--             --       . sortDescriptorIntTuple
+--             --         (m ^. fileSelectionModel . selectionDetailsOrdering)
+--             --       -- this is total jank but it works now
+--             --       $ ( let selD =
+--             --                 (\xs -> if null xs then [] else L.foldl1' union xs)
+--             --                   . map (HashSet.toList . HashSet.map tagDescriptor . tags) -- #FIXME
+--             --                   . cCollect
+--             --                   $ m ^. fileSelectionModel . fileSelection
+--             --               om =
+--             --                 foldOccurrences
+--             --                   . map tagDescriptor
+--             --                   . concatMap (HashSet.toList . tags) -- #FIXME
+--             --                   . cCollect
+--             --                   $ m ^. fileSelectionModel . fileSelection
+--             --            in decodeOccurrencesWith selD om
+--             --         )
+--             --   ]
+--         ]
+--       where
+--         sortDescriptorIntTuple ::
+--           OrderingMode -> [(Descriptor, Int)] -> [(Descriptor, Int)]
+--         sortDescriptorIntTuple (OrderingMode b d) xs =
+--           case b of
+--             Alphabetical -> if d == Asc then L.sortOn fst xs else L.sortOn (Down . fst) xs
+--             Numerical -> if d == Asc then L.sortOn snd xs else L.sortOn (Down . snd) xs
+--     imageDetailDescriptor ::
+--       (WidgetModel s) =>
+--       (Descriptor, Int) ->
+--       WidgetNode s TaggerEvent
+--     imageDetailDescriptor (d, c) =
+--       hgrid_ [] $
+--         [ draggable_ d []
+--             . box_ [alignLeft]
+--             . flip styleBasic [textColor yuiBlue]
+--             . label
+--             . getPlainText
+--             $ d,
+--           flip styleBasic [paddingL 15]
+--             . box_ [alignLeft]
+--             . flip styleBasic [textColor yuiBlue]
+--             . label
+--             . T.pack
+--             . show
+--             $ c
+--         ]
 
 representativeFilePreview :: Maybe Representative -> TaggerWidget
 representativeFilePreview mr =
