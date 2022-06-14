@@ -37,7 +37,7 @@ import IO
     whenJust,
   )
 import System.Exit (exitFailure)
-import Type.BufferList (Cycleable (cCollect), emptyBufferList)
+import Type.BufferList (totalBufferList)
 import Type.Model.Prim
   ( FileSetArithmetic (Union),
     QueryCriteria (ByTag),
@@ -143,8 +143,8 @@ cliQuery c OptionRecord {optionQuery} =
     optionQuery
     ( \q -> do
         let q' = T.pack q
-        r <- runQuery c Union ByTag emptyBufferList q'
-        let fs = map (filePath . file) . cCollect $ r
+        r <- runQuery c Union ByTag mempty q'
+        let fs = map (filePath . file) . totalBufferList $ r
         if null fs
           then hPutStrLn stderr "0 results" >> exitFailure
           else mapM_ T.IO.putStrLn fs

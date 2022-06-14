@@ -45,6 +45,7 @@ executable tagger
                       ,RankNTypes
                       ,ExistentialQuantification
                       ,TupleSections
+                      ,MultiParamTypeClasses
 
   ghc-options:         -threaded
                        -Wall
@@ -68,5 +69,6 @@ executable tagger
                       ,random-shuffle == 0.0.4
                       ,parsec == 3.1.14.0
                       ,time == 1.9.3
+                      ,type-iso
   hs-source-dirs:      app
   default-language:    Haskell2010

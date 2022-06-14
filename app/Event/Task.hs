@@ -101,7 +101,7 @@ import IO
     waitForProcess,
   )
 import qualified Toml
-import Type.BufferList (BufferList, Cycleable (cFromList))
+import Type.BufferList (BufferList, bufferListFromList)
 import Type.Config (TaggerConfig, taggerConfigCodec)
 import Type.Model
   ( FileSetArithmetic (..),
@@ -151,11 +151,11 @@ queryWithParseResults c a ByUntagged currentBuffer _ = do
       ByUntagged
       (QueryToken (CLiteral ByUntagged) (PDescriptor "Untagged Search"))
   let untaggedQuerySections = QuerySection (ALiteral a) byUntaggedResults
-  return . bfComb a currentBuffer . cFromList . sectionContents $ untaggedQuerySections
+  return . bfComb a currentBuffer . bufferListFromList . sectionContents $ untaggedQuerySections
 queryWithParseResults c a qc currentBuffer qss = do
   queriedSections <- mapM (queryWithQuerySection c qc) qss
   let combinedResults = combineQueriedSection a queriedSections
-  return . bfComb a currentBuffer . cFromList . sectionContents $ combinedResults
+  return . bfComb a currentBuffer . bufferListFromList . sectionContents $ combinedResults
 
 bfComb ::
   Intersectable l =>

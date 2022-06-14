@@ -28,7 +28,7 @@ where
 
 import Control.Lens ((^.))
 import qualified Data.Text as T
-import Database.Tagger.Type (DescriptorTree, FileWithTags (tags))
+import Database.Tagger.Type (DescriptorTree)
 import IO (taggerVersion)
 import Monomer
   ( AppConfig,
@@ -38,21 +38,16 @@ import Monomer
     CmbAlignTop (alignTop),
     CmbBgColor (bgColor),
     CmbBorder (border),
-    CmbChildSpacing (childSpacing_),
-    CmbEllipsis (ellipsis),
     CmbFitHeight (fitHeight),
     CmbIgnoreChildrenEvts (ignoreChildrenEvts),
     CmbMaxHeight (maxHeight),
-    CmbMaxWidth (maxWidth),
     CmbOnClick (onClick),
     CmbPadding (padding),
     CmbPaddingB (paddingB),
     CmbPaddingT (paddingT),
     CmbStyleBasic (styleBasic),
-    CmbTextColor (textColor),
     CmbTextSize (textSize),
     CmbTransparency (transparency),
-    CmbWheelRate (wheelRate),
     MainWindowState (MainWindowMaximized, MainWindowNormal),
     Theme,
     WidgetModel,
@@ -68,7 +63,6 @@ import Monomer
     box,
     box_,
     button,
-    draggable,
     draggable_,
     dropTarget_,
     hgrid,
@@ -79,7 +73,6 @@ import Monomer
     image_,
     keystroke_,
     label,
-    label_,
     lightThemeColors,
     nodeVisible,
     separatorLine,
@@ -87,7 +80,6 @@ import Monomer
     splitIgnoreChildResize,
     vgrid,
     vgrid_,
-    vscroll_,
     vstack,
     vstack_,
     white,
@@ -118,8 +110,7 @@ import Monomer.Core.Themes.BaseTheme
     baseTheme,
   )
 import Node.Color
-  ( yuiBlue,
-    yuiLightPeach,
+  ( yuiLightPeach,
     yuiOrange,
     yuiPeach,
     yuiRed,
@@ -174,7 +165,7 @@ import Node.Micro
     treeLeafButtonRequestDescriptorTree,
     unrelatedDescriptorTreeWidget,
   )
-import Type.BufferList (Cycleable (cCollect), buffer)
+import Type.BufferList (buffer, totalBufferList)
 import Type.Config
   ( DescriptorTreeConfig,
     FontConfig (bold, regular, thin),
@@ -395,7 +386,7 @@ fileSelectionWidget m =
                       m ^. fileSelectionModel . fileSelection . buffer
                   )
               !++ " / "
-              !++ ( T.pack . show . length . cCollect $
+              !++ ( T.pack . show . length . totalBufferList $
                       m ^. fileSelectionModel . fileSelection
                   )
               !++ ")"

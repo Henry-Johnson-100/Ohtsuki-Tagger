@@ -27,10 +27,8 @@ import Database.Tagger.Access
   )
 import Database.Tagger.Type
   ( Descriptor (descriptor, descriptorId),
-    File (filePath),
-    FileWithTags (file, tags),
+    FileWithTags (..),
     Tag (tagDescriptor),
-    fwtFileEqual,
     getNode,
   )
 import Event.Parser (parseQuery)
@@ -42,13 +40,10 @@ import Event.Task
     deleteDescriptor,
     exportConfig,
     getParentDescriptorTree,
-    getRefreshedFWTs,
     getRepresentative,
     lookupInfraDescriptorTree,
     relateTo,
     renameDescriptor,
-    runQuery,
-    runShellCmds,
     tag,
     unrelate,
     untag,
@@ -64,13 +59,8 @@ import Monomer
     WindowRequest (WindowSetTitle),
   )
 import Type.BufferList
-  ( BufferList (_buffer, _list),
-    Cycleable (cCollect, cDequeue, cFromList, cHead, cPop),
-    buffer,
+  ( bufferListFromList,
     emptyBuffer,
-    emptyBufferList,
-    list,
-    shuffleBufferList,
     takeToBuffer,
     toBuffer,
   )
@@ -125,7 +115,6 @@ import Type.Model
     rootTree,
     selectionBufferSize,
     selectionconf,
-    shellCmd,
   )
 import Util.Core (head', hoistMaybe, maybeWithList, (!++))
 
@@ -369,7 +358,7 @@ fileSelectionEventHandler _ _ model event =
     --     asyncEvent (DoFileSelectionEvent FileSelectionQueryTextClear)
     --   ]
     FileSelectionClear ->
-      [ model *~ (fileSelectionModel . fileSelection) .~ emptyBufferList,
+      [ model *~ (fileSelectionModel . fileSelection) .~ mempty,
         asyncEvent (DoFileSelectionEvent FileSelectionQueryTextClear)
       ]
     FileSelectionQueryTextClear -> [model *~ (fileSelectionModel . queryText) .~ ""]
@@ -553,7 +542,7 @@ taggerEventHandler wenv node model event =
     NewFileTextCommit ->
       [ dbConnTask
           (DoFileSelectionEvent . FileSelectionPut)
-          (\conn -> fmap cFromList . addPath conn $ (model ^. newFileText))
+          (\conn -> fmap bufferListFromList . addPath conn $ (model ^. newFileText))
           $ model ^. dbConn,
         model *~ newFileText .~ ""
       ]

@@ -54,9 +54,7 @@ import Database.Tagger.Type
     Tag,
   )
 import Type.BufferList
-  ( BufferList (BufferList),
-    Cycleable (cCollect, cFromList),
-    emptyBufferList,
+  ( BufferList,
   )
 import Type.Config (TaggerConfig)
 import Util.Core (OccurrenceMap)
@@ -177,24 +175,29 @@ instance Intersectable [] where
   intersectBy = L.intersectBy
   diffBy = L.deleteFirstsBy
 
-instance Listable BufferList where
-  toList = cCollect
-  fromList = cFromList
+-- instance Listable BufferList where
+--   toList = cCollect
+--   fromList = cFromList
 
 instance Intersectable BufferList where
-  unionBy b bl@(BufferList bx xx) (BufferList by xy) =
-    let onlyNew xs' = diffBy b xs' (cCollect bl)
-     in BufferList (unionBy b bx (onlyNew by)) (unionBy b xx (onlyNew xy))
-  intersectBy b (BufferList bx xx) (BufferList by xy) =
-    let combinedSelection b' = unionBy b' by xy
-     in BufferList
-          (intersectBy b bx (combinedSelection b))
-          (intersectBy b xx (combinedSelection b))
-  diffBy b (BufferList bx xx) (BufferList by xy) =
-    let combinedDiff = unionBy b by xy
-     in BufferList
-          (diffBy b bx combinedDiff)
-          (diffBy b xx combinedDiff)
+  unionBy = undefined
+  intersectBy = undefined
+  diffBy = undefined
+
+-- instance Intersectable BufferList where
+--   unionBy b bl@(BufferList bx xx) (BufferList by xy) =
+--     let onlyNew xs' = diffBy b xs' (cCollect bl)
+--      in BufferList (unionBy b bx (onlyNew by)) (unionBy b xx (onlyNew xy))
+--   intersectBy b (BufferList bx xx) (BufferList by xy) =
+--     let combinedSelection b' = unionBy b' by xy
+--      in BufferList
+--           (intersectBy b bx (combinedSelection b))
+--           (intersectBy b xx (combinedSelection b))
+--   diffBy b (BufferList bx xx) (BufferList by xy) =
+--     let combinedDiff = unionBy b by xy
+--      in BufferList
+--           (diffBy b bx combinedDiff)
+--           (diffBy b xx combinedDiff)
 
 data TaggingMode
   = TagMode
@@ -346,7 +349,7 @@ emptyDescriptorTreeModel =
 emptyFileSelectionModel :: FileSelectionModel
 emptyFileSelectionModel =
   FileSelectionModel
-    { _fsmFileSelection = emptyBufferList,
+    { _fsmFileSelection = mempty,
       _fsmSetArithmetic = Union,
       _fsmQueryCriteria = ByTag,
       _fsmQueryText = "",

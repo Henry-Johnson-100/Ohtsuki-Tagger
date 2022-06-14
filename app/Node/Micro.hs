@@ -97,7 +97,7 @@ import Monomer
     white,
   )
 import Node.Color (yuiBlue, yuiOrange, yuiYellow)
-import Type.BufferList (Cycleable (cCollect))
+import Type.BufferList
 import Type.Config (DescriptorTreeConfig, TaggerConfig)
 import Type.Model
   ( ConfigurationEvent (ExportAll),
@@ -142,7 +142,6 @@ import Type.Model
     HasTaggingMode (..),
     HasTagsString (tagsString),
     HasUnrelatedDescriptorTree (unrelatedDescriptorTree),
-    Intersectable (union),
     OrdDirection (Asc),
     OrderingBy (..),
     OrderingMode (..),
@@ -194,7 +193,6 @@ import Type.Model
   )
 import Util.Core
   ( OccurrenceMap,
-    PrimaryKey (decodeOccurrencesWith, foldOccurrences),
     (!++),
   )
 
@@ -370,12 +368,12 @@ previewButton = flip styledButton "Preview" . DoSingleFileEvent . SingleFilePut
 fileSingleNextFromFileSelectionButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
 fileSingleNextFromFileSelectionButton =
-  styledButton (DoSingleFileEvent SingleFileNextFromFileSelection) "↓"
+  styledButton (DoSingleFileEvent SingleFileNextFromFileSelection) "Next"
 
 fileSinglePrevFromFileSelectionButton ::
   (WidgetModel s) => WidgetNode s TaggerEvent
 fileSinglePrevFromFileSelectionButton =
-  styledButton (DoSingleFileEvent SingleFilePrevFromFileSelection) "↑"
+  styledButton (DoSingleFileEvent SingleFilePrevFromFileSelection) "Prev"
 
 clearSelectionButton ::
   (WidgetModel s) =>
@@ -843,7 +841,7 @@ imageDetailWidget m =
             [ label $
                 "In Selection: "
                   !++ "("
-                  !++ (T.pack . show . length . cCollect)
+                  !++ (T.pack . show . length . totalBufferList)
                     (m ^. fileSelectionModel . fileSelection)
                   !++ ")",
               spacer,
@@ -854,32 +852,32 @@ imageDetailWidget m =
                 . (\(OrderingMode _ d) -> d)
                 $ m ^. fileSelectionModel . selectionDetailsOrdering
             ]
-          --   ,
-          -- spacer,
-          -- hstack_
-          --   []
-          --   [ spacer,
-          --     flip styleBasic [border 1 black]
-          --       . vscroll_ [wheelRate 50]
-          --       . vstack_ []
-          --       . map imageDetailDescriptor
-          --       . sortDescriptorIntTuple
-          --         (m ^. fileSelectionModel . selectionDetailsOrdering)
-          --       -- this is total jank but it works now
-          --       $ ( let selD =
-          --                 (\xs -> if null xs then [] else L.foldl1' union xs)
-          --                   . map (HashSet.toList . HashSet.map tagDescriptor . tags) -- #FIXME
-          --                   . cCollect
-          --                   $ m ^. fileSelectionModel . fileSelection
-          --               om =
-          --                 foldOccurrences
-          --                   . map tagDescriptor
-          --                   . concatMap (HashSet.toList . tags) -- #FIXME
-          --                   . cCollect
-          --                   $ m ^. fileSelectionModel . fileSelection
-          --            in decodeOccurrencesWith selD om
-          --         )
-          --   ]
+            --   ,
+            -- spacer,
+            -- hstack_
+            --   []
+            --   [ spacer,
+            --     flip styleBasic [border 1 black]
+            --       . vscroll_ [wheelRate 50]
+            --       . vstack_ []
+            --       . map imageDetailDescriptor
+            --       . sortDescriptorIntTuple
+            --         (m ^. fileSelectionModel . selectionDetailsOrdering)
+            --       -- this is total jank but it works now
+            --       $ ( let selD =
+            --                 (\xs -> if null xs then [] else L.foldl1' union xs)
+            --                   . map (HashSet.toList . HashSet.map tagDescriptor . tags) -- #FIXME
+            --                   . cCollect
+            --                   $ m ^. fileSelectionModel . fileSelection
+            --               om =
+            --                 foldOccurrences
+            --                   . map tagDescriptor
+            --                   . concatMap (HashSet.toList . tags) -- #FIXME
+            --                   . cCollect
+            --                   $ m ^. fileSelectionModel . fileSelection
+            --            in decodeOccurrencesWith selD om
+            --         )
+            --   ]
         ]
       where
         sortDescriptorIntTuple ::
