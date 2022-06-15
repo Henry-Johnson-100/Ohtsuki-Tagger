@@ -113,3 +113,9 @@ hierarchyTreeToMap = hierarchyTreeToMap' empty
               . NE.map hierarchyTreeToMap
               $ is
           )
+
+-- hierarchyKVToTree :: Hashable a => a -> HashSet.HashSet a -> HierarchyTree a
+-- hierarchyKVToTree k vs =
+--   if HashSet.null vs
+--     then Infra k
+--     else Meta 

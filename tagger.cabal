@@ -88,7 +88,6 @@ library tagger-lib
   exposed-modules:     Database.Tagger
                       ,Database.Tagger.Type
                       ,Data.HierarchyMap
-                      ,Data.HierarchyTree
 
   other-modules:       Database.Tagger.Script
                       ,Database.Tagger.Type.Lens
