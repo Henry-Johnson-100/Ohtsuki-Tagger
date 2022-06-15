@@ -21,7 +21,7 @@ module Database.Tagger.Type.Prim (
 import Data.Text
 import Database.SQLite.Simple
 
--- * Types
+-- * Connection Types
 
 {- |
  A newtype that wraps a 'Connection` to create instances of Show and Eq.
