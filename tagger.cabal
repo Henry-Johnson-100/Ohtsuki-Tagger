@@ -88,14 +88,19 @@ library tagger-lib
   exposed-modules:     Database.Tagger
                       ,Database.Tagger.Type
                       ,Data.HierarchyMap
+                      ,Data.HierarchyTree
 
   other-modules:       Database.Tagger.Script
                       ,Database.Tagger.Type.Lens
                       ,Database.Tagger.Type.Prim
+                      ,Data.Hierarchy.Internal
 
   other-extensions:    DeriveGeneric
                       ,DeriveAnyClass
                       ,OverloadedLists
+                      ,DeriveFunctor
+                      ,DeriveFoldable
+                      ,MultiParamTypeClasses
 
   hs-source-dirs:      lib
 
@@ -104,5 +109,6 @@ library tagger-lib
   build-depends:       sqlite-simple == 0.4.18.0
                       ,direct-sqlite == 2.3.26
                       ,raw-strings-qq
+                      ,type-iso
 
   default-language:    Haskell2010
