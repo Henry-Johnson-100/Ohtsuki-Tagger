@@ -101,6 +101,7 @@ library tagger-lib
                       ,DeriveFunctor
                       ,DeriveFoldable
                       ,MultiParamTypeClasses
+                      ,BangPatterns
 
   hs-source-dirs:      lib
 
