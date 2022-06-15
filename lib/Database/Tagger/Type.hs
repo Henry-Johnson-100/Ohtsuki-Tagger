@@ -21,12 +21,22 @@ module Database.Tagger.Type (
   isSubTag,
   isSubTagOf,
   MetaDescriptor (..),
+  DescriptorTree (..),
+  sortChildren,
+  insertIntoDescriptorTree,
+  descriptorTreeChildren,
+  descriptorTreeElem,
+  getNode,
+  flattenTree,
 
   -- * Lenses
   module Database.Tagger.Type.Lens,
 ) where
 
 import Data.Hashable
+import qualified Data.List as L
+import Data.List.NonEmpty (NonEmpty ((:|)))
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe
 import Data.Text
 import Database.SQLite.Simple
@@ -113,3 +123,95 @@ data MetaDescriptor = MetaDescriptor
     infraDescriptorId :: RecordKey
   }
   deriving (Show, Eq)
+
+{- |
+ Data type that stores hierarchical relations between between descriptors.
+
+ These are created in the MetaDescriptor table and a DescriptorTree
+ is just an encoding of a recursive query on that table.
+-}
+data DescriptorTree
+  = -- | A Descriptor that is not meta to any others.
+    Infra Descriptor
+  | -- | A Descriptor that has 1 or more infra relations.
+    -- That is, it is meta to at least one Descriptor.
+    Meta Descriptor (NonEmpty.NonEmpty DescriptorTree)
+  deriving (Show, Eq)
+
+{- |
+ Ignores the children list and just compares the node Descriptor.
+-}
+instance Ord DescriptorTree where
+  (<=) (Infra d) trb =
+    case trb of
+      Infra db -> d <= db
+      Meta db _ -> d <= db
+  (<=) (Meta d _) trb =
+    case trb of
+      Infra db -> d <= db
+      Meta db _ -> d <= db
+
+{- |
+ Sorts the children trees of the given tree.
+-}
+sortChildren :: DescriptorTree -> DescriptorTree
+sortChildren tr =
+  case tr of
+    Meta d cs -> Meta d (NonEmpty.sort cs)
+    _ -> tr
+
+{- |
+ Inserts the given tree into to the head of the
+ list of children of the second given tree.
+
+ Will transform an Infra to a Meta.
+-}
+insertIntoDescriptorTree :: DescriptorTree -> DescriptorTree -> DescriptorTree
+insertIntoDescriptorTree mt it =
+  case mt of
+    Infra md -> Meta md (it :| [])
+    Meta md cs -> Meta md (NonEmpty.cons it cs)
+
+{- |
+ Return a list of the given tree's children.
+
+ Empty if the tree is Infra.
+-}
+descriptorTreeChildren :: DescriptorTree -> [DescriptorTree]
+descriptorTreeChildren tr =
+  case tr of
+    Infra _ -> []
+    Meta _ cs -> NonEmpty.toList cs
+
+{- |
+ Determine if the given Descriptor is contained in the given tree.
+-}
+descriptorTreeElem :: Descriptor -> DescriptorTree -> Bool
+descriptorTreeElem k mt =
+  case mt of
+    Infra mk -> k == mk
+    Meta mk cs ->
+      (k == mk) || Prelude.any (descriptorTreeElem k) cs
+
+{- |
+ Retrieves the node Descriptor.
+-}
+getNode :: DescriptorTree -> Descriptor
+getNode tr =
+  case tr of
+    Infra d -> d
+    Meta d _ -> d
+
+{- |
+ Width-first flatten a tree into a list of Descriptors.
+
+ Will never be empty.
+-}
+flattenTree :: DescriptorTree -> [Descriptor]
+flattenTree = flattenTree' []
+ where
+  flattenTree' :: [Descriptor] -> DescriptorTree -> [Descriptor]
+  flattenTree' xs tr =
+    case tr of
+      Infra d -> d : xs
+      Meta d cs -> L.foldl' flattenTree' (d : xs) cs

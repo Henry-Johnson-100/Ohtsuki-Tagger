@@ -94,6 +94,7 @@ library tagger-lib
 
   other-extensions:    DeriveGeneric
                       ,DeriveAnyClass
+                      ,OverloadedLists
 
   hs-source-dirs:      lib
 
