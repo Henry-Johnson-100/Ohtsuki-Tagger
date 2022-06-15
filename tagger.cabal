@@ -13,7 +13,23 @@ maintainer:          monawasensei@gmail.com
 category:            Database
 extra-source-files:  CHANGELOG.md
 
+common tagger-common
+  default-language:    Haskell2010
+
+  ghc-options:        -Wall
+
+  other-extensions:    OverloadedStrings
+                      ,TemplateHaskell
+                      ,FlexibleInstances
+                      ,FunctionalDependencies
+
+  build-depends:       base ^>=4.13.0.0
+                      ,lens == 5.1
+                      ,text == 1.2.4.0
+                      ,transformers == 0.5.6.2
+
 executable tagger
+  import:              tagger-common
   main-is:             Main.hs
 
   other-modules:       Node.Application
@@ -36,11 +52,7 @@ executable tagger
                       ,Util.Core
                       ,Paths_tagger
 
-  other-extensions:    OverloadedStrings
-                      ,TemplateHaskell
-                      ,FlexibleInstances
-                      ,FunctionalDependencies
-                      ,MagicHash
+  other-extensions:    MagicHash
                       ,DeriveGeneric
                       ,DeriveFunctor
                       ,RankNTypes
@@ -49,14 +61,9 @@ executable tagger
                       ,MultiParamTypeClasses
 
   ghc-options:         -threaded
-                       -Wall
                        -Wno-orphans
 
-  build-depends:       base ^>=4.13.0.0
-                      ,monomer == 1.4.1.0
-                      ,lens == 5.1
-                      ,text == 1.2.4.0
-                      ,transformers == 0.5.6.2
+  build-depends:       monomer == 1.4.1.0
                       ,directory == 1.3.6.0
                       ,filepath == 1.4.2.1
                       ,process == 1.6.9.0
@@ -74,13 +81,25 @@ executable tagger
                       ,raw-strings-qq
                       ,tagger-lib
   hs-source-dirs:      app
-  default-language:    Haskell2010
 
 library tagger-lib
+  import:              tagger-common
+
   exposed-modules:     Database.Tagger
-  -- other-modules:
+                      ,Database.Tagger.Type
+
+  other-modules:       Database.Tagger.Script
+                      ,Database.Tagger.Type.Lens
+                      ,Database.Tagger.Type.Prim
+
   -- other-extensions:
+
   hs-source-dirs:      lib
-  ghc-options:         -Wall
-  build-depends:       base ^>=4.13.0.0
+
+  -- ghc-options:
+
+  build-depends:       sqlite-simple == 0.4.18.0
+                      ,direct-sqlite == 2.3.26
+                      ,raw-strings-qq
+
   default-language:    Haskell2010
