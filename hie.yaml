@@ -62,3 +62,6 @@ cradle:
 
     - path: "lib"
       component: "tagger:lib:tagger-lib"
+
+    - path: "test/tagger-lib"
+      component: "tagger:test:tagger-lib-test"
