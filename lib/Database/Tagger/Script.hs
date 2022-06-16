@@ -1,17 +1,12 @@
 {-# LANGUAGE QuasiQuotes #-}
 
-module Database.Tagger.Script
-  ( schemaDefinition,
-    runScript,
-    printScript,
-  )
-where
+module Database.Tagger.Script (
+  SQLiteScript (..),
+  schemaDefinition,
+) where
 
 import Data.String (IsString (..))
 import Data.Text (Text)
-import qualified Data.Text.IO
-import Database.SQLite.Simple (Connection (connectionHandle))
-import Database.SQLite3 (exec)
 import Text.RawString.QQ (r)
 
 newtype SQLiteScript = SQLiteScript Text deriving (Show, Eq)
@@ -76,11 +71,3 @@ INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId)
 INSERT INTO TaggerDBInfo (_tagger, version, lastAccessed)
   VALUES (0, '0.3.2.0', datetime());
 |]
-
-runScript :: SQLiteScript -> Connection -> IO ()
-runScript (SQLiteScript s) c = do
-  let cHandle = connectionHandle c
-  exec cHandle s
-
-printScript :: SQLiteScript -> IO ()
-printScript (SQLiteScript s) = Data.Text.IO.putStrLn s

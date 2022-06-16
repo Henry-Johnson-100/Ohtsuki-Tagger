@@ -8,6 +8,14 @@ module Database.Tagger.Connection (
   query_,
   execute,
   execute_,
+  initializeDatabase,
+
+  -- * Internal Connection types
+
+  -- | Functions exposing internal Connection representations. Exposed for convenience.
+  withBareConnection,
+  withConnection,
+  withConnectionHandle,
 
   -- * Database.SQLite.Simple types
 
@@ -22,6 +30,8 @@ import Control.Monad
 import qualified Data.Text.IO as T.IO
 import Data.Time
 import qualified Database.SQLite.Simple as Simple
+import qualified Database.SQLite3 as SQLite3
+import Database.Tagger.Script
 import Database.Tagger.Type
 import System.IO
 import Tagger.Info
@@ -51,7 +61,7 @@ query ::
   Simple.Query ->
   q ->
   IO [r]
-query tc queryStmnt params = runBareAction (\bc -> bareQuery bc queryStmnt params) tc
+query tc queryStmnt params = withBareConnection (\bc -> bareQuery bc queryStmnt params) tc
 
 {- |
  Run a query taking no parameters with a 'TaggedConnection`
@@ -64,7 +74,7 @@ query_ ::
   TaggedConnection ->
   Simple.Query ->
   IO [r]
-query_ tc queryStmnt = runBareAction (`bareQuery_` queryStmnt) tc
+query_ tc queryStmnt = withBareConnection (`bareQuery_` queryStmnt) tc
 
 {- |
  Execute a statement on a 'TaggedConnection`
@@ -80,7 +90,7 @@ execute ::
   q ->
   IO ()
 execute tc queryStmnt params =
-  runBareAction
+  withBareConnection
     (\bc -> bareExecute bc queryStmnt params)
     tc
 
@@ -96,9 +106,49 @@ execute_ ::
   Simple.Query ->
   IO ()
 execute_ tc queryStmnt =
-  runBareAction
+  withBareConnection
     (`bareExecute_` queryStmnt)
     tc
+
+{- |
+ Run the Tagger schema definition script on the given connection.
+
+ Should ideally not do anything on a database that is already up-to-date with the current
+ schema definition, but it would be best to avoid doing that anyways.
+-}
+initializeDatabase :: TaggedConnection -> IO ()
+initializeDatabase =
+  withBareConnection
+    ( withConnection
+        ( withConnectionHandle
+            (`SQLite3.exec` (\(SQLiteScript s) -> s) schemaDefinition)
+        )
+    )
+
+{- |
+ Run a monoidal IO action using a 'TaggedConnection`'s 'BareConnection`.
+-}
+withBareConnection :: Monoid b => (BareConnection -> IO b) -> TaggedConnection -> IO b
+withBareConnection f tc =
+  maybe
+    ( T.IO.hPutStrLn stderr ("Not Connected to " <> _taggedconnectionConnName tc)
+        >> mempty
+    )
+    f
+    . _taggedconnectionConnInstance
+    $ tc
+
+{- |
+ Run an action using a 'BareConnection`'s Connection.
+-}
+withConnection :: (Simple.Connection -> t) -> BareConnection -> t
+withConnection f = f . _bareConnection
+
+{- |
+ Run an action using a Connection's ConnectionHandle.
+-}
+withConnectionHandle :: (SQLite3.Database -> c) -> Simple.Connection -> c
+withConnectionHandle f = f . Simple.connectionHandle
 
 updateLastAccessed :: BareConnection -> IO ()
 updateLastAccessed = undefined
@@ -136,32 +186,19 @@ updateTaggerDBInfo bc = do
       "UPDATE TaggerDBInfo SET version = ?, lastAccessed = ?"
       (taggerVersion, currentTime)
 
-runBareAction :: Monoid b => (BareConnection -> IO b) -> TaggedConnection -> IO b
-runBareAction f tc =
-  maybe
-    ( T.IO.hPutStrLn stderr ("Not Connected to " <> _taggedconnectionConnName tc)
-        >> mempty
-    )
-    f
-    . _taggedconnectionConnInstance
-    $ tc
-
 bareQuery ::
   (Simple.ToRow q, Simple.FromRow r) =>
   BareConnection ->
   Simple.Query ->
   q ->
   IO [r]
-bareQuery = bareConnectionAction Simple.query
+bareQuery = withConnection Simple.query
 
 bareQuery_ :: Simple.FromRow r => BareConnection -> Simple.Query -> IO [r]
-bareQuery_ = bareConnectionAction Simple.query_
+bareQuery_ = withConnection Simple.query_
 
 bareExecute :: Simple.ToRow q => BareConnection -> Simple.Query -> q -> IO ()
-bareExecute = bareConnectionAction Simple.execute
+bareExecute = withConnection Simple.execute
 
 bareExecute_ :: BareConnection -> Simple.Query -> IO ()
-bareExecute_ = bareConnectionAction Simple.execute_
-
-bareConnectionAction :: (Simple.Connection -> t) -> BareConnection -> t
-bareConnectionAction f bc = f (_bareConnection bc)
+bareExecute_ = withConnection Simple.execute_
