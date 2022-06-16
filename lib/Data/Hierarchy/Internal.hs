@@ -54,7 +54,7 @@ instance Hashable a => Monoid (HierarchyMap a) where
 
  > insert 1 [1,2] empty
 
- would created a map [(1, [1,2]), (2, [])] where 1 is circularly related to itself.
+ will create a map [(1, [1,2]), (2, [])] where 1 is circularly related to itself.
  This would cause an infinite hang if ever called.
 -}
 insert :: Hashable a => a -> HashSet.HashSet a -> HierarchyMap a -> HierarchyMap a
