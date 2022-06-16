@@ -1,2 +1,5 @@
+import Test.Data.HierarchyMap
+import Test.Tasty
+
 main :: IO ()
-main = putStrLn "Hello desu!"
+main = defaultMain hierarchyMapTests

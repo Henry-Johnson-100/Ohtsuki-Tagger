@@ -120,6 +120,7 @@ library tagger-lib
 
 test-suite tagger-lib-test
   import:              haskell-common
+                      ,tagger-common
 
   type:                exitcode-stdio-1.0
 
@@ -129,7 +130,10 @@ test-suite tagger-lib-test
 
   hs-source-dirs:      test/tagger-lib
 
+  other-extensions:    OverloadedLists
+
   other-modules:       Test.Data.HierarchyMap
 
   build-depends:       tasty == 1.4.2.3
+                      ,tasty-hunit
                       ,tagger-lib

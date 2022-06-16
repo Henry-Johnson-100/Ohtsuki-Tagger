@@ -48,6 +48,14 @@ instance Hashable a => Monoid (HierarchyMap a) where
  Adds empty k-v entries for each member of the given set, representing Infra relations.
 
  Does not prohibit circular relations.
+
+ Care should be taken that data inserted into the 'HierarchyMap` is not circularly related
+ ex:
+
+ > insert 1 [1,2] empty
+
+ would created a map [(1, [1,2]), (2, [])] where 1 is circularly related to itself.
+ This would cause an infinite hang if ever called.
 -}
 insert :: Hashable a => a -> HashSet.HashSet a -> HierarchyMap a -> HierarchyMap a
 insert k s (HierarchyMap m) =
@@ -118,4 +126,4 @@ hierarchyTreeToMap = hierarchyTreeToMap' empty
 -- hierarchyKVToTree k vs =
 --   if HashSet.null vs
 --     then Infra k
---     else Meta 
+--     else Meta

@@ -18,10 +18,12 @@ module Data.HierarchyMap (
   Data.HierarchyMap.lookup,
   metaMember,
   infraMember,
+  isInfraTo,
   insert,
   empty,
-  isMetaCircular,
+  Data.HierarchyMap.null,
   getAllInfraTo,
+  getAllMetaTo,
 ) where
 
 import qualified Data.HashMap.Strict as HashMap
@@ -50,6 +52,9 @@ union = unionWith HashSet.union
 member :: Hashable a => a -> HierarchyMap a -> Bool
 member x (HierarchyMap m) = HashMap.member x m
 
+null :: HierarchyMap k -> Bool
+null (HierarchyMap m) = HashMap.null m
+
 {- |
  Return empty set if the key is not in the map.
 -}
@@ -77,10 +82,22 @@ infraMember :: Hashable a => a -> HierarchyMap a -> Bool
 infraMember x (HierarchyMap m) = maybe False HashSet.null $ HashMap.lookup x m
 
 {- |
- Returns 'True` if the given value is meta to itself at any point in the map.
+ 'True` if the first given value is infra to the second in the given map.
 -}
-isMetaCircular :: Hashable a => a -> HierarchyMap a -> Bool
-isMetaCircular x = HashSet.member x . getAllInfraTo x
+isInfraTo :: Hashable a => a -> a -> HierarchyMap a -> Bool
+isInfraTo x y = HashSet.member x . getAllInfraTo y
+
+{- |
+ Retrieve a set of all values that are meta to the given value.
+-}
+getAllMetaTo :: Hashable a => a -> HierarchyMap a -> HashSet.HashSet a
+getAllMetaTo x hm@(HierarchyMap m) =
+  let !parentLayer = HashMap.keysSet $ HashMap.filter (HashSet.member x) m
+   in HashSet.union parentLayer
+        . HashSet.unions
+        . map (`getAllMetaTo` hm)
+        . HashSet.toList
+        $ parentLayer
 
 {- |
  Retrieve a set of all elements that are infra to the given value.
