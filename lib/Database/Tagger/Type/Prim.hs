@@ -13,9 +13,8 @@ The two modules are separated purely to make exporting lenses and lens instances
 with non-TemplateHaskell generated code simpler.
 -}
 module Database.Tagger.Type.Prim (
-  BareConnection,
+  BareConnection (..),
   TaggedConnection (..),
-  _bareConnection,
 ) where
 
 import Data.Text

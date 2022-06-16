@@ -12,6 +12,7 @@ Maintainer  : monawasensei@gmail.com
 -}
 module Database.Tagger.Type (
   module Database.Tagger.Type.Prim,
+  Database.Tagger.Type.Prim.BareConnection,
 
   -- * Database Types
   RecordKey,
@@ -36,7 +37,8 @@ import Data.Maybe
 import Data.Text
 import Database.SQLite.Simple
 import Database.Tagger.Type.Lens
-import Database.Tagger.Type.Prim
+import Database.Tagger.Type.Prim hiding (BareConnection (..))
+import qualified Database.Tagger.Type.Prim
 import GHC.Generics
 
 type RecordKey = Int

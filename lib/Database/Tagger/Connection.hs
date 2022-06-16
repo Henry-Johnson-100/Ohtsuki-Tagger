@@ -1,9 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
+{- |
+Module      : Database.Tagger.Connection
+Description : Module to open, query, and close Tagger database connections.
+
+License     : GPL-3
+Maintainer  : monawasensei@gmail.com
+-}
 module Database.Tagger.Connection (
   -- * Wrapped types
   open,
+  open',
+  close,
   query,
   query_,
   execute,
@@ -26,28 +35,74 @@ module Database.Tagger.Connection (
   Simple.Only (..),
 ) where
 
-import Control.Monad
+import Control.Monad (unless, when)
+import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
-import Data.Time
+import Data.Time (getCurrentTime)
 import qualified Database.SQLite.Simple as Simple
 import qualified Database.SQLite3 as SQLite3
-import Database.Tagger.Script
-import Database.Tagger.Type
-import System.IO
-import Tagger.Info
+import Database.Tagger.Script (
+  SQLiteScript (SQLiteScript),
+  schemaDefinition,
+ )
+import Database.Tagger.Type.Prim (BareConnection (..), TaggedConnection (..))
+import System.IO (stderr)
+import Tagger.Info (taggerVersion)
 
 {- |
  Open a new 'TaggedConnection` with the database at the given path.
 
- The connection's label is set to the path and the lastAccessed time is
- updated.
+ The connection's label is set to the path and the lastAccessed time and database version
+ is updated.
 
- All Tagger connections should be made with this function.
+ If the db info table is not found then the database is initialized, if this is undesired,
+  use open'
+
+ Most Tagger connections should be made with this function.
 -}
 open :: FilePath -> IO TaggedConnection
 open p = do
-  currentTime <- getCurrentTime
-  undefined
+  let tagName = T.pack p
+  bc <- fmap BareConnection . Simple.open $ p
+  dbInfoTableExists <- taggerDBInfoTableExists bc
+  unless
+    dbInfoTableExists
+    ( withConnection
+        (withConnectionHandle (`SQLite3.exec` (\(SQLiteScript s) -> s) schemaDefinition))
+        bc
+    )
+  activateForeignKeyPragma bc
+  updateTaggerDBInfoVersion bc
+  updateTaggerDBInfoLastAccessed bc
+  return $ TaggedConnection tagName (Just bc)
+
+{- |
+ Like 'open` but does NOT update the table with lastAccessedDateTime or the table version.
+
+ Also does not attempt to initialize the database if there is no db info table.
+-}
+open' :: FilePath -> IO TaggedConnection
+open' p = do
+  let tagName = T.pack p
+  bc <- fmap BareConnection . Simple.open $ p
+  activateForeignKeyPragma bc
+  return $ TaggedConnection tagName (Just bc)
+
+{- |
+ Given a 'TaggedConnection`, will close it and return a 'TaggedConnection` with the same
+ label a 'Nothing` 'BareConnection`.
+
+ Does nothing if the 'BareConnection` is already 'Nothing`.
+-}
+close :: TaggedConnection -> IO TaggedConnection
+close tc@(TaggedConnection _ mbc) =
+  maybe
+    (return tc)
+    ( \bc -> do
+        withConnection Simple.close bc
+        return (tc{_taggedconnectionConnInstance = Nothing})
+    )
+    mbc
 
 {- |
  Run a query with a 'TaggedConnection`
@@ -150,18 +205,6 @@ withConnection f = f . _bareConnection
 withConnectionHandle :: (SQLite3.Database -> c) -> Simple.Connection -> c
 withConnectionHandle f = f . Simple.connectionHandle
 
-updateLastAccessed :: BareConnection -> IO ()
-updateLastAccessed = undefined
-
-getLastAccessed :: BareConnection -> IO ()
-getLastAccessed = undefined
-
-updateLastBackupDateTime :: BareConnection -> IO ()
-updateLastBackupDateTime = undefined
-
-getLastBackupDateTime :: BareConnection -> IO ()
-getLastBackupDateTime = undefined
-
 activateForeignKeyPragma :: BareConnection -> IO ()
 activateForeignKeyPragma = flip bareExecute_ "PRAGMA foreign_keys = on"
 
@@ -176,15 +219,31 @@ taggerDBInfoTableExists c = do
       IO [Simple.Only Int]
   return . all ((> 0) . (\(Simple.Only n) -> n)) $ r
 
-updateTaggerDBInfo :: BareConnection -> IO ()
-updateTaggerDBInfo bc = do
-  currentTime <- getCurrentTime
+updateTaggerDBInfoLastAccessed :: BareConnection -> IO ()
+updateTaggerDBInfoLastAccessed bc = do
   dbInfoTableExists <- taggerDBInfoTableExists bc
   when dbInfoTableExists $ do
-    bareExecute
+    currentTime <- getCurrentTime
+    withConnection
+      ( \c ->
+          Simple.execute
+            c
+            "UPDATE TaggerDBInfo SET lastAccessed = ?"
+            [currentTime]
+      )
       bc
-      "UPDATE TaggerDBInfo SET version = ?, lastAccessed = ?"
-      (taggerVersion, currentTime)
+
+updateTaggerDBInfoVersion :: BareConnection -> IO ()
+updateTaggerDBInfoVersion bc = do
+  dbInfoTableExists <- taggerDBInfoTableExists bc
+  when
+    dbInfoTableExists
+    ( withConnection
+        ( \c ->
+            Simple.execute c "UPDATE TaggerDBInfo SET version = ?" [taggerVersion]
+        )
+        bc
+    )
 
 bareQuery ::
   (Simple.ToRow q, Simple.FromRow r) =>
