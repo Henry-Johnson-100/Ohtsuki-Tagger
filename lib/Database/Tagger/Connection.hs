@@ -2,14 +2,20 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Database.Tagger.Connection (
+  -- * Wrapped types
   open,
   query,
   query_,
   execute,
   execute_,
+
+  -- * Database.SQLite.Simple types
+
+  -- | Types exported from Database.SQLite.Simple for use in 'Database.Tagger`
   Simple.Query,
   Simple.ToRow,
   Simple.FromRow,
+  Simple.Only (..),
 ) where
 
 import Control.Monad
@@ -45,11 +51,7 @@ query ::
   Simple.Query ->
   q ->
   IO [r]
-query (TaggedConnection l mc) queryStmnt params =
-  maybe
-    (T.IO.hPutStrLn stderr ("Not connected to: " <> l) >> mempty)
-    (\bc -> bareQuery bc queryStmnt params)
-    mc
+query tc queryStmnt params = runBareAction (\bc -> bareQuery bc queryStmnt params) tc
 
 {- |
  Run a query taking no parameters with a 'TaggedConnection`
@@ -62,11 +64,7 @@ query_ ::
   TaggedConnection ->
   Simple.Query ->
   IO [r]
-query_ (TaggedConnection l mc) queryStmnt =
-  maybe
-    (T.IO.hPutStrLn stderr ("Not connected to: " <> l) >> mempty)
-    (`bareQuery_` queryStmnt)
-    mc
+query_ tc queryStmnt = runBareAction (`bareQuery_` queryStmnt) tc
 
 {- |
  Execute a statement on a 'TaggedConnection`
@@ -81,11 +79,10 @@ execute ::
   Simple.Query ->
   q ->
   IO ()
-execute (TaggedConnection l mc) queryStmnt params =
-  maybe
-    (T.IO.hPutStrLn stderr ("Not connected to: " <> l) >> mempty)
+execute tc queryStmnt params =
+  runBareAction
     (\bc -> bareExecute bc queryStmnt params)
-    mc
+    tc
 
 {- |
  Execute a statement taking no parameters on a 'TaggedConnection`
@@ -98,11 +95,10 @@ execute_ ::
   TaggedConnection ->
   Simple.Query ->
   IO ()
-execute_ (TaggedConnection l mc) queryStmnt =
-  maybe
-    (T.IO.hPutStrLn stderr ("Not connected to: " <> l) >> mempty)
+execute_ tc queryStmnt =
+  runBareAction
     (`bareExecute_` queryStmnt)
-    mc
+    tc
 
 updateLastAccessed :: BareConnection -> IO ()
 updateLastAccessed = undefined
@@ -119,28 +115,36 @@ getLastBackupDateTime = undefined
 activateForeignKeyPragma :: BareConnection -> IO ()
 activateForeignKeyPragma = flip bareExecute_ "PRAGMA foreign_keys = on"
 
--- taggerDBInfoTableExists :: BareConnection -> IO Bool
--- taggerDBInfoTableExists c = do
---   r <-
---     query_
---       (_bareConnection c)
---       "SELECT COUNT(*) \
---       \FROM sqlite_master \
---       \WHERE type = 'table' AND name = 'TaggerDBInfo'" ::
---       IO [Only Int]
---   return . all ((> 0) . (\(Only n) -> n)) $ r
+taggerDBInfoTableExists :: BareConnection -> IO Bool
+taggerDBInfoTableExists c = do
+  r <-
+    bareQuery_
+      c
+      "SELECT COUNT(*) \
+      \FROM sqlite_master \
+      \WHERE type = 'table' AND name = 'TaggerDBInfo'" ::
+      IO [Simple.Only Int]
+  return . all ((> 0) . (\(Simple.Only n) -> n)) $ r
 
--- updateTaggerDBInfo :: BareConnection -> IO ()
--- updateTaggerDBInfo bc = do
---   let c = _bareConnection bc
---   currentTime <- getCurrentTime
---   dbInfoTableExists <- taggerDBInfoTableExists c
---   when dbInfoTableExists $ do
---     _ <- getLastBackupDateTime bc
---     execute
---       c
---       "UPDATE TaggerDBInfo SET version = ?, lastAccessed = ?"
---       (taggerVersion, currentTime)
+updateTaggerDBInfo :: BareConnection -> IO ()
+updateTaggerDBInfo bc = do
+  currentTime <- getCurrentTime
+  dbInfoTableExists <- taggerDBInfoTableExists bc
+  when dbInfoTableExists $ do
+    bareExecute
+      bc
+      "UPDATE TaggerDBInfo SET version = ?, lastAccessed = ?"
+      (taggerVersion, currentTime)
+
+runBareAction :: Monoid b => (BareConnection -> IO b) -> TaggedConnection -> IO b
+runBareAction f tc =
+  maybe
+    ( T.IO.hPutStrLn stderr ("Not Connected to " <> _taggedconnectionConnName tc)
+        >> mempty
+    )
+    f
+    . _taggedconnectionConnInstance
+    $ tc
 
 bareQuery ::
   (Simple.ToRow q, Simple.FromRow r) =>
