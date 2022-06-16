@@ -93,10 +93,10 @@ library tagger-lib
 
   exposed-modules:     Database.Tagger
                       ,Database.Tagger.Type
+                      ,Database.Tagger.Connection
                       ,Data.HierarchyMap
 
   other-modules:       Database.Tagger.Script
-                      ,Database.Tagger.Connection
                       ,Database.Tagger.Type.Lens
                       ,Database.Tagger.Type.Prim
                       ,Data.Hierarchy.Internal
