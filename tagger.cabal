@@ -26,12 +26,14 @@ common tagger-common
                       ,FlexibleInstances
                       ,FunctionalDependencies
 
+  other-modules:       Paths_tagger
+
   build-depends:       lens == 5.1
                       ,text == 1.2.4.0
                       ,transformers == 0.5.6.2
                       ,hashable == 1.4.0.2
                       ,containers == 0.6.2.1
-                      ,unordered-containers == 0.2.18.0                      
+                      ,unordered-containers == 0.2.18.0
 
 executable tagger
   import:              haskell-common
@@ -57,7 +59,6 @@ executable tagger
                       ,Database.Tagger.Script
                       ,IO
                       ,Util.Core
-                      ,Paths_tagger
 
   other-extensions:    MagicHash
                       ,DeriveGeneric
@@ -95,9 +96,11 @@ library tagger-lib
                       ,Data.HierarchyMap
 
   other-modules:       Database.Tagger.Script
+                      ,Database.Tagger.Connection
                       ,Database.Tagger.Type.Lens
                       ,Database.Tagger.Type.Prim
                       ,Data.Hierarchy.Internal
+                      ,Tagger.Info
 
   other-extensions:    DeriveGeneric
                       ,DeriveAnyClass
@@ -115,6 +118,7 @@ library tagger-lib
                       ,direct-sqlite == 2.3.26
                       ,raw-strings-qq
                       ,type-iso
+                      ,time == 1.9.3
 
   default-language:    Haskell2010
 
