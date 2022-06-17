@@ -31,6 +31,7 @@ module Database.Tagger.Connection (
   -- | Types exported from Database.SQLite.Simple for use in 'Database.Tagger`
   Simple.Query,
   Simple.ToRow,
+  Database.SQLite.Simple.ToField.ToField,
   Simple.FromRow,
   Simple.Only (..),
 ) where
@@ -40,6 +41,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import Data.Time (getCurrentTime)
 import qualified Database.SQLite.Simple as Simple
+import qualified Database.SQLite.Simple.ToField
 import qualified Database.SQLite3 as SQLite3
 import Database.Tagger.Query.Type
 import Database.Tagger.Script (

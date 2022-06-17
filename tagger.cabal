@@ -99,10 +99,11 @@ library tagger-lib
   other-modules:       Database.Tagger.Script
                       ,Database.Tagger.Type.Lens
                       ,Database.Tagger.Type.Prim
+                      ,Database.Tagger.Query
                       ,Database.Tagger.Query.Type
-                      ,Database.Tagger.Query.Basic
                       ,Data.Hierarchy.Internal
                       ,Tagger.Info
+                      ,Tagger.Util
 
   other-extensions:    DeriveGeneric
                       ,DeriveAnyClass
