@@ -41,6 +41,7 @@ import qualified Data.Text.IO as T.IO
 import Data.Time (getCurrentTime)
 import qualified Database.SQLite.Simple as Simple
 import qualified Database.SQLite3 as SQLite3
+import Database.Tagger.Query.Type
 import Database.Tagger.Script (
   SQLiteScript (SQLiteScript),
   schemaDefinition,
@@ -113,10 +114,11 @@ close tc@(TaggedConnection _ mbc) =
 query ::
   (Simple.ToRow q, Simple.FromRow r) =>
   TaggedConnection ->
-  Simple.Query ->
+  TaggerQuery ->
   q ->
   IO [r]
-query tc queryStmnt params = withBareConnection (\bc -> bareQuery bc queryStmnt params) tc
+query tc (TaggerQuery queryStmnt) params =
+  withBareConnection (\bc -> bareQuery bc queryStmnt params) tc
 
 {- |
  Run a query taking no parameters with a 'TaggedConnection`
@@ -127,9 +129,9 @@ query tc queryStmnt params = withBareConnection (\bc -> bareQuery bc queryStmnt 
 query_ ::
   Simple.FromRow r =>
   TaggedConnection ->
-  Simple.Query ->
+  TaggerQuery ->
   IO [r]
-query_ tc queryStmnt = withBareConnection (`bareQuery_` queryStmnt) tc
+query_ tc (TaggerQuery queryStmnt) = withBareConnection (`bareQuery_` queryStmnt) tc
 
 {- |
  Execute a statement on a 'TaggedConnection`
@@ -141,10 +143,10 @@ query_ tc queryStmnt = withBareConnection (`bareQuery_` queryStmnt) tc
 execute ::
   Simple.ToRow q =>
   TaggedConnection ->
-  Simple.Query ->
+  TaggerQuery ->
   q ->
   IO ()
-execute tc queryStmnt params =
+execute tc (TaggerQuery queryStmnt) params =
   withBareConnection
     (\bc -> bareExecute bc queryStmnt params)
     tc
@@ -158,9 +160,9 @@ execute tc queryStmnt params =
 -}
 execute_ ::
   TaggedConnection ->
-  Simple.Query ->
+  TaggerQuery ->
   IO ()
-execute_ tc queryStmnt =
+execute_ tc (TaggerQuery queryStmnt) =
   withBareConnection
     (`bareExecute_` queryStmnt)
     tc
