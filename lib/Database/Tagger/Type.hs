@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE StrictData #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -16,8 +17,8 @@ module Database.Tagger.Type (
   Database.Tagger.Type.Prim.BareConnection,
 
   -- * Database Types
-  RecordKey (..),
   RowId,
+  RecordKey (..),
   ForeignRecord,
   File (..),
   Descriptor (..),
@@ -34,21 +35,21 @@ module Database.Tagger.Type (
 ) where
 
 import qualified Data.HashSet as HashSet
-import Data.Hashable
-import Data.HierarchyMap (HierarchyMap)
-import Data.Int
-import Data.Maybe
-import Data.Text
-import Database.SQLite.Simple
-import Database.SQLite.Simple.FromField
-import Database.SQLite.Simple.ToField
+import Data.Hashable (Hashable)
+import Data.Hierarchy.Internal (HierarchyMap)
+import Data.Int (Int64)
+import Data.Maybe (isJust)
+import Data.Text (Text)
+import Database.SQLite.Simple (FromRow (..), field)
+import Database.SQLite.Simple.FromField (FromField (..))
+import Database.SQLite.Simple.ToField (ToField (..))
 import Database.Tagger.Type.Lens
 import Database.Tagger.Type.Prim hiding (BareConnection (..))
 import qualified Database.Tagger.Type.Prim
-import GHC.Generics
+import GHC.Generics (Generic)
 
 {- |
- Synonym denoting that a given 'RecordKey` actuall corresponds to a Foreign Key
+ Synonym denoting that a given 'RecordKey` actually corresponds to a Foreign Key
  of some sort.
 -}
 type ForeignRecord a = RecordKey a
@@ -57,7 +58,8 @@ type ForeignRecord a = RecordKey a
  Representing a Primary Key or RowId for a certain type specified in the type parameter.
 -}
 newtype RecordKey a = RecordKey Int64
-  deriving (Show, Eq, Generic, Hashable)
+  deriving (Generic)
+  deriving newtype (Show, Eq, Hashable, Bounded, Enum, Num, Ord, Real, Read, Integral)
 
 instance FromField (RecordKey a) where
   fromField = fmap RecordKey . fromField

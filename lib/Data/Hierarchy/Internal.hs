@@ -1,6 +1,5 @@
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE StrictData #-}
 {-# OPTIONS_HADDOCK hide #-}
 
@@ -13,7 +12,6 @@ import qualified Data.HashSet as HashSet
 import Data.Hashable (Hashable)
 import qualified Data.List as L
 import qualified Data.List.NonEmpty as NE
-import Data.Types.Injective
 
 {- |
  A flat 'HashMap` that encodes hierarchical relationships
@@ -82,12 +80,6 @@ data HierarchyTree a
   = Infra a
   | Meta a (NE.NonEmpty (HierarchyTree a))
   deriving (Show, Eq, Functor, Foldable)
-
-{- |
- > to = hierarchyTreeToMap
--}
-instance Hashable a => Injective (HierarchyTree a) (HierarchyMap a) where
-  to = hierarchyTreeToMap
 
 {- |
  Fetch the top node of the current tree.

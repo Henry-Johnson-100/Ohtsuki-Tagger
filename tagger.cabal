@@ -107,10 +107,11 @@ library tagger-lib
 
   other-extensions:    DeriveGeneric
                       ,DeriveAnyClass
+                      ,GeneralisedNewtypeDeriving
+                      ,DerivingStrategies
                       ,OverloadedLists
                       ,DeriveFunctor
                       ,DeriveFoldable
-                      ,MultiParamTypeClasses
                       ,BangPatterns
 
   hs-source-dirs:      lib
