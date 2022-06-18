@@ -41,6 +41,6 @@ data TaggedConnection = TaggedConnection
     -- typically the absolute path of the file connected to, but could be anything.
     _taggedconnectionConnName :: !Text
   , -- | Connection to a database, if it is open.
-    _taggedconnectionConnInstance :: !(Maybe BareConnection)
+    _taggedconnectionConnInstance :: !BareConnection
   }
   deriving (Eq, Show)

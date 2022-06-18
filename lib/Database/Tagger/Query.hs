@@ -51,7 +51,6 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import qualified Data.HashSet as HashSet
-import Data.Maybe
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import Database.Tagger.Connection
@@ -225,13 +224,13 @@ insertDescriptors ps tc = do
   insertionResult <-
     runExceptT $ do
       unrelatedDK <- getUnrelatedDescriptorKey tc
-      desKeys <- lift $ fmap catMaybes . mapM (runMaybeT . insertDescriptorAndGetKey) $ ps
+      desKeys <- lift $ mapM insertDescriptorAndGetKey $ ps
       lift $ createBulkInfraRelations tc unrelatedDK desKeys
   either (T.IO.hPutStrLn stderr) pure insertionResult
  where
-  insertDescriptorAndGetKey :: T.Text -> MaybeT IO RecordKey
+  insertDescriptorAndGetKey :: T.Text -> IO RecordKey
   insertDescriptorAndGetKey desName = do
-    lift $ execute tc [r||] [desName]
+    execute tc [r||] [desName]
     lastInsertRowId tc
 
 {- |

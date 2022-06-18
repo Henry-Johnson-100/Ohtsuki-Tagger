@@ -40,10 +40,7 @@ module Database.Tagger.Connection (
 ) where
 
 import Control.Monad (unless, when)
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Maybe
 import qualified Data.Text as T
-import qualified Data.Text.IO as T.IO
 import Data.Time (getCurrentTime)
 import qualified Database.SQLite.Simple as Simple
 import qualified Database.SQLite.Simple.ToField
@@ -55,9 +52,7 @@ import Database.Tagger.Script (
   schemaTeardown,
  )
 import Database.Tagger.Type.Prim (BareConnection (..), TaggedConnection (..))
-import System.IO (stderr)
 import Tagger.Info (taggerVersion)
-import Tagger.Util
 
 {- |
  Open a new 'TaggedConnection` with the database at the given path.
@@ -84,7 +79,7 @@ open p = do
   activateForeignKeyPragma bc
   updateTaggerDBInfoVersion bc
   updateTaggerDBInfoLastAccessed bc
-  return $ TaggedConnection tagName (Just bc)
+  return $ TaggedConnection tagName bc
 
 {- |
  Like 'open` but does NOT update the table with lastAccessedDateTime or the table version.
@@ -96,23 +91,15 @@ open' p = do
   let tagName = T.pack p
   bc <- fmap BareConnection . Simple.open $ p
   activateForeignKeyPragma bc
-  return $ TaggedConnection tagName (Just bc)
+  return $ TaggedConnection tagName bc
 
 {- |
- Given a 'TaggedConnection`, will close it and return a 'TaggedConnection` with the same
- label a 'Nothing` 'BareConnection`.
-
- Does nothing if the 'BareConnection` is already 'Nothing`.
+ Closes a TaggedConnection
 -}
-close :: TaggedConnection -> IO TaggedConnection
-close tc@(TaggedConnection _ mbc) =
-  maybe
-    (return tc)
-    ( \bc -> do
-        withConnection Simple.close bc
-        return (tc{_taggedconnectionConnInstance = Nothing})
-    )
-    mbc
+close :: TaggedConnection -> IO ()
+close =
+  withBareConnection
+    (withConnection Simple.close)
 
 {- |
  Run a query with a 'TaggedConnection`
@@ -186,15 +173,10 @@ executeMany tc (TaggerQuery queryStmnt) params =
     tc
 
 {- |
- Returns
-
- > MaybeT (IO Nothing)
-
- If the connection is not active.
+  Gets the ID of the row last inserted into the database.
 -}
-lastInsertRowId :: TaggedConnection -> MaybeT IO Int
-lastInsertRowId (TaggedConnection _ mbc) =
-  maybe (hoistMaybe Nothing) (lift . bareLastInsertRowId) mbc
+lastInsertRowId :: TaggedConnection -> IO Int
+lastInsertRowId = withBareConnection bareLastInsertRowId
 
 {- |
  Run the Tagger schema definition script on the given connection.
@@ -226,17 +208,10 @@ teardownDatabase =
     )
 
 {- |
- Run a monoidal IO action using a 'TaggedConnection`'s 'BareConnection`.
+ Run an action using a 'TaggedConnection`'s 'BareConnection`
 -}
-withBareConnection :: Monoid b => (BareConnection -> IO b) -> TaggedConnection -> IO b
-withBareConnection f tc =
-  maybe
-    ( T.IO.hPutStrLn stderr ("Not Connected to " <> _taggedconnectionConnName tc)
-        >> mempty
-    )
-    f
-    . _taggedconnectionConnInstance
-    $ tc
+withBareConnection :: (BareConnection -> t) -> TaggedConnection -> t
+withBareConnection f (TaggedConnection _ bc) = f bc
 
 {- |
  Run an action using a 'BareConnection`'s Connection.
