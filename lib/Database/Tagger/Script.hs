@@ -3,6 +3,7 @@
 module Database.Tagger.Script (
   SQLiteScript (..),
   schemaDefinition,
+  schemaTeardown,
 ) where
 
 import Data.String (IsString (..))
@@ -71,3 +72,16 @@ INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId)
 INSERT INTO TaggerDBInfo (_tagger, version, lastAccessed)
   VALUES (0, '0.3.2.0', datetime());
 |]
+
+schemaTeardown :: SQLiteScript
+schemaTeardown =
+  SQLiteScript . fromString $
+    [r|
+      PRAGMA foreign_keys = on;
+      DROP TABLE IF EXISTS File;
+      DROP TABLE IF EXISTS Descriptor;
+      DROP TABLE IF EXISTS MetaDescriptor;
+      DROP TABLE IF EXISTS Tag;
+      DROP TABLE IF EXISTS Representative;
+      DROP TABLE IF EXISTS TaggerDBInfo;
+    |]

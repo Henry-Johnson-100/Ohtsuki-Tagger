@@ -18,6 +18,7 @@ module Database.Tagger.Connection (
   execute,
   execute_,
   initializeDatabase,
+  teardownDatabase,
 
   -- * Internal Connection types
 
@@ -47,6 +48,7 @@ import Database.Tagger.Query.Type
 import Database.Tagger.Script (
   SQLiteScript (SQLiteScript),
   schemaDefinition,
+  schemaTeardown,
  )
 import Database.Tagger.Type.Prim (BareConnection (..), TaggedConnection (..))
 import System.IO (stderr)
@@ -181,6 +183,20 @@ initializeDatabase =
     ( withConnection
         ( withConnectionHandle
             (`SQLite3.exec` (\(SQLiteScript s) -> s) schemaDefinition)
+        )
+    )
+
+{- |
+ DROP all tables defined in the schemaDefinition.
+
+ This is really only used for generating and tearing down test databases.
+-}
+teardownDatabase :: TaggedConnection -> IO ()
+teardownDatabase =
+  withBareConnection
+    ( withConnection
+        ( withConnectionHandle
+            (`SQLite3.exec` (\(SQLiteScript s) -> s) schemaTeardown)
         )
     )
 
