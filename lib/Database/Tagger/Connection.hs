@@ -17,6 +17,8 @@ module Database.Tagger.Connection (
   query_,
   execute,
   execute_,
+  executeMany,
+  lastInsertRowId,
   initializeDatabase,
   teardownDatabase,
 
@@ -38,6 +40,8 @@ module Database.Tagger.Connection (
 ) where
 
 import Control.Monad (unless, when)
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Maybe
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import Data.Time (getCurrentTime)
@@ -53,6 +57,7 @@ import Database.Tagger.Script (
 import Database.Tagger.Type.Prim (BareConnection (..), TaggedConnection (..))
 import System.IO (stderr)
 import Tagger.Info (taggerVersion)
+import Tagger.Util
 
 {- |
  Open a new 'TaggedConnection` with the database at the given path.
@@ -172,6 +177,26 @@ execute_ tc (TaggerQuery queryStmnt) =
     tc
 
 {- |
+ Execute a statement on a list of parameters.
+-}
+executeMany :: Simple.ToRow q => TaggedConnection -> TaggerQuery -> [q] -> IO ()
+executeMany tc (TaggerQuery queryStmnt) params =
+  withBareConnection
+    (\bc -> bareExecuteMany bc queryStmnt params)
+    tc
+
+{- |
+ Returns
+
+ > MaybeT (IO Nothing)
+
+ If the connection is not active.
+-}
+lastInsertRowId :: TaggedConnection -> MaybeT IO Int
+lastInsertRowId (TaggedConnection _ mbc) =
+  maybe (hoistMaybe Nothing) (lift . bareLastInsertRowId) mbc
+
+{- |
  Run the Tagger schema definition script on the given connection.
 
  Should ideally not do anything on a database that is already up-to-date with the current
@@ -281,3 +306,11 @@ bareExecute = withConnection Simple.execute
 
 bareExecute_ :: BareConnection -> Simple.Query -> IO ()
 bareExecute_ = withConnection Simple.execute_
+
+bareExecuteMany :: Simple.ToRow q => BareConnection -> Simple.Query -> [q] -> IO ()
+bareExecuteMany = withConnection Simple.executeMany
+
+bareLastInsertRowId :: BareConnection -> IO Int
+bareLastInsertRowId =
+  fmap (fromInteger . toInteger)
+    . withConnection Simple.lastInsertRowId

@@ -34,15 +34,30 @@ module Database.Tagger.Query (
   flatQueryForFileByTagDescriptor,
 
   -- * Operations
+  -- $Operations
+
+  -- ** 'File` Operations
+  insertFiles,
+  deleteFiles,
+
+  -- ** 'Descriptor` Operations
+  insertDescriptors,
+
+  -- ** 'Relation` Operations
+  insertDescriptorRelation,
 ) where
 
 import Control.Monad.Trans.Class
+import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import qualified Data.HashSet as HashSet
+import Data.Maybe
 import qualified Data.Text as T
+import qualified Data.Text.IO as T.IO
 import Database.Tagger.Connection
 import Database.Tagger.Query.Type
 import Database.Tagger.Type
+import System.IO
 import Tagger.Util
 import Text.RawString.QQ
 
@@ -168,3 +183,105 @@ queryForUntaggedFiles tc = HashSet.fromList <$> query_ tc q
       WHERE
         t.id IS NULL
       |]
+
+{- $Operations
+ functions that perform some action on the database like
+ inserting new records or creating relations.
+-}
+
+{- |
+ Insert a list of given 'FilePath`s as 'File` records into the database.
+
+ Does not validate or resolve file paths.
+-}
+insertFiles :: [FilePath] -> TaggedConnection -> IO ()
+insertFiles ps tc =
+  executeMany tc q (map Only ps)
+ where
+  q =
+    [r|
+    INSERT INTO File (filePath) VALUES (?)
+    |]
+
+{- |
+ Given a list of exact absolute paths, delete their corresponding records from
+ the database.
+-}
+deleteFiles :: [FilePath] -> TaggedConnection -> IO ()
+deleteFiles ps tc = executeMany tc q (Only <$> ps)
+ where
+  q =
+    [r|
+    DELETE FROM File WHERE filePath = ?
+    |]
+
+{- |
+ Given a list of labels, create new 'Descriptor` rows in the database.
+
+ The new 'Descriptor`s will automatically be related to \#UNRELATED\#.
+-}
+insertDescriptors :: [T.Text] -> TaggedConnection -> IO ()
+insertDescriptors ps tc = do
+  insertionResult <-
+    runExceptT $ do
+      unrelatedDK <- getUnrelatedDescriptorKey tc
+      desKeys <- lift $ fmap catMaybes . mapM (runMaybeT . insertDescriptorAndGetKey) $ ps
+      lift $ createBulkInfraRelations tc unrelatedDK desKeys
+  either (T.IO.hPutStrLn stderr) pure insertionResult
+ where
+  insertDescriptorAndGetKey :: T.Text -> MaybeT IO RecordKey
+  insertDescriptorAndGetKey desName = do
+    lift $ execute tc [r||] [desName]
+    lastInsertRowId tc
+
+{- |
+ Create a new 'Descriptor` relation.
+
+ Any Infra relations that the second given 'RecordKey` is a part of should be replaced
+ automatically by SQLite.
+-}
+insertDescriptorRelation :: TaggedConnection -> RecordKey -> RecordKey -> IO ()
+insertDescriptorRelation tc newMeta newInfra =
+  execute tc q (newMeta, newInfra)
+ where
+  q =
+    [r|
+    INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId)
+      VALUES (?,?)
+    |]
+
+{- |
+ Convenience function for relating many 'Descriptor`s to one meta 'Descriptor`
+-}
+createBulkInfraRelations :: TaggedConnection -> RecordKey -> [RecordKey] -> IO ()
+createBulkInfraRelations tc metaD =
+  executeMany
+    tc
+    [r|INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId)
+      VALUES (?,?)
+    |]
+    . zip (repeat metaD)
+
+getUnrelatedDescriptorKey :: TaggedConnection -> ExceptT T.Text IO RecordKey
+getUnrelatedDescriptorKey tc = do
+  result <-
+    lift $
+      query_
+        tc
+        q ::
+      ExceptT T.Text IO [Only RecordKey]
+  maybe
+    ( throwE
+        "#UNRELATED# Descriptor not found.\n\
+        \Some database operations may be impossible to perform.\n\
+        \Please reinitialize database to generate #UNRELATED# Descriptor."
+    )
+    ( return . (\(Only x) -> x)
+    )
+    . head'
+    $ result
+ where
+  q =
+    [r|
+    SELECT id FROM Descriptor WHERE descriptor = '#UNRELATED#'
+    |]
