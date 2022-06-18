@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE StrictData #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -15,7 +16,9 @@ module Database.Tagger.Type (
   Database.Tagger.Type.Prim.BareConnection,
 
   -- * Database Types
-  RecordKey,
+  RecordKey (..),
+  RowId,
+  ForeignRecord,
   File (..),
   Descriptor (..),
   Tag (..),
@@ -33,15 +36,39 @@ module Database.Tagger.Type (
 import qualified Data.HashSet as HashSet
 import Data.Hashable
 import Data.HierarchyMap (HierarchyMap)
+import Data.Int
 import Data.Maybe
 import Data.Text
 import Database.SQLite.Simple
+import Database.SQLite.Simple.FromField
+import Database.SQLite.Simple.ToField
 import Database.Tagger.Type.Lens
 import Database.Tagger.Type.Prim hiding (BareConnection (..))
 import qualified Database.Tagger.Type.Prim
 import GHC.Generics
 
-type RecordKey = Int
+{- |
+ Synonym denoting that a given 'RecordKey` actuall corresponds to a Foreign Key
+ of some sort.
+-}
+type ForeignRecord a = RecordKey a
+
+{- |
+ Representing a Primary Key or RowId for a certain type specified in the type parameter.
+-}
+newtype RecordKey a = RecordKey Int64
+  deriving (Show, Eq, Generic, Hashable)
+
+instance FromField (RecordKey a) where
+  fromField = fmap RecordKey . fromField
+
+instance ToField (RecordKey a) where
+  toField (RecordKey k) = toField k
+
+{- |
+ An empty class for types that are identifiable by a RowId or Primary Key.
+-}
+class RowId r
 
 type DescriptorTree = HierarchyMap Descriptor
 
@@ -50,11 +77,11 @@ type DescriptorTree = HierarchyMap Descriptor
 -}
 data File = File
   { -- | Unique primary key identifying a File record.
-    fileId :: RecordKey
+    fileId :: RecordKey File
   , -- | Unique absolute path to a File.
     filePath :: Text
   }
-  deriving (Show, Eq, Generic, Hashable)
+  deriving (Show, Eq, Generic, Hashable, RowId)
 
 {- |
  Ord instance that ignores the RecordKey.
@@ -70,11 +97,11 @@ instance FromRow File where
 -}
 data Descriptor = Descriptor
   { -- | Unique Primary key identifying a Descriptor record.
-    descriptorId :: RecordKey
+    descriptorId :: RecordKey Descriptor
   , -- | Descriptor text.
     descriptor :: Text
   }
-  deriving (Show, Eq, Generic, Hashable)
+  deriving (Show, Eq, Generic, Hashable, RowId)
 
 {- |
  Ord instance that ignores the RecordKey.
@@ -90,15 +117,15 @@ instance FromRow Descriptor where
 -}
 data Tag = Tag
   { -- | Unique id identifying a single tag record.
-    tagId :: RecordKey
+    tagId :: RecordKey Tag
   , -- | Foreign key to a File record.
-    tagFileId :: RecordKey
+    tagFileId :: RecordKey File
   , -- | Foreign key to a Descriptor record.
-    tagDescriptorId :: RecordKey
+    tagDescriptorId :: RecordKey Descriptor
   , -- | Linking key to another Tag record if this tag is a subtag.
-    tagSubtagOfId :: Maybe RecordKey
+    tagSubtagOfId :: Maybe (RecordKey Tag)
   }
-  deriving (Show, Eq, Generic, Hashable)
+  deriving (Show, Eq, Generic, Hashable, RowId)
 
 instance FromRow Tag where
   fromRow = Tag <$> field <*> field <*> field <*> field
@@ -117,9 +144,9 @@ isSubTagOf :: Tag -> Tag -> Bool
 -}
 data MetaDescriptor = MetaDescriptor
   { -- | Foreign key to a Descriptor record.
-    metaDescriptorId :: RecordKey
+    metaDescriptorId :: RecordKey Descriptor
   , -- | Foreign key to a Descriptor record.
-    infraDescriptorId :: RecordKey
+    infraDescriptorId :: RecordKey Descriptor
   }
   deriving (Show, Eq)
 
@@ -129,7 +156,7 @@ data MetaDescriptor = MetaDescriptor
  Is an encoding of a recursive query on a joined table of Tag - File - Tag
 -}
 data TaggedFile = TaggedFile
-  { taggedFileId :: RecordKey
+  { taggedFileId :: RecordKey File
   , taggedFileTags :: HashSet.HashSet Tag
   }
   deriving (Show, Eq, Generic, Hashable)

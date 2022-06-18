@@ -39,12 +39,18 @@ module Database.Tagger.Query (
   -- ** 'File` Operations
   insertFiles,
   deleteFiles,
+  updateFilePaths,
 
   -- ** 'Descriptor` Operations
   insertDescriptors,
+  deleteDescriptors,
+  updateDescriptors,
 
   -- ** 'Relation` Operations
   insertDescriptorRelation,
+
+  -- ** 'Tag` Operations
+  insertTags,
 ) where
 
 import Control.Monad.Trans.Class
@@ -103,7 +109,7 @@ queryForFileByExactPath ps tc =
 {- |
  Query for files by their ids.
 -}
-queryForFileByFileId :: [RecordKey] -> TaggedConnection -> IO (HashSet.HashSet File)
+queryForFileByFileId :: [RecordKey File] -> TaggedConnection -> IO (HashSet.HashSet File)
 queryForFileByFileId rks tc =
   HashSet.fromList <$> query tc (q . length $ rks) rks
  where
@@ -125,7 +131,7 @@ queryForFileByFileId rks tc =
  Probably more efficient if only one file is needed but if this needs to be run multiple
  times then it is better to use 'queryForFileByFileId`
 -}
-queryForSingleFileByFileId :: RecordKey -> TaggedConnection -> MaybeT IO File
+queryForSingleFileByFileId :: RecordKey File -> TaggedConnection -> MaybeT IO File
 queryForSingleFileByFileId rk tc = do
   result <- lift $ query tc q [rk] :: MaybeT IO [File]
   hoistMaybe . head' $ result
@@ -215,6 +221,22 @@ deleteFiles ps tc = executeMany tc q (Only <$> ps)
     |]
 
 {- |
+ Given a tuple of a new file path and an existing 'File`'s primary key,
+  update that 'File`'s filePath field.
+
+ This should not be called without also calling the system's equivalent "mv" command.
+  Doing so may cause some Tagger operations to fail.
+-}
+updateFilePaths :: [(FilePath, RecordKey File)] -> TaggedConnection -> IO ()
+updateFilePaths updates tc =
+  executeMany tc q updates
+ where
+  q =
+    [r|
+    UPDATE File SET filePath = ? WHERE id = ?
+    |]
+
+{- |
  Given a list of labels, create new 'Descriptor` rows in the database.
 
  The new 'Descriptor`s will automatically be related to \#UNRELATED\#.
@@ -228,10 +250,34 @@ insertDescriptors ps tc = do
       lift $ createBulkInfraRelations tc unrelatedDK desKeys
   either (T.IO.hPutStrLn stderr) pure insertionResult
  where
-  insertDescriptorAndGetKey :: T.Text -> IO RecordKey
+  insertDescriptorAndGetKey :: T.Text -> IO (RecordKey Descriptor)
   insertDescriptorAndGetKey desName = do
     execute tc [r||] [desName]
     lastInsertRowId tc
+
+{- |
+ Delete a list of descriptor name matches from the database.
+-}
+deleteDescriptors :: [T.Text] -> TaggedConnection -> IO ()
+deleteDescriptors ps tc =
+  executeMany tc q (Only <$> ps)
+ where
+  q =
+    [r|
+    DELETE FROM Descriptor WHERE descriptor = ?
+    |]
+
+{- |
+ Given a tuple of 'Text` and a 'Descriptor`'s primary key, relabel that 'Descriptor`.
+-}
+updateDescriptors :: [(T.Text, RecordKey File)] -> TaggedConnection -> IO ()
+updateDescriptors updates tc =
+  executeMany tc q updates
+ where
+  q =
+    [r|
+    UPDATE Descriptor SET descriptor = ? WHERE id = ?
+    |]
 
 {- |
  Create a new 'Descriptor` relation.
@@ -239,7 +285,8 @@ insertDescriptors ps tc = do
  Any Infra relations that the second given 'RecordKey` is a part of should be replaced
  automatically by SQLite.
 -}
-insertDescriptorRelation :: TaggedConnection -> RecordKey -> RecordKey -> IO ()
+insertDescriptorRelation ::
+  TaggedConnection -> RecordKey Descriptor -> RecordKey Descriptor -> IO ()
 insertDescriptorRelation tc newMeta newInfra =
   execute tc q (newMeta, newInfra)
  where
@@ -252,7 +299,11 @@ insertDescriptorRelation tc newMeta newInfra =
 {- |
  Convenience function for relating many 'Descriptor`s to one meta 'Descriptor`
 -}
-createBulkInfraRelations :: TaggedConnection -> RecordKey -> [RecordKey] -> IO ()
+createBulkInfraRelations ::
+  TaggedConnection ->
+  RecordKey Descriptor ->
+  [RecordKey Descriptor] ->
+  IO ()
 createBulkInfraRelations tc metaD =
   executeMany
     tc
@@ -261,14 +312,14 @@ createBulkInfraRelations tc metaD =
     |]
     . zip (repeat metaD)
 
-getUnrelatedDescriptorKey :: TaggedConnection -> ExceptT T.Text IO RecordKey
+getUnrelatedDescriptorKey :: TaggedConnection -> ExceptT T.Text IO (RecordKey Descriptor)
 getUnrelatedDescriptorKey tc = do
   result <-
     lift $
       query_
         tc
         q ::
-      ExceptT T.Text IO [Only RecordKey]
+      ExceptT T.Text IO [Only (RecordKey Descriptor)]
   maybe
     ( throwE
         "#UNRELATED# Descriptor not found.\n\
@@ -283,4 +334,21 @@ getUnrelatedDescriptorKey tc = do
   q =
     [r|
     SELECT id FROM Descriptor WHERE descriptor = '#UNRELATED#'
+    |]
+
+{- |
+ Given a list of tag triples,
+  Insert them as 'Tag`s into the database.
+-}
+insertTags ::
+  [(RecordKey File, RecordKey Descriptor, Maybe (RecordKey Tag))] ->
+  TaggedConnection ->
+  IO ()
+insertTags inserts tc =
+  executeMany tc q inserts
+ where
+  q =
+    [r|
+    INSERT INTO Tag (fileId, descriptorId, subTagOfId)
+      VALUES (?,?,?)
     |]

@@ -51,7 +51,8 @@ import Database.Tagger.Script (
   schemaDefinition,
   schemaTeardown,
  )
-import Database.Tagger.Type.Prim (BareConnection (..), TaggedConnection (..))
+import Database.Tagger.Type
+import Database.Tagger.Type.Prim (BareConnection (..))
 import Tagger.Info (taggerVersion)
 
 {- |
@@ -175,7 +176,7 @@ executeMany tc (TaggerQuery queryStmnt) params =
 {- |
   Gets the ID of the row last inserted into the database.
 -}
-lastInsertRowId :: TaggedConnection -> IO Int
+lastInsertRowId :: RowId r => TaggedConnection -> IO (RecordKey r)
 lastInsertRowId = withBareConnection bareLastInsertRowId
 
 {- |
@@ -285,7 +286,6 @@ bareExecute_ = withConnection Simple.execute_
 bareExecuteMany :: Simple.ToRow q => BareConnection -> Simple.Query -> [q] -> IO ()
 bareExecuteMany = withConnection Simple.executeMany
 
-bareLastInsertRowId :: BareConnection -> IO Int
+bareLastInsertRowId :: RowId r => BareConnection -> IO (RecordKey r)
 bareLastInsertRowId =
-  fmap (fromInteger . toInteger)
-    . withConnection Simple.lastInsertRowId
+  withConnection (fmap RecordKey . Simple.lastInsertRowId)
