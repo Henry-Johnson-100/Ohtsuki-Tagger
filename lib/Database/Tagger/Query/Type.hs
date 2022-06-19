@@ -14,10 +14,8 @@ Maintainer  : monawasensei@gmail.com
 module Database.Tagger.Query.Type (
   TaggerQuery (..),
   qcat,
-  paramList,
 ) where
 
-import qualified Data.List as L
 import Data.String
 import Database.SQLite.Simple
 
@@ -40,12 +38,3 @@ newtype TaggerQuery = TaggerQuery {taggerQuery :: Query}
 -}
 qcat :: TaggerQuery -> TaggerQuery -> TaggerQuery
 x `qcat` y = x <> " " <> y
-
-{- |
- Given a number of parameters, generate a literal 'TaggerQuery` list of positional
- SQLite parameters.
-
- > paramList 5 == "(?,?,?,?,?)"
--}
-paramList :: Int -> TaggerQuery
-paramList n = "(" <> (fromString . L.intercalate "," . replicate n $ "?") <> ")"

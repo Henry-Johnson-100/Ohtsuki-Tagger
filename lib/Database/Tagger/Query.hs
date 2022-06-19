@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
@@ -24,8 +25,6 @@ module Database.Tagger.Query (
 
   -- | Queries that search based on some attribute of a 'File` type.
   queryForFileByPattern,
-  queryForFileByExactPath,
-  queryForFileByFileId,
   queryForSingleFileByFileId,
 
   -- *** On 'Descriptor`
@@ -60,7 +59,6 @@ import qualified Data.HashSet as HashSet
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import Database.Tagger.Connection
-import Database.Tagger.Query.Type
 import Database.Tagger.Type
 import System.IO
 import Tagger.Util
@@ -84,46 +82,6 @@ queryForFileByPattern p tc = HashSet.fromList <$> query tc q [p]
       WHERE
         filePath LIKE ?
       |]
-
-{- |
- Query for files based on exact matches of absolute file paths.
-
- More performant for bulk queries but harder to do manually.
--}
-queryForFileByExactPath :: [T.Text] -> TaggedConnection -> IO (HashSet.HashSet File)
-queryForFileByExactPath ps tc =
-  HashSet.fromList <$> query tc (q . length $ ps) ps
- where
-  q n =
-    [r|
-      SELECT
-        id
-        ,filePath
-      FROM
-        File
-      WHERE
-        filePath IN
-      |]
-      `qcat` paramList n
-
-{- |
- Query for files by their ids.
--}
-queryForFileByFileId :: [RecordKey File] -> TaggedConnection -> IO (HashSet.HashSet File)
-queryForFileByFileId rks tc =
-  HashSet.fromList <$> query tc (q . length $ rks) rks
- where
-  q n =
-    [r|
-      SELECT
-        id
-        ,filePath
-      FROM
-        File
-      WHERE
-        id IN
-      |]
-      `qcat` paramList n
 
 {- |
  Query for a single file with its id.
