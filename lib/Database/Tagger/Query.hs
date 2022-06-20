@@ -48,23 +48,31 @@ module Database.Tagger.Query (
 
   -- | Queries that return 'Descriptor`s
   allDescriptors,
+
+  -- *** On 'Descriptor`
   queryForDescriptorByPattern,
   queryForSingleDescriptorByDescriptorId,
-  queryForSingleDescriptorByTagId,
   getInfraChildren,
   getMetaParent,
-  hasInfraRelations,
+
+  -- *** On 'Tag`
+  queryForSingleDescriptorByTagId,
 
   -- ** 'Tag` Queries
 
   -- | Queries that return 'Tag`s.
   allTags,
+
+  -- *** On 'File`
   queryForFileTagsByFileId,
 
   -- ** MetaDescriptor Queries
 
   -- | Queries on the MetaDescriptor table. Used in testing.
   allMetaDescriptorRows,
+
+  -- ** Misc.
+  hasInfraRelations,
 
   -- * Operations
   -- $Operations
