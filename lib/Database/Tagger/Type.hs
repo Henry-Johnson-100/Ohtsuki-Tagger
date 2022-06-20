@@ -19,7 +19,6 @@ module Database.Tagger.Type (
   -- * Database Types
   RowId,
   RecordKey (..),
-  ForeignRecord,
   File (..),
   Descriptor (..),
   Tag (..),
@@ -47,12 +46,6 @@ import Database.Tagger.Type.Lens
 import Database.Tagger.Type.Prim hiding (BareConnection (..))
 import qualified Database.Tagger.Type.Prim
 import GHC.Generics (Generic)
-
-{- |
- Synonym denoting that a given 'RecordKey` actually corresponds to a Foreign Key
- of some sort.
--}
-type ForeignRecord a = RecordKey a
 
 {- |
  Representing a Primary Key or RowId for a certain type specified in the type parameter.
