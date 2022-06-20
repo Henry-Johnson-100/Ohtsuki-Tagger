@@ -19,6 +19,7 @@ module Database.Tagger.Query (
   -- ** File Queries
 
   -- | Queries that return 'File` types.
+  allFiles,
   queryForUntaggedFiles,
 
   -- *** On 'File`
@@ -34,11 +35,24 @@ module Database.Tagger.Query (
   queryForFileBySubTagRelation,
 
   -- ** 'Descriptor` Queries
+
+  -- | Queries that return 'Descriptor`s
+  allDescriptors,
   queryForDescriptorByPattern,
   queryForSingleDescriptorByDescriptorId,
   getInfraChildren,
   getMetaParent,
   hasInfraRelations,
+
+  -- ** 'Tag` Queries
+
+  -- | Queries that return 'Tag`s. Probably won't be used very much.
+  allTags,
+
+  -- ** MetaDescriptor Queries
+
+  -- | Queries on the MetaDescriptor table. Used in testing.
+  allMetaDescriptorRows,
 
   -- * Operations
   -- $Operations
@@ -185,6 +199,20 @@ queryForUntaggedFiles tc = HashSet.fromList <$> query_ tc q
         t.id IS NULL
       |]
 
+{- |
+ Returns all 'File`s in the database.
+-}
+allFiles :: TaggedConnection -> IO (HashSet.HashSet File)
+allFiles tc = HashSet.fromList <$> query_ tc q
+ where
+  q =
+    [r|
+    SELECT
+      id
+      ,filePath
+    FROM File
+    |]
+
 {- $Operations
  functions that perform some action on the database like
  inserting new records or creating relations.
@@ -282,6 +310,21 @@ updateDescriptors updates tc =
   q =
     [r|
     UPDATE Descriptor SET descriptor = ? WHERE id = ?
+    |]
+
+{- |
+ Returns all 'Descriptor`s in the database.
+-}
+allDescriptors :: TaggedConnection -> IO (HashSet.HashSet Descriptor)
+allDescriptors tc = HashSet.fromList <$> query_ tc q
+ where
+  q =
+    [r|
+    SELECT
+      id
+      ,descriptor
+    FROM
+      Descriptor
     |]
 
 {- |
@@ -390,6 +433,42 @@ hasInfraRelations dk tc = do
         FROM MetaDescriptor 
         WHERE metaDescriptorId = ?
       )
+    |]
+
+{- |
+ Returns all 'Tag`s in the database.
+
+ Will likely be a pretty large set for mature databases.
+-}
+allTags :: TaggedConnection -> IO (HashSet.HashSet Tag)
+allTags tc = HashSet.fromList <$> query_ tc q
+ where
+  q =
+    [r|
+    SELECT
+      id
+      ,fileId
+      ,descriptorId
+      ,subTagOfId
+    FROM
+      Tag
+    |]
+
+{- |
+ Retrieve all rows in the MetaDescriptor table encoded as a HashSet of tuples of
+ 'Descriptor` ID's.
+-}
+allMetaDescriptorRows ::
+  TaggedConnection -> IO (HashSet.HashSet (RecordKey Descriptor, RecordKey Descriptor))
+allMetaDescriptorRows tc = HashSet.fromList <$> query_ tc q
+ where
+  q =
+    [r|
+    SELECT
+      metaDescriptorId
+      ,infraDescriptorId
+    FROM 
+      MetaDescriptor
     |]
 
 {- |
