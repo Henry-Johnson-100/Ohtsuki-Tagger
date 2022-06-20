@@ -82,7 +82,9 @@ open p = do
   activateForeignKeyPragma bc
   updateTaggerDBInfoVersion bc
   updateTaggerDBInfoLastAccessed bc
-  return $ TaggedConnection tagName bc
+  let conn = TaggedConnection tagName bc
+  seq conn (pure ())
+  return conn
 
 {- |
  Like 'open` but does NOT update the table with lastAccessedDateTime or the table version.

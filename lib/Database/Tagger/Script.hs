@@ -78,10 +78,10 @@ schemaTeardown =
   SQLiteScript . fromString $
     [r|
       PRAGMA foreign_keys = on;
-      DROP TABLE IF EXISTS File;
-      DROP TABLE IF EXISTS Descriptor;
-      DROP TABLE IF EXISTS MetaDescriptor;
       DROP TABLE IF EXISTS Tag;
       DROP TABLE IF EXISTS Representative;
+      DROP TABLE IF EXISTS MetaDescriptor;
       DROP TABLE IF EXISTS TaggerDBInfo;
+      DROP TABLE IF EXISTS File;
+      DROP TABLE IF EXISTS Descriptor;
     |]
