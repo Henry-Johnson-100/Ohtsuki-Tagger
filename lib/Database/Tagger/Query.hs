@@ -53,6 +53,7 @@ module Database.Tagger.Query (
   queryForDescriptorByPattern,
   queryForSingleDescriptorByDescriptorId,
   getInfraChildren,
+  getAllInfra,
   getMetaParent,
 
   -- *** On 'Tag`
@@ -459,6 +460,8 @@ queryForSingleDescriptorByTagId rk tc = do
 {- |
  Retrieve a single layer relation of 'Descriptor`s that are Infra related to the
  'Descriptor` given as the id.
+
+ Will always return a subset of 'getAllInfra`.
 -}
 getInfraChildren ::
   RecordKey Descriptor ->
@@ -476,6 +479,43 @@ getInfraChildren dk tc = HashSet.fromList <$> query tc q [dk]
       ON md.infraDescriptorId = d.id
     WHERE
       md.metaDescriptorId = ?
+    |]
+
+{- |
+ Given a 'Descriptor` ID, return a set of all 'Descriptor` Descriptors.
+
+ Does not include the given Descriptor.
+-}
+getAllInfra ::
+  RecordKey Descriptor ->
+  TaggedConnection ->
+  IO (HashSet.HashSet Descriptor)
+getAllInfra rk tc =
+  HashSet.fromList <$> query tc q [rk]
+ where
+  q =
+    [r|
+    WITH RECURSIVE all_infra_tree AS
+      (
+        SELECT
+          infraDescriptorId
+        FROM
+          MetaDescriptor
+        WHERE
+          metaDescriptorId = ?
+        UNION
+        SELECT
+          md.infraDescriptorId
+        FROM all_infra_tree ait
+          JOIN MetaDescriptor md
+            ON ait.infraDescriptorId = md.metaDescriptorId
+      )
+    SELECT
+      d.id
+      ,d.descriptor
+    FROM all_infra_tree ait
+      JOIN Descriptor d
+        ON ait.infraDescriptorId = d.id
     |]
 
 {- |
