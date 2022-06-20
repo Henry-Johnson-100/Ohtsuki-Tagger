@@ -40,21 +40,94 @@ taggerDatabaseTests =
           , after
               AllSucceed
               "database_initialization"
-              ( testGroup
-                  "database_operations"
-                  [ dummy_insertions iotc
-                  ]
-              )
+              (dummy_insertions iotc)
           , after
               AllSucceed
-              "database_operations"
+              "dummy_insertions"
               ( database_validation
                   iotc
               )
           ]
     )
 
-database_validation iotc = testCase "database_validation" (assertFailure "Not Implemented")
+database_validation :: IO TaggedConnection -> TestTree
+database_validation iotc =
+  testGroup
+    "database_validation"
+    [ testCase
+        "has_unrelated_descriptors"
+        ( iotc
+            >>= ( \tc -> do
+                    unrel <- getInfraChildren 3 tc
+                    assertEqual
+                      "#UNRELATED# Does not have the correct number of infra relations\n\
+                      \it should contain x, y, and z"
+                      3
+                      (HS.size unrel)
+                )
+        )
+    , testCase
+        "has_untagged_files"
+        ( iotc
+            >>= ( \tc -> do
+                    untagged <- queryForUntaggedFiles tc
+                    assertEqual
+                      "The number of untagged files is incorrect"
+                      6
+                      (HS.size untagged)
+                )
+        )
+    , testCase
+        "flat_query_for_0_depth_tag"
+        ( iotc
+            >>= ( \tc -> do
+                    taggedWithXXY <- flatQueryForFileByTagDescriptor "xxy" tc
+                    assertBool
+                      "Could not query for files a and b tagged with xxy"
+                      ( HS.member (File 1 "a") taggedWithXXY
+                          && HS.member (File 2 "b") taggedWithXXY
+                          && HS.size taggedWithXXY == 2
+                      )
+                )
+        )
+    , testCase
+        "flat_query_for_n_depth_tag"
+        ( iotc
+            >>= ( \tc -> do
+                    subtaggedWithZ <- flatQueryForFileByTagDescriptor "z" tc
+                    assertBool
+                      "Could not query for files a and b tagged with z"
+                      ( HS.member (File 1 "a") subtaggedWithZ
+                          && HS.member (File 2 "b") subtaggedWithZ
+                          && HS.size subtaggedWithZ == 2
+                      )
+                )
+        )
+    , testCase
+        "query_for_0_1_depth_subtag_relation"
+        ( iotc
+            >>= ( \tc -> do
+                    f <- queryForFileBySubTagRelation 10 6 tc
+                    assertBool
+                      "Could not query for files a and b tagged with z"
+                      ( HS.member (File 1 "a") f
+                          && HS.member (File 2 "b") f
+                          && HS.size f == 2
+                      )
+                )
+        )
+    , testCase
+        "query_for_n_n+1_depth_subtag_relation"
+        ( iotc
+            >>= ( \tc -> do
+                    f <- queryForFileBySubTagRelation 6 7 tc
+                    assertBool
+                      "Could not query for files a and b tagged with z"
+                      ( HS.member (File 2 "b") f && HS.size f == 1
+                      )
+                )
+        )
+    ]
 
 dummy_insertions :: IO TaggedConnection -> TestTree
 dummy_insertions iotc =
