@@ -1,7 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use second" #-}
 
 {- |
 Module      : Database.Tagger.Query.Basic
@@ -34,20 +38,28 @@ module Database.Tagger.Query (
   flatQueryForFileByTagDescriptor,
   queryForFileBySubTagRelation,
 
+  -- ** 'TaggedFile` and 'ConcreteTaggedFile` Queries
+
+  -- | Fairly costly compared to most other queries, so should be used sparingly.
+  queryForTaggedFileWithFileId,
+  queryForConcreteTaggedFileWithFileId,
+
   -- ** 'Descriptor` Queries
 
   -- | Queries that return 'Descriptor`s
   allDescriptors,
   queryForDescriptorByPattern,
   queryForSingleDescriptorByDescriptorId,
+  queryForSingleDescriptorByTagId,
   getInfraChildren,
   getMetaParent,
   hasInfraRelations,
 
   -- ** 'Tag` Queries
 
-  -- | Queries that return 'Tag`s. Probably won't be used very much.
+  -- | Queries that return 'Tag`s.
   allTags,
+  queryForFileTagsByFileId,
 
   -- ** MetaDescriptor Queries
 
@@ -74,10 +86,13 @@ module Database.Tagger.Query (
   insertTags,
 ) where
 
+import Control.Monad
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
-import Control.Monad.Trans.Maybe (MaybeT)
+import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
 import qualified Data.HashSet as HashSet
+import Data.HierarchyMap
+import Data.Maybe
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import Database.Tagger.Connection
@@ -180,6 +195,47 @@ queryForFileBySubTagRelation superK subK tc =
       t.descriptorId = ?
       AND t1.descriptorId = ?
     |]
+
+{- |
+ Given a 'File` ID, return the corresponding 'TaggedFile` if it exists.
+-}
+queryForTaggedFileWithFileId :: RecordKey File -> TaggedConnection -> MaybeT IO TaggedFile
+queryForTaggedFileWithFileId rk tc = do
+  guard =<< lift (doesFileExist rk tc)
+  fileTags <- lift $ queryForFileTagsByFileId rk tc
+  return $ TaggedFile rk fileTags
+
+{- |
+ Given a 'File` ID, return the corresponding 'ConcreteTaggedFile` if it exists.
+
+ Intended to be called for only one file at a time. Calling it for large numbers of
+  'File`s is quite costly and provides no real benefit in the Tagger GUI front-end.
+-}
+queryForConcreteTaggedFileWithFileId ::
+  RecordKey File ->
+  TaggedConnection ->
+  MaybeT IO ConcreteTaggedFile
+queryForConcreteTaggedFileWithFileId rk tc = do
+  file <- queryForSingleFileByFileId rk tc
+  fileTags <- lift $ queryForFileTagListByFileId rk tc
+  concreteFileTags <-
+    lift
+      . fmap (map (second HashSet.fromList) . catMaybes)
+      . mapM (runMaybeT . traverseRelationTuple . getRelationTuple)
+      $ fileTags
+  let fileTagMap = inserts concreteFileTags empty
+  return $ ConcreteTaggedFile file fileTagMap
+ where
+  getRelationTuple (Tag t _ _ ms) =
+    maybe (t, []) (,[t]) ms
+  traverseRelationTuple (x, xs) = do
+    md <- queryForSingleDescriptorByTagId x tc
+    ids <-
+      lift
+        . catMaybeTM (`queryForSingleDescriptorByTagId` tc)
+        $ xs
+    return (md, ids)
+  second f (x, y) = (x, f y)
 
 {- |
  Query for 'File`s without tags.
@@ -369,6 +425,30 @@ queryForSingleDescriptorByDescriptorId dk tc = do
     |]
 
 {- |
+ Given a 'Tag` ID, return the 'Descriptor` used in that 'Tag` if it exists.
+-}
+queryForSingleDescriptorByTagId ::
+  RecordKey Tag -> TaggedConnection -> MaybeT IO Descriptor
+queryForSingleDescriptorByTagId rk tc = do
+  result <- lift $ query tc q [rk] :: MaybeT IO [Descriptor]
+  hoistMaybe . head' $ result
+ where
+  q =
+    [r|
+    SELECT
+      d.id
+      ,d.descriptor
+    FROM 
+      Tag t
+    JOIN
+      Descriptor d
+    ON
+      t.descriptorId = d.id
+    WHERE
+      t.id = ?
+    |]
+
+{- |
  Retrieve a single layer relation of 'Descriptor`s that are Infra related to the
  'Descriptor` given as the id.
 -}
@@ -455,6 +535,34 @@ allTags tc = HashSet.fromList <$> query_ tc q
     |]
 
 {- |
+ Return a list of all 'Tag`s for a given 'File`.
+-}
+queryForFileTagsByFileId :: RecordKey File -> TaggedConnection -> IO (HashSet.HashSet Tag)
+queryForFileTagsByFileId rk tc =
+  HashSet.fromList <$> queryForFileTagListByFileId rk tc
+
+{- |
+ Special version of 'queryForFileTagsByFileId` for easier traversals before giving a
+ final unordered result.
+-}
+queryForFileTagListByFileId :: RecordKey File -> TaggedConnection -> IO [Tag]
+queryForFileTagListByFileId rk tc =
+  query tc q [rk]
+ where
+  q =
+    [r|
+    SELECT
+      id
+      ,fileId
+      ,descriptorId
+      ,subTagOfId
+    FROM
+      Tag
+    WHERE
+      fileId = ?
+    |]
+
+{- |
  Retrieve all rows in the MetaDescriptor table encoded as a HashSet of tuples of
  'Descriptor` ID's.
 -}
@@ -478,8 +586,8 @@ allMetaDescriptorRows tc = HashSet.fromList <$> query_ tc q
  automatically by SQLite.
 -}
 insertDescriptorRelation ::
-  TaggedConnection -> RecordKey Descriptor -> RecordKey Descriptor -> IO ()
-insertDescriptorRelation tc newMeta newInfra =
+  RecordKey Descriptor -> RecordKey Descriptor -> TaggedConnection -> IO ()
+insertDescriptorRelation newMeta newInfra tc =
   execute tc q (newMeta, newInfra)
  where
   q =
@@ -536,11 +644,33 @@ insertTags ::
   [(RecordKey File, RecordKey Descriptor, Maybe (RecordKey Tag))] ->
   TaggedConnection ->
   IO ()
-insertTags inserts tc =
-  executeMany tc q inserts
+insertTags toInsert tc =
+  executeMany tc q toInsert
  where
   q =
     [r|
     INSERT INTO Tag (fileId, descriptorId, subTagOfId)
       VALUES (?,?,?)
+    |]
+
+{- |
+ Given a 'File` ID, show if it exists in the database.
+-}
+doesFileExist :: RecordKey File -> TaggedConnection -> IO Bool
+doesFileExist rk tc = do
+  result <- query tc q [rk] :: IO [Only Int]
+  return . any ((==) 1 . (\(Only n) -> n)) $ result
+ where
+  q =
+    [r|
+    SELECT
+      EXISTS
+        (
+          SELECT
+            *
+          FROM
+            File
+          WHERE
+            id = ?
+        )
     |]

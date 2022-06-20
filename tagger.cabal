@@ -114,6 +114,7 @@ library tagger-lib
                       ,DeriveFoldable
                       ,BangPatterns
                       ,QuasiQuotes
+                      ,TupleSections
 
   hs-source-dirs:      lib
 

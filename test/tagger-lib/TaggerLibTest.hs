@@ -1,6 +1,6 @@
-import Test.Data.HierarchyMap
-import Test.Database.Tagger
-import Test.Tasty
+import Test.Data.HierarchyMap (hierarchyMapTests)
+import Test.Database.Tagger (taggerDatabaseTests)
+import Test.Tasty (defaultMain, testGroup)
 
 main :: IO ()
 main =

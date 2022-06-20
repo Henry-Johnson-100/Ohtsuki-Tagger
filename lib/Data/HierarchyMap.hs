@@ -52,12 +52,17 @@ module Data.HierarchyMap (
   getAllMetaTo,
 ) where
 
+import qualified Data.Foldable as F
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.HashSet as HashSet
 import Data.Hashable (Hashable)
-import Data.Hierarchy.Internal
-import qualified Data.List as L
-import Data.Maybe
+import Data.Hierarchy.Internal (
+  HierarchyMap (..),
+  empty,
+  insert,
+  unionWith,
+ )
+import Data.Maybe (fromMaybe)
 
 {- |
  Map over all elements in the hierarchy.
@@ -78,8 +83,12 @@ union = unionWith HashSet.union
 
  > flip $ foldl' (flip (uncurry insert))
 -}
-inserts :: Hashable a => [(a, HashSet.HashSet a)] -> HierarchyMap a -> HierarchyMap a
-inserts = flip $ L.foldl' (flip (uncurry insert))
+inserts ::
+  (Hashable a, Foldable t) =>
+  t (a, HashSet.HashSet a) ->
+  HierarchyMap a ->
+  HierarchyMap a
+inserts = flip $ F.foldl' (flip (uncurry insert))
 
 {- |
  'True` if the given value exists as either a meta or infra member.

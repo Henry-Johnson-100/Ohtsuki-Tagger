@@ -9,8 +9,14 @@ module Test.Database.Tagger (
 import qualified Data.HashSet as HS
 import qualified Data.Text as T
 import Database.Tagger
-import Test.Tasty
-import Test.Tasty.HUnit
+import Test.Tasty (
+  DependencyType (AllSucceed),
+  TestTree,
+  after,
+  testGroup,
+  withResource,
+ )
+import Test.Tasty.HUnit (assertBool, assertEqual, testCase)
 
 testDbPath :: FilePath
 testDbPath = "test/resources/test_database_tagger.db.rsc"
@@ -170,10 +176,10 @@ dummy_insertions iotc =
           "dummy_relations"
           ( iotc
               >>= ( \tc -> do
-                      insertDescriptorRelation tc 4 7
-                      insertDescriptorRelation tc 7 8
-                      insertDescriptorRelation tc 5 9
-                      insertDescriptorRelation tc 9 10
+                      insertDescriptorRelation 4 7 tc
+                      insertDescriptorRelation 7 8 tc
+                      insertDescriptorRelation 5 9 tc
+                      insertDescriptorRelation 9 10 tc
                       numRel <- HS.size <$> allMetaDescriptorRows tc
                       assertEqual
                         "Not all relations created properly."

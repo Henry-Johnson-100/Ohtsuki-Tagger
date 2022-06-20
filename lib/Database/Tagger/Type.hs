@@ -35,7 +35,7 @@ module Database.Tagger.Type (
 
 import qualified Data.HashSet as HashSet
 import Data.Hashable (Hashable)
-import Data.Hierarchy.Internal (HierarchyMap)
+import Data.HierarchyMap (HierarchyMap)
 import Data.Int (Int64)
 import Data.Maybe (isJust)
 import Data.Text (Text)
@@ -159,12 +159,12 @@ data TaggedFile = TaggedFile
 {- |
  Data type representing a \"dereferenced\" TaggedFile
 
- Contains the actual file and a list of the Descriptors that it is tagged with.
+ Contains the actual file and a 'HierarchyMap` of the 'Descriptor`s it is tagged with.
 
  For visual or human-readable representation.
 -}
 data ConcreteTaggedFile = ConcreteTaggedFile
   { concreteTaggedFile :: File
-  , concreteTaggedFileDescriptors :: [Descriptor]
+  , concreteTaggedFileDescriptors :: HierarchyMap Descriptor
   }
   deriving (Show, Eq)
