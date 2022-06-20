@@ -92,10 +92,7 @@ queryForFileByPattern p tc = HashSet.fromList <$> query tc q [p]
       |]
 
 {- |
- Query for a single file with its id.
-
- Probably more efficient if only one file is needed but if this needs to be run multiple
- times then it is better to use 'queryForFileByFileId`
+ Query for a single 'File` with its id.
 -}
 queryForSingleFileByFileId :: RecordKey File -> TaggedConnection -> MaybeT IO File
 queryForSingleFileByFileId rk tc = do
@@ -114,10 +111,10 @@ queryForSingleFileByFileId rk tc = do
       |]
 
 {- |
- Performs a case-insensitive search for files that are tagged with a descriptor
+ Performs a case-insensitive search for 'File`s that are tagged with a 'Descriptor`
  matching the text pattern provided.
 
- A flat search, meaning that any descriptor that tags an image will be searched,
+ A flat search, meaning that any 'Descriptor` that tags an image will be searched,
  regardless of whether or not it is a subtag or not.
 -}
 flatQueryForFileByTagDescriptor :: T.Text -> TaggedConnection -> IO (HashSet.HashSet File)
@@ -171,7 +168,7 @@ queryForFileBySubTagRelation superK subK tc =
     |]
 
 {- |
- Query for files without tags.
+ Query for 'File`s without tags.
 -}
 queryForUntaggedFiles :: TaggedConnection -> IO (HashSet.HashSet File)
 queryForUntaggedFiles tc = HashSet.fromList <$> query_ tc q
@@ -239,6 +236,10 @@ updateFilePaths updates tc =
  Given a list of labels, create new 'Descriptor` rows in the database.
 
  The new 'Descriptor`s will automatically be related to \#UNRELATED\#.
+
+ This should be the only way that new 'Descriptor`s are added to a Tagger database.
+ Doing so manually is not really a good idea unless care is taken to also manually relate
+ new 'Descriptor`s to \#UNRELATED\#.
 -}
 insertDescriptors :: [T.Text] -> TaggedConnection -> IO ()
 insertDescriptors ps tc = do
