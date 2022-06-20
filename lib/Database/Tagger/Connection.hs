@@ -14,6 +14,7 @@ module Database.Tagger.Connection (
   open',
   close,
   query,
+  queryNamed,
   query_,
   execute,
   execute_,
@@ -37,6 +38,7 @@ module Database.Tagger.Connection (
   Database.SQLite.Simple.ToField.ToField,
   Simple.FromRow,
   Simple.Only (..),
+  Simple.NamedParam (..),
 ) where
 
 import Control.Monad (unless, when)
@@ -104,9 +106,6 @@ close =
 
 {- |
  Run a query with a 'TaggedConnection`
-
- If the tagged connection's connection is 'Nothing` then an error is printed and
- an empty result list is returned.
 -}
 query ::
   (Simple.ToRow q, Simple.FromRow r) =>
@@ -116,6 +115,18 @@ query ::
   IO [r]
 query tc (TaggerQuery queryStmnt) params =
   withBareConnection (\bc -> bareQuery bc queryStmnt params) tc
+
+{- |
+ Run a query with named parameters.
+-}
+queryNamed ::
+  Simple.FromRow r =>
+  TaggedConnection ->
+  TaggerQuery ->
+  [Simple.NamedParam] ->
+  IO [r]
+queryNamed tc (TaggerQuery queryStmnt) params =
+  withBareConnection (\bc -> bareQueryNamed bc queryStmnt params) tc
 
 {- |
  Run a query taking no parameters with a 'TaggedConnection`
@@ -273,6 +284,14 @@ bareQuery ::
   q ->
   IO [r]
 bareQuery = withConnection Simple.query
+
+bareQueryNamed ::
+  (Simple.FromRow r) =>
+  BareConnection ->
+  Simple.Query ->
+  [Simple.NamedParam] ->
+  IO [r]
+bareQueryNamed = withConnection Simple.queryNamed
 
 bareQuery_ :: Simple.FromRow r => BareConnection -> Simple.Query -> IO [r]
 bareQuery_ = withConnection Simple.query_

@@ -31,6 +31,14 @@ module Database.Tagger.Query (
 
   -- | Queries that search based on some attribute of a 'Descriptor` type.
   flatQueryForFileByTagDescriptor,
+  queryForFileBySubTagRelation,
+
+  -- ** 'Descriptor` Queries
+  queryForDescriptorByPattern,
+  queryForSingleDescriptorByDescriptorId,
+  getInfraChildren,
+  getMetaParent,
+  hasInfraRelations,
 
   -- * Operations
   -- $Operations
@@ -52,17 +60,17 @@ module Database.Tagger.Query (
   insertTags,
 ) where
 
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Except
-import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Class (MonadTrans (lift))
+import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
+import Control.Monad.Trans.Maybe (MaybeT)
 import qualified Data.HashSet as HashSet
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import Database.Tagger.Connection
 import Database.Tagger.Type
-import System.IO
+import System.IO (stderr)
 import Tagger.Util
-import Text.RawString.QQ
+import Text.RawString.QQ (r)
 
 {- |
  Performs a case-insensitive search of all registered file paths, tagged or not.
@@ -128,6 +136,39 @@ flatQueryForFileByTagDescriptor p tc = HashSet.fromList <$> query tc q [p]
       WHERE
         d.descriptor LIKE ?
       |]
+
+{- |
+ Query for a given subtag relationship.
+
+ This query is single-depth, it searches for subtag relations that have been explicitly
+ created and not relations that have been implicitly created because of relation nesting.
+-}
+queryForFileBySubTagRelation ::
+  -- | The id of the meta 'Descriptor`, corresponds to the Tag.subTagOfId column.
+  RecordKey Descriptor ->
+  -- | The id of the infra 'Descriptor`, corresponds to the Tag.id column.
+  RecordKey Descriptor ->
+  TaggedConnection ->
+  IO (HashSet.HashSet File)
+queryForFileBySubTagRelation superK subK tc =
+  HashSet.fromList <$> query tc q (superK, subK)
+ where
+  q =
+    [r|
+    SELECT
+      f.id
+      ,f.filePath
+    FROM
+      Tag t
+    JOIN
+      Tag t1
+      ON t.id = t1.subTagOfId
+    JOIN File f
+      ON t.fileId = f.id
+    WHERE
+      t.descriptorId = ?
+      AND t1.descriptorId = ?
+    |]
 
 {- |
  Query for files without tags.
@@ -204,14 +245,19 @@ insertDescriptors ps tc = do
   insertionResult <-
     runExceptT $ do
       unrelatedDK <- getUnrelatedDescriptorKey tc
-      desKeys <- lift $ mapM insertDescriptorAndGetKey $ ps
+      desKeys <- lift $ mapM insertDescriptorAndGetKey ps
       lift $ createBulkInfraRelations tc unrelatedDK desKeys
   either (T.IO.hPutStrLn stderr) pure insertionResult
  where
   insertDescriptorAndGetKey :: T.Text -> IO (RecordKey Descriptor)
   insertDescriptorAndGetKey desName = do
-    execute tc [r||] [desName]
+    execute tc q [desName]
     lastInsertRowId tc
+   where
+    q =
+      [r|
+      INSERT INTO Descriptor (descriptor) VALUES (?)
+      |]
 
 {- |
  Delete a list of descriptor name matches from the database.
@@ -235,6 +281,114 @@ updateDescriptors updates tc =
   q =
     [r|
     UPDATE Descriptor SET descriptor = ? WHERE id = ?
+    |]
+
+{- |
+ Query for 'Descriptor`s with a SQL pattern on the 'Descriptor`s' labels.
+-}
+queryForDescriptorByPattern ::
+  T.Text -> TaggedConnection -> IO (HashSet.HashSet Descriptor)
+queryForDescriptorByPattern p tc =
+  HashSet.fromList <$> query tc q [p]
+ where
+  q =
+    [r|
+    SELECT
+      id
+      ,descriptor
+    FROM 
+      Descriptor
+    WHERE 
+      descriptor LIKE ?
+    |]
+
+{- |
+ Query for a descriptor given an ID.
+-}
+queryForSingleDescriptorByDescriptorId ::
+  RecordKey Descriptor ->
+  TaggedConnection ->
+  MaybeT IO Descriptor
+queryForSingleDescriptorByDescriptorId dk tc = do
+  result <- lift $ query tc q [dk] :: MaybeT IO [Descriptor]
+  hoistMaybe . head' $ result
+ where
+  q =
+    [r|
+    SELECT
+      id
+      ,descriptor
+    FROM
+      Descriptor
+    WHERE
+      id = ?
+    |]
+
+{- |
+ Retrieve a single layer relation of 'Descriptor`s that are Infra related to the
+ 'Descriptor` given as the id.
+-}
+getInfraChildren ::
+  RecordKey Descriptor ->
+  TaggedConnection ->
+  IO (HashSet.HashSet Descriptor)
+getInfraChildren dk tc = HashSet.fromList <$> query tc q [dk]
+ where
+  q =
+    [r|
+    SELECT
+      d.id
+      ,d.descriptor
+    FROM MetaDescriptor md
+    JOIN Descriptor d
+      ON md.infraDescriptorId = d.id
+    WHERE
+      md.metaDescriptorId = ?
+    |]
+
+{- |
+ Retrieve the 'Descriptor` that is Meta related to the given 'Descriptor` if it exists.
+
+ Note that the actual implementation of this function only retrieves the first parent
+ returned by the query. Multiple parents should never happen to a UNIQUE constraint
+ in a Tagger's database.
+-}
+getMetaParent :: RecordKey Descriptor -> TaggedConnection -> MaybeT IO Descriptor
+getMetaParent rk tc = do
+  result <- lift $ query tc q [rk] :: MaybeT IO [Descriptor]
+  hoistMaybe . head' $ result
+ where
+  q =
+    [r|
+    SELECT
+      d.id
+      ,d.descriptor
+    FROM
+      MetaDescriptor md
+    JOIN
+      Descriptor d
+    ON
+      md.metaDescriptorId = d.id
+    WHERE
+      md.infraDescriptorId = ?
+    |]
+
+{- |
+ Return 'True` if the given 'Descriptor` is Meta related to anything.
+-}
+hasInfraRelations :: RecordKey Descriptor -> TaggedConnection -> IO Bool
+hasInfraRelations dk tc = do
+  result <- query tc q [dk] :: IO [Only Int]
+  return . any ((==) 1 . (\(Only n) -> n)) $ result
+ where
+  q =
+    [r|
+    SELECT EXISTS
+      (
+        SELECT * 
+        FROM MetaDescriptor 
+        WHERE metaDescriptorId = ?
+      )
     |]
 
 {- |
