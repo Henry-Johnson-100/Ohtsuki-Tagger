@@ -148,6 +148,7 @@ test-suite tagger-lib-test
 
   other-modules:       Test.Data.HierarchyMap
                       ,Test.Database.Tagger
+                      ,Test.Text.QueryParser
 
   build-depends:       tasty == 1.4.2.3
                       ,tasty-hunit
