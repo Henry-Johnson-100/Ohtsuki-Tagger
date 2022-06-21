@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_HADDOCK prune, hide #-}
 
 {- |
 Module      : Database.Tagger.Type.Lens
@@ -17,7 +18,10 @@ import Control.Lens (
   makeLenses,
   makeLensesWith,
  )
-import Database.Tagger.Type.Prim
+import Database.Tagger.Type.Prim (
+  BareConnection,
+  TaggedConnection,
+ )
 
 makeLensesWith abbreviatedFields ''TaggedConnection
 

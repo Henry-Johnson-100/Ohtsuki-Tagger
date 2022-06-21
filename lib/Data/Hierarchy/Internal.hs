@@ -68,6 +68,9 @@ unionWith ::
   HierarchyMap a
 unionWith f (HierarchyMap x) (HierarchyMap y) = HierarchyMap $ HashMap.unionWith f x y
 
+{- |
+ Returns empty map.
+-}
 empty :: HierarchyMap a
 empty = HierarchyMap HashMap.empty
 

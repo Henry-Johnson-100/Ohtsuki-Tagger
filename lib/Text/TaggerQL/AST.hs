@@ -78,4 +78,7 @@ data Term a
   | TermWildCard QueryCriteria
   deriving (Show, Eq)
 
+{- |
+ placeholder type that I will be getting rid of soon.
+-}
 data Sentence a = Sentence SetOp a deriving (Show, Eq)

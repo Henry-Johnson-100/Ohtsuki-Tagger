@@ -1,3 +1,10 @@
+{- |
+Module      : Tagger.Info
+Description : Basic information detailing runtime information of tagger-lib
+
+License     : GPL-3
+Maintainer  : monawasensei@gmail.com
+-}
 module Tagger.Info (
   taggerVersion,
 ) where

@@ -96,6 +96,9 @@ inserts = flip $ F.foldl' (flip (uncurry insert))
 member :: Hashable a => a -> HierarchyMap a -> Bool
 member x (HierarchyMap m) = HashMap.member x m
 
+{- |
+ 'True` if the map is empty.
+-}
 null :: HierarchyMap k -> Bool
 null (HierarchyMap m) = HashMap.null m
 

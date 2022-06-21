@@ -1,5 +1,12 @@
 {-# LANGUAGE QuasiQuotes #-}
 
+{- |
+Module      : Database.Tagger.Script
+Description : Scripts for initialization or maintenance of a Tagger database.
+
+License     : GPL-3
+Maintainer  : monawasensei@gmail.com
+-}
 module Database.Tagger.Script (
   SQLiteScript (..),
   schemaDefinition,
@@ -12,6 +19,10 @@ import Text.RawString.QQ (r)
 
 newtype SQLiteScript = SQLiteScript Text deriving (Show, Eq)
 
+{- |
+ Defines the tables of a Tagger database and inserts some
+ default information.
+-}
 schemaDefinition :: SQLiteScript
 schemaDefinition =
   SQLiteScript
@@ -73,6 +84,9 @@ INSERT INTO TaggerDBInfo (_tagger, version, lastAccessed)
   VALUES (0, '0.3.2.0', datetime());
 |]
 
+{- |
+ DROPS all tables in a Tagger database.
+-}
 schemaTeardown :: SQLiteScript
 schemaTeardown =
   SQLiteScript . fromString $

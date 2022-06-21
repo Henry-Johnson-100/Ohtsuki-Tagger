@@ -65,6 +65,9 @@ instance ToField (RecordKey a) where
 -}
 class RowId r
 
+{- |
+ Type synonym for a 'HierarchyMap` of 'Descriptor`s.
+-}
 type DescriptorTree = HierarchyMap Descriptor
 
 {- |
@@ -125,6 +128,9 @@ data Tag = Tag
 instance FromRow Tag where
   fromRow = Tag <$> field <*> field <*> field <*> field
 
+{- |
+ Returns 'True` if the given 'Tag` is a subtag.
+-}
 isSubTag :: Tag -> Bool
 isSubTag (Tag _ _ _ s) = isJust s
 
