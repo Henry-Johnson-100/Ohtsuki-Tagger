@@ -1,7 +1,7 @@
 import Test.Data.HierarchyMap (hierarchyMapTests)
 import Test.Database.Tagger (taggerDatabaseTests)
 import Test.Tasty (defaultMain, testGroup)
-import Test.Text.QueryParser ( queryParserTests )
+import Test.Text.TaggerQL.Parser ( queryParserTests )
 
 main :: IO ()
 main =

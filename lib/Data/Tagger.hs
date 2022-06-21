@@ -3,6 +3,7 @@
 module Data.Tagger (
   CyclicEnum (..),
   QueryCriteria (..),
+  SetOp (..),
 ) where
 
 class (Bounded e, Ord e, Enum e) => CyclicEnum e where
@@ -16,4 +17,10 @@ data QueryCriteria
   | MetaDescriptorCriteria
   | FilePatternCriteria
   | UntaggedCriteria
+  deriving (Show, Eq, Bounded, Enum, Ord, CyclicEnum)
+
+data SetOp
+  = Union
+  | Intersect
+  | Difference
   deriving (Show, Eq, Bounded, Enum, Ord, CyclicEnum)

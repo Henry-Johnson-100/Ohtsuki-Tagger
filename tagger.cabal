@@ -95,8 +95,10 @@ library tagger-lib
                       ,Database.Tagger.Type
                       ,Data.HierarchyMap
                       ,Data.Tagger
-                      ,Text.QueryParser
-                      ,Text.QueryParser.Internal
+                      ,Text.TaggerQL
+                      ,Text.TaggerQL.Parser
+                      ,Text.TaggerQL.Parser.Internal
+                      ,Text.TaggerQL.AST
 
   other-modules:       Database.Tagger.Script
                       ,Database.Tagger.Type.Lens
@@ -118,6 +120,7 @@ library tagger-lib
                       ,BangPatterns
                       ,QuasiQuotes
                       ,TupleSections
+                      ,FlexibleContexts
 
   hs-source-dirs:      lib
 
@@ -148,7 +151,7 @@ test-suite tagger-lib-test
 
   other-modules:       Test.Data.HierarchyMap
                       ,Test.Database.Tagger
-                      ,Test.Text.QueryParser
+                      ,Test.Text.TaggerQL.Parser
 
   build-depends:       tasty == 1.4.2.3
                       ,tasty-hunit
