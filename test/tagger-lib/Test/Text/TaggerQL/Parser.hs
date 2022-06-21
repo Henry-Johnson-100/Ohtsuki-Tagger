@@ -15,14 +15,7 @@ queryParserTests :: TestTree
 queryParserTests =
   testGroup
     "QueryParser Tests"
-    [ testGroup
-        "term_parser_tests"
-        [ testCase
-            "escape_unallowed_characters"
-            ( assertEqual
-                "Unallowed characters should be escapable"
-                (Right $ TermPattern DescriptorCriteria ":|")
-                (parse termParser "d.:\\|")
-            )
-        ]
+    [ testCase
+        "NA"
+        (assertFailure "Not Implemented")
     ]

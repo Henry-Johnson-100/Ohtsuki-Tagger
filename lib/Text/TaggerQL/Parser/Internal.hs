@@ -6,9 +6,7 @@
 {-# HLINT ignore "Use <$>" #-}
 
 module Text.TaggerQL.Parser.Internal (
-  termParser,
-  Text.TaggerQL.Parser.Internal.parse,
-) where
+  ) where
 
 import Control.Monad
 import Data.Char
@@ -17,44 +15,11 @@ import qualified Data.Text as T
 import Text.Parsec
 import Text.TaggerQL.AST
 
-parse :: SimpleParser a -> T.Text -> Either ParseError a
-parse p = Text.Parsec.parse p "TaggerQL"
-
 type SimpleParser a = Parsec T.Text () a
 
 type QueryCriteriaLiteralParser = SimpleParser QueryCriteria
 
 type SetOpParser = SimpleParser SetOp
-
-type TermParser = SimpleParser (Term T.Text)
-
-type SentenceParser a = SimpleParser (Sentence a)
-
--- | placeholder
-unionSentence :: SentenceParser [Term T.Text]
-unionSentence = do
-  r <-
-    between
-      (unionOpParser >> spaces)
-      (ichar '|')
-      (endBy termParser spaces)
-  return $ Sentence Union r
-
-termParser :: TermParser
-termParser = try termWildCardParser <|> termPatternParser
-
-termPatternParser :: TermParser
-termPatternParser = do
-  c <- anyCriteriaLiteralParser
-  p <- acceptablePatternParser
-  return $ TermPattern c p
-
-termWildCardParser :: TermParser
-termWildCardParser = do
-  c <-
-    anyCriteriaLiteralParser
-  void $ ichar '*'
-  return $ TermWildCard c
 
 anyOpParser :: SetOpParser
 anyOpParser =
