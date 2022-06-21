@@ -126,7 +126,7 @@ queryForFileByPattern p tc = HashSet.fromList <$> query tc q [p]
       FROM
         File
       WHERE
-        filePath LIKE ?
+        filePath LIKE ? ESCAPE '\'
       |]
 
 {- |
@@ -169,7 +169,7 @@ flatQueryForFileByTagDescriptor p tc = HashSet.fromList <$> query tc q [p]
         JOIN File f
           ON t.fileId = f.id
       WHERE
-        d.descriptor LIKE ?
+        d.descriptor LIKE ? ESCAPE '\'
       |]
 
 {- |
@@ -408,7 +408,7 @@ queryForDescriptorByPattern p tc =
     FROM 
       Descriptor
     WHERE 
-      descriptor LIKE ?
+      descriptor LIKE ? ESCAPE '\'
     |]
 
 {- |
