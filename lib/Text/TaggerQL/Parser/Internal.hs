@@ -1,12 +1,15 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
+{-# HLINT ignore "Use <$>" #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Use <$>" #-}
-
 module Text.TaggerQL.Parser.Internal (
-  ) where
+  taggerQLTokenParser,
+  taggerQLSubClauseParser,
+  taggerQLComplexTermParser,
+  taggerQLSimpleTermParser,
+) where
 
 import Control.Monad
 import Data.Char
@@ -15,11 +18,83 @@ import qualified Data.Text as T
 import Text.Parsec
 import Text.TaggerQL.AST
 
-type SimpleParser a = Parsec T.Text () a
+type Parser a = Parsec T.Text () a
 
-type QueryCriteriaLiteralParser = SimpleParser QueryCriteria
+type QueryCriteriaLiteralParser = Parser QueryCriteria
 
-type SetOpParser = SimpleParser SetOp
+type SetOpParser = Parser SetOp
+
+type TaggerQLTokenParser = Parser (TaggerQLToken T.Text)
+
+type TaggerQLComplexTermParser = Parser (TaggerQLComplexTerm T.Text)
+
+type TaggerQLSubClauseParser = Parser (TaggerQLSubClause T.Text)
+
+type TaggerQLSimpleTermParser = Parser (TaggerQLSimpleTerm T.Text)
+
+{- |
+ Parses a 'TaggerQLToken`
+
+ This is the terminating parser for the recursive definition of the
+ 'taggerQLComplexTermParser`
+-}
+taggerQLTokenParser :: TaggerQLTokenParser
+taggerQLTokenParser =
+  try taggerQLSimpleTokenParser
+    <|> taggerQLComplexTokenParser
+ where
+  taggerQLSimpleTokenParser = TaggerQLSimpleToken <$> taggerQLSimpleTermParser
+  taggerQLComplexTokenParser = TaggerQLComplexToken <$> taggerQLComplexTermParser
+
+{- |
+ Parses a 'TaggerQLComplexTerm`
+
+ recursively defined with 'taggerQLSubClauseParser` and 'taggerQLTokenParser`
+-}
+taggerQLComplexTermParser :: TaggerQLComplexTermParser
+taggerQLComplexTermParser = do
+  c <-
+    descriptorCriteriaLiteralParser
+      <|> metaDescriptorCriteriaLiteralParser
+      <|> filePatternCriteriaLiteralParser
+      <|> try
+        ( untaggedCriteriaLiteralParser
+            >> unexpected "Untagged queries not allowed before a subquery."
+        )
+      <|> pure DescriptorCriteria
+  basis <- acceptablePatternParser
+  spaces
+  against <- taggerQLSubClauseParser
+  spaces
+  return $
+    TaggerQLComplexTerm
+      c
+      basis
+      against
+
+{- |
+ Parses a 'TaggerQLSubClause`
+-}
+taggerQLSubClauseParser :: TaggerQLSubClauseParser
+taggerQLSubClauseParser = do
+  setOp <- anyOpParser
+  contents <- subClauseContentsParser (sepEndBy taggerQLTokenParser (many space))
+  spaces
+  return $ TaggerQLSubClause setOp contents
+ where
+  subClauseContentsParser = between subClauseOpenParser subClauseCloseParser
+
+{- |
+ Parses a 'TaggerQLSimpleTerm`
+
+ The smallest unit of complete TaggerQL syntax.
+-}
+taggerQLSimpleTermParser :: TaggerQLSimpleTermParser
+taggerQLSimpleTermParser = do
+  c <- anyCriteriaLiteralParser
+  p <- acceptablePatternParser
+  notFollowedBy (spaces >> anyOpParser >> subClauseOpenParser)
+  return $ TaggerQLSimpleTerm c p
 
 anyOpParser :: SetOpParser
 anyOpParser =
@@ -28,13 +103,19 @@ anyOpParser =
     <|> diffOpParser
 
 unionOpParser :: SetOpParser
-unionOpParser = ichar 'u' >> ichar '|' >> return Union
+unionOpParser = ichar 'u' >> return Union
 
 intersectOpParser :: SetOpParser
-intersectOpParser = ichar 'i' >> ichar '|' >> return Intersect
+intersectOpParser = ichar 'i' >> return Intersect
 
 diffOpParser :: SetOpParser
-diffOpParser = ichar 'd' >> ichar '|' >> return Difference
+diffOpParser = ichar 'd' >> return Difference
+
+subClauseOpenParser :: Parser ()
+subClauseOpenParser = void (ichar '[') >> spaces
+
+subClauseCloseParser :: Parser ()
+subClauseCloseParser = spaces >> void (ichar ']')
 
 anyCriteriaLiteralParser :: QueryCriteriaLiteralParser
 anyCriteriaLiteralParser =
@@ -63,11 +144,28 @@ untaggedCriteriaLiteralParser = ichar 'u' >> ichar '.' >> return UntaggedCriteri
 ichar :: Stream s m Char => Char -> ParsecT s u m Char
 ichar c = satisfy (\c' -> toLower c == toLower c')
 
-acceptablePatternParser :: SimpleParser T.Text
-acceptablePatternParser = fmap T.pack . many1 $ notDisallowedChars
+acceptablePatternParser :: Parser T.Text
+acceptablePatternParser = fmap T.pack . many1 $ acceptableCharParser
 
-notDisallowedChars :: SimpleParser Char
-notDisallowedChars = noneOf "{}| \r\t\n"
+acceptableCharParser :: Parser Char
+acceptableCharParser =
+  ( try
+      ( do
+          void $ ichar '\\'
+          oneOf disallowedChars
+      )
+      <|> ichar '\\'
+  )
+    <|> notDisallowedChars
 
-spaceOrEOF :: SimpleParser ()
+notDisallowedChars :: Parser Char
+notDisallowedChars = noneOf disallowedChars
+
+disallowedChars :: [Char]
+disallowedChars = "{}()[]*. \r\t\n"
+
+subqueryContents :: Parser a -> Parser a
+subqueryContents = between (char '{') (char '}')
+
+spaceOrEOF :: Parser ()
 spaceOrEOF = void space <|> eof

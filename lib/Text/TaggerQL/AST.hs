@@ -13,6 +13,7 @@ Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL.AST (
   TaggerQLQuery (..),
+  TaggerQLSubQuery (..),
   TaggerQLClause (..),
   TaggerQLToken (..),
   TaggerQLSubClause (..),
@@ -28,7 +29,15 @@ import Data.Tagger
  Made up of 'TaggerQLClause` which can be traversed and combined.
 -}
 data TaggerQLQuery a
-  = TaggerQLQuery [TaggerQLClause a]
+  = TaggerQLQuery [TaggerQLSubQuery a]
+  deriving (Show, Eq, Functor, Foldable)
+
+{- |
+ Subqueries are complete queries whose result set's may be combined with
+ other subqueries. The default is to combine with the program's set.
+-}
+data TaggerQLSubQuery a
+  = TaggerQLSubQuery [TaggerQLClause a]
   deriving (Show, Eq, Functor, Foldable)
 
 {- |
@@ -75,11 +84,13 @@ data TaggerQLComplexTerm a
 -}
 data TaggerQLSimpleTerm a
   = TaggerQLSimpleTerm QueryCriteria a
-  | TaggerQLWildCard QueryCriteria
   deriving (Show, Eq, Functor, Foldable)
 
 instance Traversable TaggerQLQuery where
   traverse f (TaggerQLQuery cs) = TaggerQLQuery <$> traverse (traverse f) cs
+
+instance Traversable TaggerQLSubQuery where
+  traverse f (TaggerQLSubQuery qs) = TaggerQLSubQuery <$> traverse (traverse f) qs
 
 instance Traversable TaggerQLClause where
   traverse f (TaggerQLClause so ts) = TaggerQLClause so <$> traverse (traverse f) ts
@@ -100,4 +111,3 @@ instance Traversable TaggerQLComplexTerm where
 
 instance Traversable TaggerQLSimpleTerm where
   traverse f (TaggerQLSimpleTerm qc t) = TaggerQLSimpleTerm qc <$> f t
-  traverse _ (TaggerQLWildCard qc) = pure (TaggerQLWildCard qc)
