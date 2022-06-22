@@ -156,3 +156,4 @@ test-suite tagger-lib-test
   build-depends:       tasty == 1.4.2.3
                       ,tasty-hunit
                       ,tagger-lib
+                      ,parsec
