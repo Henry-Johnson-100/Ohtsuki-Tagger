@@ -115,8 +115,8 @@ import Text.RawString.QQ (r)
 
  Can use SQL wildcards like % or _
 -}
-queryForFileByPattern :: T.Text -> TaggedConnection -> IO (HashSet.HashSet File)
-queryForFileByPattern p tc = HashSet.fromList <$> query tc q [p]
+queryForFileByPattern :: T.Text -> TaggedConnection -> IO [File]
+queryForFileByPattern p tc = query tc q [p]
  where
   q =
     [r|
@@ -155,8 +155,8 @@ queryForSingleFileByFileId rk tc = do
  A flat search, meaning that any 'Descriptor` that tags an image will be searched,
  regardless of whether or not it is a subtag or not.
 -}
-flatQueryForFileByTagDescriptor :: T.Text -> TaggedConnection -> IO (HashSet.HashSet File)
-flatQueryForFileByTagDescriptor p tc = HashSet.fromList <$> query tc q [p]
+flatQueryForFileByTagDescriptor :: T.Text -> TaggedConnection -> IO [File]
+flatQueryForFileByTagDescriptor p tc = query tc q [p]
  where
   q =
     [r|
@@ -184,9 +184,9 @@ queryForFileBySubTagRelation ::
   -- | The id of the infra 'Descriptor`, corresponds to the Tag.id column.
   RecordKey Descriptor ->
   TaggedConnection ->
-  IO (HashSet.HashSet File)
+  IO [File]
 queryForFileBySubTagRelation superK subK tc =
-  HashSet.fromList <$> query tc q (superK, subK)
+  query tc q (superK, subK)
  where
   q =
     [r|
@@ -211,7 +211,7 @@ queryForFileBySubTagRelation superK subK tc =
 queryForTaggedFileWithFileId :: RecordKey File -> TaggedConnection -> MaybeT IO TaggedFile
 queryForTaggedFileWithFileId rk tc = do
   guard =<< lift (doesFileExist rk tc)
-  fileTags <- lift $ queryForFileTagsByFileId rk tc
+  fileTags <- fmap HashSet.fromList . lift $ queryForFileTagsByFileId rk tc
   return $ TaggedFile rk fileTags
 
 {- |
@@ -226,7 +226,7 @@ queryForConcreteTaggedFileWithFileId ::
   MaybeT IO ConcreteTaggedFile
 queryForConcreteTaggedFileWithFileId rk tc = do
   file <- queryForSingleFileByFileId rk tc
-  fileTags <- lift $ queryForFileTagListByFileId rk tc
+  fileTags <- lift $ queryForFileTagsByFileId rk tc
   concreteFileTags <-
     lift
       . fmap (map (second HashSet.fromList) . catMaybes)
@@ -249,8 +249,8 @@ queryForConcreteTaggedFileWithFileId rk tc = do
 {- |
  Query for 'File`s without tags.
 -}
-queryForUntaggedFiles :: TaggedConnection -> IO (HashSet.HashSet File)
-queryForUntaggedFiles tc = HashSet.fromList <$> query_ tc q
+queryForUntaggedFiles :: TaggedConnection -> IO [File]
+queryForUntaggedFiles tc = query_ tc q
  where
   q =
     [r|
@@ -267,8 +267,8 @@ queryForUntaggedFiles tc = HashSet.fromList <$> query_ tc q
 {- |
  Returns all 'File`s in the database.
 -}
-allFiles :: TaggedConnection -> IO (HashSet.HashSet File)
-allFiles tc = HashSet.fromList <$> query_ tc q
+allFiles :: TaggedConnection -> IO [File]
+allFiles tc = query_ tc q
  where
   q =
     [r|
@@ -380,8 +380,8 @@ updateDescriptors updates tc =
 {- |
  Returns all 'Descriptor`s in the database.
 -}
-allDescriptors :: TaggedConnection -> IO (HashSet.HashSet Descriptor)
-allDescriptors tc = HashSet.fromList <$> query_ tc q
+allDescriptors :: TaggedConnection -> IO [Descriptor]
+allDescriptors tc = query_ tc q
  where
   q =
     [r|
@@ -396,9 +396,9 @@ allDescriptors tc = HashSet.fromList <$> query_ tc q
  Query for 'Descriptor`s with a SQL pattern on the 'Descriptor`s' labels.
 -}
 queryForDescriptorByPattern ::
-  T.Text -> TaggedConnection -> IO (HashSet.HashSet Descriptor)
+  T.Text -> TaggedConnection -> IO [Descriptor]
 queryForDescriptorByPattern p tc =
-  HashSet.fromList <$> query tc q [p]
+  query tc q [p]
  where
   q =
     [r|
@@ -466,8 +466,8 @@ queryForSingleDescriptorByTagId rk tc = do
 getInfraChildren ::
   RecordKey Descriptor ->
   TaggedConnection ->
-  IO (HashSet.HashSet Descriptor)
-getInfraChildren dk tc = HashSet.fromList <$> query tc q [dk]
+  IO [Descriptor]
+getInfraChildren dk tc = query tc q [dk]
  where
   q =
     [r|
@@ -489,9 +489,9 @@ getInfraChildren dk tc = HashSet.fromList <$> query tc q [dk]
 getAllInfra ::
   RecordKey Descriptor ->
   TaggedConnection ->
-  IO (HashSet.HashSet Descriptor)
+  IO [Descriptor]
 getAllInfra rk tc =
-  HashSet.fromList <$> query tc q [rk]
+  query tc q [rk]
  where
   q =
     [r|
@@ -568,8 +568,8 @@ hasInfraRelations dk tc = do
 
  Will likely be a pretty large set for mature databases.
 -}
-allTags :: TaggedConnection -> IO (HashSet.HashSet Tag)
-allTags tc = HashSet.fromList <$> query_ tc q
+allTags :: TaggedConnection -> IO [Tag]
+allTags tc = query_ tc q
  where
   q =
     [r|
@@ -583,18 +583,11 @@ allTags tc = HashSet.fromList <$> query_ tc q
     |]
 
 {- |
- Return a list of all 'Tag`s for a given 'File`.
--}
-queryForFileTagsByFileId :: RecordKey File -> TaggedConnection -> IO (HashSet.HashSet Tag)
-queryForFileTagsByFileId rk tc =
-  HashSet.fromList <$> queryForFileTagListByFileId rk tc
-
-{- |
  Special version of 'queryForFileTagsByFileId` for easier traversals before giving a
  final unordered result.
 -}
-queryForFileTagListByFileId :: RecordKey File -> TaggedConnection -> IO [Tag]
-queryForFileTagListByFileId rk tc =
+queryForFileTagsByFileId :: RecordKey File -> TaggedConnection -> IO [Tag]
+queryForFileTagsByFileId rk tc =
   query tc q [rk]
  where
   q =
