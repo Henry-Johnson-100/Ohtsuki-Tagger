@@ -4,6 +4,7 @@ module Test.Text.TaggerQL.Parser (
   queryParserTests,
 ) where
 
+import Data.Char
 import Data.Tagger
 import qualified Data.Text as T
 import Test.Tasty
@@ -55,5 +56,24 @@ queryParserTests =
                   )
             )
             (parse taggerQLTokenParser "test" "u\\[\\] u[test]")
+        )
+    , let charSet = [id, toUpper] <*> "abcdefghijklmnopqrstuvwxyz1234567890"
+       in testCase
+            "single_chars_are_valid_terms"
+            ( assertEqual
+                "semi-special single chars should not have to be escaped to be valid terms."
+                ( Right
+                    . TaggerQLSimpleToken
+                    . TaggerQLSimpleTerm DescriptorCriteria
+                    <$> (T.singleton <$> charSet)
+                )
+                (parse taggerQLTokenParser "test" <$> (T.singleton <$> charSet))
+            )
+    , testCase
+        "terms_starting_with_semi_special_chars_are_valid"
+        ( assertEqual
+            "Terms are allowed to start with semi special chars like 'u'"
+            (Right . TaggerQLSimpleToken . TaggerQLSimpleTerm DescriptorCriteria $ "unrelated")
+            (parse taggerQLTokenParser "test" "unrelated")
         )
     ]

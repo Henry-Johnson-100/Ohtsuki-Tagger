@@ -162,7 +162,7 @@ notDisallowedChars :: Parser Char
 notDisallowedChars = noneOf disallowedChars
 
 disallowedChars :: [Char]
-disallowedChars = "{}()[]*. \r\t\n"
+disallowedChars = "{}()[] \r\t\n"
 
 subqueryContents :: Parser a -> Parser a
 subqueryContents = between (char '{') (char '}')
