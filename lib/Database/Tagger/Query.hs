@@ -36,6 +36,7 @@ module Database.Tagger.Query (
 
   -- | Queries that search based on some attribute of a 'Descriptor` type.
   flatQueryForFileByTagDescriptor,
+  flatQueryForFileOnMetaRelation,
   queryForFileBySubTagRelation,
 
   -- ** 'TaggedFile` and 'ConcreteTaggedFile` Queries
@@ -149,13 +150,10 @@ queryForSingleFileByFileId rk tc = do
       |]
 
 {- |
- Performs a case-insensitive search for 'File`s that are tagged with a 'Descriptor`
- matching the text pattern provided.
-
  A flat search, meaning that any 'Descriptor` that tags an image will be searched,
  regardless of whether or not it is a subtag or not.
 -}
-flatQueryForFileByTagDescriptor :: T.Text -> TaggedConnection -> IO [File]
+flatQueryForFileByTagDescriptor :: RecordKey Descriptor -> TaggedConnection -> IO [File]
 flatQueryForFileByTagDescriptor p tc = query tc q [p]
  where
   q =
@@ -169,8 +167,58 @@ flatQueryForFileByTagDescriptor p tc = query tc q [p]
         JOIN File f
           ON t.fileId = f.id
       WHERE
-        d.descriptor LIKE ? ESCAPE '\'
+        d.id = ?
       |]
+
+{- |
+ Flat query for 'File`s that are tagged with the given 'Descriptor` and all 'Descriptor`s
+ that are infra to it.
+-}
+flatQueryForFileOnMetaRelation :: RecordKey Descriptor -> TaggedConnection -> IO [File]
+flatQueryForFileOnMetaRelation dk tc = queryNamed tc q [":metaDes" := dk]
+ where
+  q =
+    [r|
+    WITH RECURSIVE infra_tree AS
+      (
+        SELECT
+          infraDescriptorId
+        FROM
+          MetaDescriptor
+        WHERE
+          metaDescriptorId = :metaDes
+        UNION
+        SELECT
+          md.infraDescriptorId
+        FROM
+          infra_tree ift
+        JOIN
+          MetaDescriptor md
+          ON
+            ift.infraDescriptorId = md.metaDescriptorId
+      )
+    SELECT
+      f.id
+      ,f.filePath
+    FROM
+      (
+        SELECT
+          :metaDes "infraDescriptorId"
+        UNION
+        SELECT
+          infraDescriptorId
+        FROM
+          infra_tree
+      ) ift
+      JOIN
+        Tag t
+        ON
+          ift.infraDescriptorId = t.descriptorId
+      JOIN
+        File f
+        ON
+          t.fileId = f.id
+    |]
 
 {- |
  Query for a given subtag relationship.
