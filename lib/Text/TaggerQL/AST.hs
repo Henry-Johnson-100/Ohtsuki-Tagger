@@ -12,7 +12,7 @@ License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL.AST (
-  TaggerQLAST (..),
+  TaggerQLQuery (..),
   TaggerQLClause (..),
   TaggerQLToken (..),
   TaggerQLSubClause (..),
@@ -27,8 +27,8 @@ import Data.Tagger
 
  Made up of 'TaggerQLClause` which can be traversed and combined.
 -}
-data TaggerQLAST a
-  = TaggerQLAST [TaggerQLClause a]
+data TaggerQLQuery a
+  = TaggerQLQuery [TaggerQLClause a]
   deriving (Show, Eq, Functor, Foldable)
 
 {- |
@@ -78,8 +78,8 @@ data TaggerQLSimpleTerm a
   | TaggerQLWildCard QueryCriteria
   deriving (Show, Eq, Functor, Foldable)
 
-instance Traversable TaggerQLAST where
-  traverse f (TaggerQLAST cs) = TaggerQLAST <$> traverse (traverse f) cs
+instance Traversable TaggerQLQuery where
+  traverse f (TaggerQLQuery cs) = TaggerQLQuery <$> traverse (traverse f) cs
 
 instance Traversable TaggerQLClause where
   traverse f (TaggerQLClause so ts) = TaggerQLClause so <$> traverse (traverse f) ts

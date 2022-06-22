@@ -24,5 +24,5 @@ runTaggerQL = undefined
 {- |
  Given a TaggerQL query, produce the abstract syntax tree.
 -}
-taggerQLAST :: T.Text -> TaggerQLAST T.Text
+taggerQLAST :: T.Text -> TaggerQLQuery T.Text
 taggerQLAST = undefined
