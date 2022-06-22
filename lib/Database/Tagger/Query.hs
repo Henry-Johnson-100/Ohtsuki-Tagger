@@ -532,14 +532,14 @@ getInfraChildren dk tc = query tc q [dk]
 {- |
  Given a 'Descriptor` ID, return a set of all 'Descriptor` Descriptors.
 
- Does not include the given Descriptor.
+ Includes the given 'Descriptor`.
 -}
 getAllInfra ::
   RecordKey Descriptor ->
   TaggedConnection ->
   IO [Descriptor]
 getAllInfra rk tc =
-  query tc q [rk]
+  queryNamed tc q [":metaDes" := rk]
  where
   q =
     [r|
@@ -550,7 +550,7 @@ getAllInfra rk tc =
         FROM
           MetaDescriptor
         WHERE
-          metaDescriptorId = ?
+          metaDescriptorId = :metaDes
         UNION
         SELECT
           md.infraDescriptorId
@@ -561,7 +561,14 @@ getAllInfra rk tc =
     SELECT
       d.id
       ,d.descriptor
-    FROM all_infra_tree ait
+    FROM (
+      SELECT
+        :metaDes "infraDescriptorId"
+      UNION
+      SELECT
+        infraDescriptorId
+      FROM all_infra_tree
+    ) ait
       JOIN Descriptor d
         ON ait.infraDescriptorId = d.id
     |]
@@ -631,8 +638,7 @@ allTags tc = query_ tc q
     |]
 
 {- |
- Special version of 'queryForFileTagsByFileId` for easier traversals before giving a
- final unordered result.
+ Returns all 'Tag`s for a given 'File`.
 -}
 queryForFileTagsByFileId :: RecordKey File -> TaggedConnection -> IO [Tag]
 queryForFileTagsByFileId rk tc =
@@ -652,12 +658,12 @@ queryForFileTagsByFileId rk tc =
     |]
 
 {- |
- Retrieve all rows in the MetaDescriptor table encoded as a HashSet of tuples of
+ Retrieve all rows in the MetaDescriptor table encoded as a list of tuples of
  'Descriptor` ID's.
 -}
 allMetaDescriptorRows ::
-  TaggedConnection -> IO (HashSet.HashSet (RecordKey Descriptor, RecordKey Descriptor))
-allMetaDescriptorRows tc = HashSet.fromList <$> query_ tc q
+  TaggedConnection -> IO [(RecordKey Descriptor, RecordKey Descriptor)]
+allMetaDescriptorRows tc = query_ tc q
  where
   q =
     [r|
