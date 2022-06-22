@@ -25,8 +25,6 @@ import Data.Tagger
 
 {- |
  Represents the entirety of a given TaggerQL query.
-
- Made up of 'TaggerQLClause` which can be traversed and combined.
 -}
 data TaggerQLQuery a
   = TaggerQLQuery [TaggerQLSubQuery a]
@@ -35,6 +33,8 @@ data TaggerQLQuery a
 {- |
  Subqueries are complete queries whose result set's may be combined with
  other subqueries. The default is to combine with the program's set.
+
+ Made up of 'TaggerQLClause` which can be traversed and combined.
 -}
 data TaggerQLSubQuery a
   = TaggerQLSubQuery [TaggerQLClause a]
