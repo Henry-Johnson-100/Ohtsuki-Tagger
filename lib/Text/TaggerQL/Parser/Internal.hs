@@ -5,18 +5,40 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Text.TaggerQL.Parser.Internal (
-  taggerQLTokenParser,
-  taggerQLSubClauseParser,
-  taggerQLComplexTermParser,
-  taggerQLSimpleTermParser,
+  requestParser,
+  sentenceParser,
+  manyTermParser,
+  termParser,
+  subQueryParser,
+  termPartialParser,
 ) where
 
-import Control.Monad
-import Data.Char
-import Data.Tagger
+import Control.Monad (void)
+import Data.Char (toLower)
+import Data.Maybe (fromMaybe)
+import Data.Tagger (QueryCriteria (..), SetOp (..))
 import qualified Data.Text as T
-import Text.Parsec
-import Text.TaggerQL.AST
+import Text.Parsec (
+  Parsec,
+  ParsecT,
+  Stream,
+  choice,
+  many1,
+  noneOf,
+  oneOf,
+  optionMaybe,
+  satisfy,
+  sepBy1,
+  spaces,
+  try,
+  (<?>),
+  (<|>),
+ )
+import Text.TaggerQL.AST (
+  Request (..),
+  Sentence (..),
+  Term (Term, termPredicate),
+ )
 
 type Parser a = Parsec T.Text () a
 
@@ -24,105 +46,105 @@ type QueryCriteriaLiteralParser = Parser QueryCriteria
 
 type SetOpParser = Parser SetOp
 
-type TaggerQLTokenParser = Parser (TaggerQLToken T.Text)
+type TermParser = Parser (Term T.Text)
 
-type TaggerQLComplexTermParser = Parser (TaggerQLComplexTerm T.Text)
+type SentenceParser = Parser (Sentence T.Text)
 
-type TaggerQLSubClauseParser = Parser (TaggerQLSubClause T.Text)
+type RequestParser = Parser (Request T.Text)
 
-type TaggerQLSimpleTermParser = Parser (TaggerQLSimpleTerm T.Text)
-
-{- |
- Parses a 'TaggerQLToken`
-
- This is the terminating parser for the recursive definition of the
- 'taggerQLComplexTermParser`
--}
-taggerQLTokenParser :: TaggerQLTokenParser
-taggerQLTokenParser =
-  try taggerQLSimpleTokenParser
-    <|> taggerQLComplexTokenParser
- where
-  taggerQLSimpleTokenParser = TaggerQLSimpleToken <$> taggerQLSimpleTermParser
-  taggerQLComplexTokenParser = TaggerQLComplexToken <$> taggerQLComplexTermParser
+newtype ParserState = S {isTopLevel :: Bool} deriving (Show, Eq)
 
 {- |
- Parses a 'TaggerQLComplexTerm`
-
- recursively defined with 'taggerQLSubClauseParser` and 'taggerQLTokenParser`
+ Parses many 'Sentence`s to form a whole 'Request`.
 -}
-taggerQLComplexTermParser :: TaggerQLComplexTermParser
-taggerQLComplexTermParser = do
-  c <-
-    descriptorCriteriaLiteralParser
-      <|> metaDescriptorCriteriaLiteralParser
-      <|> filePatternCriteriaLiteralParser
-      <|> try
-        ( untaggedCriteriaLiteralParser
-            >> unexpected "Untagged queries not allowed before a subquery."
-        )
-      <|> pure DescriptorCriteria
-  basis <- acceptablePatternParser
+requestParser :: RequestParser
+requestParser = Request <$> many1 sentenceParser
+
+{- |
+ Parses a 'Sentence` from many 'Term`s.
+
+ Optionally wrapped in ().
+-}
+sentenceParser :: SentenceParser
+sentenceParser = do
+  maybeParen <- optionMaybe queryOpenParser
+  terms <- manyTermParser
+  maybe (pure ()) (const queryCloseParser) maybeParen
+  return $ Sentence terms
+
+{- |
+ Parse one or more 'Term`s separated by 0 or more spaces.
+-}
+manyTermParser :: Parser [Term T.Text]
+manyTermParser = sepBy1 termParser spaces
+
+{- |
+ Parse a 'Term` from a partial 'Term` and an optional subquery
+ to determine the predicates.
+-}
+termParser :: TermParser
+termParser = do
+  partialTerm <- termPartialParser
   spaces
-  against <- taggerQLSubClauseParser
+  predicates <- optionMaybe subQueryParser
   spaces
-  return $
-    TaggerQLComplexTerm
-      c
-      basis
-      against
+  return $ partialTerm{termPredicate = fromMaybe [] predicates}
 
 {- |
- Parses a 'TaggerQLSubClause`
+ Parses 'Term`s wrapped in {} to form predicates for this parser's caller.
 -}
-taggerQLSubClauseParser :: TaggerQLSubClauseParser
-taggerQLSubClauseParser = do
-  setOp <- anyOpParser
-  contents <- subClauseContentsParser (sepEndBy taggerQLTokenParser (many space))
-  spaces
-  return $ TaggerQLSubClause setOp contents
- where
-  subClauseContentsParser = between subClauseOpenParser subClauseCloseParser
+subQueryParser :: Parser [Term T.Text]
+subQueryParser = do
+  subClauseScopeOpenParser
+  terms <- sepBy1 termParser spaces
+  subClauseScopeCloseParser
+  return terms
 
 {- |
- Parses a 'TaggerQLSimpleTerm`
-
- The smallest unit of complete TaggerQL syntax.
+ Parses a partial 'Term`, a term with no predicates by default.
 -}
-taggerQLSimpleTermParser :: TaggerQLSimpleTermParser
-taggerQLSimpleTermParser = do
-  c <- anyCriteriaLiteralParser
+termPartialParser :: TermParser
+termPartialParser = do
+  so <- anyOpParser
+  spaces
+  qc <- anyCriteriaLiteralParser
   p <- acceptablePatternParser
-  notFollowedBy (spaces >> anyOpParser >> subClauseOpenParser)
-  return $ TaggerQLSimpleTerm c p
+  return $ Term so qc p []
 
 anyOpParser :: SetOpParser
 anyOpParser =
-  unionOpParser
-    <|> intersectOpParser
-    <|> diffOpParser
+  (choice . map try $ [unionOpParser, intersectOpParser, diffOpParser]) <|> return Intersect
 
 unionOpParser :: SetOpParser
-unionOpParser = ichar 'u' >> return Union
+unionOpParser = ichar 'u' >> ichar '|' >> return Union
 
 intersectOpParser :: SetOpParser
-intersectOpParser = ichar 'i' >> return Intersect
+intersectOpParser = ichar 'i' >> ichar '|' >> return Intersect
 
 diffOpParser :: SetOpParser
-diffOpParser = ichar 'd' >> return Difference
+diffOpParser = ichar 'd' >> ichar '|' >> return Difference
 
-subClauseOpenParser :: Parser ()
-subClauseOpenParser = void (ichar '[') >> spaces
+queryOpenParser :: Parser ()
+queryOpenParser = void (ichar '(') >> spaces
 
-subClauseCloseParser :: Parser ()
-subClauseCloseParser = spaces >> void (ichar ']')
+queryCloseParser :: Parser ()
+queryCloseParser = void spaces >> void (ichar ')')
+
+subClauseScopeOpenParser :: Parser ()
+subClauseScopeOpenParser = void (ichar '{') >> spaces
+
+subClauseScopeCloseParser :: Parser ()
+subClauseScopeCloseParser = spaces >> void (ichar '}')
 
 anyCriteriaLiteralParser :: QueryCriteriaLiteralParser
 anyCriteriaLiteralParser =
-  descriptorCriteriaLiteralParser
-    <|> metaDescriptorCriteriaLiteralParser
-    <|> filePatternCriteriaLiteralParser
-    <|> untaggedCriteriaLiteralParser
+  ( choice . map try $
+      [ descriptorCriteriaLiteralParser
+      , metaDescriptorCriteriaLiteralParser
+      , filePatternCriteriaLiteralParser
+      , untaggedCriteriaLiteralParser
+      ]
+  )
     <|> pure DescriptorCriteria
 
 descriptorCriteriaLiteralParser :: QueryCriteriaLiteralParser
@@ -145,7 +167,12 @@ ichar :: Stream s m Char => Char -> ParsecT s u m Char
 ichar c = satisfy (\c' -> toLower c == toLower c')
 
 acceptablePatternParser :: Parser T.Text
-acceptablePatternParser = fmap T.pack . many1 $ acceptableCharParser
+acceptablePatternParser =
+  (fmap T.pack . many1 $ acceptableCharParser)
+    <?> ( "an acceptable pattern of characters not in the set, '"
+            ++ disallowedChars
+            ++ "' or any of those characters with an escape char, \\, before it."
+        )
 
 acceptableCharParser :: Parser Char
 acceptableCharParser =
@@ -162,10 +189,4 @@ notDisallowedChars :: Parser Char
 notDisallowedChars = noneOf disallowedChars
 
 disallowedChars :: [Char]
-disallowedChars = "{}()[] \r\t\n"
-
-subqueryContents :: Parser a -> Parser a
-subqueryContents = between (char '{') (char '}')
-
-spaceOrEOF :: Parser ()
-spaceOrEOF = void space <|> eof
+disallowedChars = "{}()| \r\t\n"
