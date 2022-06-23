@@ -12,9 +12,11 @@ module Text.TaggerQL.AST (
   Request (..),
   Sentence (..),
   Term (..),
+  formatRequest,
 ) where
 
-import Data.Tagger (QueryCriteria, SetOp)
+import qualified Data.List as L
+import Data.Tagger (QueryCriteria (..), SetOp (..))
 
 {- |
  A collection of 'Sentence`s.
@@ -46,3 +48,43 @@ data Term a = Term
     termPredicate :: [Term a]
   }
   deriving (Show, Eq, Functor)
+
+{- |
+ Pretty-print a 'Request`
+-}
+formatRequest :: Show a => Request a -> String
+formatRequest (Request sentences) =
+  "Request\n" ++ (L.intercalate "\n" . map (formatSentence 1) $ sentences)
+
+formatSentence :: Show a => Int -> Sentence a -> String
+formatSentence indentLevel (Sentence terms) =
+  concat (replicate indentLevel "  ")
+    ++ "Sentence\n"
+    ++ (L.intercalate "\n" . map (formatTerm (indentLevel + 1)) $ terms)
+
+formatTerm :: Show a => Int -> Term a -> String
+formatTerm indentLevel (Term so qc b ps) =
+  concat (replicate indentLevel "  ")
+    ++ formatSetOp so
+    ++ formatCriteria qc
+    ++ show b
+    ++ if null ps
+      then ""
+      else
+        "\n"
+          ++ (L.intercalate "\n" . map (formatTerm (indentLevel + 1)) $ ps)
+
+formatCriteria :: QueryCriteria -> String
+formatCriteria qc =
+  case qc of
+    DescriptorCriteria -> "D."
+    MetaDescriptorCriteria -> "R."
+    FilePatternCriteria -> "P."
+    UntaggedCriteria -> "U."
+
+formatSetOp :: SetOp -> String
+formatSetOp so =
+  case so of
+    Union -> "U| "
+    Intersect -> "I| "
+    Difference -> "D| "
