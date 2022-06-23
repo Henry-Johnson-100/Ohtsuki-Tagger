@@ -68,11 +68,11 @@ formatTerm indentLevel (Term so qc b ps) =
     ++ formatSetOp so
     ++ formatCriteria qc
     ++ show b
-    ++ if null ps
-      then ""
-      else
-        "\n"
-          ++ (L.intercalate "\n" . map (formatTerm (indentLevel + 1)) $ ps)
+    ++ ( if null ps
+          then ""
+          else "\n"
+       )
+    ++ (L.intercalate "\n" . map (formatTerm (indentLevel + 1)) $ ps)
 
 formatCriteria :: QueryCriteria -> String
 formatCriteria qc =
