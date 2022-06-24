@@ -14,6 +14,7 @@ module Text.TaggerQL.AST (
   Clause (..),
   TermTree (..),
   Term (..),
+  termTreeNode,
   newPredicates,
   nestPredicate,
 ) where
@@ -25,14 +26,24 @@ newtype Request a = Request [Sentence a] deriving (Show, Eq, Functor)
 
 data Sentence a = (Clause a) :| (Sentence a) deriving (Show, Eq, Functor)
 
-data Clause a = Clause SetOp (TermTree a) deriving (Show, Eq, Functor)
+data Clause a = Clause SetOp (N.NonEmpty (TermTree a)) deriving (Show, Eq, Functor)
 
 data TermTree a
   = Simple (Term a)
   | Term a :+ (N.NonEmpty (TermTree a))
   deriving (Show, Eq, Functor)
 
-data Term a = Term QueryCriteria a deriving (Show, Eq, Functor)
+data Term a = Term {termCriteria :: QueryCriteria, termPattern :: a}
+  deriving (Show, Eq, Functor)
+
+{- |
+ Return the 'Term` in the given 'TermTree` node.
+-}
+termTreeNode :: TermTree a -> Term a
+termTreeNode b =
+  case b of
+    Simple t -> t
+    t :+ _ -> t
 
 {- |
  Given a 'TermTree` and a list of trees, insert them as new branches

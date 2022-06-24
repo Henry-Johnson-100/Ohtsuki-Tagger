@@ -5,40 +5,22 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Text.TaggerQL.Parser.Internal (
+  clauseParser,
   termTreeParser,
   termTreeChildrenParser,
   simpleTreeParser,
   termParser,
 ) where
 
--- requestParser,
--- sentenceParser,
--- manyTermParser,
--- termParser,
--- subQueryParser,
--- termPartialParser,
-
-import Control.Monad (void)
+import Control.Monad (guard, void, when)
 import Data.Char (toLower)
 
+import qualified Data.List.NonEmpty as NE
+import Data.Maybe
 import Data.Tagger (QueryCriteria (..), SetOp (..))
 import qualified Data.Text as T
-import Text.Parsec (
-  Parsec,
-  ParsecT,
-  Stream,
-  choice,
-  many1,
-  noneOf,
-  oneOf,
-  optionMaybe,
-  satisfy,
-  sepBy1,
-  spaces,
-  try,
-  (<?>),
-  (<|>),
- )
+import GHC.Stack
+import Text.Parsec
 import Text.TaggerQL.AST
 
 type Parser a = Parsec T.Text () a
@@ -74,6 +56,40 @@ newtype ParserState = S {isTopLevel :: Bool} deriving (Show, Eq)
 -- manyTermParser = sepBy1 termParser spaces
 
 {- |
+ Parse a 'Clause` which consists of an optional 'SetOp` literal
+ and any number of 'TermTree`s delimited by spaces.
+
+ Parses a clauses until another 'SetOp` parser, unescaped closing parenthesis '(', or eof.
+-}
+clauseParser :: Parser (Clause T.Text)
+clauseParser = do
+  so <- anyOpParser
+  spaces
+  terms <-
+    manyTill1
+      (do t <- termTreeParser; spaces; return t)
+      ( try
+          ( void unionOpParser
+              <|> void intersectOpParser
+              <|> void diffOpParser
+              <|> void queryCloseParser
+              <|> eof
+          )
+      )
+      <?> "at least one term in a Clause"
+  return $ Clause so (NE.fromList terms)
+
+manyTill1 ::
+  (Stream s m t, HasCallStack) =>
+  ParsecT s u m a ->
+  ParsecT s u m end ->
+  ParsecT s u m [a]
+manyTill1 p e = do
+  r <- manyTill p e
+  guard (not . null $ r) <?> "at least one result in manyTill1"
+  return r
+
+{- |
  Parse a complete 'TermTree` including any nested children.
 -}
 termTreeParser :: Parser (TermTree T.Text)
@@ -81,6 +97,9 @@ termTreeParser = do
   basis <- simpleTreeParser
   spaces
   predicates <- optionMaybe termTreeChildrenParser
+  when
+    (isJust predicates && (termCriteria . termTreeNode $ basis) == UntaggedCriteria)
+    (fail "Cannot use UntaggedCriteria literal \"U.\" with a subquery.")
   spaces
   return $ maybe basis (newPredicates basis) predicates
 
@@ -101,7 +120,7 @@ simpleTreeParser :: Parser (TermTree T.Text)
 simpleTreeParser = Simple <$> termParser
 
 {- |
- Parse a 'Term` from a 'QueryCritera` literal and text pattern.
+ Parse a 'Term` from a 'QueryCriteria` literal and text pattern.
 -}
 termParser :: Parser (Term T.Text)
 termParser = do
