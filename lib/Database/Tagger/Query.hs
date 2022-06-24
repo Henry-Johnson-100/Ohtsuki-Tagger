@@ -36,7 +36,9 @@ module Database.Tagger.Query (
 
   -- | Queries that search based on some attribute of a 'Descriptor` type.
   flatQueryForFileByTagDescriptor,
+  flatQueryForFileByTagDescriptorPattern,
   flatQueryForFileOnMetaRelation,
+  flatQueryForFileOnMetaRelationPattern,
   queryForFileBySubTagRelation,
 
   -- ** 'TaggedFile` and 'ConcreteTaggedFile` Queries
@@ -179,45 +181,53 @@ flatQueryForFileOnMetaRelation dk tc = queryNamed tc q [":metaDes" := dk]
  where
   q =
     [r|
-    WITH RECURSIVE infra_tree AS
-      (
-        SELECT
-          infraDescriptorId
-        FROM
-          MetaDescriptor
-        WHERE
-          metaDescriptorId = :metaDes
-        UNION
-        SELECT
-          md.infraDescriptorId
-        FROM
-          infra_tree ift
-        JOIN
-          MetaDescriptor md
-          ON
-            ift.infraDescriptorId = md.metaDescriptorId
-      )
+    WITH RECURSIVE rec (infraDescriptorId) AS (
+      SELECT :metaDes
+      UNION ALL
+      SELECT md.infraDescriptorId
+      FROM rec r
+      JOIN MetaDescriptor md
+        ON r.infraDescriptorId = md.metaDescriptorId
+    )
     SELECT
       f.id
       ,f.filePath
-    FROM
-      (
-        SELECT
-          :metaDes "infraDescriptorId"
-        UNION
-        SELECT
-          infraDescriptorId
-        FROM
-          infra_tree
-      ) ift
-      JOIN
-        Tag t
-        ON
-          ift.infraDescriptorId = t.descriptorId
-      JOIN
-        File f
-        ON
-          t.fileId = f.id
+    FROM rec r
+    JOIN Tag t
+      ON r.infraDescriptorId = t.descriptorId
+    JOIN File f
+      ON t.fileId = f.id
+    |]
+
+{- |
+ Like 'flatQueryForFileOnMetaRelation` but given a text pattern instead of 'RecordKey`
+
+ The text pattern can correspond to more than one 'Descriptor` and all infra
+ children of each 'Descriptor` will be returned.
+-}
+flatQueryForFileOnMetaRelationPattern :: T.Text -> TaggedConnection -> IO [File]
+flatQueryForFileOnMetaRelationPattern p tc = queryNamed tc q [":metaDesPattern" := p]
+ where
+  q =
+    [r|
+    WITH RECURSIVE rec(infraDescriptorId) AS (
+      SELECT id
+      FROM Descriptor
+      WHERE descriptor LIKE :metaDesPattern
+      UNION ALL
+      SELECT md.infraDescriptorId
+      FROM rec r
+      JOIN MetaDescriptor md
+        ON r.infraDescriptorId = md.metaDescriptorId
+    )
+    SELECT
+      f.id
+      ,f.filePath
+    FROM rec r
+    JOIN Tag t
+      ON r.infraDescriptorId = t.descriptorId
+    JOIN File f
+      ON t.fileId = f.id
     |]
 
 {- |
@@ -251,6 +261,37 @@ queryForFileBySubTagRelation superK subK tc =
     WHERE
       t.descriptorId = ?
       AND t1.descriptorId = ?
+    |]
+
+{- |
+ Return a set of all 'File`s that have a 'Tag` where the 'Descriptor` matches
+ the given pattern.
+
+ Previous implementations did something like this:
+
+ @
+  \\p -> do $
+    ds <- queryForDescriptorByPattern p
+    fmap concat . mapM (flatQueryForFileByTagDescriptor . descriptorId) $ ds
+ @
+
+ This query is more efficient and handles all of that in one SQL query, but may return
+   some duplicates.
+-}
+flatQueryForFileByTagDescriptorPattern :: T.Text -> TaggedConnection -> IO [File]
+flatQueryForFileByTagDescriptorPattern p tc = query tc q [p]
+ where
+  q =
+    [r|
+    SELECT
+      f.id
+      ,f.filePath
+    FROM Tag t
+    JOIN Descriptor d
+      ON t.descriptorId = d.id
+    JOIN File f
+      ON t.fileId = f.id
+    WHERE d.descriptor LIKE ?
     |]
 
 {- |
@@ -543,34 +584,20 @@ getAllInfra rk tc =
  where
   q =
     [r|
-    WITH RECURSIVE all_infra_tree AS
-      (
-        SELECT
-          infraDescriptorId
-        FROM
-          MetaDescriptor
-        WHERE
-          metaDescriptorId = :metaDes
-        UNION
-        SELECT
-          md.infraDescriptorId
-        FROM all_infra_tree ait
-          JOIN MetaDescriptor md
-            ON ait.infraDescriptorId = md.metaDescriptorId
-      )
+    WITH RECURSIVE rec(infraDescriptorId) AS (
+      SELECT :metaDes
+      UNION ALL
+      SELECT md.infraDescriptorId
+      FROM rec r
+      JOIN MetaDescriptor md
+        ON r.infraDescriptorId = md.metaDescriptorId
+    )
     SELECT
       d.id
       ,d.descriptor
-    FROM (
-      SELECT
-        :metaDes "infraDescriptorId"
-      UNION
-      SELECT
-        infraDescriptorId
-      FROM all_infra_tree
-    ) ait
-      JOIN Descriptor d
-        ON ait.infraDescriptorId = d.id
+    FROM rec r
+    JOIN Descriptor d
+      ON r.infraDescriptorId = d.id
     |]
 
 {- |
