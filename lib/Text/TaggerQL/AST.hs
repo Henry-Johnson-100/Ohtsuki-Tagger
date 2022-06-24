@@ -11,68 +11,49 @@ Maintainer  : monawasensei@gmail.com
 module Text.TaggerQL.AST (
   Request (..),
   Sentence (..),
+  Clause (..),
+  TermTree (..),
   Term (..),
-  formatRequest,
+  newPredicates,
+  nestPredicate,
 ) where
 
-import qualified Data.List as L
+import qualified Data.List.NonEmpty as N
 import Data.Tagger (QueryCriteria (..), SetOp (..))
 
-{- |
- A collection of 'Sentence`s.
-
- A 'Request` is a whole TaggerQL query.
--}
 newtype Request a = Request [Sentence a] deriving (Show, Eq, Functor)
 
-{- |
- A collection of 'Term`s.
--}
-newtype Sentence a = Sentence [Term a] deriving (Show, Eq, Functor)
+data Sentence a = (Clause a) :| (Sentence a) deriving (Show, Eq, Functor)
 
-{- |
- The smallest valid unit of a TaggerQL query.
+data Clause a = Clause SetOp (TermTree a) deriving (Show, Eq, Functor)
 
- It may have a predicate in addition to its basis if the term is a subquery.
-
- Most complex searches can be desugared into a list of terms.
--}
-data Term a = Term
-  { -- | How to combine this 'Term` with other results.
-    termSetOperation :: SetOp
-  , -- | How to search with this 'Term`
-    termCriteria :: QueryCriteria
-  , -- | The pattern with which to search.
-    termBasis :: a
-  , -- | The predicate that modifies the search, such as searching for subtags.
-    termPredicate :: [Term a]
-  }
+data TermTree a
+  = Simple (Term a)
+  | Term a :+ (N.NonEmpty (TermTree a))
   deriving (Show, Eq, Functor)
 
+data Term a = Term QueryCriteria a deriving (Show, Eq, Functor)
+
 {- |
- Pretty-print a 'Request`
+ Given a 'TermTree` and a list of trees, insert them as new branches
+ immediately under the given node and to the right of any existing predicates.
 -}
-formatRequest :: Show a => Request a -> String
-formatRequest (Request sentences) =
-  "Request\n" ++ (L.intercalate "\n" . map (formatSentence 1) $ sentences)
+newPredicates :: TermTree a -> [TermTree a] -> TermTree a
+newPredicates basis [] = basis
+newPredicates basis ts =
+  case basis of
+    Simple t -> t :+ N.fromList ts
+    t :+ ps -> t :+ N.fromList (N.toList ps ++ ts)
 
-formatSentence :: Show a => Int -> Sentence a -> String
-formatSentence indentLevel (Sentence terms) =
-  concat (replicate indentLevel "  ")
-    ++ "Sentence\n"
-    ++ (L.intercalate "\n" . map (formatTerm (indentLevel + 1)) $ terms)
-
-formatTerm :: Show a => Int -> Term a -> String
-formatTerm indentLevel (Term so qc b ps) =
-  concat (replicate indentLevel "  ")
-    ++ formatSetOp so
-    ++ formatCriteria qc
-    ++ show b
-    ++ ( if null ps
-          then ""
-          else "\n"
-       )
-    ++ (L.intercalate "\n" . map (formatTerm (indentLevel + 1)) $ ps)
+{- |
+ For the first given 'TermTree`, nest the second given tree at the bottom of its
+ right-most child.
+-}
+nestPredicate :: TermTree a -> TermTree a -> TermTree a
+nestPredicate basis nest =
+  case basis of
+    Simple t -> t :+ (nest N.:| [])
+    t :+ ps -> t :+ N.fromList (N.init ps ++ [nestPredicate (N.last ps) nest])
 
 formatCriteria :: QueryCriteria -> String
 formatCriteria qc =

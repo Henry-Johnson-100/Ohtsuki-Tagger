@@ -5,17 +5,22 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Text.TaggerQL.Parser.Internal (
-  requestParser,
-  sentenceParser,
-  manyTermParser,
+  termTreeParser,
+  termTreeChildrenParser,
+  simpleTreeParser,
   termParser,
-  subQueryParser,
-  termPartialParser,
 ) where
+
+-- requestParser,
+-- sentenceParser,
+-- manyTermParser,
+-- termParser,
+-- subQueryParser,
+-- termPartialParser,
 
 import Control.Monad (void)
 import Data.Char (toLower)
-import Data.Maybe (fromMaybe)
+
 import Data.Tagger (QueryCriteria (..), SetOp (..))
 import qualified Data.Text as T
 import Text.Parsec (
@@ -34,11 +39,7 @@ import Text.Parsec (
   (<?>),
   (<|>),
  )
-import Text.TaggerQL.AST (
-  Request (..),
-  Sentence (..),
-  Term (Term, termPredicate),
- )
+import Text.TaggerQL.AST
 
 type Parser a = Parsec T.Text () a
 
@@ -46,70 +47,67 @@ type QueryCriteriaLiteralParser = Parser QueryCriteria
 
 type SetOpParser = Parser SetOp
 
-type TermParser = Parser (Term T.Text)
-
-type SentenceParser = Parser (Sentence T.Text)
-
-type RequestParser = Parser (Request T.Text)
-
 newtype ParserState = S {isTopLevel :: Bool} deriving (Show, Eq)
 
-{- |
- Parses many 'Sentence`s to form a whole 'Request`.
--}
-requestParser :: RequestParser
-requestParser = Request <$> many1 sentenceParser
+-- {- |
+--  Parses many 'Sentence`s to form a whole 'Request`.
+-- -}
+-- requestParser :: RequestParser
+-- requestParser = Request <$> many1 sentenceParser
+
+-- {- |
+--  Parses a 'Sentence` from many 'Term`s.
+
+--  Optionally wrapped in ().
+-- -}
+-- sentenceParser :: SentenceParser
+-- sentenceParser = do
+--   maybeParen <- optionMaybe queryOpenParser
+--   terms <- manyTermParser
+--   maybe (pure ()) (const queryCloseParser) maybeParen
+--   return $ Sentence terms
+
+-- {- |
+--  Parse one or more 'Term`s separated by 0 or more spaces.
+-- -}
+-- manyTermParser :: Parser [Term T.Text]
+-- manyTermParser = sepBy1 termParser spaces
 
 {- |
- Parses a 'Sentence` from many 'Term`s.
-
- Optionally wrapped in ().
+ Parse a complete 'TermTree` including any nested children.
 -}
-sentenceParser :: SentenceParser
-sentenceParser = do
-  maybeParen <- optionMaybe queryOpenParser
-  terms <- manyTermParser
-  maybe (pure ()) (const queryCloseParser) maybeParen
-  return $ Sentence terms
-
-{- |
- Parse one or more 'Term`s separated by 0 or more spaces.
--}
-manyTermParser :: Parser [Term T.Text]
-manyTermParser = sepBy1 termParser spaces
-
-{- |
- Parse a 'Term` from a partial 'Term` and an optional subquery
- to determine the predicates.
--}
-termParser :: TermParser
-termParser = do
-  partialTerm <- termPartialParser
+termTreeParser :: Parser (TermTree T.Text)
+termTreeParser = do
+  basis <- simpleTreeParser
   spaces
-  predicates <- optionMaybe subQueryParser
+  predicates <- optionMaybe termTreeChildrenParser
   spaces
-  return $ partialTerm{termPredicate = fromMaybe [] predicates}
+  return $ maybe basis (newPredicates basis) predicates
 
 {- |
- Parses 'Term`s wrapped in {} to form predicates for this parser's caller.
+ Parse all 'TermTree`s inside of a given subclause surrounded by {}
 -}
-subQueryParser :: Parser [Term T.Text]
-subQueryParser = do
+termTreeChildrenParser :: Parser [TermTree T.Text]
+termTreeChildrenParser = do
   subClauseScopeOpenParser
-  terms <- sepBy1 termParser spaces
+  t <- sepBy1 termTreeParser spaces
   subClauseScopeCloseParser
-  return terms
+  return t
 
 {- |
- Parses a partial 'Term`, a term with no predicates by default.
+ Parse a 'TermTree` without checking for children.
 -}
-termPartialParser :: TermParser
-termPartialParser = do
-  so <- anyOpParser
-  spaces
+simpleTreeParser :: Parser (TermTree T.Text)
+simpleTreeParser = Simple <$> termParser
+
+{- |
+ Parse a 'Term` from a 'QueryCritera` literal and text pattern.
+-}
+termParser :: Parser (Term T.Text)
+termParser = do
   qc <- anyCriteriaLiteralParser
   p <- acceptablePatternParser
-  return $ Term so qc p []
+  return $ Term qc p
 
 anyOpParser :: SetOpParser
 anyOpParser =
