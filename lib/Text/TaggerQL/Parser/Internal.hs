@@ -5,21 +5,21 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Text.TaggerQL.Parser.Internal (
-  clauseParser,
+  combinableSentenceParser,
+  sentenceParser,
+  combinableTermParser,
   termTreeParser,
   termTreeChildrenParser,
-  simpleTreeParser,
+  noRelationTreeParser,
   termParser,
 ) where
 
-import Control.Monad (guard, void, when)
+import Control.Monad (void, when)
 import Data.Char (toLower)
 
-import qualified Data.List.NonEmpty as NE
 import Data.Maybe
 import Data.Tagger (QueryCriteria (..), SetOp (..))
 import qualified Data.Text as T
-import GHC.Stack
 import Text.Parsec
 import Text.TaggerQL.AST
 
@@ -29,72 +29,57 @@ type QueryCriteriaLiteralParser = Parser QueryCriteria
 
 type SetOpParser = Parser SetOp
 
-newtype ParserState = S {isTopLevel :: Bool} deriving (Show, Eq)
-
 -- {- |
 --  Parses many 'Sentence`s to form a whole 'Request`.
 -- -}
 -- requestParser :: RequestParser
 -- requestParser = Request <$> many1 sentenceParser
 
--- {- |
---  Parses a 'Sentence` from many 'Term`s.
-
---  Optionally wrapped in ().
--- -}
--- sentenceParser :: SentenceParser
--- sentenceParser = do
---   maybeParen <- optionMaybe queryOpenParser
---   terms <- manyTermParser
---   maybe (pure ()) (const queryCloseParser) maybeParen
---   return $ Sentence terms
-
--- {- |
---  Parse one or more 'Term`s separated by 0 or more spaces.
--- -}
--- manyTermParser :: Parser [Term T.Text]
--- manyTermParser = sepBy1 termParser spaces
+combinableSentenceParser :: Parser (CombinableSentence T.Text)
+combinableSentenceParser = do
+  maybeSOWithParen <-
+    optionMaybe
+      ( do
+          so <- explicitOpParser <|> pure Intersect
+          spaces
+          queryOpenParser
+          return so
+      )
+  s <- sentenceParser
+  so <- maybe (pure Intersect) (\so' -> queryCloseParser >> return so') maybeSOWithParen
+  return $ CombinableSentence so s
 
 {- |
- Parse a 'Clause` which consists of an optional 'SetOp` literal
- and any number of 'TermTree`s delimited by spaces.
-
- Parses a clauses until another 'SetOp` parser, unescaped closing parenthesis '(', or eof.
+ Parse a 'Sentence` of space-delimited 'CombinableTerm`s, optionally wrapped in
+  parentheses.
 -}
-clauseParser :: Parser (Clause T.Text)
-clauseParser = do
-  so <- anyOpParser
-  spaces
-  terms <-
-    manyTill1
-      (do t <- termTreeParser; spaces; return t)
-      ( try
-          ( void unionOpParser
-              <|> void intersectOpParser
-              <|> void diffOpParser
-              <|> void queryCloseParser
-              <|> eof
-          )
-      )
-      <?> "at least one term in a Clause"
-  return $ Clause so (NE.fromList terms)
+sentenceParser :: Parser (Sentence T.Text)
+sentenceParser = do
+  cts <- sepBy1 combinableTermParser spaces
+  return $ Sentence cts
 
-manyTill1 ::
-  (Stream s m t, HasCallStack) =>
-  ParsecT s u m a ->
-  ParsecT s u m end ->
-  ParsecT s u m [a]
-manyTill1 p e = do
-  r <- manyTill p e
-  guard (not . null $ r) <?> "at least one result in manyTill1"
-  return r
+{- |
+ Parse a 'CombinableTerm` which consists of an optional 'SetOp` literal
+ and a single 'TermTree`. The 'SetOp` has a default value of 'Intersect` if none
+  are parsed.
+-}
+combinableTermParser :: Parser (CombinableTerm T.Text)
+combinableTermParser = do
+  so <- explicitOpParser <|> pure Intersect
+  spaces
+  term <- termTreeParser True
+  return $ CombinableTerm so term
 
 {- |
  Parse a complete 'TermTree` including any nested children.
 -}
-termTreeParser :: Parser (TermTree T.Text)
-termTreeParser = do
-  basis <- simpleTreeParser
+termTreeParser ::
+  -- | 'True` if the 'TermTree` is top-level.
+  --This determines if simple 'Terms` are 'Simple` or 'Bottom`
+  Bool ->
+  Parser (TermTree T.Text)
+termTreeParser isTopLevel = do
+  basis <- noRelationTreeParser isTopLevel
   spaces
   predicates <- optionMaybe termTreeChildrenParser
   when
@@ -109,15 +94,20 @@ termTreeParser = do
 termTreeChildrenParser :: Parser [TermTree T.Text]
 termTreeChildrenParser = do
   subClauseScopeOpenParser
-  t <- sepBy1 termTreeParser spaces
+  t <- sepBy1 (termTreeParser False) spaces
   subClauseScopeCloseParser
   return t
 
 {- |
  Parse a 'TermTree` without checking for children.
 -}
-simpleTreeParser :: Parser (TermTree T.Text)
-simpleTreeParser = Simple <$> termParser
+noRelationTreeParser :: Bool -> Parser (TermTree T.Text)
+noRelationTreeParser isTopLevel =
+  if isTopLevel
+    then Simple <$> termParser
+    else Bottom <$> termParser
+
+-- Simple <$> termParser
 
 {- |
  Parse a 'Term` from a 'QueryCriteria` literal and text pattern.
@@ -128,9 +118,11 @@ termParser = do
   p <- acceptablePatternParser
   return $ Term qc p
 
-anyOpParser :: SetOpParser
-anyOpParser =
-  (choice . map try $ [unionOpParser, intersectOpParser, diffOpParser]) <|> return Intersect
+{- |
+ Parses a 'SetOp` literal or nothing.
+-}
+explicitOpParser :: SetOpParser
+explicitOpParser = choice . map try $ [unionOpParser, intersectOpParser, diffOpParser]
 
 unionOpParser :: SetOpParser
 unionOpParser = ichar 'u' >> ichar '|' >> return Union
@@ -162,7 +154,7 @@ anyCriteriaLiteralParser =
       , untaggedCriteriaLiteralParser
       ]
   )
-    <|> pure DescriptorCriteria
+    <|> pure MetaDescriptorCriteria
 
 descriptorCriteriaLiteralParser :: QueryCriteriaLiteralParser
 descriptorCriteriaLiteralParser = ichar 'd' >> ichar '.' >> return DescriptorCriteria

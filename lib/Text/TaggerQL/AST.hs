@@ -9,28 +9,48 @@ License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL.AST (
-  Request (..),
+  CombinableSentence (..),
   Sentence (..),
-  Clause (..),
+  CombinableTerm (..),
   TermTree (..),
   Term (..),
   termTreeNode,
+  termTreeChildren,
   newPredicates,
-  nestPredicate,
 ) where
 
 import qualified Data.List.NonEmpty as N
 import Data.Tagger (QueryCriteria (..), SetOp (..))
 
-newtype Request a = Request [Sentence a] deriving (Show, Eq, Functor)
+data CombinableSentence a = CombinableSentence
+  { combinableSentenceSetOp :: SetOp
+  , combinableSentence :: Sentence a
+  }
+  deriving (Show, Eq, Functor)
 
-data Sentence a = (Clause a) :| (Sentence a) deriving (Show, Eq, Functor)
+{- |
+ A complete TaggerQL query.
+-}
+newtype Sentence a = Sentence [CombinableTerm a]
+  deriving (Show, Eq, Functor)
 
-data Clause a = Clause SetOp (N.NonEmpty (TermTree a)) deriving (Show, Eq, Functor)
+{- |
+ A single 'TermTree` with a 'SetOp` to tell how the contents of a tree are
+ to be combined with other trees.
+-}
+data CombinableTerm a = CombinableTerm
+  { combinableTermSetOp :: SetOp
+  , combinableTerm :: TermTree a
+  }
+  deriving (Show, Eq, Functor)
 
 data TermTree a
-  = Simple (Term a)
-  | Term a :+ (N.NonEmpty (TermTree a))
+  = -- | Top level terms with no relations
+    Simple (Term a)
+  | -- | The last term in a relation.
+    Bottom (Term a)
+  | -- | A term with an arbitrary number of relations, all terminated by Bottom
+    Term a :<- (N.NonEmpty (TermTree a))
   deriving (Show, Eq, Functor)
 
 data Term a = Term {termCriteria :: QueryCriteria, termPattern :: a}
@@ -43,7 +63,15 @@ termTreeNode :: TermTree a -> Term a
 termTreeNode b =
   case b of
     Simple t -> t
-    t :+ _ -> t
+    Bottom t -> t
+    t :<- _ -> t
+
+{- |
+ Returns the children of a given node, can be empty in the case of Simple terms.
+-}
+termTreeChildren :: TermTree a -> [TermTree a]
+termTreeChildren (_ :<- ps) = N.toList ps
+termTreeChildren _ = []
 
 {- |
  Given a 'TermTree` and a list of trees, insert them as new branches
@@ -53,18 +81,9 @@ newPredicates :: TermTree a -> [TermTree a] -> TermTree a
 newPredicates basis [] = basis
 newPredicates basis ts =
   case basis of
-    Simple t -> t :+ N.fromList ts
-    t :+ ps -> t :+ N.fromList (N.toList ps ++ ts)
-
-{- |
- For the first given 'TermTree`, nest the second given tree at the bottom of its
- right-most child.
--}
-nestPredicate :: TermTree a -> TermTree a -> TermTree a
-nestPredicate basis nest =
-  case basis of
-    Simple t -> t :+ (nest N.:| [])
-    t :+ ps -> t :+ N.fromList (N.init ps ++ [nestPredicate (N.last ps) nest])
+    Simple t -> t :<- N.fromList ts
+    Bottom t -> t :<- N.fromList ts
+    t :<- ps -> t :<- N.fromList (N.toList ps ++ ts)
 
 formatCriteria :: QueryCriteria -> String
 formatCriteria qc =
