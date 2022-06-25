@@ -9,9 +9,9 @@ License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL.AST (
+  Request (..),
   CombinableSentence (..),
   Sentence (..),
-  CombinableTerm (..),
   TermTree (..),
   Term (..),
   termTreeNode,
@@ -22,6 +22,8 @@ module Text.TaggerQL.AST (
 import qualified Data.List.NonEmpty as N
 import Data.Tagger (QueryCriteria (..), SetOp (..))
 
+newtype Request a = Request [CombinableSentence a] deriving (Show, Eq, Functor)
+
 data CombinableSentence a = CombinableSentence
   { combinableSentenceSetOp :: SetOp
   , combinableSentence :: Sentence a
@@ -31,17 +33,7 @@ data CombinableSentence a = CombinableSentence
 {- |
  A complete TaggerQL query.
 -}
-newtype Sentence a = Sentence [CombinableTerm a]
-  deriving (Show, Eq, Functor)
-
-{- |
- A single 'TermTree` with a 'SetOp` to tell how the contents of a tree are
- to be combined with other trees.
--}
-data CombinableTerm a = CombinableTerm
-  { combinableTermSetOp :: SetOp
-  , combinableTerm :: TermTree a
-  }
+newtype Sentence a = Sentence [TermTree a]
   deriving (Show, Eq, Functor)
 
 data TermTree a

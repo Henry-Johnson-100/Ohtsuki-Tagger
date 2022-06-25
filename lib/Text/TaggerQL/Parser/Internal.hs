@@ -7,7 +7,6 @@
 module Text.TaggerQL.Parser.Internal (
   combinableSentenceParser,
   sentenceParser,
-  combinableTermParser,
   termTreeParser,
   termTreeChildrenParser,
   noRelationTreeParser,
@@ -23,6 +22,8 @@ import qualified Data.Text as T
 import Text.Parsec
 import Text.TaggerQL.AST
 
+newtype Token a = Token {getToken :: a} deriving (Show, Eq)
+
 type Parser a = Parsec T.Text () a
 
 type QueryCriteriaLiteralParser = Parser QueryCriteria
@@ -35,40 +36,26 @@ type SetOpParser = Parser SetOp
 -- requestParser :: RequestParser
 -- requestParser = Request <$> many1 sentenceParser
 
+requestParser :: Parser (Request T.Text)
+requestParser = do
+  spaces
+  r <- Request <$> many1 combinableSentenceParser
+  spaces
+  return r
+
 combinableSentenceParser :: Parser (CombinableSentence T.Text)
 combinableSentenceParser = do
-  maybeSOWithParen <-
-    optionMaybe
-      ( do
-          so <- explicitOpParser <|> pure Intersect
-          spaces
-          queryOpenParser
-          return so
-      )
-  s <- sentenceParser
-  so <- maybe (pure Intersect) (\so' -> queryCloseParser >> return so') maybeSOWithParen
-  return $ CombinableSentence so s
-
-{- |
- Parse a 'Sentence` of space-delimited 'CombinableTerm`s, optionally wrapped in
-  parentheses.
--}
-sentenceParser :: Parser (Sentence T.Text)
-sentenceParser = do
-  cts <- sepBy1 combinableTermParser spaces
-  return $ Sentence cts
-
-{- |
- Parse a 'CombinableTerm` which consists of an optional 'SetOp` literal
- and a single 'TermTree`. The 'SetOp` has a default value of 'Intersect` if none
-  are parsed.
--}
-combinableTermParser :: Parser (CombinableTerm T.Text)
-combinableTermParser = do
   so <- explicitOpParser <|> pure Intersect
   spaces
-  term <- termTreeParser True
-  return $ CombinableTerm so term
+  maybeParen <- optionMaybe queryOpenParser
+  s <- sentenceParser
+  maybe (pure ()) (const queryCloseParser) maybeParen
+  return $ CombinableSentence so s
+
+sentenceParser :: Parser (Sentence T.Text)
+sentenceParser = do
+  cts <- sepBy1 (try $ termTreeParser True) spaces
+  return $ Sentence cts
 
 {- |
  Parse a complete 'TermTree` including any nested children.
@@ -116,7 +103,7 @@ termParser :: Parser (Term T.Text)
 termParser = do
   qc <- anyCriteriaLiteralParser
   p <- acceptablePatternParser
-  return $ Term qc p
+  return . Term qc . getToken $ p
 
 {- |
  Parses a 'SetOp` literal or nothing.
@@ -175,27 +162,100 @@ untaggedCriteriaLiteralParser = ichar 'u' >> ichar '.' >> return UntaggedCriteri
 ichar :: Stream s m Char => Char -> ParsecT s u m Char
 ichar c = satisfy (\c' -> toLower c == toLower c')
 
-acceptablePatternParser :: Parser T.Text
 acceptablePatternParser =
-  (fmap T.pack . many1 $ acceptableCharParser)
+  (fmap (Token . T.pack) . many1 $ acceptableCharParser)
     <?> ( "an acceptable pattern of characters not in the set, '"
-            ++ disallowedChars
+            ++ charRequiringEscape
             ++ "' or any of those characters with an escape char, \\, before it."
         )
 
-acceptableCharParser :: Parser Char
-acceptableCharParser =
-  ( try
-      ( do
-          void $ ichar '\\'
-          oneOf disallowedChars
+{- |
+ * Can contain any non white-space chars
+ * Can contain any escaped chars
+ * Stops parsing at reserved tokens and does not consume them
+-}
+newPatternParser =
+  Token . T.pack
+    <$> manyTill1
+      anyChar
+      ( lookAhead $
+          choice
+            ( try
+                <$> [ void . many1 $ space
+                    , void queryCriteriaLiteralReservedToken
+                    , void setOpLiteralReservedToken
+                    , eof
+                    ]
+            )
       )
-      <|> ichar '\\'
-  )
-    <|> notDisallowedChars
+
+-- anyEscapedCharParser :: Parser T.Text
+-- anyEscapedCharParser = () <|> (T.pack <$> anyChar)
+
+manyTill1 ::
+  Stream s m t =>
+  ParsecT s u m a ->
+  ParsecT s u m end ->
+  ParsecT s u m [a]
+manyTill1 p e = do
+  r <- manyTill p e
+  when (null r) (fail "") <?> "one or more tokens in manyTill1"
+  return r
+
+queryCriteriaLiteralReservedToken :: Parser (Token QueryCriteria)
+queryCriteriaLiteralReservedToken =
+  Token
+    <$> choice
+      ( try
+          <$> [ descriptorCriteriaLiteralParser
+              , metaDescriptorCriteriaLiteralParser
+              , filePatternCriteriaLiteralParser
+              , untaggedCriteriaLiteralParser
+              ]
+      )
+
+setOpLiteralReservedToken :: Parser (Token SetOp)
+setOpLiteralReservedToken =
+  Token
+    <$> choice
+      ( try
+          <$> [ unionOpParser
+              , intersectOpParser
+              , diffOpParser
+              ]
+      )
+
+acceptableCharParser :: Parser Char
+acceptableCharParser = do
+  c <-
+    ( try
+        ( do
+            void $ ichar '\\'
+            oneOf charRequiringEscape
+        )
+        <|> ichar '\\'
+      )
+      <|> notDisallowedChars
+  when (c `elem` ("ud" :: String)) (notFollowedBy (ichar '|' <|> ichar '.'))
+  when (c `elem` ("rp" :: String)) (notFollowedBy $ ichar '.')
+  when (c == 'i') (notFollowedBy $ ichar '|')
+  return c
 
 notDisallowedChars :: Parser Char
-notDisallowedChars = noneOf disallowedChars
+notDisallowedChars = noneOf charRequiringEscape
 
-disallowedChars :: [Char]
-disallowedChars = "{}()| \r\t\n"
+charRequiringEscape :: [Char]
+charRequiringEscape = "{}().| \t\n\r"
+
+reservedTokenParser :: Parser ()
+reservedTokenParser =
+  choice $
+    try
+      <$> [ void descriptorCriteriaLiteralParser
+          , void metaDescriptorCriteriaLiteralParser
+          , void filePatternCriteriaLiteralParser
+          , void untaggedCriteriaLiteralParser
+          , void unionOpParser
+          , void intersectOpParser
+          , void diffOpParser
+          ]
