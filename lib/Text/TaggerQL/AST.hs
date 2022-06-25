@@ -23,8 +23,24 @@ module Text.TaggerQL.AST (
 import qualified Data.List.NonEmpty as N
 import Data.Tagger (QueryCriteria (..), SetOp (..))
 
-newtype Request a = Request [CombinableSentence a] deriving (Show, Eq, Functor)
+{- |
+ A newtype wrapper for a list of 'CombinableSentence`s.
 
+ The 'Request` type is the final and most complete representation of a TaggerQL query.
+ It essentially consists of a recursive list of queries, all represented in the
+ 'Request` type as the terminal parent of them all.
+-}
+newtype Request a = Request {request :: [CombinableSentence a]}
+  deriving (Show, Eq, Functor)
+
+{- |
+ A tree of 'Sentences` and a 'SetOp` to describe how to combine them.
+
+ All 'CombinableSentence`s terminate in a 'SimpleCombinableSentence` eventually.
+
+ The fields are meant to be accessed primarily with pattern matching as the query engine
+ must interpret the constructors differently.
+-}
 data CombinableSentence a
   = SimpleCombinableSentence SetOp (Sentence a)
   | ComplexCombinableSentence SetOp [CombinableSentence a]
@@ -34,16 +50,10 @@ combinableSentenceSetOp :: CombinableSentence a -> SetOp
 combinableSentenceSetOp (SimpleCombinableSentence s _) = s
 combinableSentenceSetOp (ComplexCombinableSentence s _) = s
 
--- data CombinableSentence a = CombinableSentence
---   { combinableSentenceSetOp :: SetOp
---   , combinableSentence :: Sentence a
---   }
---   deriving (Show, Eq, Functor)
-
 {- |
  A complete TaggerQL query.
 -}
-newtype Sentence a = Sentence [TermTree a]
+newtype Sentence a = Sentence {sentence :: [TermTree a]}
   deriving (Show, Eq, Functor)
 
 data TermTree a
@@ -87,17 +97,17 @@ newPredicates basis ts =
     Bottom t -> t :<- N.fromList ts
     t :<- ps -> t :<- N.fromList (N.toList ps ++ ts)
 
-formatCriteria :: QueryCriteria -> String
-formatCriteria qc =
-  case qc of
-    DescriptorCriteria -> "D."
-    MetaDescriptorCriteria -> "R."
-    FilePatternCriteria -> "P."
-    UntaggedCriteria -> "U."
+-- formatCriteria :: QueryCriteria -> String
+-- formatCriteria qc =
+--   case qc of
+--     DescriptorCriteria -> "D."
+--     MetaDescriptorCriteria -> "R."
+--     FilePatternCriteria -> "P."
+--     UntaggedCriteria -> "U."
 
-formatSetOp :: SetOp -> String
-formatSetOp so =
-  case so of
-    Union -> "U| "
-    Intersect -> "I| "
-    Difference -> "D| "
+-- formatSetOp :: SetOp -> String
+-- formatSetOp so =
+--   case so of
+--     Union -> "U| "
+--     Intersect -> "I| "
+--     Difference -> "D| "
