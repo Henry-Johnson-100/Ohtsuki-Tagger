@@ -36,21 +36,42 @@ type SetOpParser = Parser SetOp
 -- requestParser :: RequestParser
 -- requestParser = Request <$> many1 sentenceParser
 
-requestParser :: Parser (Request T.Text)
-requestParser = do
-  spaces
-  r <- Request <$> many1 combinableSentenceParser
-  spaces
-  return r
+-- requestParser :: Parser (Request T.Text)
+-- requestParser = do
+--   spaces
+--   r <- Request <$> many1 combinableSentenceParser
+--   spaces
+--   return r
+
+-- combinableSentenceParser :: Parser (CombinableSentence T.Text)
+-- combinableSentenceParser = do
+--   so <- explicitOpParser <|> pure Intersect
+--   spaces
+--   maybeParen <- optionMaybe queryOpenParser
+--   s <- sentenceParser
+--   maybe (pure ()) (const queryCloseParser) maybeParen
+--   return $ CombinableSentence so s
 
 combinableSentenceParser :: Parser (CombinableSentence T.Text)
-combinableSentenceParser = do
-  so <- explicitOpParser <|> pure Intersect
+combinableSentenceParser =
+  try complexCombinableSentenceParser
+    <|> simpleCombinableSentenceParser
+
+complexCombinableSentenceParser :: Parser (CombinableSentence T.Text)
+complexCombinableSentenceParser = do
+  so <- explicitOpParser
   spaces
-  maybeParen <- optionMaybe queryOpenParser
+  queryOpenParser
+  cs <- sepBy1 combinableSentenceParser spaces
+  queryCloseParser
+  return $ ComplexCombinableSentence so cs
+
+simpleCombinableSentenceParser :: Parser (CombinableSentence T.Text)
+simpleCombinableSentenceParser = do
+  so <- explicitOpParser <|> pure Union
+  spaces
   s <- sentenceParser
-  maybe (pure ()) (const queryCloseParser) maybeParen
-  return $ CombinableSentence so s
+  return $ SimpleCombinableSentence so s
 
 sentenceParser :: Parser (Sentence T.Text)
 sentenceParser = do

@@ -14,6 +14,7 @@ module Text.TaggerQL.AST (
   Sentence (..),
   TermTree (..),
   Term (..),
+  combinableSentenceSetOp,
   termTreeNode,
   termTreeChildren,
   newPredicates,
@@ -24,11 +25,20 @@ import Data.Tagger (QueryCriteria (..), SetOp (..))
 
 newtype Request a = Request [CombinableSentence a] deriving (Show, Eq, Functor)
 
-data CombinableSentence a = CombinableSentence
-  { combinableSentenceSetOp :: SetOp
-  , combinableSentence :: Sentence a
-  }
+data CombinableSentence a
+  = SimpleCombinableSentence SetOp (Sentence a)
+  | ComplexCombinableSentence SetOp [CombinableSentence a]
   deriving (Show, Eq, Functor)
+
+combinableSentenceSetOp :: CombinableSentence a -> SetOp
+combinableSentenceSetOp (SimpleCombinableSentence s _) = s
+combinableSentenceSetOp (ComplexCombinableSentence s _) = s
+
+-- data CombinableSentence a = CombinableSentence
+--   { combinableSentenceSetOp :: SetOp
+--   , combinableSentence :: Sentence a
+--   }
+--   deriving (Show, Eq, Functor)
 
 {- |
  A complete TaggerQL query.
