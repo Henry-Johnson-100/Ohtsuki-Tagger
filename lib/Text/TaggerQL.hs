@@ -10,24 +10,105 @@ License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL (
-  runTaggerQL,
+  CombinableSentenceResult,
+  combinableSentenceResultSetOp,
+  combinableSentenceResultSet,
+  runRequest,
+  queryRequest,
 ) where
 
 import qualified Data.HashSet as HashSet
 import Data.Hashable
+import qualified Data.List as L
 import qualified Data.List.NonEmpty as NE
 import Data.Tagger
 import qualified Data.Text as T
 import Database.Tagger
 import Text.TaggerQL.AST
 
-data TermResult = TermResult SetOp (HashSet.HashSet File) deriving (Show, Eq)
+data CombinableSentenceResult
+  = CombinableSentenceResult SetOp (HashSet.HashSet File)
+  deriving (Show, Eq)
+
+combinableSentenceResultSetOp :: CombinableSentenceResult -> SetOp
+combinableSentenceResultSetOp (CombinableSentenceResult so _) = so
+
+combinableSentenceResultSet :: CombinableSentenceResult -> HashSet.HashSet File
+combinableSentenceResultSet (CombinableSentenceResult _ s) = s
+
+newtype TermResult = TermResult (HashSet.HashSet File) deriving (Show, Eq)
+
+newtype SimpleTerm = SimpleTerm (TermTree T.Text)
+  deriving (Show, Eq)
+
+newtype TermTag = TermTag (TermTree T.Text) deriving (Show, Eq)
+
+newtype TermSubTag = TermSubTag (TermTree T.Text) deriving (Show, Eq)
+
+runRequest ::
+  TaggedConnection ->
+  Request T.Text ->
+  IO (HashSet.HashSet File)
+runRequest tc r = combinableSentenceResultSet <$> queryRequest tc r
+
+queryRequest ::
+  TaggedConnection ->
+  Request T.Text ->
+  IO CombinableSentenceResult
+queryRequest tc (Request cs) = combineSentences <$> mapM (queryCombinableSentence tc) cs
+
+combineSentences :: [CombinableSentenceResult] -> CombinableSentenceResult
+combineSentences [] = emptyCombinableSentenceResult
+combineSentences cs = L.foldl1' combineSentence cs
 
 {- |
- Given a TaggerQL query, produce a set of the 'File`s it corresponds to.
+ Return an empty result with a default 'SetOp` of Union.
 -}
-runTaggerQL :: T.Text -> TaggedConnection -> IO (HashSet.HashSet File)
-runTaggerQL = undefined
+emptyCombinableSentenceResult :: CombinableSentenceResult
+emptyCombinableSentenceResult = undefined
+
+{- |
+ Left-associative combination of the results of a combinable sentence query.
+-}
+combineSentence ::
+  CombinableSentenceResult ->
+  CombinableSentenceResult ->
+  CombinableSentenceResult
+combineSentence x y = undefined
+
+queryCombinableSentence ::
+  TaggedConnection ->
+  CombinableSentence T.Text ->
+  IO CombinableSentenceResult
+queryCombinableSentence tc cs = undefined
+
+querySentence ::
+  TaggedConnection ->
+  Sentence T.Text ->
+  IO TermResult
+querySentence tc s = undefined
+
+queryTermTree ::
+  TaggedConnection ->
+  TermTree T.Text ->
+  IO TermResult
+queryTermTree tc tt = undefined
+
+queryTermRelation ::
+  TaggedConnection ->
+  TermTag ->
+  TermSubTag ->
+  IO TermResult
+queryTermRelation
+  tc
+  (TermTag t)
+  (TermSubTag st) = undefined
+
+querySimpleTerm ::
+  TaggedConnection ->
+  SimpleTerm ->
+  IO TermResult
+querySimpleTerm tc (SimpleTerm tt) = undefined
 
 combFun ::
   Hashable a =>
@@ -40,69 +121,3 @@ combFun so =
     Union -> HashSet.union
     Intersect -> HashSet.intersection
     Difference -> HashSet.difference
-
--- foldTermResults :: NE.NonEmpty TermResult -> TermResult
--- foldTermResults (t NE.:| []) = t
--- foldTermResults (t NE.:| (t' : ts)) = foldTermResults (combineTermResults t t' NE.:| ts)
-
--- desugarTerm :: Term T.Text -> [DesugaredTerm T.Text]
--- desugarTerm t@(Term so qc b ps) =
---   case ps of
---     [] -> []
---     _ ->
---       let removePredicates t' = t'{termPredicate = []}
---           basisPreds =
---             map
---               (Term so qc b . (: []) . removePredicates)
---               ps
---           desugaredPreds = map unsugar . concat $ map desugarTerm ps
---        in DesugaredTerm <$> (basisPreds ++ desugaredPreds)
-
--- {- |
---  A right-associative combination of the results of a TaggerQL query.
-
---  Preserves the left-most 'SetOp` but consumes the right-most.
--- -}
--- combineTermResults :: TermResult -> TermResult -> TermResult
--- combineTermResults (TermResult sox tx) (TermResult soy ty) =
---   TermResult sox $ combFun soy tx ty
-
--- queryTerm :: TaggedConnection -> Term T.Text -> IO TermResult
--- queryTerm tc t@(Term _ _ _ predicates) =
---   if null predicates
---     then queryNullPredicateTerm tc . DesugaredTerm $ t
---     else queryWithPredicates tc t
-
--- queryWithPredicates :: TaggedConnection -> Term T.Text -> IO TermResult
--- queryWithPredicates tc (Term so qc t predicates) = undefined
-
--- {- |
---  Dispatch a basis and predicate pattern to the appropriate query based on the
---  'QueryCriteria` of both.
--- -}
--- getSubQueryType ::
---   QueryCriteria ->
---   QueryCriteria ->
---   T.Text ->
---   T.Text ->
---   TaggedConnection ->
---   IO (HashSet.HashSet File)
--- getSubQueryType bc pc bp pp tc = undefined
-
--- queryNullPredicateTerm :: TaggedConnection -> DesugaredTerm T.Text -> IO TermResult
--- queryNullPredicateTerm tc (DesugaredTerm (Term so qc t _)) =
---   case qc of
---     DescriptorCriteria ->
---       TermResult so . HashSet.fromList
---         <$> flatQueryForFileByTagDescriptorPattern t tc
---     MetaDescriptorCriteria -> do
---       ds <- queryForDescriptorByPattern t tc
---       results <-
---         HashSet.fromList
---           <$> mapMConcat (flip flatQueryForFileOnMetaRelation tc . descriptorId) ds
---       return $ TermResult so results
---     FilePatternCriteria -> TermResult so . HashSet.fromList <$> queryForFileByPattern t tc
---     UntaggedCriteria -> TermResult so . HashSet.fromList <$> queryForUntaggedFiles tc
-
--- mapMConcat :: (Traversable t, Monad f) => (a1 -> f [a2]) -> t a1 -> f [a2]
--- mapMConcat f = fmap concat . mapM f
