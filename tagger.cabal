@@ -121,6 +121,7 @@ library tagger-lib
                       ,QuasiQuotes
                       ,TupleSections
                       ,FlexibleContexts
+                      ,ViewPatterns
 
   hs-source-dirs:      lib
 
