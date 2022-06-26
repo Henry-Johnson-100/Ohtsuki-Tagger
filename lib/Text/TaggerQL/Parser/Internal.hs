@@ -9,9 +9,9 @@ module Text.TaggerQL.Parser.Internal (
   requestParser,
   combinableSentenceParser,
   sentenceParser,
-  termTreeParser,
-  termTreeChildrenParser,
-  noRelationTreeParser,
+  complexTermParser,
+  complexTermChildrenParser,
+  bottomTermParser,
   termParser,
 
   -- * Additional
@@ -47,15 +47,7 @@ import Text.Parsec (
   (<?>),
   (<|>),
  )
-import Text.TaggerQL.AST (
-  CombinableSentence (..),
-  Request (..),
-  Sentence (..),
-  Term (Term, termCriteria),
-  TermTree (Bottom, Simple),
-  newPredicates,
-  termTreeNode,
- )
+import Text.TaggerQL.AST
 
 type Parser a = Parsec T.Text () a
 
@@ -130,48 +122,48 @@ simpleCombinableSentenceParser = do
 
 {- |
  Parses 1 or more 'TermTree`s that are separated by spaces.
+
+ This parser parses a list of 'ComplexTerm`s and lifts them to a 'TermTree` before
+ mapping over the list and calling 'simplifyTermTree` to convert all of the top-level
+ 'Bottom`s to 'SimpleTerm`s.
 -}
 sentenceParser :: Parser (Sentence T.Text)
 sentenceParser = do
-  cts <- sepBy1 (try $ termTreeParser True) spaces
-  return $ Sentence cts
+  cts <- map (simplifyTermTree . Complex) <$> sepBy1 (try complexTermParser) spaces
+  return . Sentence $ cts
 
 {- |
- Parse a complete 'TermTree` including any nested children.
+ Parse a 'ComplexTerm` with 0 or more nested 'ComplexTerm` predicates.
+
+ Defaults to a 'Bottom` if there are no predicates.
 -}
-termTreeParser ::
-  -- | 'True` if the 'TermTree` is top-level.
-  --This determines if simple 'Terms` are 'Simple` or 'Bottom`
-  Bool ->
-  Parser (TermTree T.Text)
-termTreeParser isTopLevel = do
-  basis <- noRelationTreeParser isTopLevel
+complexTermParser :: Parser (ComplexTerm T.Text)
+complexTermParser = do
+  basis <- bottomTermParser
   spaces
-  predicates <- optionMaybe termTreeChildrenParser
+  predicates <- optionMaybe complexTermChildrenParser
   when
-    (isJust predicates && (termCriteria . termTreeNode $ basis) == UntaggedCriteria)
+    (isJust predicates && (termCriteria . complexTermNode $ basis) == UntaggedCriteria)
     (fail "Cannot use UntaggedCriteria literal \"U.\" with a subquery.")
   spaces
-  return $ maybe basis (newPredicates basis) predicates
+  let node = maybe basis (newPredicates basis) predicates
+  return node
 
 {- |
- Parse all 'TermTree`s inside of a given subclause surrounded by {}
+ Parse all 'ComplexTerm`s inside of a given subclause surrounded by {}
 -}
-termTreeChildrenParser :: Parser [TermTree T.Text]
-termTreeChildrenParser = do
+complexTermChildrenParser :: Parser [ComplexTerm T.Text]
+complexTermChildrenParser = do
   subClauseScopeOpenParser
-  t <- sepBy1 (termTreeParser False) spaces
+  t <- sepBy1 complexTermParser spaces
   subClauseScopeCloseParser
   return t
 
 {- |
- Parse a 'TermTree` without checking for children.
+ Parse a 'Term` and return it as 'Bottom`.
 -}
-noRelationTreeParser :: Bool -> Parser (TermTree T.Text)
-noRelationTreeParser isTopLevel =
-  if isTopLevel
-    then Simple <$> termParser
-    else Bottom <$> termParser
+bottomTermParser :: Parser (ComplexTerm T.Text)
+bottomTermParser = Bottom <$> termParser
 
 {- |
  Parse a 'Term` from a 'QueryCriteria` literal and text pattern.

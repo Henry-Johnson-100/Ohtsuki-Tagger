@@ -13,8 +13,8 @@ module Text.TaggerQL (
   CombinableSentenceResult,
   combinableSentenceResultSetOp,
   combinableSentenceResultSet,
-  runRequest,
-  queryRequest,
+  -- runRequest,
+  -- queryRequest,
 ) where
 
 import Control.Monad.Trans.Class
@@ -50,89 +50,89 @@ newtype TermTag = TermTag (Term T.Text) deriving (Show, Eq)
 
 newtype TermSubTag = TermSubTag (TermTree T.Text) deriving (Show, Eq)
 
-runRequest ::
-  TaggedConnection ->
-  Request T.Text ->
-  IO (HashSet.HashSet File)
-runRequest tc r = combinableSentenceResultSet <$> queryRequest tc r
+-- runRequest ::
+--   TaggedConnection ->
+--   Request T.Text ->
+--   IO (HashSet.HashSet File)
+-- runRequest tc r = combinableSentenceResultSet <$> queryRequest tc r
 
-queryRequest ::
-  TaggedConnection ->
-  Request T.Text ->
-  IO CombinableSentenceResult
-queryRequest tc (Request cs) = combineSentences <$> mapM (queryCombinableSentence tc) cs
+-- queryRequest ::
+--   TaggedConnection ->
+--   Request T.Text ->
+--   IO CombinableSentenceResult
+-- queryRequest tc (Request cs) = combineSentences <$> mapM (queryCombinableSentence tc) cs
 
-queryCombinableSentence ::
-  TaggedConnection ->
-  CombinableSentence T.Text ->
-  IO CombinableSentenceResult
-queryCombinableSentence tc cs = undefined
+-- queryCombinableSentence ::
+--   TaggedConnection ->
+--   CombinableSentence T.Text ->
+--   IO CombinableSentenceResult
+-- queryCombinableSentence tc cs = undefined
 
-querySentence ::
-  TaggedConnection ->
-  Sentence T.Text ->
-  IO TermResult
-querySentence tc (Sentence tts) =
-  intersectTermResults . catMaybes <$> mapM (runMaybeT . queryTermTree tc) tts
+-- querySentence ::
+--   TaggedConnection ->
+--   Sentence T.Text ->
+--   IO TermResult
+-- querySentence tc (Sentence tts) =
+--   intersectTermResults . catMaybes <$> mapM (runMaybeT . queryTermTree tc) tts
 
-{- |
- Return 'Nothing` if the given tree is 'Bottom`,
- that way, these terms can be filtered before combination instead of trying to do things
- like intersect an empty bottom set.
--}
-queryTermTree ::
-  TaggedConnection ->
-  TermTree T.Text ->
-  MaybeT IO TermResult
-queryTermTree tc tt =
-  case tt of
-    Simple t -> lift . querySimpleTerm tc . SimpleTerm $ t
-    Bottom _ -> hoistMaybe Nothing
-    t :<- ts ->
-      intersectTermResults
-        . NE.toList
-        <$> (lift . mapM (queryTermRelation tc (TermTag t) . TermSubTag) $ ts)
+-- {- |
+--  Return 'Nothing` if the given tree is 'Bottom`,
+--  that way, these terms can be filtered before combination instead of trying to do things
+--  like intersect an empty bottom set.
+-- -}
+-- queryTermTree ::
+--   TaggedConnection ->
+--   TermTree T.Text ->
+--   MaybeT IO TermResult
+-- queryTermTree tc tt =
+--   case tt of
+--     Simple t -> lift . querySimpleTerm tc . SimpleTerm $ t
+--     Bottom _ -> hoistMaybe Nothing
+--     t :<- ts ->
+--       intersectTermResults
+--         . NE.toList
+--         <$> (lift . mapM (queryTermRelation tc (TermTag t) . TermSubTag) $ ts)
 
-queryTermRelation ::
-  TaggedConnection ->
-  TermTag ->
-  TermSubTag ->
-  IO TermResult
-queryTermRelation
-  tc
-  (TermTag term)
-  (TermSubTag subTagTermTree) =
-    case subTagTermTree of
-      -- This should never happen, it throws an error instead of being the same as
-      -- the Bottom case because it may signify a failure in TaggerQL querying logic
-      -- or a problem with the parser.
-      Simple _ -> error "Got a Simple term when Bottom or :<- was expected."
-      Bottom subTagTerm -> queryFlatTermRelation tc term subTagTerm
-      subTagTerm :<- subSubTagTermTrees -> undefined
+-- queryTermRelation ::
+--   TaggedConnection ->
+--   TermTag ->
+--   TermSubTag ->
+--   IO TermResult
+-- queryTermRelation
+--   tc
+--   (TermTag term)
+--   (TermSubTag subTagTermTree) =
+--     case subTagTermTree of
+--       -- This should never happen, it throws an error instead of being the same as
+--       -- the Bottom case because it may signify a failure in TaggerQL querying logic
+--       -- or a problem with the parser.
+--       Simple _ -> error "Got a Simple term when Bottom or :<- was expected."
+--       Bottom subTagTerm -> queryFlatTermRelation tc term subTagTerm
+--       subTagTerm :<- subSubTagTermTrees -> undefined
 
-queryFlatTermRelation ::
-  TaggedConnection ->
-  -- | The Tag to search for.
-  Term T.Text ->
-  -- | The Subtag that modifies the Tag.
-  Term T.Text ->
-  IO TermResult
-queryFlatTermRelation tc tt st = undefined
+-- queryFlatTermRelation ::
+--   TaggedConnection ->
+--   -- | The Tag to search for.
+--   Term T.Text ->
+--   -- | The Subtag that modifies the Tag.
+--   Term T.Text ->
+--   IO TermResult
+-- queryFlatTermRelation tc tt st = undefined
 
-querySimpleTerm ::
-  TaggedConnection ->
-  SimpleTerm ->
-  IO TermResult
-querySimpleTerm tc (SimpleTerm (Term qc p)) =
-  case qc of
-    DescriptorCriteria ->
-      TermResult . HS.fromList <$> flatQueryForFileByTagDescriptorPattern p tc
-    MetaDescriptorCriteria ->
-      TermResult . HS.fromList <$> flatQueryForFileOnMetaRelationPattern p tc
-    FilePatternCriteria ->
-      TermResult . HS.fromList <$> queryForFileByPattern p tc
-    UntaggedCriteria ->
-      TermResult . HS.fromList <$> queryForUntaggedFiles tc
+-- querySimpleTerm ::
+--   TaggedConnection ->
+--   SimpleTerm ->
+--   IO TermResult
+-- querySimpleTerm tc (SimpleTerm (Term qc p)) =
+--   case qc of
+--     DescriptorCriteria ->
+--       TermResult . HS.fromList <$> flatQueryForFileByTagDescriptorPattern p tc
+--     MetaDescriptorCriteria ->
+--       TermResult . HS.fromList <$> flatQueryForFileOnMetaRelationPattern p tc
+--     FilePatternCriteria ->
+--       TermResult . HS.fromList <$> queryForFileByPattern p tc
+--     UntaggedCriteria ->
+--       TermResult . HS.fromList <$> queryForUntaggedFiles tc
 
 {- |
  Should perform an associative strict intersection of the given 'TermResult`s.
