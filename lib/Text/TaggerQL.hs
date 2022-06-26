@@ -43,55 +43,84 @@ combinableSentenceResultSet (CombinableSentenceResult _ s) = s
 
 newtype TermResult = TermResult {termResult :: HashSet.HashSet File} deriving (Show, Eq)
 
-newtype SimpleTerm = SimpleTerm (Term T.Text)
-  deriving (Show, Eq)
-
 newtype TermTag = TermTag (Term T.Text) deriving (Show, Eq)
 
 newtype TermSubTag = TermSubTag (TermTree T.Text) deriving (Show, Eq)
 
--- runRequest ::
---   TaggedConnection ->
---   Request T.Text ->
---   IO (HashSet.HashSet File)
--- runRequest tc r = combinableSentenceResultSet <$> queryRequest tc r
+runRequest ::
+  TaggedConnection ->
+  Request T.Text ->
+  IO (HashSet.HashSet File)
+runRequest tc r = combinableSentenceResultSet <$> queryRequest tc r
 
--- queryRequest ::
---   TaggedConnection ->
---   Request T.Text ->
---   IO CombinableSentenceResult
--- queryRequest tc (Request cs) = combineSentences <$> mapM (queryCombinableSentence tc) cs
+queryRequest ::
+  TaggedConnection ->
+  Request T.Text ->
+  IO CombinableSentenceResult
+queryRequest tc (Request cs) =
+  combineSentences <$> mapM (queryCombinableSentence tc) cs
 
--- queryCombinableSentence ::
---   TaggedConnection ->
---   CombinableSentence T.Text ->
---   IO CombinableSentenceResult
--- queryCombinableSentence tc cs = undefined
+queryCombinableSentence ::
+  TaggedConnection ->
+  CombinableSentence T.Text ->
+  IO CombinableSentenceResult
+queryCombinableSentence tc cs = undefined
 
--- querySentence ::
---   TaggedConnection ->
---   Sentence T.Text ->
---   IO TermResult
--- querySentence tc (Sentence tts) =
---   intersectTermResults . catMaybes <$> mapM (runMaybeT . queryTermTree tc) tts
+{- |
+ All 'TermTree`s in a 'Sentence` are intersected with each other.
+-}
+querySentence ::
+  TaggedConnection ->
+  Sentence T.Text ->
+  IO TermResult
+querySentence tc (Sentence tts) =
+  intersectTermResults
+    . catMaybes
+    <$> mapM (runMaybeT . queryTermTree tc) tts
 
--- {- |
---  Return 'Nothing` if the given tree is 'Bottom`,
---  that way, these terms can be filtered before combination instead of trying to do things
---  like intersect an empty bottom set.
--- -}
--- queryTermTree ::
---   TaggedConnection ->
---   TermTree T.Text ->
---   MaybeT IO TermResult
--- queryTermTree tc tt =
---   case tt of
---     Simple t -> lift . querySimpleTerm tc . SimpleTerm $ t
---     Bottom _ -> hoistMaybe Nothing
---     t :<- ts ->
---       intersectTermResults
---         . NE.toList
---         <$> (lift . mapM (queryTermRelation tc (TermTag t) . TermSubTag) $ ts)
+{- |
+ Return 'Nothing` if the given 'TermTree` is Complex and Bottom.
+-}
+queryTermTree ::
+  TaggedConnection ->
+  TermTree T.Text ->
+  MaybeT IO TermResult
+queryTermTree tc tt =
+  case tt of
+    Simple st -> lift $ querySimpleTerm tc st
+    Complex ct -> queryComplexTerm tc ct
+
+queryComplexTerm ::
+  TaggedConnection ->
+  ComplexTerm T.Text ->
+  MaybeT IO TermResult
+queryComplexTerm tc ct =
+  case ct of
+    Bottom _ -> hoistMaybe Nothing
+    t :<- nct -> undefined
+
+querySimpleTerm ::
+  TaggedConnection ->
+  SimpleTerm T.Text ->
+  IO TermResult
+querySimpleTerm tc (SimpleTerm (Term qc p)) =
+  case qc of
+    DescriptorCriteria ->
+      TermResult . HS.fromList <$> flatQueryForFileByTagDescriptorPattern p tc
+    MetaDescriptorCriteria ->
+      TermResult . HS.fromList <$> flatQueryForFileOnMetaRelationPattern p tc
+    FilePatternCriteria ->
+      TermResult . HS.fromList <$> queryForFileByPattern p tc
+    UntaggedCriteria ->
+      TermResult . HS.fromList <$> queryForUntaggedFiles tc
+
+-- case tt of
+--   Simple t -> lift . querySimpleTerm tc . SimpleTerm $ t
+--   Bottom _ -> hoistMaybe Nothing
+--   t :<- ts ->
+--     intersectTermResults
+--       . NE.toList
+--       <$> (lift . mapM (queryTermRelation tc (TermTag t) . TermSubTag) $ ts)
 
 -- queryTermRelation ::
 --   TaggedConnection ->
@@ -118,21 +147,6 @@ newtype TermSubTag = TermSubTag (TermTree T.Text) deriving (Show, Eq)
 --   Term T.Text ->
 --   IO TermResult
 -- queryFlatTermRelation tc tt st = undefined
-
--- querySimpleTerm ::
---   TaggedConnection ->
---   SimpleTerm ->
---   IO TermResult
--- querySimpleTerm tc (SimpleTerm (Term qc p)) =
---   case qc of
---     DescriptorCriteria ->
---       TermResult . HS.fromList <$> flatQueryForFileByTagDescriptorPattern p tc
---     MetaDescriptorCriteria ->
---       TermResult . HS.fromList <$> flatQueryForFileOnMetaRelationPattern p tc
---     FilePatternCriteria ->
---       TermResult . HS.fromList <$> queryForFileByPattern p tc
---     UntaggedCriteria ->
---       TermResult . HS.fromList <$> queryForUntaggedFiles tc
 
 {- |
  Should perform an associative strict intersection of the given 'TermResult`s.
