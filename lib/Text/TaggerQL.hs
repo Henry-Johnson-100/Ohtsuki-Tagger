@@ -43,10 +43,10 @@ combinableSentenceResultSet (CombinableSentenceResult _ s) = s
 
 newtype TermResult = TermResult {termResult :: HashSet.HashSet File} deriving (Show, Eq)
 
-newtype SimpleTerm = SimpleTerm (TermTree T.Text)
+newtype SimpleTerm = SimpleTerm (Term T.Text)
   deriving (Show, Eq)
 
-newtype TermTag = TermTag (TermTree T.Text) deriving (Show, Eq)
+newtype TermTag = TermTag (Term T.Text) deriving (Show, Eq)
 
 newtype TermSubTag = TermSubTag (TermTree T.Text) deriving (Show, Eq)
 
@@ -86,9 +86,12 @@ queryTermTree ::
   MaybeT IO TermResult
 queryTermTree tc tt =
   case tt of
-    Simple _ -> lift . querySimpleTerm tc . SimpleTerm $ tt
+    Simple t -> lift . querySimpleTerm tc . SimpleTerm $ t
     Bottom _ -> hoistMaybe Nothing
-    t :<- ts -> lift undefined
+    t :<- ts ->
+      intersectTermResults
+        . NE.toList
+        <$> (lift . mapM (queryTermRelation tc (TermTag t) . TermSubTag) $ ts)
 
 queryTermRelation ::
   TaggedConnection ->
@@ -97,14 +100,30 @@ queryTermRelation ::
   IO TermResult
 queryTermRelation
   tc
-  (TermTag t)
-  (TermSubTag st) = undefined
+  (TermTag term)
+  (TermSubTag subTagTermTree) =
+    case subTagTermTree of
+      -- This should never happen, it throws an error instead of being the same as
+      -- the Bottom case because it may signify a failure in TaggerQL querying logic
+      -- or a problem with the parser.
+      Simple _ -> error "Got a Simple term when Bottom or :<- was expected."
+      Bottom subTagTerm -> queryFlatTermRelation tc term subTagTerm
+      subTagTerm :<- subSubTagTermTrees -> undefined
+
+queryFlatTermRelation ::
+  TaggedConnection ->
+  -- | The Tag to search for.
+  Term T.Text ->
+  -- | The Subtag that modifies the Tag.
+  Term T.Text ->
+  IO TermResult
+queryFlatTermRelation tc tt st = undefined
 
 querySimpleTerm ::
   TaggedConnection ->
   SimpleTerm ->
   IO TermResult
-querySimpleTerm tc (SimpleTerm (termTreeNode -> Term qc p)) =
+querySimpleTerm tc (SimpleTerm (Term qc p)) =
   case qc of
     DescriptorCriteria ->
       TermResult . HS.fromList <$> flatQueryForFileByTagDescriptorPattern p tc
@@ -120,7 +139,10 @@ querySimpleTerm tc (SimpleTerm (termTreeNode -> Term qc p)) =
 -}
 intersectTermResults :: [TermResult] -> TermResult
 intersectTermResults [] = emptyTermResult
-intersectTermResults trs = TermResult . L.foldl1' HS.intersection . map termResult $ trs
+intersectTermResults trs = L.foldl1' intersectTermResult trs
+
+intersectTermResult :: TermResult -> TermResult -> TermResult
+intersectTermResult (TermResult x) (TermResult y) = TermResult $ HS.intersection x y
 
 combineSentences :: [CombinableSentenceResult] -> CombinableSentenceResult
 combineSentences [] = emptyCombinableSentenceResult
