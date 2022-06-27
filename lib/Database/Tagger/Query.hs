@@ -48,6 +48,7 @@ module Database.Tagger.Query (
   queryForFileByDescriptorSubTagMetaDescriptor,
   queryForFileByFilePatternAndDescriptor,
   queryForFileByFilePatternAndMetaDescriptor,
+  queryForFileByMetaDescriptorSubTagDescriptor,
 
   -- ** 'TaggedFile` and 'ConcreteTaggedFile` Queries
 
@@ -417,6 +418,74 @@ queryForFileByDescriptorSubTagMetaDescriptor dp stdp tc =
       ON st.descriptorId = d.id
     WHERE d.descriptor LIKE :desPattern ESCAPE '\'
       AND it.descriptorId IN rec_des
+    |]
+
+{- |
+ Given two patterns to match on 'Descriptor`s, find all files that
+ are tagged with any 'Descriptor` infra to the first and subtagged by any
+ 'Descriptor` matched by the second.
+-}
+queryForFileByMetaDescriptorSubTagDescriptor ::
+  T.Text ->
+  T.Text ->
+  TaggedConnection ->
+  IO [File]
+queryForFileByMetaDescriptorSubTagDescriptor mdp dp tc =
+  queryNamed tc q [":metaDesPattern" := mdp, ":subDesPattern" := dp]
+ where
+  q =
+    [r|
+    WITH joined_tags(id,fileId,descriptorId,subTagOfId) AS (
+      WITH super_tags(id, fileId, descriptorId, subTagOfId) AS (
+        WITH RECURSIVE super_meta_descriptors(id) AS (
+          SELECT id
+          FROM Descriptor
+          WHERE descriptor LIKE :metaDesPattern ESCAPE '\'
+          UNION
+          SELECT md.infraDescriptorId
+          FROM super_meta_descriptors smd
+          JOIN MetaDescriptor md
+            ON smd.id = md.metaDescriptorId
+        )
+        SELECT
+          t.id
+          ,t.fileId
+          ,t.descriptorId
+          ,t.subTagOfId
+        FROM Tag t
+        JOIN super_meta_descriptors smd
+          ON t.descriptorId = smd.id
+      ),
+      sub_tags(id,fileId,descriptorId,subTagOfId) AS (
+        WITH sub_descriptors(id) AS (
+          SELECT id
+          FROM Descriptor
+          WHERE descriptor LIKE :subDesPattern ESCAPE '\'
+        )
+        SELECT
+          t.id
+          ,t.fileId
+          ,t.descriptorId
+          ,t.subTagOfId
+        FROM Tag t
+        JOIN sub_descriptors sd
+          ON t.descriptorId = sd.id
+      )
+      SELECT   
+        sup.id
+        ,sup.fileId
+        ,sup.descriptorId
+        ,sup.subTagOfId
+      FROM super_tags sup
+      JOIN sub_tags st
+        ON sup.id = st.subTagOfId
+    )
+    SELECT
+      f.id
+      ,f.filePath
+    FROM joined_tags jt
+    JOIN File f
+      ON jt.fileId = f.id
     |]
 
 {- |
