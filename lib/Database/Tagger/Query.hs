@@ -31,6 +31,8 @@ module Database.Tagger.Query (
   -- | Queries that search based on some attribute of a 'File` type.
   queryForFileByPattern,
   queryForSingleFileByFileId,
+  queryForFileByFilePatternAndFilePattern,
+  queryForFileByFilePatternAndUntagged,
 
   -- *** On 'Descriptor`
 
@@ -41,6 +43,8 @@ module Database.Tagger.Query (
   flatQueryForFileOnMetaRelationPattern,
   queryForFileByDescriptorSubTagDescriptor,
   queryForFileByDescriptorSubTagMetaDescriptor,
+  queryForFileByFilePatternAndDescriptor,
+  queryForFileByFilePatternAndMetaDescriptor,
 
   -- ** 'TaggedFile` and 'ConcreteTaggedFile` Queries
 
@@ -151,6 +155,49 @@ queryForSingleFileByFileId rk tc = do
         WHERE
           id = ?
       |]
+
+{- |
+ Given two file patterns, find 'File`s whose paths match both.
+-}
+queryForFileByFilePatternAndFilePattern ::
+  T.Text ->
+  T.Text ->
+  TaggedConnection ->
+  IO [File]
+queryForFileByFilePatternAndFilePattern fpx fpy tc =
+  query tc q (fpx, fpy)
+ where
+  q =
+    [r|
+    SELECT
+      id
+      ,filePath
+    FROM File
+    WHERE filePath LIKE ? ESCAPE '\'
+      AND filePath LIKE ? ESCAPE '\'
+    |]
+
+{- |
+ Query for 'File`s whose paths match the given pattern and have no 'Tag`s.
+-}
+queryForFileByFilePatternAndUntagged ::
+  T.Text ->
+  TaggedConnection ->
+  IO [File]
+queryForFileByFilePatternAndUntagged p tc =
+  query tc q [p]
+ where
+  q =
+    [r|
+    SELECT
+      f.id
+      ,f.filePath
+    FROM File f
+    LEFT JOIN Tag t
+      ON f.id = t.fileId
+    WHERE f.filePath LIKE ? ESCAPE '\'
+      AND t.fileId IS NULL
+    |]
 
 {- |
  A flat search, meaning that any 'Descriptor` that tags an image will be searched,
@@ -296,6 +343,69 @@ queryForFileByDescriptorSubTagMetaDescriptor dp stdp tc =
       ON st.descriptorId = d.id
     WHERE d.descriptor LIKE :desPattern ESCAPE '\'
       AND it.descriptorId IN rec_des
+    |]
+
+{- |
+ Return a set of 'File`s that have the first given pattern in their file paths
+ and are tagged with 'Descriptor`s like the second given pattern.
+
+ Synonymous with intersecting a file pattern query and a flat descriptor query.
+-}
+queryForFileByFilePatternAndDescriptor ::
+  T.Text ->
+  T.Text ->
+  TaggedConnection ->
+  IO [File]
+queryForFileByFilePatternAndDescriptor fp dp tc =
+  queryNamed tc q [":filePattern" := fp, ":desPattern" := dp]
+ where
+  q =
+    [r|
+    SELECT
+      f.id
+      ,f.filePath
+    FROM Tag t
+    JOIN Descriptor d
+      ON t.descriptorId = d.id
+    JOIN File f
+      ON t.fileId = f.id
+    WHERE f.filePath LIKE :filePattern ESCAPE '\'
+      AND d.descriptor LIKE :desPattern ESCAPE '\'
+    |]
+
+{- |
+ Return a set of 'File`s that match the first given pattern and are tagged by
+ any 'Descriptor` that is infra from 'Descriptor`s that match the second given pattern.
+-}
+queryForFileByFilePatternAndMetaDescriptor ::
+  T.Text ->
+  T.Text ->
+  TaggedConnection ->
+  IO [File]
+queryForFileByFilePatternAndMetaDescriptor fp dp tc =
+  queryNamed tc q [":filePattern" := fp, ":desPattern" := dp]
+ where
+  q =
+    [r|
+    WITH RECURSIVE rec_tree(id) AS (
+      SELECT id
+      FROM Descriptor
+      WHERE descriptor LIKE :desPattern ESCAPE '\'
+      UNION
+      SELECT md.infraDescriptorId
+      FROM rec_tree rt
+      JOIN MetaDescriptor md
+        ON rt.id = md.metaDescriptorId
+    )
+    SELECT
+      f.id
+      ,f.filePath
+    FROM rec_tree rt
+    JOIN Tag t
+      ON rt.id = t.descriptorId
+    JOIN File f
+      ON t.fileId = f.id
+    WHERE f.filePath LIKE :filePattern ESCAPE '\'
     |]
 
 {- |

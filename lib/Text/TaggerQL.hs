@@ -106,26 +106,53 @@ queryComplexTermRelation ::
   MaybeT IO TermResult
 queryComplexTermRelation
   tc
-  (TermTag (Term tqc tp))
-  (TermSubTag (Term sqc sp)) =
+  (TermTag (Term tqc basisPattern))
+  (TermSubTag (Term sqc subQueryPattern)) =
     case (tqc, sqc) of
       (DescriptorCriteria, DescriptorCriteria) ->
         lift $
           TermResult . HS.fromList
-            <$> queryForFileByDescriptorSubTagDescriptor tp sp tc
+            <$> queryForFileByDescriptorSubTagDescriptor basisPattern subQueryPattern tc
       (DescriptorCriteria, MetaDescriptorCriteria) ->
         lift $
           TermResult . HS.fromList
-            <$> queryForFileByDescriptorSubTagMetaDescriptor tp sp tc
-      (DescriptorCriteria, FilePatternCriteria) -> undefined
+            <$> queryForFileByDescriptorSubTagMetaDescriptor
+              basisPattern
+              subQueryPattern
+              tc
+      -- flipped case of (FilePatternCriteria, DescriptorCriteria)
+      (DescriptorCriteria, FilePatternCriteria) ->
+        lift $
+          TermResult . HS.fromList
+            <$> queryForFileByFilePatternAndDescriptor subQueryPattern basisPattern tc
       (MetaDescriptorCriteria, DescriptorCriteria) -> undefined
       (MetaDescriptorCriteria, MetaDescriptorCriteria) -> undefined
-      (MetaDescriptorCriteria, FilePatternCriteria) -> undefined
-      (FilePatternCriteria, DescriptorCriteria) -> undefined
-      (FilePatternCriteria, MetaDescriptorCriteria) -> undefined
-      (FilePatternCriteria, FilePatternCriteria) -> undefined
-      (FilePatternCriteria, UntaggedCriteria) -> undefined
-      (UntaggedCriteria, FilePatternCriteria) -> undefined
+      -- flipped case of (FilePatternCriteria, MetaDescriptorCriteria)
+      (MetaDescriptorCriteria, FilePatternCriteria) ->
+        lift $
+          TermResult . HS.fromList
+            <$> queryForFileByFilePatternAndMetaDescriptor subQueryPattern basisPattern tc
+      (FilePatternCriteria, DescriptorCriteria) ->
+        lift $
+          TermResult . HS.fromList
+            <$> queryForFileByFilePatternAndDescriptor basisPattern subQueryPattern tc
+      (FilePatternCriteria, MetaDescriptorCriteria) ->
+        lift $
+          TermResult . HS.fromList
+            <$> queryForFileByFilePatternAndMetaDescriptor basisPattern subQueryPattern tc
+      (FilePatternCriteria, FilePatternCriteria) ->
+        lift $
+          TermResult . HS.fromList
+            <$> queryForFileByFilePatternAndFilePattern basisPattern subQueryPattern tc
+      (FilePatternCriteria, UntaggedCriteria) ->
+        lift $
+          TermResult . HS.fromList
+            <$> queryForFileByFilePatternAndUntagged basisPattern tc
+      -- flipped case of (FilePatternCriteria, UntaggedCriteria)
+      (UntaggedCriteria, FilePatternCriteria) ->
+        lift $
+          TermResult . HS.fromList
+            <$> queryForFileByFilePatternAndUntagged subQueryPattern tc
       (UntaggedCriteria, _) -> hoistMaybe Nothing
       (_, UntaggedCriteria) -> hoistMaybe Nothing
 
