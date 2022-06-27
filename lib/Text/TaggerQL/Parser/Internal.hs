@@ -7,7 +7,7 @@
 module Text.TaggerQL.Parser.Internal (
   -- * Parsers
   requestParser,
-  combinableSentenceParser,
+  sentenceTreeParser,
   sentenceParser,
   complexTermParser,
   complexTermChildrenParser,
@@ -84,41 +84,44 @@ TaggerQL's representation of its constructors as literals are as follows:
 -}
 
 {- |
- Parse many 'CombinableSentence`s and store them in a list.
+ Parse many 'SentenceTree`s and store them in a list.
 
- 'CombinableSentences` will later be subject to querying and a left-associative fold
+ 'SentenceTree`s will later be subject to querying and a left-associative fold
  to combine their results, so order of sentences in this parser is important.
 -}
 requestParser :: Parser (Request T.Text)
-requestParser = Request <$> between spaces spaces (many1 combinableSentenceParser)
+requestParser = Request <$> between spaces spaces (many1 sentenceTreeParser)
 
 {- |
- Parse a 'CombinableSentence` which either:
+ Parse a 'SentenceTree` which is either:
 
  * A 'Sentence` preceded by an optional 'SetOp` literal, defaults to 'Union`
- * An explicit 'SetOp` literal and 1 or more 'CombinableSentence`s wrapped in ().
- The 'CombinableSentence` parser is recursive and can nest arbitrary amounts of times.
+ * An explicit 'SetOp` literal and 1 or more 'SentenceTree`s wrapped in ().
+ The 'SentenceTree` parser is recursive and can nest arbitrary amounts of times.
 -}
-combinableSentenceParser :: Parser (CombinableSentence T.Text)
-combinableSentenceParser =
-  try complexCombinableSentenceParser
-    <|> simpleCombinableSentenceParser
+sentenceTreeParser :: Parser (SentenceTree T.Text)
+sentenceTreeParser =
+  try sentenceTreeBranchParser
+    <|> sentenceTreeNodeParser
 
-complexCombinableSentenceParser :: Parser (CombinableSentence T.Text)
-complexCombinableSentenceParser = do
+sentenceTreeBranchParser :: Parser (SentenceTree T.Text)
+sentenceTreeBranchParser = do
   so <- explicitOpParser
   spaces
   queryOpenParser
-  cs <- sepBy1 combinableSentenceParser spaces
+  cs <- sepBy1 sentenceTreeParser spaces
   queryCloseParser
-  return $ ComplexCombinableSentence so cs
+  return $ SentenceBranch so cs
 
-simpleCombinableSentenceParser :: Parser (CombinableSentence T.Text)
-simpleCombinableSentenceParser = do
+sentenceTreeNodeParser :: Parser (SentenceTree T.Text)
+sentenceTreeNodeParser = SentenceNode <$> combinableSentenceParser
+
+combinableSentenceParser :: Parser (SentenceSet T.Text)
+combinableSentenceParser = do
   so <- explicitOpParser <|> pure Union
   spaces
   s <- sentenceParser
-  return $ SimpleCombinableSentence so s
+  return $ CombinableSentence so s
 
 {- |
  Parses 1 or more 'TermTree`s that are separated by spaces.

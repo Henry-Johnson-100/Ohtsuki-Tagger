@@ -10,13 +10,13 @@ Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL.AST (
   Request (..),
-  CombinableSentence (..),
+  SentenceTree (..),
+  SentenceSet (..),
   Sentence (..),
   TermTree (..),
   ComplexTerm (..),
   SimpleTerm (..),
   Term (..),
-  combinableSentenceSetOp,
   termTreeNode,
   complexTermNode,
   simplifyTermTree,
@@ -27,31 +27,33 @@ import qualified Data.List.NonEmpty as N
 import Data.Tagger (QueryCriteria (..), SetOp (..))
 
 {- |
- A newtype wrapper for a list of 'CombinableSentence`s.
+ A newtype wrapper for a list of 'SentenceTree`s.
 
  The 'Request` type is the final and most complete representation of a TaggerQL query.
  It essentially consists of a recursive list of queries, all represented in the
  'Request` type as the terminal parent of them all.
 -}
-newtype Request a = Request {request :: [CombinableSentence a]}
+newtype Request a = Request {request :: [SentenceTree a]}
   deriving (Show, Eq, Functor)
 
 {- |
- A tree of 'Sentences` and a 'SetOp` to describe how to combine them.
-
- All 'CombinableSentence`s terminate in a 'SimpleCombinableSentence` eventually.
-
- The fields are meant to be accessed primarily with pattern matching as the query engine
- must interpret the constructors differently.
+ A data type encompassing either a single 'SentenceSet` or a recursive list of
+ 'SentenceTree`s
 -}
-data CombinableSentence a
-  = SimpleCombinableSentence SetOp (Sentence a)
-  | ComplexCombinableSentence SetOp [CombinableSentence a]
+data SentenceTree a
+  = SentenceNode (SentenceSet a)
+  | SentenceBranch SetOp [SentenceTree a]
   deriving (Show, Eq, Functor)
 
-combinableSentenceSetOp :: CombinableSentence a -> SetOp
-combinableSentenceSetOp (SimpleCombinableSentence s _) = s
-combinableSentenceSetOp (ComplexCombinableSentence s _) = s
+{- |
+ A data type encompassing a 'SetOp` Literal and a 'Sentence`
+
+ The 'SetOp` Literal is to inform how this 'Sentence` is combined with others
+ in a left-associative combination.
+-}
+data SentenceSet a
+  = CombinableSentence SetOp (Sentence a)
+  deriving (Show, Eq, Functor)
 
 {- |
  A list of 'TermTree`s, one 'Sentence` technically makes up a complete TaggerQL query

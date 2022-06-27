@@ -47,24 +47,24 @@ newtype TermTag = TermTag (Term T.Text) deriving (Show, Eq)
 
 newtype TermSubTag = TermSubTag (TermTree T.Text) deriving (Show, Eq)
 
-runRequest ::
-  TaggedConnection ->
-  Request T.Text ->
-  IO (HashSet.HashSet File)
-runRequest tc r = combinableSentenceResultSet <$> queryRequest tc r
+-- runRequest ::
+--   TaggedConnection ->
+--   Request T.Text ->
+--   IO (HashSet.HashSet File)
+-- runRequest tc r = combinableSentenceResultSet <$> queryRequest tc r
 
-queryRequest ::
-  TaggedConnection ->
-  Request T.Text ->
-  IO CombinableSentenceResult
-queryRequest tc (Request cs) =
-  combineSentences <$> mapM (queryCombinableSentence tc) cs
+-- queryRequest ::
+--   TaggedConnection ->
+--   Request T.Text ->
+--   IO CombinableSentenceResult
+-- queryRequest tc (Request cs) =
+--   combineSentences <$> mapM (queryCombinableSentence tc) cs
 
-queryCombinableSentence ::
-  TaggedConnection ->
-  CombinableSentence T.Text ->
-  IO CombinableSentenceResult
-queryCombinableSentence tc cs = undefined
+-- queryCombinableSentence ::
+--   TaggedConnection ->
+--   CombinableSentence T.Text ->
+--   IO CombinableSentenceResult
+-- queryCombinableSentence tc cs = undefined
 
 {- |
  All 'TermTree`s in a 'Sentence` are intersected with each other.
