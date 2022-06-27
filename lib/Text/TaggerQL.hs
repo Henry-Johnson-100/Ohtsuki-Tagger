@@ -103,32 +103,31 @@ queryComplexTermRelation ::
   TaggedConnection ->
   TermTag ->
   TermSubTag ->
-  IO TermResult
+  MaybeT IO TermResult
 queryComplexTermRelation
   tc
   (TermTag (Term tqc tp))
   (TermSubTag (Term sqc sp)) =
     case (tqc, sqc) of
       (DescriptorCriteria, DescriptorCriteria) ->
-        TermResult . HS.fromList
-          <$> queryForFileByDescriptorSubTagDescriptor tp sp tc
+        lift $
+          TermResult . HS.fromList
+            <$> queryForFileByDescriptorSubTagDescriptor tp sp tc
       (DescriptorCriteria, MetaDescriptorCriteria) ->
-        TermResult . HS.fromList
-          <$> queryForFileByDescriptorSubTagMetaDescriptor tp sp tc
+        lift $
+          TermResult . HS.fromList
+            <$> queryForFileByDescriptorSubTagMetaDescriptor tp sp tc
       (DescriptorCriteria, FilePatternCriteria) -> undefined
-      (DescriptorCriteria, UntaggedCriteria) -> undefined
       (MetaDescriptorCriteria, DescriptorCriteria) -> undefined
       (MetaDescriptorCriteria, MetaDescriptorCriteria) -> undefined
       (MetaDescriptorCriteria, FilePatternCriteria) -> undefined
-      (MetaDescriptorCriteria, UntaggedCriteria) -> undefined
       (FilePatternCriteria, DescriptorCriteria) -> undefined
       (FilePatternCriteria, MetaDescriptorCriteria) -> undefined
       (FilePatternCriteria, FilePatternCriteria) -> undefined
       (FilePatternCriteria, UntaggedCriteria) -> undefined
-      (UntaggedCriteria, DescriptorCriteria) -> undefined
-      (UntaggedCriteria, MetaDescriptorCriteria) -> undefined
       (UntaggedCriteria, FilePatternCriteria) -> undefined
-      (UntaggedCriteria, UntaggedCriteria) -> undefined
+      (UntaggedCriteria, _) -> hoistMaybe Nothing
+      (_, UntaggedCriteria) -> hoistMaybe Nothing
 
 querySimpleTerm ::
   TaggedConnection ->
