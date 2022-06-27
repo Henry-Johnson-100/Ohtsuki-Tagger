@@ -31,8 +31,6 @@ module Database.Tagger.Query (
   -- | Queries that search based on some attribute of a 'File` type.
   queryForFileByPattern,
   queryForSingleFileByFileId,
-  queryForFileByFilePatternAndFilePattern,
-  queryForFileByFilePatternAndUntagged,
 
   -- *** On 'Descriptor`
 
@@ -41,6 +39,11 @@ module Database.Tagger.Query (
   flatQueryForFileByTagDescriptorPattern,
   flatQueryForFileOnMetaRelation,
   flatQueryForFileOnMetaRelationPattern,
+
+  -- *** Relational queries
+  -- $Relational
+  queryForFileByFilePatternAndFilePattern,
+  queryForFileByFilePatternAndUntagged,
   queryForFileByDescriptorSubTagDescriptor,
   queryForFileByDescriptorSubTagMetaDescriptor,
   queryForFileByFilePatternAndDescriptor,
@@ -117,6 +120,14 @@ import Database.Tagger.Type
 import System.IO (stderr)
 import Tagger.Util
 import Text.RawString.QQ (r)
+
+{- $Relational
+ Queries hand-written to operate more efficiently on relations between two
+ 'QueryCriteria` and two given text patterns.
+
+ These are primarily used by the TaggerQL engine to place as much work as possible
+ in sqlite rather than intersecting large sets of data in Haskell.
+-}
 
 {- |
  Performs a case-insensitive search of all registered file paths, tagged or not.
