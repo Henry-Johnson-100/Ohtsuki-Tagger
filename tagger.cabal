@@ -95,6 +95,7 @@ library tagger-lib
                       ,Database.Tagger.Type
                       ,Data.HierarchyMap
                       ,Data.Tagger
+                      ,Data.Tagger.Internal                      
                       ,Text.TaggerQL
                       ,Text.TaggerQL.Parser
                       ,Text.TaggerQL.Parser.Internal

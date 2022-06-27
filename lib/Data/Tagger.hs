@@ -17,32 +17,11 @@ module Data.Tagger (
   SetOp (..),
 ) where
 
-{- |
- Typeclass defining a bounded, ordered, cyclic enumeration.
-
- The methods 'next` and 'prev` are wrappers for 'succ` and 'pred`
- that wrap to either 'minBound` or 'maxBound`.
--}
-class (Bounded e, Ord e, Enum e) => CyclicEnum e where
-  next :: e -> e
-  next x = if x >= maxBound then minBound else succ x
-  prev :: e -> e
-  prev x = if x <= minBound then maxBound else pred x
-
-{- |
- Type detailing how what criteria a query is meant to search on.
--}
-data QueryCriteria
-  = -- | Search for files that are tagged with 'Descriptor`s matching a given pattern.
-    DescriptorCriteria
-  | -- | Search for files that are tagged with an inclusive set of all
-    --infra-related 'Descriptor`s matching a given pattern.
-    MetaDescriptorCriteria
-  | -- | Search for files that have a file path matching a given pattern.
-    FilePatternCriteria
-  | -- | Search for files that are untagged.
-    UntaggedCriteria
-  deriving (Show, Eq, Bounded, Enum, Ord, CyclicEnum)
+import Data.Tagger.Internal (
+  CyclicEnum (..),
+  PatternableCriteria (..),
+  UnPatternableCriteria (..),
+ )
 
 {- |
  A type detailing how set-like collections are to be combined.
@@ -52,3 +31,38 @@ data SetOp
   | Intersect
   | Difference
   deriving (Show, Eq, Bounded, Enum, Ord, CyclicEnum)
+
+data QueryCriteria
+  = -- | 'QueryCriteria` that correspond to attributes of records in the Tagger database
+    -- that have some sort of data representation, usually text.
+    TagCriteria PatternableCriteria
+  | -- | 'QueryCriteria` that correspond to rows or entities in the Tagger database that
+    -- have no data representation or are characterized by lack of data.
+    OtherCriteria UnPatternableCriteria
+  deriving (Show, Eq)
+
+instance CyclicEnum QueryCriteria
+
+instance Ord QueryCriteria where
+  compare qcx qcy = compare (fromEnum qcx) (fromEnum qcy)
+
+instance Enum QueryCriteria where
+  toEnum n =
+    case n of
+      0 -> TagCriteria DescriptorCriteria
+      1 -> TagCriteria MetaDescriptorCriteria
+      2 -> TagCriteria FilePatternCriteria
+      3 -> OtherCriteria UntaggedCriteria
+      _ -> error "Out of bounds in toEnum :: Int -> QueryCriteria"
+  fromEnum c =
+    case c of
+      TagCriteria pc ->
+        case pc of
+          DescriptorCriteria -> 0
+          MetaDescriptorCriteria -> 1
+          FilePatternCriteria -> 2
+      OtherCriteria _ -> 3
+
+instance Bounded QueryCriteria where
+  minBound = TagCriteria DescriptorCriteria
+  maxBound = OtherCriteria UntaggedCriteria
