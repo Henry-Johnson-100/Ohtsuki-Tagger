@@ -115,6 +115,20 @@ queryComplexTermRelation
       (DescriptorCriteria, MetaDescriptorCriteria) ->
         TermResult . HS.fromList
           <$> queryForFileByDescriptorSubTagMetaDescriptor tp sp tc
+      (DescriptorCriteria, FilePatternCriteria) -> undefined
+      (DescriptorCriteria, UntaggedCriteria) -> undefined
+      (MetaDescriptorCriteria, DescriptorCriteria) -> undefined
+      (MetaDescriptorCriteria, MetaDescriptorCriteria) -> undefined
+      (MetaDescriptorCriteria, FilePatternCriteria) -> undefined
+      (MetaDescriptorCriteria, UntaggedCriteria) -> undefined
+      (FilePatternCriteria, DescriptorCriteria) -> undefined
+      (FilePatternCriteria, MetaDescriptorCriteria) -> undefined
+      (FilePatternCriteria, FilePatternCriteria) -> undefined
+      (FilePatternCriteria, UntaggedCriteria) -> undefined
+      (UntaggedCriteria, DescriptorCriteria) -> undefined
+      (UntaggedCriteria, MetaDescriptorCriteria) -> undefined
+      (UntaggedCriteria, FilePatternCriteria) -> undefined
+      (UntaggedCriteria, UntaggedCriteria) -> undefined
 
 querySimpleTerm ::
   TaggedConnection ->
