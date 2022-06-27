@@ -109,7 +109,9 @@ queryComplexTermRelation
   (TermTag (Term tqc tp))
   (TermSubTag (Term sqc sp)) =
     case (tqc, sqc) of
-      (DescriptorCriteria, DescriptorCriteria) -> undefined
+      (DescriptorCriteria, DescriptorCriteria) ->
+        TermResult . HS.fromList
+          <$> queryForFileByDescriptorSubTagDescriptor tp sp tc
       (DescriptorCriteria, MetaDescriptorCriteria) ->
         TermResult . HS.fromList
           <$> queryForFileByDescriptorSubTagMetaDescriptor tp sp tc

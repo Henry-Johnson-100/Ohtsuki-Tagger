@@ -39,7 +39,7 @@ module Database.Tagger.Query (
   flatQueryForFileByTagDescriptorPattern,
   flatQueryForFileOnMetaRelation,
   flatQueryForFileOnMetaRelationPattern,
-  queryForFileBySubTagRelation,
+  queryForFileByDescriptorSubTagDescriptor,
   queryForFileByDescriptorSubTagMetaDescriptor,
 
   -- ** 'TaggedFile` and 'ConcreteTaggedFile` Queries
@@ -214,7 +214,7 @@ flatQueryForFileOnMetaRelationPattern p tc = queryNamed tc q [":metaDesPattern" 
     WITH RECURSIVE rec(infraDescriptorId) AS (
       SELECT id
       FROM Descriptor
-      WHERE descriptor LIKE :metaDesPattern
+      WHERE descriptor LIKE :metaDesPattern ESCAPE '\'
       UNION ALL
       SELECT md.infraDescriptorId
       FROM rec r
@@ -232,20 +232,16 @@ flatQueryForFileOnMetaRelationPattern p tc = queryNamed tc q [":metaDesPattern" 
     |]
 
 {- |
- Query for a given subtag relationship.
-
- This query is single-depth, it searches for subtag relations that have been explicitly
- created and not relations that have been implicitly created because of relation nesting.
+ Given two 'Descriptor` patterns, query for 'File`s that are tagged with the
+ first and subtagged with the second.
 -}
-queryForFileBySubTagRelation ::
-  -- | The id of the meta 'Descriptor`, corresponds to the Tag.subTagOfId column.
-  RecordKey Descriptor ->
-  -- | The id of the infra 'Descriptor`, corresponds to the Tag.id column.
-  RecordKey Descriptor ->
+queryForFileByDescriptorSubTagDescriptor ::
+  T.Text ->
+  T.Text ->
   TaggedConnection ->
   IO [File]
-queryForFileBySubTagRelation superK subK tc =
-  query tc q (superK, subK)
+queryForFileByDescriptorSubTagDescriptor dp stdp tc =
+  queryNamed tc q [":desPattern" := dp, ":subDesPattern" := stdp]
  where
   q =
     [r|
@@ -260,12 +256,12 @@ queryForFileBySubTagRelation superK subK tc =
     JOIN File f
       ON t.fileId = f.id
     WHERE
-      t.descriptorId = ?
-      AND t1.descriptorId = ?
+      t.descriptorId LIKE :desPattern ESCAPE '\'
+      AND t1.descriptorId LIKE :subDesPattern ESCAPE '\'
     |]
 
 {- |
- Given two 'Descriptor` patterns, query for files that are tagged with
+ Given two 'Descriptor` patterns, query for 'File`s that are tagged with
  the first and subtagged by any 'Descriptor` that is infra to the second, inclusive.
 -}
 queryForFileByDescriptorSubTagMetaDescriptor ::
@@ -281,7 +277,7 @@ queryForFileByDescriptorSubTagMetaDescriptor dp stdp tc =
     WITH RECURSIVE rec_des(id) AS (
       SELECT id
       FROM Descriptor
-      WHERE descriptor LIKE :subDesPattern
+      WHERE descriptor LIKE :subDesPattern ESCAPE '\'
       UNION
       SELECT md.infraDescriptorId
       FROM rec_des rd
@@ -298,7 +294,7 @@ queryForFileByDescriptorSubTagMetaDescriptor dp stdp tc =
       ON st.id = it.subTagOfId
     JOIN Descriptor d
       ON st.descriptorId = d.id
-    WHERE d.descriptor LIKE :desPattern
+    WHERE d.descriptor LIKE :desPattern ESCAPE '\'
       AND it.descriptorId IN rec_des
     |]
 
@@ -330,7 +326,7 @@ flatQueryForFileByTagDescriptorPattern p tc = query tc q [p]
       ON t.descriptorId = d.id
     JOIN File f
       ON t.fileId = f.id
-    WHERE d.descriptor LIKE ?
+    WHERE d.descriptor LIKE ? ESCAPE '\'
     |]
 
 {- |

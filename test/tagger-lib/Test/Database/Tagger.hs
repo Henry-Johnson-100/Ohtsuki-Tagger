@@ -113,7 +113,7 @@ database_validation iotc =
         "query_for_0_1_depth_subtag_relation"
         ( iotc
             >>= ( \tc -> do
-                    f <- queryForFileBySubTagRelation 10 6 tc
+                    f <- queryForFileByDescriptorSubTagDescriptor 10 6 tc
                     assertBool
                       "Could not query for files a and b tagged with z"
                       ( HS.member (File 1 "a") f
@@ -126,7 +126,7 @@ database_validation iotc =
         "query_for_n_n+1_depth_subtag_relation"
         ( iotc
             >>= ( \tc -> do
-                    f <- queryForFileBySubTagRelation 6 7 tc
+                    f <- queryForFileByDescriptorSubTagDescriptor 6 7 tc
                     assertBool
                       "Could not query for files a and b tagged with z"
                       ( HS.member (File 2 "b") f && HS.size f == 1
