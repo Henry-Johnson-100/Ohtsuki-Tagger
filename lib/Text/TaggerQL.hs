@@ -99,7 +99,7 @@ queryComplexTerm tc ct =
     Bottom _ -> hoistMaybe Nothing
     t :<- nct -> undefined
 
--- Could be handled easier programatically but with hand-written queries for
+-- Could be handled easier programmatically, but with hand-written queries for
 -- each case, it probably has better performance.
 queryComplexTermRelation ::
   TaggedConnection ->
@@ -134,7 +134,13 @@ queryComplexTermRelation
               basisPattern
               subQueryPattern
               tc
-      (MetaDescriptorCriteria, MetaDescriptorCriteria) -> undefined
+      (MetaDescriptorCriteria, MetaDescriptorCriteria) ->
+        lift $
+          TermResult . HS.fromList
+            <$> queryForFileByMetaDescriptorSubTagMetaDescriptor
+              basisPattern
+              subQueryPattern
+              tc
       -- flipped case of (FilePatternCriteria, MetaDescriptorCriteria)
       (MetaDescriptorCriteria, FilePatternCriteria) ->
         lift $

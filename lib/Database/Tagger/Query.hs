@@ -49,6 +49,7 @@ module Database.Tagger.Query (
   queryForFileByFilePatternAndDescriptor,
   queryForFileByFilePatternAndMetaDescriptor,
   queryForFileByMetaDescriptorSubTagDescriptor,
+  queryForFileByMetaDescriptorSubTagMetaDescriptor,
 
   -- ** 'TaggedFile` and 'ConcreteTaggedFile` Queries
 
@@ -479,6 +480,79 @@ queryForFileByMetaDescriptorSubTagDescriptor mdp dp tc =
       FROM super_tags sup
       JOIN sub_tags st
         ON sup.id = st.subTagOfId
+    )
+    SELECT
+      f.id
+      ,f.filePath
+    FROM joined_tags jt
+    JOIN File f
+      ON jt.fileId = f.id
+    |]
+
+{- |
+ Given two patterns to match on 'Descriptor`s, find all files that
+ are tagged with any 'Descriptor` infra to the first and subtagged by any
+ 'Descriptor` infra to the one matched by the second.
+-}
+queryForFileByMetaDescriptorSubTagMetaDescriptor ::
+  T.Text ->
+  T.Text ->
+  TaggedConnection ->
+  IO [File]
+queryForFileByMetaDescriptorSubTagMetaDescriptor bp sp tc =
+  queryNamed tc q [":metaDesPattern" := bp, ":subMetaDesPattern" := sp]
+ where
+  q =
+    [r|
+    WITH joined_tags(id, fileId, descriptorId, subTagOfId) AS (
+      WITH super_tags(id,fileId,descriptorId,subTagOfId) AS (
+        WITH RECURSIVE super_meta_descriptors(id) AS (
+          SELECT id
+          FROM Descriptor
+          WHERE descriptor LIKE :metaDesPattern ESCAPE '\'
+          UNION
+          SELECT md.infraDescriptorId
+          FROM super_meta_descriptors smd
+          JOIN MetaDescriptor md
+            ON smd.id = md.metaDescriptorId
+        )
+        SELECT
+          t.id
+          ,t.fileId
+          ,t.descriptorId
+          ,t.subTagOfId
+        FROM Tag t
+        JOIN super_meta_descriptors smd
+          ON t.descriptorId = smd.id
+      ),
+      sub_tags(id,fileId,descriptorId,subTagOfId) AS (
+        WITH RECURSIVE sub_meta_descriptors(id) AS (
+          SELECT id
+          FROM Descriptor
+          WHERE descriptor LIKE :subMetaDesPattern
+          UNION
+          SELECT md.infraDescriptorId
+          FROM sub_meta_descriptors smd
+          JOIN MetaDescriptor md
+            ON smd.id = md.metaDescriptorId
+        )
+        SELECT
+          t.id
+          ,t.fileId
+          ,t.descriptorId
+          ,t.subTagOfId
+        FROM Tag t
+        JOIN sub_meta_descriptors smd
+          ON t.descriptorId = smd.id
+      )
+    SELECT
+      sup.id
+      ,sup.fileId
+      ,sup.descriptorId
+      ,sup.subTagOfId
+    FROM super_tags sup
+    JOIN sub_tags st
+      ON sup.id = st.subTagOfId
     )
     SELECT
       f.id
