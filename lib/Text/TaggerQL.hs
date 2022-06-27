@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {-# HLINT ignore "Use concatMap" #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
@@ -9,9 +10,16 @@ License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL (
+  -- * Query with TaggerQL
   TaggerQLQuery,
   taggerQL,
   queryRequest,
+
+  -- * Tag with TaggerQL
+  TaggerQLTagStmnt,
+  taggerQLTag,
+
+  -- * Other
   CombinableSentenceResult,
   combinableSentenceResultSetOp,
   combinableSentenceResultSet,
@@ -53,6 +61,16 @@ newtype TaggerQLQuery = TaggerQLQuery T.Text deriving (Show, Eq)
 
 instance IsString TaggerQLQuery where
   fromString = TaggerQLQuery . T.pack
+
+{- |
+ newtype wrapper for 'Text`
+
+ is an instance of IsString
+-}
+newtype TaggerQLTagStmnt = TaggerQLTagStmnt T.Text deriving (Show, Eq)
+
+instance IsString TaggerQLTagStmnt where
+  fromString = TaggerQLTagStmnt . T.pack
 
 newtype TermResult = TermResult {termResult :: HashSet.HashSet File} deriving (Show, Eq)
 
@@ -280,7 +298,7 @@ combineSentence
  Return an empty result with a default 'SetOp` of Union.
 -}
 emptyCombinableSentenceResult :: CombinableSentenceResult
-emptyCombinableSentenceResult = undefined
+emptyCombinableSentenceResult = CombinableSentenceResult Union HS.empty
 
 emptyTermResult :: TermResult
 emptyTermResult = TermResult HS.empty
@@ -296,3 +314,76 @@ combFun so =
     Union -> HashSet.union
     Intersect -> HashSet.intersection
     Difference -> HashSet.difference
+
+{- |
+ Run a subset of the TaggerQL as 'Descriptor` patterns to insert as tags on the given
+ 'File`.
+
+ Because it is a subset of TaggerQL, 'QueryCriteria` Literals can be parsed, but they
+ will be ignored during insertion. If it is desired to 'Tag` a 'File` with 'Descriptor`s
+ that look like 'QueryCriteria` Literals, then use escape characters.
+-}
+taggerQLTag :: RecordKey File -> TaggerQLTagStmnt -> TaggedConnection -> IO ()
+taggerQLTag fk (TaggerQLTagStmnt q) tc = do
+  let tagStmnt = parse sentenceParser "TaggerQLStmnt" q
+  either
+    (hPrint stderr)
+    (insertTagSentence tc . zipDescriptorPatternsWithFileKey fk)
+    tagStmnt
+ where
+  zipDescriptorPatternsWithFileKey ::
+    RecordKey File ->
+    Sentence T.Text ->
+    Sentence (RecordKey File, T.Text)
+  zipDescriptorPatternsWithFileKey fk' = fmap (fk',)
+
+insertTagSentence :: TaggedConnection -> Sentence (RecordKey File, T.Text) -> IO ()
+insertTagSentence tc (Sentence tts) = mapM_ (insertTagTree tc) tts
+
+insertTagTree :: TaggedConnection -> TermTree (RecordKey File, T.Text) -> IO ()
+insertTagTree tc tt =
+  case tt of
+    Simple t -> insertSimpleTerm tc t
+    Complex t -> insertComplexTerm tc Nothing t
+
+insertComplexTerm ::
+  TaggedConnection ->
+  Maybe (RecordKey Descriptor) ->
+  ComplexTerm (RecordKey File, T.Text) ->
+  IO ()
+insertComplexTerm tc maybePrevBasisDK ct =
+  case ct of
+    (Bottom t) -> insertTerm tc maybePrevBasisDK t
+    (Term _ (fk, p)) :<- sts -> do
+      -- insert the top-level tags (as subtags if necessary)
+      thisDks <- map descriptorId <$> queryForDescriptorByPattern p tc
+      superDks <-
+        maybe
+          (pure [Nothing])
+          (\bdk -> map (Just . tagId) <$> queryForTagByFileAndDescriptorKey fk bdk tc)
+          maybePrevBasisDK
+      let thisTagTuples = (fk,,) <$> thisDks <*> superDks
+      void $ insertTags thisTagTuples tc
+      -- map this function over the subterms with the current node's descriptors as the
+      -- basis
+      let subterms = NE.toList sts
+      sequence_ $ insertComplexTerm tc . Just <$> thisDks <*> subterms
+
+insertSimpleTerm :: TaggedConnection -> SimpleTerm (RecordKey File, T.Text) -> IO ()
+insertSimpleTerm tc (SimpleTerm t) =
+  insertTerm tc Nothing t
+
+insertTerm ::
+  TaggedConnection ->
+  Maybe (RecordKey Descriptor) ->
+  Term (RecordKey File, T.Text) ->
+  IO ()
+insertTerm tc maybeBasisDK (Term _ (fk, p)) = do
+  thisDks <- map descriptorId <$> queryForDescriptorByPattern p tc
+  subTagIds <-
+    maybe
+      (pure [Nothing])
+      (\bdk -> map (Just . tagId) <$> queryForTagByFileAndDescriptorKey fk bdk tc)
+      maybeBasisDK
+  let tagTuples = (fk,,) <$> thisDks <*> subTagIds
+  void $ insertTags tagTuples tc

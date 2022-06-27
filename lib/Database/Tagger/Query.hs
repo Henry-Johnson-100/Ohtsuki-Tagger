@@ -76,6 +76,7 @@ module Database.Tagger.Query (
 
   -- | Queries that return 'Tag`s.
   allTags,
+  queryForTagByFileAndDescriptorKey,
 
   -- *** On 'File`
   queryForFileTagsByFileId,
@@ -106,6 +107,7 @@ module Database.Tagger.Query (
 
   -- ** 'Tag` Operations
   insertTags,
+  insertTag,
 ) where
 
 import Control.Monad
@@ -964,6 +966,27 @@ allTags tc = query_ tc q
     |]
 
 {- |
+ Return a list of 'Tag`s for the given 'File` and 'Descriptor`
+ pattern.
+-}
+queryForTagByFileAndDescriptorKey ::
+  RecordKey File -> RecordKey Descriptor -> TaggedConnection -> IO [Tag]
+queryForTagByFileAndDescriptorKey fk dk tc =
+  queryNamed tc q [":fileKey" := fk, ":desKey" := dk]
+ where
+  q =
+    [r|
+    SELECT
+      id
+      ,fileId
+      ,descriptorId
+      ,subTagOfId
+    FROM Tag
+    WHERE fileId = :fileKey
+      AND descriptorId = :desKey
+    |]
+
+{- |
  Returns all 'Tag`s for a given 'File`.
 -}
 queryForFileTagsByFileId :: RecordKey File -> TaggedConnection -> IO [Tag]
@@ -1064,9 +1087,19 @@ getUnrelatedDescriptorKey tc = do
 insertTags ::
   [(RecordKey File, RecordKey Descriptor, Maybe (RecordKey Tag))] ->
   TaggedConnection ->
-  IO ()
-insertTags toInsert tc =
-  executeMany tc q toInsert
+  IO [RecordKey Tag]
+insertTags toInsert tc = mapM (`insertTag` tc) toInsert
+
+{- |
+ Insert one 'Tag` and retrieve its ID.
+-}
+insertTag ::
+  (RecordKey File, RecordKey Descriptor, Maybe (RecordKey Tag)) ->
+  TaggedConnection ->
+  IO (RecordKey Tag)
+insertTag toInsert tc = do
+  execute tc q toInsert
+  lastInsertRowId tc
  where
   q =
     [r|
