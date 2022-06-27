@@ -97,7 +97,37 @@ queryComplexTerm ::
 queryComplexTerm tc ct =
   case ct of
     Bottom _ -> hoistMaybe Nothing
-    t :<- nct -> undefined
+    t :<- ((Bottom bst) NE.:| sts) ->
+      case sts of
+        -- Base terminal case for all nested complex term queries
+        [] -> queryComplexTermRelation tc (TermTag t) (TermSubTag bst)
+        sts' -> do
+          thisResult <- queryComplexTermRelation tc (TermTag t) (TermSubTag bst)
+          nextResults <-
+            lift $
+              intersectTermResults
+                <$> catMaybeTM (\ct' -> queryComplexTerm tc (t :<- (ct' NE.:| []))) sts'
+          let combinedResults = intersectTermResult thisResult nextResults
+          return combinedResults
+    t :<- (st NE.:| sts) ->
+      case sts of
+        [] -> do
+          thisResult <-
+            queryComplexTermRelation tc (TermTag t) (TermSubTag . complexTermNode $ st)
+          nestedResult <- queryComplexTerm tc st
+          let combinedResults = intersectTermResult thisResult nestedResult
+          return combinedResults
+        sts' -> do
+          thisResult <-
+            queryComplexTermRelation tc (TermTag t) (TermSubTag . complexTermNode $ st)
+          nestedResult <- queryComplexTerm tc st
+          nextResult <-
+            lift $
+              intersectTermResults
+                <$> catMaybeTM (\ct' -> queryComplexTerm tc (t :<- (ct' NE.:| []))) sts'
+          let combinedResults =
+                intersectTermResults [thisResult, nestedResult, nextResult]
+          return combinedResults
 
 -- Could be handled easier programmatically, but with hand-written queries for
 -- each case, it probably has better performance.
