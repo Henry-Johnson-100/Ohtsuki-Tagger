@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE TupleSections #-}
 {-# HLINT ignore "Use concatMap" #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -25,31 +26,78 @@ module Text.TaggerQL (
   combinableSentenceResultSet,
 ) where
 
-import Control.Monad
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Maybe
+import Control.Monad (void, (<=<))
+import Control.Monad.Trans.Class (MonadTrans (lift))
+import Control.Monad.Trans.Maybe (MaybeT)
+import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
-import qualified Data.HashSet as HashSet
-import Data.Hashable
+import Data.Hashable (Hashable)
 import qualified Data.List as L
+import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NE
-import Data.String
-import Data.Tagger
+import Data.String (IsString (..))
+import Data.Tagger (
+  QueryCriteria (
+    DescriptorCriteria,
+    FilePatternCriteria,
+    MetaDescriptorCriteria,
+    UntaggedCriteria
+  ),
+  SetOp (..),
+ )
+import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger
-import System.IO
-import Tagger.Util
-import Text.TaggerQL.AST
-import Text.TaggerQL.Parser.Internal
+import Database.Tagger.Query (
+  flatQueryForFileByTagDescriptorPattern,
+  flatQueryForFileOnMetaRelationPattern,
+  insertTags,
+  queryForDescriptorByPattern,
+  queryForFileByDescriptorSubTagDescriptor,
+  queryForFileByDescriptorSubTagMetaDescriptor,
+  queryForFileByFilePatternAndDescriptor,
+  queryForFileByFilePatternAndFilePattern,
+  queryForFileByFilePatternAndMetaDescriptor,
+  queryForFileByFilePatternAndUntagged,
+  queryForFileByMetaDescriptorSubTagDescriptor,
+  queryForFileByMetaDescriptorSubTagMetaDescriptor,
+  queryForFileByPattern,
+  queryForTagByFileAndDescriptorKey,
+  queryForUntaggedFiles,
+ )
+import Database.Tagger.Type (
+  Descriptor (descriptorId),
+  File,
+  RecordKey,
+  Tag (tagId),
+  TaggedConnection,
+ )
+import System.IO (hPrint, stderr)
+import Tagger.Util (catMaybeTM, hoistMaybe)
+import Text.TaggerQL.AST (
+  ComplexTerm (..),
+  Request (Request),
+  Sentence (Sentence),
+  SentenceSet (..),
+  SentenceTree (..),
+  SimpleTerm (..),
+  Term (Term),
+  TermTree (..),
+  complexTermNode,
+ )
+import Text.TaggerQL.Parser.Internal (
+  parse,
+  requestParser,
+  sentenceParser,
+ )
 
 data CombinableSentenceResult
-  = CombinableSentenceResult SetOp (HashSet.HashSet File)
+  = CombinableSentenceResult SetOp (HashSet File)
   deriving (Show, Eq)
 
 combinableSentenceResultSetOp :: CombinableSentenceResult -> SetOp
 combinableSentenceResultSetOp (CombinableSentenceResult so _) = so
 
-combinableSentenceResultSet :: CombinableSentenceResult -> HashSet.HashSet File
+combinableSentenceResultSet :: CombinableSentenceResult -> HashSet File
 combinableSentenceResultSet (CombinableSentenceResult _ s) = s
 
 {- |
@@ -57,7 +105,7 @@ combinableSentenceResultSet (CombinableSentenceResult _ s) = s
 
  is an instance of IsString
 -}
-newtype TaggerQLQuery = TaggerQLQuery T.Text deriving (Show, Eq)
+newtype TaggerQLQuery = TaggerQLQuery Text deriving (Show, Eq)
 
 instance IsString TaggerQLQuery where
   fromString = TaggerQLQuery . T.pack
@@ -67,21 +115,21 @@ instance IsString TaggerQLQuery where
 
  is an instance of IsString
 -}
-newtype TaggerQLTagStmnt = TaggerQLTagStmnt T.Text deriving (Show, Eq)
+newtype TaggerQLTagStmnt = TaggerQLTagStmnt Text deriving (Show, Eq)
 
 instance IsString TaggerQLTagStmnt where
   fromString = TaggerQLTagStmnt . T.pack
 
-newtype TermResult = TermResult {termResult :: HashSet.HashSet File} deriving (Show, Eq)
+newtype TermResult = TermResult {termResult :: HashSet File} deriving (Show, Eq)
 
-newtype TermTag = TermTag (Term T.Text) deriving (Show, Eq)
+newtype TermTag = TermTag (Term Text) deriving (Show, Eq)
 
-newtype TermSubTag = TermSubTag (Term T.Text) deriving (Show, Eq)
+newtype TermSubTag = TermSubTag (Term Text) deriving (Show, Eq)
 
 {- |
  Run a 'TaggerQLQuery` on a connection.
 -}
-taggerQL :: TaggerQLQuery -> TaggedConnection -> IO (HashSet.HashSet File)
+taggerQL :: TaggerQLQuery -> TaggedConnection -> IO (HashSet File)
 taggerQL (TaggerQLQuery q) tc = do
   let parseResult = parse requestParser "TaggerQL" q
   either
@@ -97,13 +145,13 @@ taggerQL (TaggerQLQuery q) tc = do
 -}
 queryRequest ::
   TaggedConnection ->
-  Request T.Text ->
+  Request Text ->
   IO CombinableSentenceResult
 queryRequest tc (Request strs) = combineSentences <$> mapM (querySentenceTree tc) strs
 
 querySentenceTree ::
   TaggedConnection ->
-  SentenceTree T.Text ->
+  SentenceTree Text ->
   IO CombinableSentenceResult
 querySentenceTree tc tr =
   case tr of
@@ -115,7 +163,7 @@ querySentenceTree tc tr =
 
 querySentenceSet ::
   TaggedConnection ->
-  SentenceSet T.Text ->
+  SentenceSet Text ->
   IO CombinableSentenceResult
 querySentenceSet tc (CombinableSentence so s) =
   CombinableSentenceResult so . termResult <$> querySentence tc s
@@ -125,7 +173,7 @@ querySentenceSet tc (CombinableSentence so s) =
 -}
 querySentence ::
   TaggedConnection ->
-  Sentence T.Text ->
+  Sentence Text ->
   IO TermResult
 querySentence tc (Sentence tts) =
   intersectTermResults
@@ -136,52 +184,67 @@ querySentence tc (Sentence tts) =
 -}
 queryTermTree ::
   TaggedConnection ->
-  TermTree T.Text ->
+  TermTree Text ->
   MaybeT IO TermResult
 queryTermTree tc tt =
   case tt of
     Simple st -> lift $ querySimpleTerm tc st
     Complex ct -> queryComplexTerm tc ct
 
+{- |
+ A depth-first query with 'ComplexTerm`s.
+ Each 'Term` in a given 'ComplexTerm` will first find its relation
+ query with its immediate sub-term then interesect that result with the results
+ of its sub-term's sub-terms. It will do this until it reaches a term-bottom relation
+ where it will perform one final query then move on to query relations of the term
+ and any sub-terms adjacent to the first.
+
+ This is a recursive, depth-first tree traversal where the results of the top relation
+ are intersected with the intersected results of every query below it.
+-}
 queryComplexTerm ::
   TaggedConnection ->
-  ComplexTerm T.Text ->
+  ComplexTerm Text ->
   MaybeT IO TermResult
-queryComplexTerm tc ct =
-  case ct of
-    -- should never be called
-    Bottom _ -> hoistMaybe Nothing
-    t :<- ((Bottom bst) NE.:| sts) ->
-      case sts of
-        -- Base terminal case for all nested complex term queries
-        [] -> queryComplexTermRelation tc (TermTag t) (TermSubTag bst)
-        sts' -> do
-          thisResult <- queryComplexTermRelation tc (TermTag t) (TermSubTag bst)
-          nextResults <-
-            lift $
-              intersectTermResults
-                <$> catMaybeTM (\ct' -> queryComplexTerm tc (t :<- (ct' NE.:| []))) sts'
-          let combinedResults = intersectTermResult thisResult nextResults
-          return combinedResults
-    t :<- (st NE.:| sts) ->
-      case sts of
-        [] -> do
-          thisResult <-
-            queryComplexTermRelation tc (TermTag t) (TermSubTag . complexTermNode $ st)
-          nestedResult <- queryComplexTerm tc st
-          let combinedResults = intersectTermResult thisResult nestedResult
-          return combinedResults
-        sts' -> do
-          thisResult <-
-            queryComplexTermRelation tc (TermTag t) (TermSubTag . complexTermNode $ st)
-          nestedResult <- queryComplexTerm tc st
-          nextResult <-
-            lift $
-              intersectTermResults
-                <$> catMaybeTM (\ct' -> queryComplexTerm tc (t :<- (ct' NE.:| []))) sts'
-          let combinedResults =
-                intersectTermResults [thisResult, nestedResult, nextResult]
-          return combinedResults
+-- This match should never be called, but if it is, it is filtered by querySentence.
+queryComplexTerm _ (Bottom _) = hoistMaybe Nothing
+-- The bottom of a depth-relation query, will perform a single query on the current
+-- term and bottom subterm then move to any adjacent subterms
+--
+-- This match contains the terminal case in t :<- (Bottom bst :| [])
+queryComplexTerm tc (t :<- ((Bottom bst) :| sts)) =
+  if null sts
+    then queryComplexTermRelation tc (TermTag t) (TermSubTag bst)
+    else do
+      thisResult <- queryComplexTermRelation tc (TermTag t) (TermSubTag bst)
+      nextResults <-
+        lift $
+          intersectTermResults
+            <$> catMaybeTM (\ct' -> queryComplexTerm tc (t :<- [ct'])) sts
+      let combinedResults = intersectTermResult thisResult nextResults
+      return combinedResults
+-- A relation query that has not reached the bottom yet.
+-- Will intersect the result of the current term and next subterm with the results
+-- of the subterm and subterm's subterms before moving on to adjacent subterms.
+queryComplexTerm tc (t :<- (st :| sts)) =
+  if null sts
+    then do
+      thisResult <-
+        queryComplexTermRelation tc (TermTag t) (TermSubTag . complexTermNode $ st)
+      nestedResult <- queryComplexTerm tc st
+      let combinedResults = intersectTermResult thisResult nestedResult
+      return combinedResults
+    else do
+      thisResult <-
+        queryComplexTermRelation tc (TermTag t) (TermSubTag . complexTermNode $ st)
+      nestedResult <- queryComplexTerm tc st
+      nextResults <-
+        lift $
+          intersectTermResults
+            <$> catMaybeTM (\ct' -> queryComplexTerm tc (t :<- [ct'])) sts
+      let combinedResults =
+            intersectTermResults [thisResult, nestedResult, nextResults]
+      return combinedResults
 
 -- Could be handled easier programmatically, but with hand-written queries for
 -- each case, it probably has better performance.
@@ -256,7 +319,7 @@ queryComplexTermRelation
 
 querySimpleTerm ::
   TaggedConnection ->
-  SimpleTerm T.Text ->
+  SimpleTerm Text ->
   IO TermResult
 querySimpleTerm tc (SimpleTerm (Term qc p)) =
   case qc of
@@ -306,14 +369,14 @@ emptyTermResult = TermResult HS.empty
 combFun ::
   Hashable a =>
   SetOp ->
-  HashSet.HashSet a ->
-  HashSet.HashSet a ->
-  HashSet.HashSet a
+  HashSet a ->
+  HashSet a ->
+  HashSet a
 combFun so =
   case so of
-    Union -> HashSet.union
-    Intersect -> HashSet.intersection
-    Difference -> HashSet.difference
+    Union -> HS.union
+    Intersect -> HS.intersection
+    Difference -> HS.difference
 
 {- |
  Run a subset of the TaggerQL as 'Descriptor` patterns to insert as tags on the given
@@ -333,14 +396,14 @@ taggerQLTag fk (TaggerQLTagStmnt q) tc = do
  where
   zipDescriptorPatternsWithFileKey ::
     RecordKey File ->
-    Sentence T.Text ->
-    Sentence (RecordKey File, T.Text)
+    Sentence Text ->
+    Sentence (RecordKey File, Text)
   zipDescriptorPatternsWithFileKey fk' = fmap (fk',)
 
-insertTagSentence :: TaggedConnection -> Sentence (RecordKey File, T.Text) -> IO ()
+insertTagSentence :: TaggedConnection -> Sentence (RecordKey File, Text) -> IO ()
 insertTagSentence tc (Sentence tts) = mapM_ (insertTagTree tc) tts
 
-insertTagTree :: TaggedConnection -> TermTree (RecordKey File, T.Text) -> IO ()
+insertTagTree :: TaggedConnection -> TermTree (RecordKey File, Text) -> IO ()
 insertTagTree tc tt =
   case tt of
     Simple t -> insertSimpleTerm tc t
@@ -349,7 +412,7 @@ insertTagTree tc tt =
 insertComplexTerm ::
   TaggedConnection ->
   Maybe (RecordKey Descriptor) ->
-  ComplexTerm (RecordKey File, T.Text) ->
+  ComplexTerm (RecordKey File, Text) ->
   IO ()
 insertComplexTerm tc maybePrevBasisDK ct =
   case ct of
@@ -369,14 +432,14 @@ insertComplexTerm tc maybePrevBasisDK ct =
       let subterms = NE.toList sts
       sequence_ $ insertComplexTerm tc . Just <$> thisDks <*> subterms
 
-insertSimpleTerm :: TaggedConnection -> SimpleTerm (RecordKey File, T.Text) -> IO ()
+insertSimpleTerm :: TaggedConnection -> SimpleTerm (RecordKey File, Text) -> IO ()
 insertSimpleTerm tc (SimpleTerm t) =
   insertTerm tc Nothing t
 
 insertTerm ::
   TaggedConnection ->
   Maybe (RecordKey Descriptor) ->
-  Term (RecordKey File, T.Text) ->
+  Term (RecordKey File, Text) ->
   IO ()
 insertTerm tc maybeBasisDK (Term _ (fk, p)) = do
   thisDks <- map descriptorId <$> queryForDescriptorByPattern p tc
