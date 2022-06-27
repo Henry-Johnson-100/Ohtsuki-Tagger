@@ -45,7 +45,7 @@ newtype TermResult = TermResult {termResult :: HashSet.HashSet File} deriving (S
 
 newtype TermTag = TermTag (Term T.Text) deriving (Show, Eq)
 
-newtype TermSubTag = TermSubTag (TermTree T.Text) deriving (Show, Eq)
+newtype TermSubTag = TermSubTag (Term T.Text) deriving (Show, Eq)
 
 -- runRequest ::
 --   TaggedConnection ->
@@ -98,6 +98,21 @@ queryComplexTerm tc ct =
   case ct of
     Bottom _ -> hoistMaybe Nothing
     t :<- nct -> undefined
+
+queryComplexTermRelation ::
+  TaggedConnection ->
+  TermTag ->
+  TermSubTag ->
+  IO TermResult
+queryComplexTermRelation
+  tc
+  (TermTag (Term tqc tp))
+  (TermSubTag (Term sqc sp)) =
+    case (tqc, sqc) of
+      (DescriptorCriteria, DescriptorCriteria) -> undefined
+      (DescriptorCriteria, MetaDescriptorCriteria) ->
+        TermResult . HS.fromList
+          <$> queryForFileByDescriptorSubTagMetaDescriptor tp sp tc
 
 querySimpleTerm ::
   TaggedConnection ->
