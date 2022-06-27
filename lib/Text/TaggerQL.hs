@@ -1,5 +1,4 @@
 {-# HLINT ignore "Use concatMap" #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {- |
@@ -13,8 +12,8 @@ module Text.TaggerQL (
   CombinableSentenceResult,
   combinableSentenceResultSetOp,
   combinableSentenceResultSet,
-  -- runRequest,
-  -- queryRequest,
+  runTaggerQLEngine,
+  queryRequest,
 ) where
 
 import Control.Monad.Trans.Class
@@ -24,7 +23,6 @@ import qualified Data.HashSet as HashSet
 import Data.Hashable
 import qualified Data.List as L
 import qualified Data.List.NonEmpty as NE
-import Data.Maybe
 import Data.Tagger
 import qualified Data.Text as T
 import Database.Tagger
@@ -47,24 +45,36 @@ newtype TermTag = TermTag (Term T.Text) deriving (Show, Eq)
 
 newtype TermSubTag = TermSubTag (Term T.Text) deriving (Show, Eq)
 
--- runRequest ::
---   TaggedConnection ->
---   Request T.Text ->
---   IO (HashSet.HashSet File)
--- runRequest tc r = combinableSentenceResultSet <$> queryRequest tc r
+runTaggerQLEngine ::
+  TaggedConnection ->
+  Request T.Text ->
+  IO (HashSet.HashSet File)
+runTaggerQLEngine tc r = combinableSentenceResultSet <$> queryRequest tc r
 
--- queryRequest ::
---   TaggedConnection ->
---   Request T.Text ->
---   IO CombinableSentenceResult
--- queryRequest tc (Request cs) =
---   combineSentences <$> mapM (queryCombinableSentence tc) cs
+queryRequest ::
+  TaggedConnection ->
+  Request T.Text ->
+  IO CombinableSentenceResult
+queryRequest tc (Request strs) = combineSentences <$> mapM (querySentenceTree tc) strs
 
--- queryCombinableSentence ::
---   TaggedConnection ->
---   CombinableSentence T.Text ->
---   IO CombinableSentenceResult
--- queryCombinableSentence tc cs = undefined
+querySentenceTree ::
+  TaggedConnection ->
+  SentenceTree T.Text ->
+  IO CombinableSentenceResult
+querySentenceTree tc tr =
+  case tr of
+    SentenceNode ss -> querySentenceSet tc ss
+    SentenceBranch so sss -> do
+      (CombinableSentenceResult _ sentenceResults) <-
+        combineSentences <$> mapM (querySentenceTree tc) sss
+      return $ CombinableSentenceResult so sentenceResults
+
+querySentenceSet ::
+  TaggedConnection ->
+  SentenceSet T.Text ->
+  IO CombinableSentenceResult
+querySentenceSet tc (CombinableSentence so s) =
+  CombinableSentenceResult so . termResult <$> querySentence tc s
 
 {- |
  All 'TermTree`s in a 'Sentence` are intersected with each other.
@@ -75,8 +85,7 @@ querySentence ::
   IO TermResult
 querySentence tc (Sentence tts) =
   intersectTermResults
-    . catMaybes
-    <$> mapM (runMaybeT . queryTermTree tc) tts
+    <$> catMaybeTM (queryTermTree tc) tts
 
 {- |
  Return 'Nothing` if the given 'TermTree` is Complex and Bottom.
@@ -96,6 +105,7 @@ queryComplexTerm ::
   MaybeT IO TermResult
 queryComplexTerm tc ct =
   case ct of
+    -- should never be called
     Bottom _ -> hoistMaybe Nothing
     t :<- ((Bottom bst) NE.:| sts) ->
       case sts of
