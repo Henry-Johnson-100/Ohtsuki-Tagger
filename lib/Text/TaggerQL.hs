@@ -9,13 +9,15 @@ License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL (
+  TaggerQLQuery,
+  taggerQL,
+  queryRequest,
   CombinableSentenceResult,
   combinableSentenceResultSetOp,
   combinableSentenceResultSet,
-  runTaggerQLEngine,
-  queryRequest,
 ) where
 
+import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe
 import qualified Data.HashSet as HS
@@ -23,11 +25,14 @@ import qualified Data.HashSet as HashSet
 import Data.Hashable
 import qualified Data.List as L
 import qualified Data.List.NonEmpty as NE
+import Data.String
 import Data.Tagger
 import qualified Data.Text as T
 import Database.Tagger
+import System.IO
 import Tagger.Util
 import Text.TaggerQL.AST
+import Text.TaggerQL.Parser.Internal
 
 data CombinableSentenceResult
   = CombinableSentenceResult SetOp (HashSet.HashSet File)
@@ -39,18 +44,39 @@ combinableSentenceResultSetOp (CombinableSentenceResult so _) = so
 combinableSentenceResultSet :: CombinableSentenceResult -> HashSet.HashSet File
 combinableSentenceResultSet (CombinableSentenceResult _ s) = s
 
+{- |
+ newtype wrapper for 'Text`
+
+ is an instance of IsString
+-}
+newtype TaggerQLQuery = TaggerQLQuery T.Text deriving (Show, Eq)
+
+instance IsString TaggerQLQuery where
+  fromString = TaggerQLQuery . T.pack
+
 newtype TermResult = TermResult {termResult :: HashSet.HashSet File} deriving (Show, Eq)
 
 newtype TermTag = TermTag (Term T.Text) deriving (Show, Eq)
 
 newtype TermSubTag = TermSubTag (Term T.Text) deriving (Show, Eq)
 
-runTaggerQLEngine ::
-  TaggedConnection ->
-  Request T.Text ->
-  IO (HashSet.HashSet File)
-runTaggerQLEngine tc r = combinableSentenceResultSet <$> queryRequest tc r
+{- |
+ Run a 'TaggerQLQuery` on a connection.
+-}
+taggerQL :: TaggerQLQuery -> TaggedConnection -> IO (HashSet.HashSet File)
+taggerQL (TaggerQLQuery q) tc = do
+  let parseResult = parse requestParser "TaggerQL" q
+  either
+    (const (return HS.empty) <=< hPrint stderr)
+    (fmap combinableSentenceResultSet . queryRequest tc)
+    parseResult
 
+{- |
+ Run a query given the 'Request` AST of the result of parsing a 'TaggerQLQuery`
+
+ Can be used to programmatically generate queries using TaggerQL alongside the
+ Text.TaggerQL.AST module to create the structure.
+-}
 queryRequest ::
   TaggedConnection ->
   Request T.Text ->
@@ -224,40 +250,6 @@ querySimpleTerm tc (SimpleTerm (Term qc p)) =
       TermResult . HS.fromList <$> queryForFileByPattern p tc
     UntaggedCriteria ->
       TermResult . HS.fromList <$> queryForUntaggedFiles tc
-
--- case tt of
---   Simple t -> lift . querySimpleTerm tc . SimpleTerm $ t
---   Bottom _ -> hoistMaybe Nothing
---   t :<- ts ->
---     intersectTermResults
---       . NE.toList
---       <$> (lift . mapM (queryTermRelation tc (TermTag t) . TermSubTag) $ ts)
-
--- queryTermRelation ::
---   TaggedConnection ->
---   TermTag ->
---   TermSubTag ->
---   IO TermResult
--- queryTermRelation
---   tc
---   (TermTag term)
---   (TermSubTag subTagTermTree) =
---     case subTagTermTree of
---       -- This should never happen, it throws an error instead of being the same as
---       -- the Bottom case because it may signify a failure in TaggerQL querying logic
---       -- or a problem with the parser.
---       Simple _ -> error "Got a Simple term when Bottom or :<- was expected."
---       Bottom subTagTerm -> queryFlatTermRelation tc term subTagTerm
---       subTagTerm :<- subSubTagTermTrees -> undefined
-
--- queryFlatTermRelation ::
---   TaggedConnection ->
---   -- | The Tag to search for.
---   Term T.Text ->
---   -- | The Subtag that modifies the Tag.
---   Term T.Text ->
---   IO TermResult
--- queryFlatTermRelation tc tt st = undefined
 
 {- |
  Should perform an associative strict intersection of the given 'TermResult`s.

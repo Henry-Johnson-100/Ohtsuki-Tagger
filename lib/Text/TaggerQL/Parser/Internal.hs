@@ -15,6 +15,7 @@ module Text.TaggerQL.Parser.Internal (
   termParser,
 
   -- * Additional
+  parse,
 
   -- ** 'SetOp` Literals
   -- $SetOp
@@ -40,6 +41,7 @@ import Text.Parsec (
   notFollowedBy,
   oneOf,
   optionMaybe,
+  parse,
   satisfy,
   sepBy1,
   spaces,
