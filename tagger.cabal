@@ -49,6 +49,7 @@ executable tagger
                       ,Data.Config
                       ,Data.Config.Lens
                       ,Data.Config.Internal
+                      ,Interface.Theme
 
   -- other-extensions:
 

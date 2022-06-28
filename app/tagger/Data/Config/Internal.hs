@@ -49,67 +49,67 @@ databaseConfigCodec =
     <*> Toml.bool "in_memory" .= _dbconfInMemory
 
 data SelectionConfig = SelectionConfig
-  { _selectionDisplayParents :: Int
-  , _selectionBufferSize :: Int
+  { _selectionconfDisplayParents :: Int
+  , _selectionconfBufferSize :: Int
   }
   deriving (Show, Eq)
 
 selectionConfigCodec :: Toml.Codec SelectionConfig SelectionConfig
 selectionConfigCodec =
   SelectionConfig
-    <$> Toml.int "display_parents" .= _selectionDisplayParents
-    <*> Toml.int "buffer_size" .= _selectionBufferSize
+    <$> Toml.int "display_parents" .= _selectionconfDisplayParents
+    <*> Toml.int "buffer_size" .= _selectionconfBufferSize
 
 data DescriptorTreeConfig = DescriptorTreeConfig
-  { _descriptorTreeRootRequest :: Text
+  { _descriptortreeconfTreeRootRequest :: Text
   }
   deriving (Show, Eq)
 
 descriptorTreeConfigCodec :: Toml.TomlCodec DescriptorTreeConfig
 descriptorTreeConfigCodec =
   DescriptorTreeConfig
-    <$> Toml.text "root_request" .= _descriptorTreeRootRequest
+    <$> Toml.text "root_request" .= _descriptortreeconfTreeRootRequest
 
 data StyleConfig = StyleConfig
-  { font :: FontConfig
-  , window :: WindowConfig
+  { _styleconfFont :: FontConfig
+  , _styleconfWindow :: WindowConfig
   }
   deriving (Show, Eq)
 
 styleConfigCodec :: Toml.Codec StyleConfig StyleConfig
 styleConfigCodec =
   StyleConfig
-    <$> Toml.table fontConfigCodec "font" .= font
-    <*> Toml.table windowConfigCodec "window" .= window
+    <$> Toml.table fontConfigCodec "_styleconfFont" .= _styleconfFont
+    <*> Toml.table windowConfigCodec "_styleconfWindow" .= _styleconfWindow
 
 data WindowConfig = WindowConfig
-  { maximize :: Bool
-  , windowSizeX :: Integer
-  , windowSizeY :: Integer
-  , windowScalingFactor :: Double
-  , windowIcon :: Maybe Text
+  { _windowconfMaximize :: Bool
+  , _windowconfSizeX :: Integer
+  , _windowconfSizeY :: Integer
+  , _windowconfScalingFactor :: Double
+  , _windowconfIcon :: Maybe Text
   }
   deriving (Show, Eq)
 
 windowConfigCodec :: Toml.Codec WindowConfig WindowConfig
 windowConfigCodec =
   WindowConfig
-    <$> Toml.bool "maximize" .= maximize
-    <*> Toml.integer "window_size_x" .= windowSizeX
-    <*> Toml.integer "window_size_y" .= windowSizeY
-    <*> Toml.double "window_scaling_factor" .= windowScalingFactor
-    <*> Toml.dioptional (Toml.text "window_icon") .= windowIcon
+    <$> Toml.bool "maximize" .= _windowconfMaximize
+    <*> Toml.integer "size_x" .= _windowconfSizeX
+    <*> Toml.integer "size_y" .= _windowconfSizeY
+    <*> Toml.double "scaling_factor" .= _windowconfScalingFactor
+    <*> Toml.dioptional (Toml.text "icon") .= _windowconfIcon
 
 data FontConfig = FontConfig
-  { regular :: Maybe Text
-  , thin :: Maybe Text
-  , bold :: Maybe Text
+  { _fontconfRegular :: Maybe Text
+  , _fontconfThin :: Maybe Text
+  , _fontconfBold :: Maybe Text
   }
   deriving (Show, Eq)
 
 fontConfigCodec :: Toml.Codec FontConfig FontConfig
 fontConfigCodec =
   FontConfig
-    <$> Toml.dioptional (Toml.text "regular") .= regular
-    <*> Toml.dioptional (Toml.text "thin") .= thin
-    <*> Toml.dioptional (Toml.text "bold") .= bold
+    <$> Toml.dioptional (Toml.text "_fontconfRegular") .= _fontconfRegular
+    <*> Toml.dioptional (Toml.text "_fontconfThin") .= _fontconfThin
+    <*> Toml.dioptional (Toml.text "_fontconfBold") .= _fontconfBold
