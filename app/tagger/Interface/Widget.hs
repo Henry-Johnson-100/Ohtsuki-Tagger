@@ -6,10 +6,11 @@ module Interface.Widget (
 
 import Data.Event
 import Data.Model
+import Interface.Widget.Internal
 import Monomer
 
 taggerApplicationUI ::
   WidgetEnv TaggerModel TaggerEvent ->
   TaggerModel ->
-  WidgetNode TaggerModel TaggerEvent
-taggerApplicationUI _ _ = label "sus"
+  TaggerWidget
+taggerApplicationUI _ _ = vstack [label "sus", descriptorTreeWidget]

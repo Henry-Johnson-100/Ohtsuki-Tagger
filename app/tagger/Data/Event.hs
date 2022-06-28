@@ -18,6 +18,7 @@ data TaggerEvent
 
 data DescriptorTreeEvent
   = DescriptorTreeInit
+  | RefreshBothDescriptorTrees
   | RefreshUnrelated
   | PutUnrelated_ [Descriptor]
   | RefreshFocusedTree

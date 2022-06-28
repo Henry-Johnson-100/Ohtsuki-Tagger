@@ -8,11 +8,13 @@ module Data.Model.Internal (
   createDescriptorTreeModel,
 ) where
 
+import Data.Config (TaggerConfig)
 import Data.Text (Text)
 import Database.Tagger.Type
 
 data TaggerModel = TaggerModel
-  { _taggermodelDescriptorTreeModel :: DescriptorTreeModel
+  { _taggermodelConf :: TaggerConfig
+  , _taggermodelDescriptorTreeModel :: DescriptorTreeModel
   , _taggermodelConnection :: TaggedConnection
   , _taggermodelIsMassOperation :: Bool
   , _taggermodelIsTagMode :: Bool
@@ -23,10 +25,15 @@ data TaggerModel = TaggerModel
 {- |
  Create a new 'TaggerModel` with the given 'TaggedConnection`
 -}
-createTaggerModel :: TaggedConnection -> Descriptor -> TaggerModel
-createTaggerModel tc d =
+createTaggerModel ::
+  TaggerConfig ->
+  TaggedConnection ->
+  Descriptor ->
   TaggerModel
-    { _taggermodelDescriptorTreeModel = createDescriptorTreeModel d
+createTaggerModel conf tc d =
+  TaggerModel
+    { _taggermodelConf = conf
+    , _taggermodelDescriptorTreeModel = createDescriptorTreeModel d
     , _taggermodelConnection = tc
     , _taggermodelIsMassOperation = False
     , _taggermodelIsTagMode = True

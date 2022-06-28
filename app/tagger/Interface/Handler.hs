@@ -5,6 +5,7 @@ module Interface.Handler (
 ) where
 
 import Control.Lens
+import Data.Config
 import Data.Event
 import Data.Model
 import Database.Tagger
@@ -34,6 +35,18 @@ descriptorTreeEventHandler ::
 descriptorTreeEventHandler _ _ model event =
   case event of
     DescriptorTreeInit ->
+      [ Event (DoDescriptorTreeEvent RefreshUnrelated)
+      , Event
+          ( DoDescriptorTreeEvent
+              ( RequestFocusedNode $
+                  model
+                    ^. conf
+                      . descriptorTreeConf
+                      . treeRootRequest
+              )
+          )
+      ]
+    RefreshBothDescriptorTrees ->
       [ Event (DoDescriptorTreeEvent RefreshUnrelated)
       , Event (DoDescriptorTreeEvent RefreshFocusedTree)
       ]

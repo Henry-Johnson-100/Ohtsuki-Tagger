@@ -35,7 +35,7 @@ withConfig c = do
 runProgram :: TaggerConfig -> IO ()
 runProgram c = do
   db <- openTaggedConnection $ c ^. dbConf
-  runTagger c (createTaggerModel db (Descriptor (-1) ""))
+  runTagger (createTaggerModel c db (Descriptor (-1) ""))
 
 openTaggedConnection :: DatabaseConfig -> IO TaggedConnection
 openTaggedConnection c = open . T.unpack $ c ^. path

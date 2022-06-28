@@ -57,6 +57,7 @@ executable tagger
                       ,Interface.Handler
                       ,Interface.Theme
                       ,Interface.Widget
+                      ,Interface.Widget.Internal
                       ,Util
 
   -- other-extensions:

@@ -10,9 +10,9 @@ import Interface.Theme
 import Interface.Widget
 import Monomer
 
-runTagger :: TaggerConfig -> TaggerModel -> IO ()
-runTagger c m = do
-  themeConf <- themeConfig $ c ^. styleConf
+runTagger :: TaggerModel -> IO ()
+runTagger m = do
+  themeConf <- themeConfig $ m ^. conf . styleConf
   startApp
     m
     taggerEventHandler

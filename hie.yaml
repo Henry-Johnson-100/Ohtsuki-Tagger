@@ -36,6 +36,9 @@ cradle:
     - path: "app/tagger/Interface/Widget.hs"
       component: "tagger:exe:tagger"
 
+    - path: "app/tagger/Interface/Widget/Internal.hs"
+      component: "tagger:exe:tagger"
+
     - path: "app/tagger/Util.hs"
       component: "tagger:exe:tagger"
 
