@@ -19,6 +19,7 @@ import Data.Config.Lens (
   HasThin (thin),
   HasWindow (window),
  )
+import Data.Event (TaggerEvent (CloseConnection))
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Monomer (
@@ -26,6 +27,7 @@ import Monomer (
   Color,
   MainWindowState (MainWindowMaximized, MainWindowNormal),
   Theme,
+  appDisposeEvent,
   appFontDef,
   appScaleFactor,
   appTheme,
@@ -62,7 +64,7 @@ import Monomer.Core.Themes.BaseTheme (
 import qualified Paths_tagger as PT
 import System.Directory (makeAbsolute)
 
-themeConfig :: StyleConfig -> IO [AppConfig e]
+themeConfig :: StyleConfig -> IO [AppConfig TaggerEvent]
 themeConfig cfg = do
   defaultThinFont <- T.pack <$> (makeAbsolute =<< PT.getDataFileName "iosevka_thin.ttf")
   defaultRegularFont <-
@@ -86,6 +88,7 @@ themeConfig cfg = do
     , appFontDef "Thin" . fromMaybe defaultThinFont $ cfg ^. font . thin
     , appFontDef "Bold" . fromMaybe defaultBoldFont $ cfg ^. font . bold
     , appWindowIcon dataIcon
+    , appDisposeEvent CloseConnection
     ]
 
 yuiTheme :: Theme

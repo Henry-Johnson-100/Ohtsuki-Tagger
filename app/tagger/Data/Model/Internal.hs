@@ -3,17 +3,18 @@
 
 module Data.Model.Internal (
   TaggerModel (..),
-  taggerModel,
+  createTaggerModel,
   DescriptorTreeModel (..),
-  descriptorTreeModel,
+  createDescriptorTreeModel,
 ) where
 
 import Data.Text (Text)
 import Database.Tagger.Type
 
 data TaggerModel = TaggerModel
-  { _taggermodelConnection :: TaggedConnection
-  , _taggermodelPreviewFocus :: Bool
+  { _taggermodelDescriptorTreeModel :: DescriptorTreeModel
+  , _taggermodelConnection :: TaggedConnection
+  , _taggermodelIsMassOperation :: Bool
   , _taggermodelIsTagMode :: Bool
   , _taggerFileSelection :: [File]
   }
@@ -22,11 +23,12 @@ data TaggerModel = TaggerModel
 {- |
  Create a new 'TaggerModel` with the given 'TaggedConnection`
 -}
-taggerModel :: TaggedConnection -> TaggerModel
-taggerModel tc =
+createTaggerModel :: TaggedConnection -> Descriptor -> TaggerModel
+createTaggerModel tc d =
   TaggerModel
-    { _taggermodelConnection = tc
-    , _taggermodelPreviewFocus = True
+    { _taggermodelDescriptorTreeModel = createDescriptorTreeModel d
+    , _taggermodelConnection = tc
+    , _taggermodelIsMassOperation = False
     , _taggermodelIsTagMode = True
     , _taggerFileSelection = []
     }
@@ -44,8 +46,8 @@ data DescriptorTreeModel = DescriptorTreeModel
  Create a new 'DescriptorTreeModel` with the given 'Descriptor` as the parent
  node.
 -}
-descriptorTreeModel :: Descriptor -> DescriptorTreeModel
-descriptorTreeModel n =
+createDescriptorTreeModel :: Descriptor -> DescriptorTreeModel
+createDescriptorTreeModel n =
   DescriptorTreeModel
     { _descriptortreeUnrelated = []
     , _descriptortreeFocusedNode = n

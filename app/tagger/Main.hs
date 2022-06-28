@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 import Control.Lens
 import Control.Monad.Trans.Except
 import Data.Config
@@ -33,7 +35,7 @@ withConfig c = do
 runProgram :: TaggerConfig -> IO ()
 runProgram c = do
   db <- openTaggedConnection $ c ^. dbConf
-  runTagger c (taggerModel db)
+  runTagger c (createTaggerModel db (Descriptor (-1) ""))
 
 openTaggedConnection :: DatabaseConfig -> IO TaggedConnection
 openTaggedConnection c = open . T.unpack $ c ^. path
