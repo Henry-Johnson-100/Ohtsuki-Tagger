@@ -4,7 +4,6 @@ import Data.Config
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
-import Interface
 import System.Directory
 import System.FilePath
 import System.IO
