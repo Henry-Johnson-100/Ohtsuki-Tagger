@@ -42,8 +42,10 @@ module Database.Tagger.Connection (
 ) where
 
 import Control.Monad (unless, when)
+import Data.Maybe
 import qualified Data.Text as T
 import Data.Time (getCurrentTime)
+import Data.Version
 import qualified Database.SQLite.Simple as Simple
 import qualified Database.SQLite.Simple.ToField
 import qualified Database.SQLite3 as SQLite3
@@ -52,10 +54,14 @@ import Database.Tagger.Script (
   SQLiteScript (SQLiteScript),
   schemaDefinition,
   schemaTeardown,
+  update0_3_4_0To0_3_4_2,
  )
 import Database.Tagger.Type
 import Database.Tagger.Type.Prim (BareConnection (..))
+import System.IO
 import Tagger.Info (taggerVersion)
+import Tagger.Util
+import Text.ParserCombinators.ReadP (readP_to_S)
 
 {- |
  Open a new 'TaggedConnection` with the database at the given path.
@@ -270,14 +276,44 @@ updateTaggerDBInfoLastAccessed bc = do
 updateTaggerDBInfoVersion :: BareConnection -> IO ()
 updateTaggerDBInfoVersion bc = do
   dbInfoTableExists <- taggerDBInfoTableExists bc
+  maybeCurrentVersion <-
+    head'
+      . mapMaybe (readVersion . (\(Simple.Only x) -> x))
+      <$> bareQuery_ bc "SELECT version FROM TaggerDBInfo LIMIT 1"
+  patchDatabase maybeCurrentVersion
   when
-    dbInfoTableExists
+    (dbInfoTableExists && isJust maybeCurrentVersion)
     ( withConnection
         ( \c ->
-            Simple.execute c "UPDATE TaggerDBInfo SET version = ?" [taggerVersion]
+            Simple.execute
+              c
+              "UPDATE TaggerDBInfo SET version = ?"
+              [showVersion taggerVersion]
         )
         bc
     )
+ where
+  readVersion :: String -> Maybe Version
+  readVersion = last' . map fst . readP_to_S parseVersion
+  patchDatabase :: Maybe Version -> IO ()
+  patchDatabase Nothing =
+    hPutStrLn stderr "Unable to determine database version, some operations may fail."
+  patchDatabase (Just v) =
+    if v /= taggerVersion
+      then do
+        when
+          (makeVersion [0, 3, 4, 0] <= v && v < makeVersion [0, 3, 4, 2])
+          v0_3_4_0_v_0_3_4_2
+      else pure ()
+   where
+    v0_3_4_0_v_0_3_4_2 =
+      runPatch update0_3_4_0To0_3_4_2
+    runPatch p =
+      withConnection
+        ( withConnectionHandle
+            (`SQLite3.exec` (\(SQLiteScript s) -> s) p)
+        )
+        bc
 
 bareQuery ::
   (Simple.ToRow q, Simple.FromRow r) =>

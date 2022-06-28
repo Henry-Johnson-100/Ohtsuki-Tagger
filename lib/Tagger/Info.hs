@@ -12,8 +12,6 @@ module Tagger.Info (
 import qualified Data.Version as Version
 import qualified Paths_tagger
 
-{- |
- Returns Tagger's current version string.
--}
-taggerVersion :: String
-taggerVersion = Version.showVersion Paths_tagger.version
+{-# INLINE taggerVersion #-}
+taggerVersion :: Version.Version
+taggerVersion = Paths_tagger.version

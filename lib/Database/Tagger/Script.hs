@@ -11,6 +11,7 @@ module Database.Tagger.Script (
   SQLiteScript (..),
   schemaDefinition,
   schemaTeardown,
+  update0_3_4_0To0_3_4_2,
 ) where
 
 import Data.String (IsString (..))
@@ -55,14 +56,6 @@ CREATE TABLE IF NOT EXISTS  "Tag" (
   FOREIGN KEY("descriptorId") REFERENCES "Descriptor"("id") ON DELETE CASCADE,
   FOREIGN KEY ("subTagOfId") REFERENCES "Tag"("id") ON DELETE CASCADE
 );
-CREATE TABLE IF NOT EXISTS "Representative" (
-  "repFileId" INTEGER NOT NULL,
-  "repDescriptorId" INTEGER NOT NULL,
-  "description" TEXT,
-  FOREIGN KEY("repFileId") REFERENCES "File"("id") ON DELETE CASCADE,
-  FOREIGN KEY("repDescriptorId") REFERENCES "Descriptor"("id") ON DELETE CASCADE,
-  CONSTRAINT "repDescriptorUnique" UNIQUE("repDescriptorId") ON CONFLICT REPLACE
-);
 CREATE TABLE IF NOT EXISTS "TaggerDBInfo" (
   _tagger INTEGER NOT NULL,
   version TEXT NOT NULL,
@@ -91,9 +84,15 @@ schemaTeardown =
     [r|
       PRAGMA foreign_keys = on;
       DROP TABLE IF EXISTS Tag;
-      DROP TABLE IF EXISTS Representative;
       DROP TABLE IF EXISTS MetaDescriptor;
       DROP TABLE IF EXISTS TaggerDBInfo;
       DROP TABLE IF EXISTS File;
       DROP TABLE IF EXISTS Descriptor;
+    |]
+
+update0_3_4_0To0_3_4_2 :: SQLiteScript
+update0_3_4_0To0_3_4_2 =
+  SQLiteScript . fromString $
+    [r|
+    DROP TABLE IF EXISTS Representative;
     |]
