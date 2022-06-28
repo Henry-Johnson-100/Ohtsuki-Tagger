@@ -1,9 +1,12 @@
 import Control.Lens
 import Control.Monad.Trans.Except
 import Data.Config
+import Data.Model
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
+import Database.Tagger
+import Interface
 import System.Directory
 import System.FilePath
 import System.IO
@@ -28,7 +31,12 @@ withConfig c = do
  Entry point for running the monomer program.
 -}
 runProgram :: TaggerConfig -> IO ()
-runProgram _ = pure ()
+runProgram c = do
+  db <- openTaggedConnection $ c ^. dbConf
+  runTagger c (taggerModel db)
+
+openTaggedConnection :: DatabaseConfig -> IO TaggedConnection
+openTaggedConnection c = open . T.unpack $ c ^. path
 
 printConfigError :: Text -> IO ()
 printConfigError e = do
