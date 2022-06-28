@@ -1,4 +1,5 @@
 {-# LANGUAGE QuasiQuotes #-}
+{-# OPTIONS_HADDOCK prune #-}
 
 {- |
 Module      : Database.Tagger.Script
