@@ -25,6 +25,7 @@ common tagger-common
                       ,TemplateHaskell
                       ,FlexibleInstances
                       ,FunctionalDependencies
+                      ,StrictData
 
   other-modules:       Paths_tagger
 
@@ -34,6 +35,27 @@ common tagger-common
                       ,hashable == 1.4.0.2
                       ,containers == 0.6.2.1
                       ,unordered-containers == 0.2.18.0
+
+executable tagger
+  import:              haskell-common
+                      ,tagger-common
+
+  main-is:             Main.hs
+
+  other-modules:       Data.Model
+                      ,Data.Model.Internal
+                      ,Data.Model.Lens
+                      ,Data.Event
+
+  -- other-extensions:
+
+  -- ghc-options:
+
+  build-depends:      tagger-lib
+                      ,monomer == 1.4.1.0
+                      ,tomland == 1.3.3.1
+
+  hs-source-dirs:      app/tagger
 
 executable taggerold
   import:              haskell-common
@@ -86,22 +108,6 @@ executable taggerold
                       ,raw-strings-qq
                       ,tagger-lib
   hs-source-dirs:      app/taggerold
-
-executable tagger
-  import:              haskell-common
-                      ,tagger-common
-
-  main-is:             Main.hs
-
-  -- other-modules:
-
-  -- other-extensions:
-
-  -- ghc-options:
-
-  build-depends:       monomer == 1.4.1.0
-
-  hs-source-dirs:      app/tagger
 
 executable taggercli
   import:              haskell-common

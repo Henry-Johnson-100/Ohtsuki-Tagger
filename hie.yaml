@@ -1,5 +1,20 @@
 cradle:
   cabal:
+    - path: "app/tagger/Main.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Data/Model.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Data/Model/Internal.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Data/Model/Lens.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Data/Event.hs"
+      component: "tagger:exe:tagger"
+
     - path: "app/taggerold/Main.hs"
       component: "tagger:exe:taggerold"
 
@@ -56,9 +71,6 @@ cradle:
 
     - path: "app/taggerold/Util/Core.hs"
       component: "tagger:exe:taggerold"
-
-    - path: "app/tagger/Main.hs"
-      component: "tagger:exe:tagger"
 
     - path: "app/taggercli/Main.hs"
       component: "tagger:exe:taggercli"
