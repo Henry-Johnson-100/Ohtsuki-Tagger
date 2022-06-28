@@ -3,18 +3,6 @@ cradle:
     - path: "app/tagger/Main.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/tagger/Data/Model.hs"
-      component: "tagger:exe:tagger"
-
-    - path: "app/tagger/Data/Model/Internal.hs"
-      component: "tagger:exe:tagger"
-
-    - path: "app/tagger/Data/Model/Lens.hs"
-      component: "tagger:exe:tagger"
-
-    - path: "app/tagger/Data/Event.hs"
-      component: "tagger:exe:tagger"
-
     - path: "app/tagger/Data/Config.hs"
       component: "tagger:exe:tagger"
 
@@ -24,7 +12,28 @@ cradle:
     - path: "app/tagger/Data/Config/Internal.hs"
       component: "tagger:exe:tagger"
 
+    - path: "app/tagger/Data/Event.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Data/Model.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Data/Model/Internal.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Data/Model/Lens.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Interface.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Interface/Handler.hs"
+      component: "tagger:exe:tagger"
+
     - path: "app/tagger/Interface/Theme.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Interface/Widget.hs"
       component: "tagger:exe:tagger"
 
     - path: "app/taggerold/Main.hs"

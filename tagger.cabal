@@ -42,14 +42,17 @@ executable tagger
 
   main-is:             Main.hs
 
-  other-modules:       Data.Model
-                      ,Data.Model.Internal
-                      ,Data.Model.Lens
-                      ,Data.Event
-                      ,Data.Config
+  other-modules:       Data.Config
                       ,Data.Config.Lens
                       ,Data.Config.Internal
+                      ,Data.Event
+                      ,Data.Model
+                      ,Data.Model.Internal
+                      ,Data.Model.Lens
+                      ,Interface
+                      ,Interface.Handler
                       ,Interface.Theme
+                      ,Interface.Widget
 
   -- other-extensions:
 
