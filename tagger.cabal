@@ -129,7 +129,6 @@ library tagger-lib
   build-depends:       sqlite-simple == 0.4.18.0
                       ,direct-sqlite == 2.3.26
                       ,raw-strings-qq
-                      ,type-iso
                       ,time == 1.9.3
                       ,parsec
 
