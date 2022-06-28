@@ -79,8 +79,8 @@ data StyleConfig = StyleConfig
 styleConfigCodec :: Toml.Codec StyleConfig StyleConfig
 styleConfigCodec =
   StyleConfig
-    <$> Toml.table fontConfigCodec "_styleconfFont" .= _styleconfFont
-    <*> Toml.table windowConfigCodec "_styleconfWindow" .= _styleconfWindow
+    <$> Toml.table fontConfigCodec "font" .= _styleconfFont
+    <*> Toml.table windowConfigCodec "window" .= _styleconfWindow
 
 data WindowConfig = WindowConfig
   { _windowconfMaximize :: Bool
