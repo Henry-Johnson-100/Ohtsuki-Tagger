@@ -13,17 +13,22 @@ main = do
   ec <- runExceptT getConfig
   either
     printConfigError
-    runWithConfig
+    withConfig
     ec
 
-runWithConfig :: TaggerConfig -> IO ()
-runWithConfig c = do
+withConfig :: TaggerConfig -> IO ()
+withConfig c = do
   workingDir <- getCurrentDirectory
   dbDir <- makeAbsolute . takeDirectory . T.unpack $ c ^. dbConf . path
   setCurrentDirectory dbDir
-  getCurrentDirectory >>= putStrLn
+  runProgram c
   setCurrentDirectory workingDir
-  getCurrentDirectory >>= putStrLn
+
+{- |
+ Entry point for running the monomer program.
+-}
+runProgram :: TaggerConfig -> IO ()
+runProgram _ = pure ()
 
 printConfigError :: Text -> IO ()
 printConfigError e = do
