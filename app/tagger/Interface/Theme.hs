@@ -8,27 +8,38 @@ module Interface.Theme (
 
 import Control.Lens
 import Data.Config
+import Data.Maybe
+import qualified Data.Text as T
 import Monomer hiding (icon)
 import Monomer.Core.Themes.BaseTheme
+import qualified Paths_tagger as PT
+import System.Directory
 
-themeConfig :: StyleConfig -> [AppConfig e]
-themeConfig cfg =
-  [ appWindowTitle "Tagger"
-  , appWindowState $
-      if cfg ^. window . maximize
-        then MainWindowMaximized
-        else
-          MainWindowNormal
-            ( fromIntegral $ cfg ^. window . sizeX
-            , fromIntegral $ cfg ^. window . sizeY
-            )
-  , appScaleFactor $ cfg ^. window . scalingFactor
-  , appTheme yuiTheme
-  -- , appFontDef "Regular" (cfg ^. font . regular)
-  -- , appFontDef "Thin" (cfg ^. font . thin)
-  -- , appFontDef "Bold" (cfg ^. font . bold)
-  ]
-    ++ maybe [] ((: []) . appWindowIcon) (cfg ^. window . icon)
+themeConfig :: StyleConfig -> IO [AppConfig e]
+themeConfig cfg = do
+  defaultThinFont <- T.pack <$> (makeAbsolute =<< PT.getDataFileName "iosevka_thin.ttf")
+  defaultRegularFont <-
+    T.pack
+      <$> (makeAbsolute =<< PT.getDataFileName "iosevka_regular.ttf")
+  defaultBoldFont <- T.pack <$> (makeAbsolute =<< PT.getDataFileName "iosevka_bold.ttf")
+  dataIcon <- T.pack <$> (makeAbsolute =<< PT.getDataFileName "Yui_signature_SS.bmp")
+  return
+    [ appWindowTitle "Tagger"
+    , appWindowState $
+        if cfg ^. window . maximize
+          then MainWindowMaximized
+          else
+            MainWindowNormal
+              ( fromIntegral $ cfg ^. window . sizeX
+              , fromIntegral $ cfg ^. window . sizeY
+              )
+    , appScaleFactor $ cfg ^. window . scalingFactor
+    , appTheme yuiTheme
+    , appFontDef "Regular" . fromMaybe defaultRegularFont $ cfg ^. font . regular
+    , appFontDef "Thin" . fromMaybe defaultThinFont $ cfg ^. font . thin
+    , appFontDef "Bold" . fromMaybe defaultBoldFont $ cfg ^. font . bold
+    , appWindowIcon dataIcon
+    ]
 
 yuiTheme :: Theme
 yuiTheme =

@@ -87,7 +87,6 @@ data WindowConfig = WindowConfig
   , _windowconfSizeX :: Integer
   , _windowconfSizeY :: Integer
   , _windowconfScalingFactor :: Double
-  , _windowconfIcon :: Maybe Text
   }
   deriving (Show, Eq)
 
@@ -98,7 +97,6 @@ windowConfigCodec =
     <*> Toml.integer "size_x" .= _windowconfSizeX
     <*> Toml.integer "size_y" .= _windowconfSizeY
     <*> Toml.double "scaling_factor" .= _windowconfScalingFactor
-    <*> Toml.dioptional (Toml.text "icon") .= _windowconfIcon
 
 data FontConfig = FontConfig
   { _fontconfRegular :: Maybe Text

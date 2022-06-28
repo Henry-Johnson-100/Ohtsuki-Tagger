@@ -79,7 +79,6 @@ exampleConf =
             1200
             800
             1.65
-            Nothing
         )
     )
     "feh -zx. -Bwhite -g800x800 -A \";\"'echo %f'"
