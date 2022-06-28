@@ -3,7 +3,7 @@
 {-# LANGUAGE StrictData #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Data.Model.Internal.Config (
+module Data.Config.Internal (
   TaggerConfig (..),
   DatabaseConfig (..),
   SelectionConfig (..),
