@@ -35,7 +35,7 @@ common tagger-common
                       ,containers == 0.6.2.1
                       ,unordered-containers == 0.2.18.0
 
-executable tagger
+executable taggerold
   import:              haskell-common
                       ,tagger-common
 
@@ -85,7 +85,39 @@ executable tagger
                       ,type-iso
                       ,raw-strings-qq
                       ,tagger-lib
-  hs-source-dirs:      app
+  hs-source-dirs:      app/taggerold
+
+executable tagger
+  import:              haskell-common
+                      ,tagger-common
+
+  main-is:             Main.hs
+
+  -- other-modules:
+
+  -- other-extensions:
+
+  -- ghc-options:
+
+  build-depends:       monomer == 1.4.1.0
+
+  hs-source-dirs:      app/tagger
+
+executable taggercli
+  import:              haskell-common
+                      ,tagger-common
+
+  main-is:             Main.hs
+
+  -- other-modules:
+
+  -- other-extensions:
+
+  -- ghc-options:
+
+  build-depends:       tagger-lib
+
+  hs-source-dirs:      app/taggercli
 
 library tagger-lib
   import:              haskell-common
