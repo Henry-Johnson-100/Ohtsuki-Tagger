@@ -9,6 +9,9 @@ cradle:
     - path: "app/tagger/Data/Model/Internal.hs"
       component: "tagger:exe:tagger"
 
+    - path: "app/tagger/Data/Model/Internal/Config.hs"
+      component: "tagger:exe:tagger"
+
     - path: "app/tagger/Data/Model/Lens.hs"
       component: "tagger:exe:tagger"
 

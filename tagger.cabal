@@ -44,6 +44,7 @@ executable tagger
 
   other-modules:       Data.Model
                       ,Data.Model.Internal
+                      ,Data.Model.Internal.Config
                       ,Data.Model.Lens
                       ,Data.Event
 

@@ -8,7 +8,22 @@ module Data.Model.Lens (
 
 import Control.Lens
 import Data.Model.Internal
+import Data.Model.Internal.Config
 
 makeLensesWith abbreviatedFields ''TaggerModel
 
 makeLensesWith abbreviatedFields ''DescriptorTreeModel
+
+makeLensesWith abbreviatedFields ''TaggerConfig
+
+makeLensesWith abbreviatedFields ''DatabaseConfig
+
+makeLensesWith abbreviatedFields ''SelectionConfig
+
+makeLensesWith abbreviatedFields ''DescriptorTreeConfig
+
+makeLensesWith abbreviatedFields ''StyleConfig
+
+makeLensesWith abbreviatedFields ''FontConfig
+
+makeLensesWith abbreviatedFields ''WindowConfig
