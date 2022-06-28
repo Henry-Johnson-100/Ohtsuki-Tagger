@@ -6,14 +6,61 @@ module Interface.Theme (
   module Interface.Theme,
 ) where
 
-import Control.Lens
-import Data.Config
-import Data.Maybe
+import Control.Lens ((^.))
+import Data.Config.Internal (StyleConfig)
+import Data.Config.Lens (
+  HasBold (bold),
+  HasFont (font),
+  HasMaximize (maximize),
+  HasRegular (regular),
+  HasScalingFactor (scalingFactor),
+  HasSizeX (sizeX),
+  HasSizeY (sizeY),
+  HasThin (thin),
+  HasWindow (window),
+ )
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
-import Monomer hiding (icon)
-import Monomer.Core.Themes.BaseTheme
+import Monomer (
+  AppConfig,
+  Color,
+  MainWindowState (MainWindowMaximized, MainWindowNormal),
+  Theme,
+  appFontDef,
+  appScaleFactor,
+  appTheme,
+  appWindowIcon,
+  appWindowState,
+  appWindowTitle,
+  lightThemeColors,
+  rgbHex,
+ )
+import Monomer.Core.Themes.BaseTheme (
+  BaseThemeColors (
+    btnBgActive,
+    btnBgBasic,
+    btnBgFocus,
+    btnBgHover,
+    btnFocusBorder,
+    clearColor,
+    dialogBg,
+    inputBgBasic,
+    inputBgFocus,
+    inputFocusBorder,
+    inputSelBasic,
+    inputSelFocus,
+    sectionColor,
+    slMainBg,
+    slNormalBgHover,
+    slNormalFocusBorder,
+    slSelectedBgBasic,
+    slSelectedBgHover,
+    slSelectedFocusBorder
+  ),
+  baseTheme,
+ )
 import qualified Paths_tagger as PT
-import System.Directory
+import System.Directory (makeAbsolute)
 
 themeConfig :: StyleConfig -> IO [AppConfig e]
 themeConfig cfg = do
