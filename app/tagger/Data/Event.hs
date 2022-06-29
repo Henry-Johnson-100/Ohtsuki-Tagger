@@ -28,6 +28,7 @@ data TaggerEvent
 
 data FocusedFileEvent
   = PutFocusedFile File
+  | PutFocusedFile_ ConcreteTaggedFile
   deriving (Show, Eq)
 
 data DescriptorTreeEvent

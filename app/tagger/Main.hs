@@ -9,6 +9,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import Database.Tagger
 import Interface
+import Paths_tagger
 import System.Directory
 import System.FilePath
 import System.IO
@@ -35,12 +36,14 @@ withConfig c = do
 runProgram :: TaggerConfig -> IO ()
 runProgram c = do
   db <- openTaggedConnection $ c ^. dbConf
+  defaultFile <- T.pack <$> getDataFileName focusedFileDefaultDataFile
   runTagger
     ( createTaggerModel
         c
         db
         (Descriptor (-1) "fake descriptor")
         (Descriptor (-2) "fake #UNRELATED#")
+        defaultFile
     )
 
 openTaggedConnection :: DatabaseConfig -> IO TaggedConnection

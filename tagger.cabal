@@ -13,6 +13,7 @@ maintainer:          monawasensei@gmail.com
 category:            Database
 extra-source-files:  CHANGELOG.md
 data-files:          Yui_signature_SS.bmp
+                    ,Yui_signature_SS.png
                     ,iosevka_thin.ttf
                     ,iosevka_regular.ttf
                     ,iosevka_bold.ttf

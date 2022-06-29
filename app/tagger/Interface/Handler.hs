@@ -14,10 +14,14 @@ import Control.Monad
 import Control.Monad.Trans.Maybe
 import Data.Config
 import Data.Event
+import Data.HierarchyMap (empty)
 import Data.Model
+import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger
 import Monomer
+import Paths_tagger
+import System.FilePath
 import Util
 
 taggerEventHandler ::
@@ -56,7 +60,32 @@ focusedFileEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
-      PutFocusedFile _ -> undefined
+      PutFocusedFile (File fk _) ->
+        [ Task
+            ( do
+                cft <- runMaybeT $ queryForConcreteTaggedFileWithFileId fk conn
+                maybe
+                  ( DoFocusedFileEvent . PutFocusedFile_ <$> do
+                      defaultFile <- T.pack <$> getDataFileName focusedFileDefaultDataFile
+                      return $ ConcreteTaggedFile (File (-1) defaultFile) empty
+                  )
+                  (return . DoFocusedFileEvent . PutFocusedFile_)
+                  cft
+            )
+        ]
+      PutFocusedFile_ cf@(ConcreteTaggedFile (File _ fp) _) ->
+        [ Model $
+            model & focusedFileModel . focusedFile .~ cf
+              & focusedFileModel . renderability .~ getRenderability fp
+        ]
+
+-- this is kind of stupid but whatever.
+getRenderability :: Text -> Renderability
+getRenderability (takeExtension . T.unpack . T.toLower -> ext)
+  | ext `elem` [".jpg", ".png", ".jfif", ".bmp", ".gif", ".jpeg"] = RenderAsImage
+  | ext `elem` [".mp3", ".mp4", ".webm", ".mkv", ".m4v", ".wav", ".flac", ".ogg"] =
+    RenderingNotSupported
+  | otherwise = RenderAsText
 
 descriptorTreeEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->

@@ -8,14 +8,17 @@ module Data.Model.Internal (
   TaggerModel (..),
   createTaggerModel,
   FocusedFileModel (..),
+  focusedFileDefaultDataFile,
   DescriptorTreeModel (..),
   DescriptorWithInfo (..),
   createDescriptorTreeModel,
   VisibilityModel (..),
   Visibility (..),
+  Renderability (..),
 ) where
 
 import Data.Config.Internal (TaggerConfig)
+import Data.HierarchyMap (empty)
 import Data.Text (Text)
 import Database.Tagger.Type
 
@@ -36,12 +39,13 @@ createTaggerModel ::
   TaggedConnection ->
   Descriptor ->
   Descriptor ->
+  Text ->
   TaggerModel
-createTaggerModel conf tc d unRelatedD =
+createTaggerModel conf tc d unRelatedD defaultFilePath =
   TaggerModel
     { _taggermodelConf = conf
     , _taggermodelDescriptorTreeModel = createDescriptorTreeModel d unRelatedD
-    , _taggermodelFocusedFileModel = createFocusedFileModel
+    , _taggermodelFocusedFileModel = createFocusedFileModel defaultFilePath
     , _taggermodelVisibilityModel = createVisibilityModel
     , _taggermodelConnection = tc
     , _taggermodelIsMassOperation = False
@@ -50,15 +54,20 @@ createTaggerModel conf tc d unRelatedD =
     }
 
 data FocusedFileModel = FocusedFileModel
-  { _focusedfilemodelFocusedFile :: Maybe ConcreteTaggedFile
+  { _focusedfilemodelFocusedFile :: ConcreteTaggedFile
+  , _focusedfilemodelRenderability :: Renderability
   }
   deriving (Show, Eq)
 
-createFocusedFileModel :: FocusedFileModel
-createFocusedFileModel =
+createFocusedFileModel :: Text -> FocusedFileModel
+createFocusedFileModel fp =
   FocusedFileModel
-    { _focusedfilemodelFocusedFile = Nothing
+    { _focusedfilemodelFocusedFile = ConcreteTaggedFile (File (-1) fp) empty
+    , _focusedfilemodelRenderability = RenderingNotSupported
     }
+
+focusedFileDefaultDataFile :: FilePath
+focusedFileDefaultDataFile = "Yui_signature_SS.png"
 
 data DescriptorTreeModel = DescriptorTreeModel
   { _descriptortreeUnrelatedNode :: Descriptor
@@ -100,6 +109,12 @@ data DescriptorWithInfo = DescriptorWithInfo
   , _descriptorwithinfoDescriptorIsMeta :: Bool
   }
   deriving (Show, Eq)
+
+data Renderability
+  = RenderAsImage
+  | RenderAsText
+  | RenderingNotSupported
+  deriving (Show, Eq, Enum)
 
 {- |
  Create a new 'DescriptorTreeModel` with the given 'Descriptor` as the parent

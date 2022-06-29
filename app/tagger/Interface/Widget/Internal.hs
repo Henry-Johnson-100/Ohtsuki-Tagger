@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Interface.Widget.Internal (
   TaggerWidget,
@@ -41,7 +42,22 @@ __        _____ ____   ____ _____ _____
 -}
 
 focusedFileWidget :: TaggerModel -> TaggerWidget
-focusedFileWidget _ = flip nodeKey "focusedFile" $ label "Fam"
+focusedFileWidget m = filePreview
+ where
+  filePreview =
+    withStyleBasic
+      [ if not (m ^. isMassOperation)
+          then border 1 yuiOrange
+          else border 1 black
+      ]
+      $ ( case m ^. focusedFileModel . renderability of
+            RenderAsImage -> imagePreviewRender
+            _ -> imagePreviewRender
+        )
+        (filePath . concreteTaggedFile $ (m ^. focusedFileModel . focusedFile))
+
+imagePreviewRender :: Text -> TaggerWidget
+imagePreviewRender fp = image_ fp [fitEither, alignCenter]
 
 {-
  ____  _____ ____   ____ ____  ___ ____ _____ ___  ____
