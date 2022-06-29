@@ -28,5 +28,6 @@ data DescriptorTreeEvent
   | RefreshFocusedTree
   | PutFocusedTree_ Descriptor [DescriptorWithInfo]
   | RequestFocusedNode Text
+  | RequestFocusedNodeParent
   | CreateRelation Descriptor Descriptor
   deriving (Show, Eq)

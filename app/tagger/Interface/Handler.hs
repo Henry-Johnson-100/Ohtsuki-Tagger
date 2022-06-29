@@ -1,11 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Interface.Handler (
   taggerEventHandler,
 ) where
 
 import Control.Lens
+import Control.Monad.Trans.Maybe
 import Data.Config
 import Data.Event
 import Data.Model
@@ -108,6 +110,20 @@ descriptorTreeEventHandler
                 ids <- getInfraChildren (descriptorId d) conn
                 idsInfo <- mapM (toDescriptorInfo conn) ids
                 return (d, idsInfo)
+            )
+        ]
+      RequestFocusedNodeParent ->
+        [ Task
+            ( do
+                pd <-
+                  runMaybeT $
+                    getMetaParent
+                      (descriptorId $ model ^. descriptorTreeModel . focusedNode)
+                      conn
+                maybe
+                  (pure (IOEvent ()))
+                  (pure . DoDescriptorTreeEvent . RequestFocusedNode . descriptor)
+                  pd
             )
         ]
       CreateRelation (Descriptor mk _) (Descriptor ik _) ->

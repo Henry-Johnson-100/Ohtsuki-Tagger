@@ -6,6 +6,7 @@ module Interface.Widget.Internal (
 ) where
 
 import Control.Lens
+import Data.Config
 import Data.Event
 import qualified Data.List as L
 import Data.Model
@@ -20,9 +21,15 @@ descriptorTreeWidget :: TaggerModel -> TaggerWidget
 descriptorTreeWidget m =
   hstack_
     []
-    [ vstack_ [] [descriptorTreeRefreshBothButton]
-    , hsplit_
+    [ vstack_
         []
+        [ descriptorTreeRefreshBothButton
+        , descriptorTreeRequestParentButton
+        , descriptorTreeFixedRequestButton $
+            m ^. conf . descriptorTreeConf . treeRootRequest
+        ]
+    , hsplit_
+        [splitIgnoreChildResize True]
         ( descriptorTreeFocusedNodeWidget m
         , descriptorTreeUnrelatedWidget m
         )
@@ -63,7 +70,7 @@ descriptorTreeFocusedNodeWidget m =
   createRelationDropTarget =
     dropTarget_
       (DoDescriptorTreeEvent . CreateRelation (m ^. descriptorTreeModel . focusedNode))
-      [dropTargetStyle [bgColor yuiYellow, border 1 yuiOrange]]
+      [dropTargetStyle [border 3 yuiBlue]]
 
 descriptorTreeUnrelatedWidget :: TaggerModel -> TaggerWidget
 descriptorTreeUnrelatedWidget m =
@@ -96,14 +103,22 @@ descriptorTreeUnrelatedWidget m =
   createUnrelationDropTargetWidget =
     dropTarget_
       (DoDescriptorTreeEvent . CreateRelation (m ^. descriptorTreeModel . unrelatedNode))
-      [dropTargetStyle [bgColor yuiYellow, border 1 yuiBlue]]
+      [dropTargetStyle [border 3 yuiBlue]]
 
 descriptorWithInfoLabel :: DescriptorWithInfo -> TaggerWidget
 descriptorWithInfoLabel (DescriptorWithInfo d@(Descriptor _ dName) isMeta) =
   draggable d
-    . withStyleHover [bgColor yuiYellow, border 1 yuiOrange]
-    . withStyleBasic [textColor (if isMeta then yuiBlue else black)]
-    $ label dName
+    . withStyleHover [border 1 yuiOrange, bgColor yuiLightPeach]
+    . withStyleBasic [textColor (if isMeta then yuiBlue else black), textLeft]
+    $ button dName (DoDescriptorTreeEvent (RequestFocusedNode dName))
+
+descriptorTreeFixedRequestButton :: Text -> TaggerWidget
+descriptorTreeFixedRequestButton t =
+  styledButton "Top" (DoDescriptorTreeEvent . RequestFocusedNode $ t)
+
+descriptorTreeRequestParentButton :: TaggerWidget
+descriptorTreeRequestParentButton =
+  styledButton "Up" (DoDescriptorTreeEvent RequestFocusedNodeParent)
 
 descriptorTreeRefreshBothButton :: TaggerWidget
 descriptorTreeRefreshBothButton =
