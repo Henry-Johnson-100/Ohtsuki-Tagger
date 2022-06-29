@@ -744,15 +744,15 @@ insertDescriptors ps tc = do
       |]
 
 {- |
- Delete a list of descriptor name matches from the database.
+ Delete a list of 'Descriptor`s from the database.
 -}
-deleteDescriptors :: [T.Text] -> TaggedConnection -> IO ()
+deleteDescriptors :: [RecordKey Descriptor] -> TaggedConnection -> IO ()
 deleteDescriptors ps tc =
   executeMany tc q (Only <$> ps)
  where
   q =
     [r|
-    DELETE FROM Descriptor WHERE descriptor = ?
+    DELETE FROM Descriptor WHERE id = ?
     |]
 
 {- |
