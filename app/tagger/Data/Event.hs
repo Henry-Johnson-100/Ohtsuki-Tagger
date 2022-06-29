@@ -30,4 +30,5 @@ data DescriptorTreeEvent
   | RequestFocusedNode Text
   | RequestFocusedNodeParent
   | CreateRelation Descriptor Descriptor
+  | ToggleDescriptorTreeVisibility
   deriving (Show, Eq)

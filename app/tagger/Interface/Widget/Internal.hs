@@ -19,21 +19,39 @@ type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
 descriptorTreeWidget :: TaggerModel -> TaggerWidget
 descriptorTreeWidget m =
-  hstack_
-    []
-    [ vstack_
-        []
-        [ descriptorTreeRefreshBothButton
-        , descriptorTreeRequestParentButton
-        , descriptorTreeFixedRequestButton $
-            m ^. conf . descriptorTreeConf . treeRootRequest
-        ]
-    , hsplit_
-        [splitIgnoreChildResize True]
-        ( descriptorTreeFocusedNodeWidget m
-        , descriptorTreeUnrelatedWidget m
-        )
+  zstack_
+    [onlyTopActive]
+    [ nodeVisible
+        descriptorTreeWidgetMainPage
+        (VisibilityMain == (m ^. visibilityModel . descriptorTreeVis))
+    , nodeVisible
+        descriptorTreeWidgetAltPage
+        (VisibilityAlt == (m ^. visibilityModel . descriptorTreeVis))
     ]
+ where
+  descriptorTreeWidgetMainPage =
+    hstack_
+      []
+      [ vstack_
+          []
+          [ descriptorTreeToggleVisButton
+          , descriptorTreeRefreshBothButton
+          , descriptorTreeRequestParentButton
+          , descriptorTreeFixedRequestButton $
+              m ^. conf . descriptorTreeConf . treeRootRequest
+          ]
+      , hsplit_
+          [splitIgnoreChildResize True]
+          ( descriptorTreeFocusedNodeWidget m
+          , descriptorTreeUnrelatedWidget m
+          )
+      ]
+  descriptorTreeWidgetAltPage =
+    vstack_
+      []
+      [ descriptorTreeToggleVisButton
+      , label "sus"
+      ]
 
 descriptorTreeFocusedNodeWidget :: TaggerModel -> TaggerWidget
 descriptorTreeFocusedNodeWidget m =
@@ -111,6 +129,10 @@ descriptorWithInfoLabel (DescriptorWithInfo d@(Descriptor _ dName) isMeta) =
     . withStyleHover [border 1 yuiOrange, bgColor yuiLightPeach]
     . withStyleBasic [textColor (if isMeta then yuiBlue else black), textLeft]
     $ button dName (DoDescriptorTreeEvent (RequestFocusedNode dName))
+
+descriptorTreeToggleVisButton :: TaggerWidget
+descriptorTreeToggleVisButton =
+  styledButton "~" (DoDescriptorTreeEvent ToggleDescriptorTreeVisibility)
 
 descriptorTreeFixedRequestButton :: Text -> TaggerWidget
 descriptorTreeFixedRequestButton t =

@@ -133,6 +133,15 @@ descriptorTreeEventHandler
             )
         , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
         ]
+      ToggleDescriptorTreeVisibility ->
+        [ let currentVis = model ^. visibilityModel . descriptorTreeVis
+           in Model $
+                model & visibilityModel . descriptorTreeVis
+                  .~ ( if currentVis /= VisibilityMain
+                        then VisibilityMain
+                        else VisibilityAlt
+                     )
+        ]
 
 toDescriptorInfo :: TaggedConnection -> Descriptor -> IO DescriptorWithInfo
 toDescriptorInfo tc d = do

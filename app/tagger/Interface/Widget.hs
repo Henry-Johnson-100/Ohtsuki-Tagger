@@ -15,4 +15,4 @@ taggerApplicationUI ::
   TaggerWidget
 taggerApplicationUI _ m =
   keystroke_ [("Ctrl-R", RefreshUI)] [ignoreChildrenEvts] $
-    vstack [label "sus", descriptorTreeWidget m]
+    vstack [descriptorTreeWidget m]
