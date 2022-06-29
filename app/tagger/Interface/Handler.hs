@@ -133,13 +133,13 @@ descriptorTreeEventHandler
             )
         , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
         ]
-      ToggleDescriptorTreeVisibility ->
+      ToggleDescriptorTreeVisibility l ->
         [ let currentVis = model ^. visibilityModel . descriptorTreeVis
            in Model $
                 model & visibilityModel . descriptorTreeVis
-                  .~ ( if currentVis /= VisibilityMain
-                        then VisibilityMain
-                        else VisibilityAlt
+                  .~ ( if currentVis == VisibilityMain
+                        then VisibilityLabel l
+                        else VisibilityMain
                      )
         ]
 

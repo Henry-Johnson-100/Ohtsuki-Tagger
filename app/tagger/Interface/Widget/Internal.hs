@@ -19,39 +19,41 @@ type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
 descriptorTreeWidget :: TaggerModel -> TaggerWidget
 descriptorTreeWidget m =
-  zstack_
-    [onlyTopActive]
-    [ nodeVisible
-        descriptorTreeWidgetMainPage
-        (VisibilityMain == (m ^. visibilityModel . descriptorTreeVis))
+  vstack_
+    []
+    [ descriptorTreeWidgetMainPane
     , nodeVisible
-        descriptorTreeWidgetAltPage
-        (VisibilityAlt == (m ^. visibilityModel . descriptorTreeVis))
+        descriptorTreeWidgetAltPane
+        (VisibilityLabel "manage" == (m ^. visibilityModel . descriptorTreeVis))
     ]
  where
-  descriptorTreeWidgetMainPage =
-    hstack_
-      []
-      [ vstack_
-          []
-          [ descriptorTreeToggleVisButton
-          , descriptorTreeRefreshBothButton
-          , descriptorTreeRequestParentButton
-          , descriptorTreeFixedRequestButton $
-              m ^. conf . descriptorTreeConf . treeRootRequest
-          ]
-      , hsplit_
-          [splitIgnoreChildResize True]
-          ( descriptorTreeFocusedNodeWidget m
-          , descriptorTreeUnrelatedWidget m
-          )
-      ]
-  descriptorTreeWidgetAltPage =
+  descriptorTreeWidgetMainPane =
     vstack_
       []
-      [ descriptorTreeToggleVisButton
-      , label "sus"
+      [ hstack_
+          []
+          [ vstack_
+              []
+              [ descriptorTreeRefreshBothButton
+              , descriptorTreeRequestParentButton
+              , descriptorTreeFixedRequestButton $
+                  m ^. conf . descriptorTreeConf . treeRootRequest
+              ]
+          , hsplit_
+              [splitIgnoreChildResize True]
+              ( descriptorTreeFocusedNodeWidget m
+              , descriptorTreeUnrelatedWidget m
+              )
+          ]
+      , separatorLine
+      , descriptorTreeToggleVisButton
       ]
+  descriptorTreeWidgetAltPane =
+    withStyleBasic [border 1 black] $
+      vstack_
+        []
+        [ label "sus"
+        ]
 
 descriptorTreeFocusedNodeWidget :: TaggerModel -> TaggerWidget
 descriptorTreeFocusedNodeWidget m =
@@ -132,7 +134,9 @@ descriptorWithInfoLabel (DescriptorWithInfo d@(Descriptor _ dName) isMeta) =
 
 descriptorTreeToggleVisButton :: TaggerWidget
 descriptorTreeToggleVisButton =
-  styledButton "~" (DoDescriptorTreeEvent ToggleDescriptorTreeVisibility)
+  styledButton
+    "Manage Descriptors"
+    (DoDescriptorTreeEvent (ToggleDescriptorTreeVisibility "manage"))
 
 descriptorTreeFixedRequestButton :: Text -> TaggerWidget
 descriptorTreeFixedRequestButton t =
