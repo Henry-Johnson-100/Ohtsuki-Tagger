@@ -29,9 +29,6 @@ data TaggerModel = TaggerModel
   }
   deriving (Show, Eq)
 
-{- |
- Create a new 'TaggerModel` with the given 'TaggedConnection`
--}
 createTaggerModel ::
   TaggerConfig ->
   TaggedConnection ->
