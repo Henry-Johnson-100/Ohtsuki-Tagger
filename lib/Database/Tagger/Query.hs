@@ -61,6 +61,7 @@ module Database.Tagger.Query (
 
   -- | Queries that return 'Descriptor`s
   allDescriptors,
+  getUnrelatedDescriptorKey,
 
   -- *** On 'Descriptor`
   queryForDescriptorByPattern,
@@ -112,16 +113,15 @@ module Database.Tagger.Query (
 
 import Control.Monad
 import Control.Monad.Trans.Class (MonadTrans (lift))
-import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
+import Control.Monad.Trans.Except (ExceptT, throwE)
 import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
 import qualified Data.HashSet as HashSet
 import Data.HierarchyMap
 import Data.Maybe
 import qualified Data.Text as T
-import qualified Data.Text.IO as T.IO
 import Database.Tagger.Connection
+import Database.Tagger.Query.Type (TaggerQuery)
 import Database.Tagger.Type
-import System.IO (stderr)
 import Tagger.Util
 import Text.RawString.QQ (r)
 
@@ -726,33 +726,40 @@ updateFilePaths updates tc =
 -}
 insertDescriptors :: [T.Text] -> TaggedConnection -> IO ()
 insertDescriptors ps tc = do
-  insertionResult <-
-    runExceptT $ do
-      unrelatedDK <- getUnrelatedDescriptorKey tc
-      desKeys <- lift $ mapM insertDescriptorAndGetKey ps
-      lift $ createBulkInfraRelations tc unrelatedDK desKeys
-  either (T.IO.hPutStrLn stderr) pure insertionResult
+  executeMany tc q (Only <$> ps)
+  execute_ tc unrelateUnrelatedTaggerQuery
  where
-  insertDescriptorAndGetKey :: T.Text -> IO (RecordKey Descriptor)
-  insertDescriptorAndGetKey desName = do
-    execute tc q [desName]
-    lastInsertRowId tc
-   where
-    q =
-      [r|
-      INSERT INTO Descriptor (descriptor) VALUES (?)
-      |]
+  q =
+    [r|
+    INSERT INTO Descriptor (descriptor) VALUES (?)
+    |]
 
 {- |
  Delete a list of 'Descriptor`s from the database.
+
+ Also runs a maintenance execution on the db, inserting all 'Descriptor`s that are not
+ infra to anything as infra to #UNRELATED#.
 -}
 deleteDescriptors :: [RecordKey Descriptor] -> TaggedConnection -> IO ()
-deleteDescriptors ps tc =
+deleteDescriptors ps tc = do
   executeMany tc q (Only <$> ps)
+  execute_ tc unrelateUnrelatedTaggerQuery
  where
   q =
     [r|
     DELETE FROM Descriptor WHERE id = ?
+    |]
+
+unrelateUnrelatedTaggerQuery :: TaggerQuery
+unrelateUnrelatedTaggerQuery =
+  [r|
+    INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId)
+      SELECT
+        (SELECT id FROM Descriptor WHERE descriptor = '#UNRELATED#')
+        ,id
+      FROM Descriptor
+      WHERE id NOT IN (SELECT infraDescriptorId FROM MetaDescriptor)
+        AND id <> (SELECT id FROM Descriptor WHERE descriptor = '#ALL#')
     |]
 
 {- |
@@ -1041,43 +1048,29 @@ insertDescriptorRelation newMeta newInfra tc =
     |]
 
 {- |
- Convenience function for relating many 'Descriptor`s to one meta 'Descriptor`
+ Search for the #UNRELATED# 'Descriptor`, throw an exception if it is not found.
 -}
-createBulkInfraRelations ::
-  TaggedConnection ->
-  RecordKey Descriptor ->
-  [RecordKey Descriptor] ->
-  IO ()
-createBulkInfraRelations tc metaD =
-  executeMany
-    tc
-    [r|INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId)
-      VALUES (?,?)
-    |]
-    . zip (repeat metaD)
-
-getUnrelatedDescriptorKey :: TaggedConnection -> ExceptT T.Text IO (RecordKey Descriptor)
+getUnrelatedDescriptorKey :: TaggedConnection -> ExceptT T.Text IO Descriptor
 getUnrelatedDescriptorKey tc = do
   result <-
     lift $
       query_
         tc
         q ::
-      ExceptT T.Text IO [Only (RecordKey Descriptor)]
+      ExceptT T.Text IO [Descriptor]
   maybe
     ( throwE
         "#UNRELATED# Descriptor not found.\n\
         \Some database operations may be impossible to perform.\n\
         \Please reinitialize database to generate #UNRELATED# Descriptor."
     )
-    ( return . (\(Only x) -> x)
-    )
+    return
     . head'
     $ result
  where
   q =
     [r|
-    SELECT id FROM Descriptor WHERE descriptor = '#UNRELATED#'
+    SELECT id, descriptor FROM Descriptor WHERE descriptor = '#UNRELATED#'
     |]
 
 {- |
