@@ -70,6 +70,17 @@ descriptorTreeEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
+      CreateRelation (Descriptor mk _) (Descriptor ik _) ->
+        [ Task
+            ( IOEvent <$> do
+                insertDescriptorRelation mk ik conn
+            )
+        , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
+        ]
+      DeleteDescriptor (Descriptor dk _) ->
+        [ Task (IOEvent <$> deleteDescriptors [dk] conn)
+        , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
+        ]
       DescriptorTreeInit ->
         [ Event (DoDescriptorTreeEvent RefreshUnrelated)
         , Event
@@ -86,9 +97,42 @@ descriptorTreeEventHandler
                 <$> (head <$> queryForDescriptorByPattern "#UNRELATED#" conn)
             )
         ]
+      InsertDescriptor ->
+        [ Task
+            ( IOEvent <$> do
+                let newDesText =
+                      T.words
+                        . T.strip
+                        $ model ^. descriptorTreeModel . newDescriptorText
+                unless (null newDesText) (insertDescriptors newDesText conn)
+            )
+        , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
+        , Event . ClearTextField $ TaggerLens (descriptorTreeModel . newDescriptorText)
+        ]
+      PutFocusedTree_ nodeName ds ->
+        [ Model $
+            model
+              & descriptorTreeModel . focusedTree .~ ds
+              & descriptorTreeModel . focusedNode .~ nodeName
+        ]
+      PutUnrelated_ ds -> [Model $ model & descriptorTreeModel . unrelated .~ ds]
+      PutUnrelatedNode_ d -> [Model $ model & descriptorTreeModel . unrelatedNode .~ d]
+      PutUpdateDescriptorFrom d ->
+        [ Model $
+            model
+              & descriptorTreeModel . updateDescriptorFrom ?~ d
+        ]
       RefreshBothDescriptorTrees ->
         [ Event (DoDescriptorTreeEvent RefreshUnrelated)
         , Event (DoDescriptorTreeEvent RefreshFocusedTree)
+        ]
+      RefreshFocusedTree ->
+        [ Event
+            ( DoDescriptorTreeEvent
+                ( RequestFocusedNode . descriptor $
+                    model ^. descriptorTreeModel . focusedNode
+                )
+            )
         ]
       RefreshUnrelated ->
         [ Task
@@ -101,22 +145,6 @@ descriptorTreeEventHandler
                       unrelatedDs
                 mapM (toDescriptorInfo conn) ds
             )
-        ]
-      PutUnrelated_ ds -> [Model $ model & descriptorTreeModel . unrelated .~ ds]
-      PutUnrelatedNode_ d -> [Model $ model & descriptorTreeModel . unrelatedNode .~ d]
-      RefreshFocusedTree ->
-        [ Event
-            ( DoDescriptorTreeEvent
-                ( RequestFocusedNode . descriptor $
-                    model ^. descriptorTreeModel . focusedNode
-                )
-            )
-        ]
-      PutFocusedTree_ nodeName ds ->
-        [ Model $
-            model
-              & descriptorTreeModel . focusedTree .~ ds
-              & descriptorTreeModel . focusedNode .~ nodeName
         ]
       RequestFocusedNode p ->
         [ Task
@@ -147,13 +175,6 @@ descriptorTreeEventHandler
                   pd
             )
         ]
-      CreateRelation (Descriptor mk _) (Descriptor ik _) ->
-        [ Task
-            ( IOEvent <$> do
-                insertDescriptorRelation mk ik conn
-            )
-        , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
-        ]
       ToggleDescriptorTreeVisibility l ->
         [ let currentVis = model ^. visibilityModel . descriptorTreeVis
            in Model $
@@ -162,11 +183,6 @@ descriptorTreeEventHandler
                         then VisibilityLabel l
                         else VisibilityMain
                      )
-        ]
-      PutUpdateDescriptorFrom d ->
-        [ Model $
-            model
-              & descriptorTreeModel . updateDescriptorFrom ?~ d
         ]
       UpdateDescriptor ->
         maybe
@@ -190,22 +206,6 @@ descriptorTreeEventHandler
                       ]
           )
           (model ^. descriptorTreeModel . updateDescriptorFrom)
-      InsertDescriptor ->
-        [ Task
-            ( IOEvent <$> do
-                let newDesText =
-                      T.words
-                        . T.strip
-                        $ model ^. descriptorTreeModel . newDescriptorText
-                unless (null newDesText) (insertDescriptors newDesText conn)
-            )
-        , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
-        , Event . ClearTextField $ TaggerLens (descriptorTreeModel . newDescriptorText)
-        ]
-      DeleteDescriptor (Descriptor dk _) ->
-        [ Task (IOEvent <$> deleteDescriptors [dk] conn)
-        , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
-        ]
 
 toDescriptorInfo :: TaggedConnection -> Descriptor -> IO DescriptorWithInfo
 toDescriptorInfo tc d = do

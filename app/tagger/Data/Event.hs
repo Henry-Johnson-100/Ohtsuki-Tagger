@@ -31,19 +31,19 @@ data FocusedFileEvent
   deriving (Show, Eq)
 
 data DescriptorTreeEvent
-  = DescriptorTreeInit
-  | RefreshBothDescriptorTrees
-  | RefreshUnrelated
+  = CreateRelation Descriptor Descriptor
+  | DeleteDescriptor Descriptor
+  | DescriptorTreeInit
+  | InsertDescriptor
+  | PutFocusedTree_ Descriptor [DescriptorWithInfo]
   | PutUnrelated_ [DescriptorWithInfo]
   | PutUnrelatedNode_ Descriptor
+  | PutUpdateDescriptorFrom Descriptor
+  | RefreshBothDescriptorTrees
   | RefreshFocusedTree
-  | PutFocusedTree_ Descriptor [DescriptorWithInfo]
+  | RefreshUnrelated
   | RequestFocusedNode Text
   | RequestFocusedNodeParent
-  | CreateRelation Descriptor Descriptor
   | ToggleDescriptorTreeVisibility Text
-  | PutUpdateDescriptorFrom Descriptor
   | UpdateDescriptor
-  | InsertDescriptor
-  | DeleteDescriptor Descriptor
   deriving (Show, Eq)
