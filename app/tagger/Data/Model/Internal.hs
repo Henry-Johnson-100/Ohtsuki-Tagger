@@ -5,6 +5,7 @@ module Data.Model.Internal (
   TaggerModel (..),
   createTaggerModel,
   DescriptorTreeModel (..),
+  DescriptorWithInfo (..),
   createDescriptorTreeModel,
 ) where
 
@@ -41,11 +42,17 @@ createTaggerModel conf tc d =
     }
 
 data DescriptorTreeModel = DescriptorTreeModel
-  { _descriptortreeUnrelated :: [Descriptor]
+  { _descriptortreeUnrelated :: [DescriptorWithInfo]
   , _descriptortreeFocusedNode :: Descriptor
-  , _descriptortreeFocusedTree :: [Descriptor]
+  , _descriptortreeFocusedTree :: [DescriptorWithInfo]
   , _descriptortreeNewDescriptorText :: Text
   , _descriptortreeUpdateDescriptorText :: (Text, Text)
+  }
+  deriving (Show, Eq)
+
+data DescriptorWithInfo = DescriptorWithInfo
+  { _descriptorwithInfoDescriptor :: Descriptor
+  , _descriptorwithinfoDescriptorIsMeta :: Bool
   }
   deriving (Show, Eq)
 

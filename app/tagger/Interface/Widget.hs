@@ -13,4 +13,4 @@ taggerApplicationUI ::
   WidgetEnv TaggerModel TaggerEvent ->
   TaggerModel ->
   TaggerWidget
-taggerApplicationUI _ _ = vstack [label "sus", descriptorTreeWidget]
+taggerApplicationUI _ m = vstack [label "sus", descriptorTreeWidget m]

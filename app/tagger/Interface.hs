@@ -4,6 +4,7 @@ module Interface (
 
 import Control.Lens
 import Data.Config
+import Data.Event
 import Data.Model
 import Interface.Handler
 import Interface.Theme
@@ -17,4 +18,4 @@ runTagger m = do
     m
     taggerEventHandler
     taggerApplicationUI
-    themeConf
+    (themeConf ++ [appInitEvent TaggerInit])

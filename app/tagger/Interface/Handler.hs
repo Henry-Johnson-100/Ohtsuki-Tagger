@@ -21,6 +21,7 @@ taggerEventHandler ::
 taggerEventHandler wenv node model event =
   case event of
     DoDescriptorTreeEvent e -> descriptorTreeEventHandler wenv node model e
+    TaggerInit -> [Event (DoDescriptorTreeEvent DescriptorTreeInit)]
     ToggleMassOperate -> [Model $ model & isMassOperation %~ not]
     ToggleTagMode -> [Model $ model & isTagMode %~ not]
     CloseConnection -> [Task (IOEvent <$> close (model ^. connection))]
@@ -55,7 +56,8 @@ descriptorTreeEventHandler _ _ model event =
           ( DoDescriptorTreeEvent . PutUnrelated_ <$> do
               let conn = model ^. connection
               unrelatedDs <- queryForDescriptorByPattern "#UNRELATED#" conn
-              concat <$> mapM (flip getAllInfra conn . descriptorId) unrelatedDs
+              ds <- concat <$> mapM (flip getInfraChildren conn . descriptorId) unrelatedDs
+              mapM (toDescriptorInfo conn) ds
           )
       ]
     PutUnrelated_ ds -> [Model $ model & descriptorTreeModel . unrelated .~ ds]
@@ -84,7 +86,13 @@ descriptorTreeEventHandler _ _ model event =
                   return
                   . head'
                   $ ds
-              ids <- getAllInfra (descriptorId d) conn
-              return (d, ids)
+              ids <- getInfraChildren (descriptorId d) conn
+              idsInfo <- mapM (toDescriptorInfo conn) ids
+              return (d, idsInfo)
           )
       ]
+
+toDescriptorInfo :: TaggedConnection -> Descriptor -> IO DescriptorWithInfo
+toDescriptorInfo tc d = do
+  ch <- getInfraChildren (descriptorId d) tc
+  return . DescriptorWithInfo d . not . null $ ch

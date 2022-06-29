@@ -12,3 +12,5 @@ import Data.Model.Internal
 makeLensesWith abbreviatedFields ''TaggerModel
 
 makeLensesWith abbreviatedFields ''DescriptorTreeModel
+
+makeLensesWith abbreviatedFields ''DescriptorWithInfo

@@ -5,11 +5,13 @@ module Data.Event (
   DescriptorTreeEvent (..),
 ) where
 
+import Data.Model
 import Data.Text (Text)
 import Database.Tagger.Type
 
 data TaggerEvent
   = DoDescriptorTreeEvent DescriptorTreeEvent
+  | TaggerInit
   | ToggleMassOperate
   | ToggleTagMode
   | CloseConnection
@@ -20,8 +22,8 @@ data DescriptorTreeEvent
   = DescriptorTreeInit
   | RefreshBothDescriptorTrees
   | RefreshUnrelated
-  | PutUnrelated_ [Descriptor]
+  | PutUnrelated_ [DescriptorWithInfo]
   | RefreshFocusedTree
-  | PutFocusedTree_ Descriptor [Descriptor]
+  | PutFocusedTree_ Descriptor [DescriptorWithInfo]
   | RequestFocusedNode Text
   deriving (Show, Eq)
