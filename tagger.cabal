@@ -60,7 +60,7 @@ executable tagger
                       ,Interface.Widget.Internal
                       ,Util
 
-  -- other-extensions:
+  other-extensions:   ViewPatterns
 
   -- ghc-options:
 

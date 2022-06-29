@@ -13,4 +13,6 @@ taggerApplicationUI ::
   WidgetEnv TaggerModel TaggerEvent ->
   TaggerModel ->
   TaggerWidget
-taggerApplicationUI _ m = vstack [label "sus", descriptorTreeWidget m]
+taggerApplicationUI _ m =
+  keystroke_ [("Ctrl-R", RefreshUI)] [ignoreChildrenEvts] $
+    vstack [label "sus", descriptorTreeWidget m]

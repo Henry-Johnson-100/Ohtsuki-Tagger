@@ -30,11 +30,12 @@ createTaggerModel ::
   TaggerConfig ->
   TaggedConnection ->
   Descriptor ->
+  Descriptor ->
   TaggerModel
-createTaggerModel conf tc d =
+createTaggerModel conf tc d unRelatedD =
   TaggerModel
     { _taggermodelConf = conf
-    , _taggermodelDescriptorTreeModel = createDescriptorTreeModel d
+    , _taggermodelDescriptorTreeModel = createDescriptorTreeModel d unRelatedD
     , _taggermodelConnection = tc
     , _taggermodelIsMassOperation = False
     , _taggermodelIsTagMode = True
@@ -42,7 +43,8 @@ createTaggerModel conf tc d =
     }
 
 data DescriptorTreeModel = DescriptorTreeModel
-  { _descriptortreeUnrelated :: [DescriptorWithInfo]
+  { _descriptortreeUnrelatedNode :: Descriptor
+  , _descriptortreeUnrelated :: [DescriptorWithInfo]
   , _descriptortreeFocusedNode :: Descriptor
   , _descriptortreeFocusedTree :: [DescriptorWithInfo]
   , _descriptortreeNewDescriptorText :: Text
@@ -60,10 +62,11 @@ data DescriptorWithInfo = DescriptorWithInfo
  Create a new 'DescriptorTreeModel` with the given 'Descriptor` as the parent
  node.
 -}
-createDescriptorTreeModel :: Descriptor -> DescriptorTreeModel
-createDescriptorTreeModel n =
+createDescriptorTreeModel :: Descriptor -> Descriptor -> DescriptorTreeModel
+createDescriptorTreeModel n unrelatedD =
   DescriptorTreeModel
-    { _descriptortreeUnrelated = []
+    { _descriptortreeUnrelatedNode = unrelatedD
+    , _descriptortreeUnrelated = []
     , _descriptortreeFocusedNode = n
     , _descriptortreeFocusedTree = []
     , _descriptortreeNewDescriptorText = ""
