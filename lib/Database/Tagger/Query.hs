@@ -758,7 +758,7 @@ deleteDescriptors ps tc =
 {- |
  Given a tuple of 'Text` and a 'Descriptor`'s primary key, relabel that 'Descriptor`.
 -}
-updateDescriptors :: [(T.Text, RecordKey File)] -> TaggedConnection -> IO ()
+updateDescriptors :: [(T.Text, RecordKey Descriptor)] -> TaggedConnection -> IO ()
 updateDescriptors updates tc =
   executeMany tc q updates
  where

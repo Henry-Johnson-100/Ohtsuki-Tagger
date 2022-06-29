@@ -11,6 +11,7 @@ import Data.Event
 import qualified Data.List as L
 import Data.Model
 import Data.Text (Text)
+import qualified Data.Text as T
 import Database.Tagger.Type
 import Interface.Theme
 import Monomer
@@ -75,7 +76,8 @@ descriptorTreeWidget m =
     withStyleBasic [border 1 black] $
       vstack_
         []
-        [ label "sus"
+        [ updateDescriptorWidget m
+        , insertDescriptorWidget
         ]
 
 descriptorTreeFocusedNodeWidget :: TaggerModel -> TaggerWidget
@@ -147,6 +149,41 @@ descriptorTreeUnrelatedWidget m =
     dropTarget_
       (DoDescriptorTreeEvent . CreateRelation (m ^. descriptorTreeModel . unrelatedNode))
       [dropTargetStyle [border 3 yuiBlue]]
+
+updateDescriptorWidget :: TaggerModel -> TaggerWidget
+updateDescriptorWidget m =
+  dropTarget_
+    (DoDescriptorTreeEvent . PutUpdateDescriptorFrom)
+    [dropTargetStyle [border 1 yuiOrange]]
+    . keystroke_ [("Enter", DoDescriptorTreeEvent UpdateDescriptor)] [ignoreChildrenEvts]
+    $ hstack_
+      []
+      [ updateDescriptorButton
+      , updateDescriptorFromLabelWidget
+      , updateDescriptorToTextField
+      ]
+ where
+  updateDescriptorButton :: TaggerWidget
+  updateDescriptorButton = styledButton "Rename" (DoDescriptorTreeEvent UpdateDescriptor)
+
+  updateDescriptorFromLabelWidget :: TaggerWidget
+  updateDescriptorFromLabelWidget =
+    label
+      ( maybe
+          "No Descriptor"
+          (\(Descriptor dk dp) -> (T.pack . show $ dk) <> " : " <> dp)
+          (m ^. descriptorTreeModel . updateDescriptorFrom)
+      )
+
+  updateDescriptorToTextField :: TaggerWidget
+  updateDescriptorToTextField = textField_ (descriptorTreeModel . updateDescriptorTo) []
+
+insertDescriptorWidget :: TaggerWidget
+insertDescriptorWidget =
+  keystroke_ [("Enter", DoDescriptorTreeEvent InsertDescriptor)] [] . hstack_ [] $
+    [insertButton, textField_ (descriptorTreeModel . newDescriptorText) []]
+ where
+  insertButton = styledButton "Insert" (DoDescriptorTreeEvent InsertDescriptor)
 
 descriptorWithInfoLabel :: DescriptorWithInfo -> TaggerWidget
 descriptorWithInfoLabel (DescriptorWithInfo d@(Descriptor _ dName) isMeta) =

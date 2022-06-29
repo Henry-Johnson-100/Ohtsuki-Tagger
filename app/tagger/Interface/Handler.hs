@@ -1,16 +1,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use const" #-}
 
 module Interface.Handler (
   taggerEventHandler,
 ) where
 
 import Control.Lens
+import Control.Monad
 import Control.Monad.Trans.Maybe
 import Data.Config
 import Data.Event
 import Data.Model
+import qualified Data.Text as T
 import Database.Tagger
 import Monomer
 import Util
@@ -36,6 +41,7 @@ taggerEventHandler
       ToggleTagMode -> [Model $ model & isTagMode %~ not]
       CloseConnection -> [Task (IOEvent <$> close conn)]
       IOEvent _ -> []
+      ClearTextField (TaggerLens l) -> [Model $ model & l .~ ""]
 
 descriptorTreeEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -142,6 +148,47 @@ descriptorTreeEventHandler
                         else VisibilityMain
                      )
         ]
+      PutUpdateDescriptorFrom d ->
+        [ Model $
+            model
+              & descriptorTreeModel . updateDescriptorFrom ?~ d
+        ]
+      UpdateDescriptor ->
+        maybe
+          []
+          ( \d ->
+              let updateText = T.strip $ model ^. descriptorTreeModel . updateDescriptorTo
+               in if T.null updateText
+                    then []
+                    else
+                      [ Task
+                          ( IOEvent
+                              <$> updateDescriptors [(updateText, descriptorId d)] conn
+                          )
+                      , Event
+                          . ClearTextField
+                          $ TaggerLens (descriptorTreeModel . updateDescriptorTo)
+                      , Model $
+                          model
+                            & descriptorTreeModel . updateDescriptorFrom .~ Nothing
+                      , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
+                      ]
+          )
+          (model ^. descriptorTreeModel . updateDescriptorFrom)
+      InsertDescriptor ->
+        [ Task
+            ( IOEvent <$> do
+                let newDesText =
+                      T.strip $
+                        model ^. descriptorTreeModel . newDescriptorText
+                unless (T.null newDesText) (insertDescriptors [newDesText] conn)
+            )
+        , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
+        , Event . ClearTextField $ TaggerLens (descriptorTreeModel . newDescriptorText)
+        ]
+      DeleteDescriptor d -> []
+
+-- [Task (IOEvent <$> deleteDescriptors)]
 
 toDescriptorInfo :: TaggedConnection -> Descriptor -> IO DescriptorWithInfo
 toDescriptorInfo tc d = do

@@ -1,3 +1,4 @@
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StrictData #-}
 
 module Data.Event (
@@ -17,6 +18,7 @@ data TaggerEvent
   | ToggleTagMode
   | CloseConnection
   | IOEvent ()
+  | ClearTextField (TaggerLens TaggerModel Text)
   deriving (Show, Eq)
 
 data DescriptorTreeEvent
@@ -31,4 +33,8 @@ data DescriptorTreeEvent
   | RequestFocusedNodeParent
   | CreateRelation Descriptor Descriptor
   | ToggleDescriptorTreeVisibility Text
+  | PutUpdateDescriptorFrom Descriptor
+  | UpdateDescriptor
+  | InsertDescriptor
+  | DeleteDescriptor Descriptor
   deriving (Show, Eq)

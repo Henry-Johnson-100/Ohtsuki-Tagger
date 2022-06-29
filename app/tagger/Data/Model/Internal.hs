@@ -55,7 +55,8 @@ data DescriptorTreeModel = DescriptorTreeModel
   , _descriptortreeFocusedNode :: Descriptor
   , _descriptortreeFocusedTree :: [DescriptorWithInfo]
   , _descriptortreeNewDescriptorText :: Text
-  , _descriptortreeUpdateDescriptorText :: (Text, Text)
+  , _descriptortreeUpdateDescriptorFrom :: Maybe Descriptor
+  , _descriptortreeUpdateDescriptorTo :: Text
   }
   deriving (Show, Eq)
 
@@ -101,5 +102,6 @@ createDescriptorTreeModel n unrelatedD =
     , _descriptortreeFocusedNode = n
     , _descriptortreeFocusedTree = []
     , _descriptortreeNewDescriptorText = ""
-    , _descriptortreeUpdateDescriptorText = ("", "")
+    , _descriptortreeUpdateDescriptorFrom = Nothing
+    , _descriptortreeUpdateDescriptorTo = ""
     }

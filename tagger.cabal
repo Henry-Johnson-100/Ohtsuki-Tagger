@@ -61,6 +61,7 @@ executable tagger
                       ,Util
 
   other-extensions:   ViewPatterns
+                     ,RankNTypes
 
   -- ghc-options:
 
