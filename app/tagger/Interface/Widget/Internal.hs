@@ -40,13 +40,17 @@ __        _____ ____   ____ _____ _____
 
 descriptorTreeWidget :: TaggerModel -> TaggerWidget
 descriptorTreeWidget m =
-  vstack_
-    []
-    [ mainPane
-    , nodeVisible
-        altPane
-        (VisibilityLabel "manage" == (m ^. visibilityModel . descriptorTreeVis))
-    ]
+  flip nodeKey "descriptorTree" $
+    keystroke_
+      [("Ctrl-m", DoDescriptorTreeEvent (ToggleDescriptorTreeVisibility "manage"))]
+      [ignoreChildrenEvts]
+      $ vstack_
+        []
+        [ mainPane
+        , nodeVisible
+            altPane
+            (VisibilityLabel "manage" == (m ^. visibilityModel . descriptorTreeVis))
+        ]
  where
   mainPane =
     vstack_
@@ -55,7 +59,8 @@ descriptorTreeWidget m =
           []
           [ mainPaneLeftButtonStack
           , hsplit_
-              [splitIgnoreChildResize True]
+              [ splitIgnoreChildResize True
+              ]
               ( descriptorTreeFocusedNodeWidget m
               , descriptorTreeUnrelatedWidget m
               )
@@ -86,7 +91,9 @@ descriptorTreeWidget m =
 
 descriptorTreeFocusedNodeWidget :: TaggerModel -> TaggerWidget
 descriptorTreeFocusedNodeWidget m =
-  createRelationDropTarget descriptorTreeFocusedNodeWidgetBody
+  withStyleBasic [borderR 1 black]
+    . createRelationDropTarget
+    $ descriptorTreeFocusedNodeWidgetBody
  where
   descriptorTreeFocusedNodeWidgetBody :: TaggerWidget
   descriptorTreeFocusedNodeWidgetBody =
@@ -123,8 +130,9 @@ descriptorTreeFocusedNodeWidget m =
 
 descriptorTreeUnrelatedWidget :: TaggerModel -> TaggerWidget
 descriptorTreeUnrelatedWidget m =
-  createUnrelationDropTargetWidget
-    descriptorTreeUnrelatedWidgetBody
+  withStyleBasic [borderL 1 black]
+    . createUnrelationDropTargetWidget
+      $descriptorTreeUnrelatedWidgetBody
  where
   descriptorTreeUnrelatedWidgetBody :: TaggerWidget
   descriptorTreeUnrelatedWidgetBody =
