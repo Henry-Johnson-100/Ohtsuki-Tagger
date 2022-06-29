@@ -21,24 +21,18 @@ descriptorTreeWidget :: TaggerModel -> TaggerWidget
 descriptorTreeWidget m =
   vstack_
     []
-    [ descriptorTreeWidgetMainPane
+    [ mainPane
     , nodeVisible
-        descriptorTreeWidgetAltPane
+        altPane
         (VisibilityLabel "manage" == (m ^. visibilityModel . descriptorTreeVis))
     ]
  where
-  descriptorTreeWidgetMainPane =
+  mainPane =
     vstack_
       []
       [ hstack_
           []
-          [ vstack_
-              []
-              [ descriptorTreeRefreshBothButton
-              , descriptorTreeRequestParentButton
-              , descriptorTreeFixedRequestButton $
-                  m ^. conf . descriptorTreeConf . treeRootRequest
-              ]
+          [ mainPaneLeftButtonStack
           , hsplit_
               [splitIgnoreChildResize True]
               ( descriptorTreeFocusedNodeWidget m
@@ -48,7 +42,16 @@ descriptorTreeWidget m =
       , separatorLine
       , descriptorTreeToggleVisButton
       ]
-  descriptorTreeWidgetAltPane =
+   where
+    mainPaneLeftButtonStack =
+      vstack_
+        []
+        [ descriptorTreeRefreshBothButton
+        , descriptorTreeRequestParentButton
+        , descriptorTreeFixedRequestButton $
+            m ^. conf . descriptorTreeConf . treeRootRequest
+        ]
+  altPane =
     withStyleBasic [border 1 black] $
       vstack_
         []
