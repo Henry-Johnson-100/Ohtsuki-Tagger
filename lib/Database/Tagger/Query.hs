@@ -61,7 +61,7 @@ module Database.Tagger.Query (
 
   -- | Queries that return 'Descriptor`s
   allDescriptors,
-  getUnrelatedDescriptorKey,
+  getUnrelatedDescriptor,
 
   -- *** On 'Descriptor`
   queryForDescriptorByPattern,
@@ -1050,8 +1050,8 @@ insertDescriptorRelation newMeta newInfra tc =
 {- |
  Search for the #UNRELATED# 'Descriptor`, throw an exception if it is not found.
 -}
-getUnrelatedDescriptorKey :: TaggedConnection -> ExceptT T.Text IO Descriptor
-getUnrelatedDescriptorKey tc = do
+getUnrelatedDescriptor :: TaggedConnection -> ExceptT T.Text IO Descriptor
+getUnrelatedDescriptor tc = do
   result <-
     lift $
       query_
