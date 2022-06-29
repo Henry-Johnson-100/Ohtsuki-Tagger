@@ -1,9 +1,13 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StrictData #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use newtype instead of data" #-}
 
 module Data.Event (
   TaggerEvent (..),
   DescriptorTreeEvent (..),
+  FocusedFileEvent (..),
 ) where
 
 import Data.Model
@@ -11,7 +15,8 @@ import Data.Text (Text)
 import Database.Tagger.Type
 
 data TaggerEvent
-  = DoDescriptorTreeEvent DescriptorTreeEvent
+  = DoFocusedFileEvent FocusedFileEvent
+  | DoDescriptorTreeEvent DescriptorTreeEvent
   | TaggerInit
   | RefreshUI
   | ToggleMassOperate
@@ -19,6 +24,10 @@ data TaggerEvent
   | CloseConnection
   | IOEvent ()
   | ClearTextField (TaggerLens TaggerModel Text)
+  deriving (Show, Eq)
+
+data FocusedFileEvent
+  = PutFocusedFile File
   deriving (Show, Eq)
 
 data DescriptorTreeEvent

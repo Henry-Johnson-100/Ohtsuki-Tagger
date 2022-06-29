@@ -7,6 +7,7 @@
 module Data.Model.Internal (
   TaggerModel (..),
   createTaggerModel,
+  FocusedFileModel (..),
   DescriptorTreeModel (..),
   DescriptorWithInfo (..),
   createDescriptorTreeModel,
@@ -21,6 +22,7 @@ import Database.Tagger.Type
 data TaggerModel = TaggerModel
   { _taggermodelConf :: TaggerConfig
   , _taggermodelDescriptorTreeModel :: DescriptorTreeModel
+  , _taggermodelFocusedFileModel :: FocusedFileModel
   , _taggermodelVisibilityModel :: VisibilityModel
   , _taggermodelConnection :: TaggedConnection
   , _taggermodelIsMassOperation :: Bool
@@ -39,11 +41,23 @@ createTaggerModel conf tc d unRelatedD =
   TaggerModel
     { _taggermodelConf = conf
     , _taggermodelDescriptorTreeModel = createDescriptorTreeModel d unRelatedD
+    , _taggermodelFocusedFileModel = createFocusedFileModel
     , _taggermodelVisibilityModel = createVisibilityModel
     , _taggermodelConnection = tc
     , _taggermodelIsMassOperation = False
     , _taggermodelIsTagMode = True
     , _taggerFileSelection = []
+    }
+
+data FocusedFileModel = FocusedFileModel
+  { _focusedfilemodelFocusedFile :: Maybe ConcreteTaggedFile
+  }
+  deriving (Show, Eq)
+
+createFocusedFileModel :: FocusedFileModel
+createFocusedFileModel =
+  FocusedFileModel
+    { _focusedfilemodelFocusedFile = Nothing
     }
 
 data DescriptorTreeModel = DescriptorTreeModel

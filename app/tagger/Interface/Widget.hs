@@ -15,4 +15,4 @@ taggerApplicationUI ::
   TaggerWidget
 taggerApplicationUI _ m =
   keystroke_ [("Ctrl-R", RefreshUI)] [ignoreChildrenEvts] $
-    vstack [descriptorTreeWidget m]
+    vsplit_ [splitIgnoreChildResize True] (focusedFileWidget m, descriptorTreeWidget m)

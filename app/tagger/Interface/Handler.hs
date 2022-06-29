@@ -32,6 +32,7 @@ taggerEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
+      DoFocusedFileEvent e -> focusedFileEventHandler wenv node model e
       DoDescriptorTreeEvent e -> descriptorTreeEventHandler wenv node model e
       TaggerInit -> [Event (DoDescriptorTreeEvent DescriptorTreeInit)]
       RefreshUI ->
@@ -42,6 +43,20 @@ taggerEventHandler
       CloseConnection -> [Task (IOEvent <$> close conn)]
       IOEvent _ -> []
       ClearTextField (TaggerLens l) -> [Model $ model & l .~ ""]
+
+focusedFileEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  FocusedFileEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+focusedFileEventHandler
+  _
+  _
+  model@(_taggermodelConnection -> conn)
+  event =
+    case event of
+      PutFocusedFile _ -> undefined
 
 descriptorTreeEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->

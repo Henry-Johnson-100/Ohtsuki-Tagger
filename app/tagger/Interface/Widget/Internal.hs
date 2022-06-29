@@ -2,6 +2,7 @@
 
 module Interface.Widget.Internal (
   TaggerWidget,
+  focusedFileWidget,
   descriptorTreeWidget,
 ) where
 
@@ -17,6 +18,30 @@ import Interface.Theme
 import Monomer
 
 type TaggerWidget = WidgetNode TaggerModel TaggerEvent
+
+{-
+ _____ ___   ____ _   _ ____  _____ ____
+|  ___/ _ \ / ___| | | / ___|| ____|  _ \
+| |_ | | | | |   | | | \___ \|  _| | | | |
+|  _|| |_| | |___| |_| |___) | |___| |_| |
+|_|   \___/ \____|\___/|____/|_____|____/
+
+ _____ ___ _     _____
+|  ___|_ _| |   | ____|
+| |_   | || |   |  _|
+|  _|  | || |___| |___
+|_|   |___|_____|_____|
+
+__        _____ ____   ____ _____ _____
+\ \      / /_ _|  _ \ / ___| ____|_   _|
+ \ \ /\ / / | || | | | |  _|  _|   | |
+  \ V  V /  | || |_| | |_| | |___  | |
+   \_/\_/  |___|____/ \____|_____| |_|
+
+-}
+
+focusedFileWidget :: TaggerModel -> TaggerWidget
+focusedFileWidget _ = flip nodeKey "focusedFile" $ label "Fam"
 
 {-
  ____  _____ ____   ____ ____  ___ ____ _____ ___  ____

@@ -22,6 +22,8 @@ makeLensesWith abbreviatedFields ''TaggerModel
 
 makeLensesWith abbreviatedFields ''DescriptorTreeModel
 
+makeLensesWith abbreviatedFields ''FocusedFileModel
+
 makeLensesWith abbreviatedFields ''DescriptorWithInfo
 
 makeLensesWith abbreviatedFields ''VisibilityModel
