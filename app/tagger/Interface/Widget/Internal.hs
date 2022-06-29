@@ -77,7 +77,11 @@ descriptorTreeWidget m =
       vstack_
         []
         [ updateDescriptorWidget m
+        , spacer
         , insertDescriptorWidget
+        , spacer
+        , box_ [alignMiddle] deleteDescriptorWidget
+        , spacer
         ]
 
 descriptorTreeFocusedNodeWidget :: TaggerModel -> TaggerWidget
@@ -159,8 +163,11 @@ updateDescriptorWidget m =
     $ hstack_
       []
       [ updateDescriptorButton
-      , updateDescriptorFromLabelWidget
-      , updateDescriptorToTextField
+      , hgrid_
+          []
+          [ box_ [alignMiddle] updateDescriptorFromLabelWidget
+          , updateDescriptorToTextField
+          ]
       ]
  where
   updateDescriptorButton :: TaggerWidget
@@ -184,6 +191,14 @@ insertDescriptorWidget =
     [insertButton, textField_ (descriptorTreeModel . newDescriptorText) []]
  where
   insertButton = styledButton "Insert" (DoDescriptorTreeEvent InsertDescriptor)
+
+deleteDescriptorWidget :: TaggerWidget
+deleteDescriptorWidget =
+  withStyleBasic [border 1 yuiRed]
+    . dropTarget_
+      (DoDescriptorTreeEvent . DeleteDescriptor)
+      [dropTargetStyle [bgColor yuiRed, border 1 yuiYellow]]
+    $ label "Delete"
 
 descriptorWithInfoLabel :: DescriptorWithInfo -> TaggerWidget
 descriptorWithInfoLabel (DescriptorWithInfo d@(Descriptor _ dName) isMeta) =

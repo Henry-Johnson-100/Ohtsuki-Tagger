@@ -186,9 +186,10 @@ descriptorTreeEventHandler
         , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
         , Event . ClearTextField $ TaggerLens (descriptorTreeModel . newDescriptorText)
         ]
-      DeleteDescriptor d -> []
-
--- [Task (IOEvent <$> deleteDescriptors)]
+      DeleteDescriptor (Descriptor dk _) ->
+        [ Task (IOEvent <$> deleteDescriptors [dk] conn)
+        , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
+        ]
 
 toDescriptorInfo :: TaggedConnection -> Descriptor -> IO DescriptorWithInfo
 toDescriptorInfo tc d = do
