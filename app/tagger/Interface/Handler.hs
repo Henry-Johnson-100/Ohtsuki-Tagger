@@ -179,9 +179,10 @@ descriptorTreeEventHandler
         [ Task
             ( IOEvent <$> do
                 let newDesText =
-                      T.strip $
-                        model ^. descriptorTreeModel . newDescriptorText
-                unless (T.null newDesText) (insertDescriptors [newDesText] conn)
+                      T.words
+                        . T.strip
+                        $ model ^. descriptorTreeModel . newDescriptorText
+                unless (null newDesText) (insertDescriptors newDesText conn)
             )
         , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
         , Event . ClearTextField $ TaggerLens (descriptorTreeModel . newDescriptorText)
