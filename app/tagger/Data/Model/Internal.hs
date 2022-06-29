@@ -1,5 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use newtype instead of data" #-}
 
 module Data.Model.Internal (
   TaggerModel (..),
@@ -7,15 +10,18 @@ module Data.Model.Internal (
   DescriptorTreeModel (..),
   DescriptorWithInfo (..),
   createDescriptorTreeModel,
+  VisibilityModel (..),
+  Visibility (..),
 ) where
 
-import Data.Config (TaggerConfig)
+import Data.Config.Internal (TaggerConfig)
 import Data.Text (Text)
 import Database.Tagger.Type
 
 data TaggerModel = TaggerModel
   { _taggermodelConf :: TaggerConfig
   , _taggermodelDescriptorTreeModel :: DescriptorTreeModel
+  , _taggermodelVisibilityModel :: VisibilityModel
   , _taggermodelConnection :: TaggedConnection
   , _taggermodelIsMassOperation :: Bool
   , _taggermodelIsTagMode :: Bool
@@ -36,6 +42,7 @@ createTaggerModel conf tc d unRelatedD =
   TaggerModel
     { _taggermodelConf = conf
     , _taggermodelDescriptorTreeModel = createDescriptorTreeModel d unRelatedD
+    , _taggermodelVisibilityModel = createVisibilityModel
     , _taggermodelConnection = tc
     , _taggermodelIsMassOperation = False
     , _taggermodelIsTagMode = True
@@ -50,6 +57,30 @@ data DescriptorTreeModel = DescriptorTreeModel
   , _descriptortreeNewDescriptorText :: Text
   , _descriptortreeUpdateDescriptorText :: (Text, Text)
   }
+  deriving (Show, Eq)
+
+data VisibilityModel = VisibilityModel
+  { _visibilitymodelDescriptorTreeVis :: Visibility
+  }
+  deriving (Show, Eq)
+
+createVisibilityModel :: VisibilityModel
+createVisibilityModel =
+  VisibilityModel
+    { _visibilitymodelDescriptorTreeVis = VisibilityMain
+    }
+
+{- |
+ Generic data type for changing visibility of a widget.
+
+ Provides labels for visibility for a main page and alternate page and
+ two additional constructors for either numbered pages or labeled pages.
+-}
+data Visibility
+  = VisibilityMain
+  | VisibilityAlt
+  | VisibilityNum Int
+  | VisibilityLabel Text
   deriving (Show, Eq)
 
 data DescriptorWithInfo = DescriptorWithInfo

@@ -14,3 +14,5 @@ makeLensesWith abbreviatedFields ''TaggerModel
 makeLensesWith abbreviatedFields ''DescriptorTreeModel
 
 makeLensesWith abbreviatedFields ''DescriptorWithInfo
+
+makeLensesWith abbreviatedFields ''VisibilityModel
