@@ -16,6 +16,8 @@ data-files:          Yui_signature_SS.bmp
                     ,iosevka_thin.ttf
                     ,iosevka_regular.ttf
                     ,iosevka_bold.ttf
+                    ,TaggerSchemaDefinition.sql
+                    ,TaggerSchemaTeardown.sql
                      
 common haskell-common
   default-language:    Haskell2010
@@ -30,6 +32,7 @@ common tagger-common
                       ,FlexibleInstances
                       ,FunctionalDependencies
                       ,StrictData
+                      ,ViewPatterns
 
   other-modules:       Paths_tagger
 
@@ -60,8 +63,7 @@ executable tagger
                       ,Interface.Widget.Internal
                       ,Util
 
-  other-extensions:   ViewPatterns
-                     ,RankNTypes
+  other-extensions:   RankNTypes
 
   -- ghc-options:
 
@@ -174,7 +176,7 @@ library tagger-lib
                       ,QuasiQuotes
                       ,TupleSections
                       ,FlexibleContexts
-                      ,ViewPatterns
+                      ,BangPatterns
 
   hs-source-dirs:      lib
 

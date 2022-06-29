@@ -79,17 +79,11 @@ open p = do
   let tagName = T.pack p
   bc <- fmap BareConnection . Simple.open $ p
   dbInfoTableExists <- taggerDBInfoTableExists bc
-  unless
-    dbInfoTableExists
-    ( withConnection
-        (withConnectionHandle (`SQLite3.exec` (\(SQLiteScript s) -> s) schemaDefinition))
-        bc
-    )
   activateForeignKeyPragma bc
+  let conn = TaggedConnection tagName bc
+  unless dbInfoTableExists (initializeDatabase conn)
   updateTaggerDBInfoVersion bc
   updateTaggerDBInfoLastAccessed bc
-  let conn = TaggedConnection tagName bc
-  seq conn (pure ())
   return conn
 
 {- |
@@ -205,13 +199,15 @@ lastInsertRowId = withBareConnection bareLastInsertRowId
  schema definition, but it would be best to avoid doing that anyways.
 -}
 initializeDatabase :: TaggedConnection -> IO ()
-initializeDatabase =
+initializeDatabase tc = do
+  initScript <- schemaDefinition
   withBareConnection
     ( withConnection
         ( withConnectionHandle
-            (`SQLite3.exec` (\(SQLiteScript s) -> s) schemaDefinition)
+            (`SQLite3.exec` (\(SQLiteScript s) -> s) initScript)
         )
     )
+    tc
 
 {- |
  DROP all tables defined in the schemaDefinition.
@@ -219,13 +215,15 @@ initializeDatabase =
  This is really only used for generating and tearing down test databases.
 -}
 teardownDatabase :: TaggedConnection -> IO ()
-teardownDatabase =
+teardownDatabase tc = do
+  teardownScript <- schemaTeardown
   withBareConnection
     ( withConnection
         ( withConnectionHandle
-            (`SQLite3.exec` (\(SQLiteScript s) -> s) schemaTeardown)
+            (`SQLite3.exec` (\(SQLiteScript s) -> s) teardownScript)
         )
     )
+    tc
 
 {- |
  Run an action using a 'TaggedConnection`'s 'BareConnection`
@@ -307,7 +305,7 @@ updateTaggerDBInfoVersion bc = do
       else pure ()
    where
     v0_3_4_0_v_0_3_4_2 =
-      runPatch update0_3_4_0To0_3_4_2
+      runPatch =<< update0_3_4_0To0_3_4_2
     runPatch p =
       withConnection
         ( withConnectionHandle
