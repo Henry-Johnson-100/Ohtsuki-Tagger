@@ -54,6 +54,18 @@ executable tagger
                       ,Component.DescriptorTree.Model
                       ,Component.DescriptorTree.Model.Core
                       ,Component.DescriptorTree.Model.Lens
+                      ,Component.FocusedFile
+                      ,Component.FocusedFile.Event
+                      ,Component.FocusedFile.Handler
+                      ,Component.FocusedFile.Model
+                      ,Component.FocusedFile.Model.Core
+                      ,Component.FocusedFile.Model.Lens                      
+                      ,Component.Tagger
+                      ,Component.Tagger.Event
+                      ,Component.Tagger.Handler
+                      ,Component.Tagger.Model
+                      ,Component.Tagger.Model.Core
+                      ,Component.Tagger.Model.Lens                      
                       ,Data.Config
                       ,Data.Config.Lens
                       ,Data.Config.Internal

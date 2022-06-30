@@ -15,6 +15,42 @@ cradle:
     - path: "app/tagger/Component/DescriptorTree/Model/Lens.hs"
       component: "tagger:exe:tagger"
 
+    - path: "app/tagger/Component/FocusedFile.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Component/FocusedFile/Event.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Component/FocusedFile/Handler.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Component/FocusedFile/Model.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Component/FocusedFile/Model/Core.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Component/FocusedFile/Model/Lens.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Component/Tagger.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Component/Tagger/Event.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Component/Tagger/Handler.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Component/Tagger/Model.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Component/Tagger/Model/Core.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Component/Tagger/Model/Lens.hs"
+      component: "tagger:exe:tagger"
+
     - path: "app/tagger/Data/Config.hs"
       component: "tagger:exe:tagger"
 
@@ -64,4 +100,4 @@ cradle:
       component: "tagger:exe:tagger"
 
     - path: "lib"
-      component: "tagger:lib:tagger-lib"
+      component: "lib:tagger"
