@@ -38,7 +38,6 @@ import Data.Hashable (Hashable)
 import Data.HierarchyMap (HierarchyMap)
 import Data.Int (Int64)
 import Data.Maybe (isJust)
-import Data.OccurrenceMap
 import Data.Text (Text)
 import Database.SQLite.Simple (FromRow (..), field)
 import Database.SQLite.Simple.FromField (FromField (..))
@@ -60,9 +59,6 @@ instance FromField (RecordKey a) where
 
 instance ToField (RecordKey a) where
   toField (RecordKey k) = toField k
-
-instance OccurrenceMapKey (RecordKey a) where
-  toOccurrenceMapKey (RecordKey n) = toOccurrenceMapKey n
 
 {- |
  An empty class for types that are identifiable by a RowId or Primary Key.

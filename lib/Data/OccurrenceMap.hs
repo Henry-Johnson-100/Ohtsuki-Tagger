@@ -13,7 +13,6 @@ These queries are called occurrences.
 -}
 module Data.OccurrenceMap (
   OccurrenceMap (..),
-  OccurrenceMapKey (..),
   get,
   set,
   occur,
@@ -22,4 +21,12 @@ module Data.OccurrenceMap (
   unions,
 ) where
 
-import Data.OccurrenceMap.Internal
+import Data.OccurrenceMap.Internal (
+  OccurrenceMap (..),
+  empty,
+  get,
+  occur,
+  set,
+  union,
+  unions,
+ )
