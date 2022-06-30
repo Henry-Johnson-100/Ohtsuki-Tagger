@@ -151,6 +151,7 @@ library tagger-lib
   exposed-modules:     Database.Tagger
                       ,Database.Tagger.Type
                       ,Data.HierarchyMap
+                      ,Data.OccurrenceMap
                       ,Data.Tagger
                       ,Text.TaggerQL
                       ,Text.TaggerQL.Parser.Internal
