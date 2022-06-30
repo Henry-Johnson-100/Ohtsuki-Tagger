@@ -51,7 +51,6 @@ executable tagger
   main-is:             Main.hs
 
   other-modules:       Component.DescriptorTree
-                      ,Component.DescriptorTree.Event
                       ,Component.DescriptorTree.Model
                       ,Component.DescriptorTree.Model.Core
                       ,Component.DescriptorTree.Model.Lens
@@ -62,6 +61,9 @@ executable tagger
                       ,Data.Model
                       ,Data.Model.Internal
                       ,Data.Model.Lens
+                      ,Data.Model.Shared
+                      ,Data.Model.Shared.Core
+                      ,Data.Model.Shared.Lens
                       ,Interface
                       ,Interface.Handler
                       ,Interface.Theme

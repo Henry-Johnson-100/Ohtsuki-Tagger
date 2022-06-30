@@ -6,9 +6,6 @@ cradle:
     - path: "app/tagger/Component/DescriptorTree.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/tagger/Component/DescriptorTree/Event.hs"
-      component: "tagger:exe:tagger"
-
     - path: "app/tagger/Component/DescriptorTree/Model.hs"
       component: "tagger:exe:tagger"
 
@@ -37,6 +34,15 @@ cradle:
       component: "tagger:exe:tagger"
 
     - path: "app/tagger/Data/Model/Lens.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Data/Model/Shared.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Data/Model/Shared/Core.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Data/Model/Shared/Lens.hs"
       component: "tagger:exe:tagger"
 
     - path: "app/tagger/Interface.hs"
