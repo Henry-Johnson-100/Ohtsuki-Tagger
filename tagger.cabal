@@ -57,6 +57,9 @@ executable tagger
                       ,Data.Model
                       ,Data.Model.Internal
                       ,Data.Model.Lens
+                      ,Data.Model.Shared
+                      ,Data.Model.Shared.Core
+                      ,Data.Model.Shared.Lens
                       ,Interface
                       ,Interface.Handler
                       ,Interface.Theme

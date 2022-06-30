@@ -12,13 +12,12 @@ module Data.Model.Internal (
   DescriptorTreeModel (..),
   DescriptorWithInfo (..),
   createDescriptorTreeModel,
-  VisibilityModel (..),
-  Visibility (..),
   Renderability (..),
 ) where
 
 import Data.Config.Internal (TaggerConfig)
 import Data.HierarchyMap (empty)
+import Data.Model.Shared
 import Data.Text (Text)
 import Database.Tagger.Type
 
@@ -78,30 +77,6 @@ data DescriptorTreeModel = DescriptorTreeModel
   , _descriptortreeUpdateDescriptorFrom :: Maybe Descriptor
   , _descriptortreeUpdateDescriptorTo :: Text
   }
-  deriving (Show, Eq)
-
-data VisibilityModel = VisibilityModel
-  { _visibilitymodelDescriptorTreeVis :: Visibility
-  }
-  deriving (Show, Eq)
-
-createVisibilityModel :: VisibilityModel
-createVisibilityModel =
-  VisibilityModel
-    { _visibilitymodelDescriptorTreeVis = VisibilityMain
-    }
-
-{- |
- Generic data type for changing visibility of a widget.
-
- Provides labels for visibility for a main page and alternate page and
- two additional constructors for either numbered pages or labeled pages.
--}
-data Visibility
-  = VisibilityMain
-  | VisibilityAlt
-  | VisibilityNum Int
-  | VisibilityLabel Text
   deriving (Show, Eq)
 
 data DescriptorWithInfo = DescriptorWithInfo

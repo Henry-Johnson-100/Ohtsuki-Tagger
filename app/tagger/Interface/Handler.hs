@@ -16,6 +16,7 @@ import Data.Config
 import Data.Event
 import Data.HierarchyMap (empty)
 import Data.Model
+import Data.Model.Shared
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger

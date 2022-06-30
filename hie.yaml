@@ -24,6 +24,15 @@ cradle:
     - path: "app/tagger/Data/Model/Lens.hs"
       component: "tagger:exe:tagger"
 
+    - path: "app/tagger/Data/Model/Shared.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Data/Model/Shared/Core.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Data/Model/Shared/Lens.hs"
+      component: "tagger:exe:tagger"
+
     - path: "app/tagger/Interface.hs"
       component: "tagger:exe:tagger"
 
