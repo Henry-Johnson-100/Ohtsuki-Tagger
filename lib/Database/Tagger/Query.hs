@@ -89,6 +89,7 @@ module Database.Tagger.Query (
 
   -- ** Misc.
   hasInfraRelations,
+  getTagOccurrences,
 
   -- * Operations
   -- $Operations
@@ -116,8 +117,9 @@ import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT, throwE)
 import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
 import qualified Data.HashSet as HashSet
-import Data.HierarchyMap
+import qualified Data.HierarchyMap as HAM
 import Data.Maybe
+import qualified Data.OccurrenceMap.Internal as OM
 import qualified Data.Text as T
 import Database.Tagger.Connection
 import Database.Tagger.Query.Type (TaggerQuery)
@@ -622,7 +624,7 @@ queryForConcreteTaggedFileWithFileId rk tc = do
       . fmap (map (second HashSet.fromList) . catMaybes)
       . mapM (runMaybeT . traverseRelationTuple . getRelationTuple)
       $ fileTags
-  let fileTagMap = inserts concreteFileTags empty
+  let fileTagMap = HAM.inserts concreteFileTags HAM.empty
   return $ ConcreteTaggedFile file fileTagMap
  where
   getRelationTuple (Tag t _ _ ms) =
@@ -952,6 +954,26 @@ hasInfraRelations dk tc = do
         WHERE metaDescriptorId = ?
       )
     |]
+
+{- |
+ Given a list of 'Descriptor`s, retrieve an 'OccurrenceMap` for how many distinct
+ 'File`s are tagged for each one.
+-}
+getTagOccurrences :: [RecordKey Descriptor] -> TaggedConnection -> IO OM.OccurrenceMap
+getTagOccurrences ds tc = do
+  ots <- mapM getOccurrunceTuple ds :: IO [(RecordKey Descriptor, Int)]
+  return . OM.fromList $ ots
+ where
+  getOccurrunceTuple dk = do
+    o <- fromMaybe 0 . head' . map (\(Only n) -> n) <$> query tc q [dk]
+    return (dk, o)
+   where
+    q =
+      [r|
+        SELECT COUNT (DISTINCT fileId)
+        FROM Tag
+        WHERE descriptorId = ?
+        |]
 
 {- |
  Returns all 'Tag`s in the database.
