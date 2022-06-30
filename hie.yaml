@@ -63,5 +63,8 @@ cradle:
     - path: "app/tagger/Util.hs"
       component: "tagger:exe:tagger"
 
-    - path: "lib"
-      component: "tagger:lib:tagger-lib"
+    - path: "lib/tagger"
+      component: "lib:tagger"
+
+    - path: "lib/tagger-shared-config"
+      component: "tagger:lib:tagger-shared-config"

@@ -76,6 +76,7 @@ executable tagger
   -- ghc-options:
 
   build-depends:      tagger
+                      ,tagger-shared-config
                       ,monomer == 1.4.1.0
                       ,tomland == 1.3.3.1
                       ,directory == 1.3.6.0
@@ -188,7 +189,7 @@ library
                       ,FlexibleContexts
                       ,BangPatterns
 
-  hs-source-dirs:      lib
+  hs-source-dirs:      lib/tagger
 
   -- ghc-options:
 
@@ -199,3 +200,20 @@ library
                       ,parsec
 
   default-language:    Haskell2010
+
+library tagger-shared-config
+  import:              haskell-common
+                      ,tagger-common
+
+  exposed-modules:     System.Tagger.Config
+
+  -- other-modules:
+
+  -- other-extensions:
+
+  hs-source-dirs:      lib/tagger-shared-config
+
+  build-depends:       tagger
+                      ,tomland == 1.3.3.1
+                      ,directory == 1.3.6.0
+                      ,filepath == 1.4.2.1
