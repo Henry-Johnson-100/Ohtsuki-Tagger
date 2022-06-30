@@ -961,10 +961,10 @@ hasInfraRelations dk tc = do
 -}
 getTagOccurrences :: [RecordKey Descriptor] -> TaggedConnection -> IO OM.OccurrenceMap
 getTagOccurrences ds tc = do
-  ots <- mapM getOccurrunceTuple ds :: IO [(RecordKey Descriptor, Int)]
+  ots <- mapM getOccurrenceTuple ds :: IO [(RecordKey Descriptor, Int)]
   return . OM.fromList $ ots
  where
-  getOccurrunceTuple dk = do
+  getOccurrenceTuple dk = do
     o <- fromMaybe 0 . head' . map (\(Only n) -> n) <$> query tc q [dk]
     return (dk, o)
    where
