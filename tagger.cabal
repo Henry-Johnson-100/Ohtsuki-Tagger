@@ -50,7 +50,12 @@ executable tagger
 
   main-is:             Main.hs
 
-  other-modules:       Data.Config
+  other-modules:       Component.DescriptorTree
+                      ,Component.DescriptorTree.Event
+                      ,Component.DescriptorTree.Model
+                      ,Component.DescriptorTree.Model.Core
+                      ,Component.DescriptorTree.Model.Lens
+                      ,Data.Config
                       ,Data.Config.Lens
                       ,Data.Config.Internal
                       ,Data.Event
