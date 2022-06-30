@@ -2,10 +2,11 @@ module Component.FocusedFile.Event (
   FocusedFileEvent (..),
 ) where
 
+import Data.OccurrenceMap (OccurrenceMap)
 import Database.Tagger.Type
 
 data FocusedFileEvent
   = PutConcreteFile ConcreteTaggedFile
+  | PutTagOccurrences OccurrenceMap
   | RequestConcreteFile File
-  | RequestTagOccurrences
   deriving (Show, Eq)
