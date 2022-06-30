@@ -237,6 +237,5 @@ descriptorTreeEventHandler
           (model ^. descriptorTreeModel . updateDescriptorFrom)
 
 toDescriptorInfo :: TaggedConnection -> Descriptor -> IO DescriptorWithInfo
-toDescriptorInfo tc d = do
-  ch <- getInfraChildren (descriptorId d) tc
-  return . DescriptorWithInfo d . not . null $ ch
+toDescriptorInfo tc d@(Descriptor dk _) =
+  DescriptorWithInfo d <$> hasInfraRelations dk tc
