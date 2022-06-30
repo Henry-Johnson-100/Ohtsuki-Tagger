@@ -164,6 +164,7 @@ library tagger-lib
                       ,Database.Tagger.Query.Type
                       ,Database.Tagger.Connection
                       ,Data.Hierarchy.Internal
+                      ,Data.OccurrenceMap.Internal
                       ,Tagger.Info
                       ,Tagger.Util
 
