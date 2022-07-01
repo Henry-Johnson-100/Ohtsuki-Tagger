@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
@@ -226,44 +227,56 @@ descriptorTreeLeaf
   ((^. descriptorTreeModel . descriptorInfoMap) -> m)
   d@(Descriptor dk p) =
     let di = m ^. descriptorInfoMapAt (fromIntegral dk)
-     in zstack_
-          []
-          [ withNodeVisible
-              (VisibilityMain == di ^. descriptorInfoVis)
-              $ hstack_
-                []
-                [ styledButton
-                    "sus"
-                    ( DoDescriptorTreeEvent
-                        (ToggleDescriptorLeafVisibility dk)
-                    )
-                , draggable d
-                    . withStyleHover [border 1 yuiOrange, bgColor yuiLightPeach]
-                    . withStyleBasic
-                      [ textColor (if di ^. descriptorIsMeta then yuiBlue else black)
-                      , textLeft
-                      ]
-                    $ button p (DoDescriptorTreeEvent (RequestFocusedNode p))
-                ]
-          , withNodeVisible
-              (VisibilityAlt == di ^. descriptorInfoVis)
-              . hstack_ []
-              $ [ styledButton
-                    "Back"
-                    (DoDescriptorTreeEvent (ToggleDescriptorLeafVisibility dk))
-                , styledButton "Commit" (DoDescriptorTreeEvent (UpdateDescriptor dk))
-                , keystroke_
-                    [("Enter", DoDescriptorTreeEvent (UpdateDescriptor dk))]
-                    []
-                    $ textField_
-                      ( descriptorTreeModel
-                          . descriptorInfoMap
-                          . descriptorInfoMapAt (fromIntegral dk)
-                          . renameText
-                      )
-                      []
-                ]
-          ]
+     in box_ [alignLeft] $
+          zstack_
+            []
+            [ withNodeVisible
+                (VisibilityMain == di ^. descriptorInfoVis)
+                $ mainPage di
+            , withNodeVisible
+                (VisibilityAlt == di ^. descriptorInfoVis)
+                altPage
+            ]
+   where
+    mainPage di =
+      hstack_
+        []
+        [ box_ [alignCenter]
+            . withStyleHover [border 0 black, bgColor yuiLightPeach]
+            . withStyleBasic [border 0 black, bgColor yuiLightPeach]
+            $ button
+              "->"
+              ( DoDescriptorTreeEvent
+                  (ToggleDescriptorLeafVisibility dk)
+              )
+        , draggable d
+            . box_ [alignLeft]
+            . withStyleHover [border 1 yuiOrange, bgColor yuiLightPeach]
+            . withStyleBasic
+              [ textColor (if di ^. descriptorIsMeta then yuiBlue else black)
+              , textLeft
+              ]
+            $ button p (DoDescriptorTreeEvent (RequestFocusedNode p))
+        ]
+    altPage =
+      hstack_
+        []
+        [ withStyleHover [border 0 black, bgColor yuiLightPeach]
+            . withStyleBasic [bgColor yuiLightPeach]
+            $ button
+              "<-"
+              (DoDescriptorTreeEvent (ToggleDescriptorLeafVisibility dk))
+        , keystroke_
+            [("Enter", DoDescriptorTreeEvent (UpdateDescriptor dk))]
+            []
+            $ textField_
+              ( descriptorTreeModel
+                  . descriptorInfoMap
+                  . descriptorInfoMapAt (fromIntegral dk)
+                  . renameText
+              )
+              []
+        ]
 
 -- ((^. descriptorTreeModel . configuringLeaves) -> configuringLeavesSet)
 -- (DescriptorWithInfo d@(Descriptor dk dName) isMeta) =
