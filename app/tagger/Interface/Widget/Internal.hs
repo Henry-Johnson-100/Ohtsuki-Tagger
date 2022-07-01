@@ -261,14 +261,16 @@ descriptorTreeLeaf
     altPage =
       hstack_
         []
-        [ withStyleHover [border 0 black, bgColor yuiLightPeach]
+        [ box_ [alignCenter]
+            . withStyleHover [border 0 black, bgColor yuiLightPeach]
             . withStyleBasic [bgColor yuiLightPeach]
             $ button
               "<-"
               (DoDescriptorTreeEvent (ToggleDescriptorLeafVisibility dk))
-        , keystroke_
-            [("Enter", DoDescriptorTreeEvent (UpdateDescriptor dk))]
-            []
+        , box_ [alignLeft]
+            . keystroke_
+              [("Enter", DoDescriptorTreeEvent (UpdateDescriptor dk))]
+              []
             $ textField_
               ( descriptorTreeModel
                   . descriptorInfoMap
@@ -276,30 +278,11 @@ descriptorTreeLeaf
                   . renameText
               )
               []
+        , box_ [alignLeft]
+            . withStyleHover [bgColor yuiRed, textColor white]
+            . withStyleBasic [textColor yuiRed]
+            $ button "Delete" (DoDescriptorTreeEvent (DeleteDescriptor d))
         ]
-
--- ((^. descriptorTreeModel . configuringLeaves) -> configuringLeavesSet)
--- (DescriptorWithInfo d@(Descriptor dk dName) isMeta) =
---   zstack_
---     []
---     [ withNodeVisible (not visibleConfiguration) $
---         hstack_
---           []
---           [ styledButton "-" (DoDescriptorTreeEvent (ConfigureDescriptorLeaf d))
---           , draggable d
---               . withStyleHover [border 1 yuiOrange, bgColor yuiLightPeach]
---               . withStyleBasic [textColor (if isMeta then yuiBlue else black), textLeft]
---               $ button dName (DoDescriptorTreeEvent (RequestFocusedNode dName))
---           ]
---     , withNodeVisible visibleConfiguration $
---         hstack_
---           []
---           [ styledButton "We have to go back" (DoDescriptorTreeEvent (ConfigureDescriptorLeaf d))
---           , textField (descriptorTreeModel . newDescriptorText)
---           ]
---     ]
---  where
---   visibleConfiguration = IntSet.member (fromIntegral dk) configuringLeavesSet
 
 descriptorTreeToggleVisButton :: TaggerWidget
 descriptorTreeToggleVisButton =
