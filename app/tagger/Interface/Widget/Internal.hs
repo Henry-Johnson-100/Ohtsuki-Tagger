@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Interface.Widget.Internal (
@@ -10,6 +11,7 @@ module Interface.Widget.Internal (
 import Control.Lens
 import Data.Config
 import Data.Event
+import qualified Data.IntSet as IntSet
 import qualified Data.List as L
 import Data.Model
 import Data.Model.Shared
@@ -148,17 +150,19 @@ descriptorTreeFocusedNodeWidget m =
 
   focusedTreeLeafWidget :: TaggerWidget
   focusedTreeLeafWidget =
-    let descriptorInfos = {-L.nub?-} m ^. descriptorTreeModel . focusedTree
+    let focusedDescriptors = {-L.nub?-} m ^. descriptorTreeModel . focusedTree
         metaDescriptors =
-          L.sortOn _descriptorwithInfoDescriptor
-            . filter _descriptorwithinfoDescriptorIsMeta
-            $ descriptorInfos
+          L.sort
+            . filter
+              (descriptorIsMetaInInfoMap m)
+            $ focusedDescriptors
         infraDescriptors =
-          L.sortOn _descriptorwithInfoDescriptor
-            . filter (not . _descriptorwithinfoDescriptorIsMeta)
-            $ descriptorInfos
+          L.sort
+            . filter
+              (not . descriptorIsMetaInInfoMap m)
+            $ focusedDescriptors
      in vscroll_ [wheelRate 50] . vstack_ [] $
-          descriptorWithInfoLabel
+          descriptorTreeLeaf m
             <$> (metaDescriptors ++ infraDescriptors)
 
   nodeHeader :: TaggerWidget
@@ -189,14 +193,16 @@ descriptorTreeUnrelatedWidget m =
   unrelatedTreeLeafWidget =
     let unrelatedDescriptors = m ^. descriptorTreeModel . unrelated
         meta =
-          L.sortOn _descriptorwithInfoDescriptor
-            . filter _descriptorwithinfoDescriptorIsMeta
+          L.sort
+            . filter
+              (descriptorIsMetaInInfoMap m)
             $ unrelatedDescriptors
         infra =
-          L.sortOn _descriptorwithInfoDescriptor
-            . filter (not . _descriptorwithinfoDescriptorIsMeta)
+          L.sort
+            . filter
+              (not . descriptorIsMetaInInfoMap m)
             $ unrelatedDescriptors
-     in vscroll_ [wheelRate 50] . vstack_ [] $ descriptorWithInfoLabel <$> (meta ++ infra)
+     in vscroll_ [wheelRate 50] . vstack_ [] $ descriptorTreeLeaf m <$> (meta ++ infra)
 
   createUnrelationDropTargetWidget :: TaggerWidget -> TaggerWidget
   createUnrelationDropTargetWidget =
@@ -250,12 +256,44 @@ deleteDescriptorWidget =
       [dropTargetStyle [bgColor yuiRed, border 1 yuiYellow]]
     $ label "Delete"
 
-descriptorWithInfoLabel :: DescriptorWithInfo -> TaggerWidget
-descriptorWithInfoLabel (DescriptorWithInfo d@(Descriptor _ dName) isMeta) =
-  draggable d
-    . withStyleHover [border 1 yuiOrange, bgColor yuiLightPeach]
-    . withStyleBasic [textColor (if isMeta then yuiBlue else black), textLeft]
-    $ button dName (DoDescriptorTreeEvent (RequestFocusedNode dName))
+descriptorTreeLeaf :: TaggerModel -> Descriptor -> TaggerWidget
+descriptorTreeLeaf
+  ((^. descriptorTreeModel . descriptorInfoMap) -> m)
+  d@(Descriptor dk p) =
+    let di = m ^. descriptorInfoMapAt (fromIntegral dk)
+     in zstack_
+          []
+          [ draggable d
+              . withStyleHover [border 1 yuiOrange, bgColor yuiLightPeach]
+              . withStyleBasic
+                [ textColor (if di ^. descriptorIsMeta then yuiBlue else black)
+                , textLeft
+                ]
+              $ button p (DoDescriptorTreeEvent (RequestFocusedNode p))
+          ]
+
+-- ((^. descriptorTreeModel . configuringLeaves) -> configuringLeavesSet)
+-- (DescriptorWithInfo d@(Descriptor dk dName) isMeta) =
+--   zstack_
+--     []
+--     [ withNodeVisible (not visibleConfiguration) $
+--         hstack_
+--           []
+--           [ styledButton "-" (DoDescriptorTreeEvent (ConfigureDescriptorLeaf d))
+--           , draggable d
+--               . withStyleHover [border 1 yuiOrange, bgColor yuiLightPeach]
+--               . withStyleBasic [textColor (if isMeta then yuiBlue else black), textLeft]
+--               $ button dName (DoDescriptorTreeEvent (RequestFocusedNode dName))
+--           ]
+--     , withNodeVisible visibleConfiguration $
+--         hstack_
+--           []
+--           [ styledButton "We have to go back" (DoDescriptorTreeEvent (ConfigureDescriptorLeaf d))
+--           , textField (descriptorTreeModel . newDescriptorText)
+--           ]
+--     ]
+--  where
+--   visibleConfiguration = IntSet.member (fromIntegral dk) configuringLeavesSet
 
 descriptorTreeToggleVisButton :: TaggerWidget
 descriptorTreeToggleVisButton =
@@ -294,3 +332,11 @@ withStyleHover ::
   WidgetNode TaggerModel TaggerEvent ->
   WidgetNode TaggerModel TaggerEvent
 withStyleHover = flip styleHover
+
+withNodeVisible :: Bool -> TaggerWidget -> TaggerWidget
+withNodeVisible = flip nodeVisible
+
+descriptorIsMetaInInfoMap :: TaggerModel -> Descriptor -> Bool
+descriptorIsMetaInInfoMap
+  ((^. descriptorTreeModel . descriptorInfoMap) -> m)
+  (Descriptor (fromIntegral -> dk) _) = m ^. descriptorInfoMapAt dk . descriptorIsMeta

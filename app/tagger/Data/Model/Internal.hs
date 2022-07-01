@@ -3,6 +3,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use newtype instead of data" #-}
+{-# HLINT ignore "Eta reduce" #-}
 
 module Data.Model.Internal (
   TaggerModel (..),
@@ -10,13 +11,18 @@ module Data.Model.Internal (
   FocusedFileModel (..),
   focusedFileDefaultDataFile,
   DescriptorTreeModel (..),
-  DescriptorWithInfo (..),
+  DescriptorInfo (..),
+  createDescriptorInfo,
   createDescriptorTreeModel,
   Renderability (..),
 ) where
 
 import Data.Config.Internal (TaggerConfig)
 import Data.HierarchyMap (empty)
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import Data.Model.Shared
 import Data.Text (Text)
 import Database.Tagger.Type
@@ -70,12 +76,14 @@ focusedFileDefaultDataFile = "Yui_signature_SS.png"
 
 data DescriptorTreeModel = DescriptorTreeModel
   { _descriptortreeUnrelatedNode :: Descriptor
-  , _descriptortreeUnrelated :: [DescriptorWithInfo]
+  , _descriptortreeUnrelated :: [Descriptor]
   , _descriptortreeFocusedNode :: Descriptor
-  , _descriptortreeFocusedTree :: [DescriptorWithInfo]
+  , _descriptortreeFocusedTree :: [Descriptor]
+  , _descriptortreeDescriptorInfoMap :: IntMap DescriptorInfo
   , _descriptortreeNewDescriptorText :: Text
   , _descriptortreeUpdateDescriptorFrom :: Maybe Descriptor
   , _descriptortreeUpdateDescriptorTo :: Text
+  , _descriptortreeConfiguringLeaves :: IntSet
   }
   deriving (Show, Eq)
 
@@ -84,6 +92,15 @@ data DescriptorWithInfo = DescriptorWithInfo
   , _descriptorwithinfoDescriptorIsMeta :: Bool
   }
   deriving (Show, Eq)
+
+data DescriptorInfo = DescriptorInfo
+  { _descriptorinfoDescriptorIsMeta :: Bool
+  , _descriptorinfoRenameText :: Text
+  }
+  deriving (Show, Eq)
+
+createDescriptorInfo :: DescriptorInfo
+createDescriptorInfo = DescriptorInfo False ""
 
 data Renderability
   = RenderAsImage
@@ -102,7 +119,9 @@ createDescriptorTreeModel n unrelatedD =
     , _descriptortreeUnrelated = []
     , _descriptortreeFocusedNode = n
     , _descriptortreeFocusedTree = []
+    , _descriptortreeDescriptorInfoMap = IntMap.empty
     , _descriptortreeNewDescriptorText = ""
     , _descriptortreeUpdateDescriptorFrom = Nothing
     , _descriptortreeUpdateDescriptorTo = ""
+    , _descriptortreeConfiguringLeaves = IntSet.empty
     }

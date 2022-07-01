@@ -15,6 +15,8 @@ import Control.Monad.Trans.Maybe
 import Data.Config
 import Data.Event
 import Data.HierarchyMap (empty)
+import qualified Data.IntMap.Strict as IntMap
+import qualified Data.IntSet as IntSet
 import Data.Model
 import Data.Model.Shared
 import Data.Text (Text)
@@ -107,6 +109,17 @@ descriptorTreeEventHandler
             )
         , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
         ]
+      ConfigureDescriptorLeaf (Descriptor dk _) ->
+        [ let lset = model ^. descriptorTreeModel . configuringLeaves
+           in Model $
+                model & descriptorTreeModel . configuringLeaves
+                  .~ ( if IntSet.member (fromIntegral dk) lset
+                        then IntSet.delete
+                        else IntSet.insert
+                     )
+                    (fromIntegral dk)
+                    lset
+        ]
       DeleteDescriptor (Descriptor dk _) ->
         [ Task (IOEvent <$> deleteDescriptors [dk] conn)
         , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
@@ -139,13 +152,18 @@ descriptorTreeEventHandler
         , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
         , Event . ClearTextField $ TaggerLens (descriptorTreeModel . newDescriptorText)
         ]
-      PutFocusedTree_ nodeName ds ->
+      PutFocusedTree_ nodeName ds desInfoMap ->
         [ Model $
             model
               & descriptorTreeModel . focusedTree .~ ds
               & descriptorTreeModel . focusedNode .~ nodeName
+              & descriptorTreeModel . descriptorInfoMap %~ IntMap.union desInfoMap
         ]
-      PutUnrelated_ ds -> [Model $ model & descriptorTreeModel . unrelated .~ ds]
+      PutUnrelated_ ds desInfoMap ->
+        [ Model $
+            model & descriptorTreeModel . unrelated .~ ds
+              & descriptorTreeModel . descriptorInfoMap %~ IntMap.union desInfoMap
+        ]
       PutUnrelatedNode_ d -> [Model $ model & descriptorTreeModel . unrelatedNode .~ d]
       PutUpdateDescriptorFrom d ->
         [ Model $
@@ -153,7 +171,8 @@ descriptorTreeEventHandler
               & descriptorTreeModel . updateDescriptorFrom ?~ d
         ]
       RefreshBothDescriptorTrees ->
-        [ Event (DoDescriptorTreeEvent RefreshUnrelated)
+        [ Model $ model & descriptorTreeModel . descriptorInfoMap .~ IntMap.empty
+        , Event (DoDescriptorTreeEvent RefreshUnrelated)
         , Event (DoDescriptorTreeEvent RefreshFocusedTree)
         ]
       RefreshFocusedTree ->
@@ -166,19 +185,20 @@ descriptorTreeEventHandler
         ]
       RefreshUnrelated ->
         [ Task
-            ( DoDescriptorTreeEvent . PutUnrelated_ <$> do
+            ( DoDescriptorTreeEvent . uncurry PutUnrelated_ <$> do
                 unrelatedDs <- queryForDescriptorByPattern "#UNRELATED#" conn
                 ds <-
                   concat
                     <$> mapM
                       (flip getInfraChildren conn . descriptorId)
                       unrelatedDs
-                mapM (toDescriptorInfo conn) ds
+                dsInfos <- IntMap.unions <$> mapM (toDescriptorInfo conn) ds
+                return (ds, dsInfos)
             )
         ]
       RequestFocusedNode p ->
         [ Task
-            ( DoDescriptorTreeEvent . uncurry PutFocusedTree_ <$> do
+            ( DoDescriptorTreeEvent . (\(x, y, z) -> PutFocusedTree_ x y z) <$> do
                 ds <- queryForDescriptorByPattern p conn
                 d <-
                   maybe
@@ -187,8 +207,8 @@ descriptorTreeEventHandler
                     . head'
                     $ ds
                 ids <- getInfraChildren (descriptorId d) conn
-                idsInfo <- mapM (toDescriptorInfo conn) ids
-                return (d, idsInfo)
+                idsInfoMap <- IntMap.unions <$> mapM (toDescriptorInfo conn) ids
+                return (d, ids, idsInfoMap)
             )
         ]
       RequestFocusedNodeParent ->
@@ -237,6 +257,7 @@ descriptorTreeEventHandler
           )
           (model ^. descriptorTreeModel . updateDescriptorFrom)
 
-toDescriptorInfo :: TaggedConnection -> Descriptor -> IO DescriptorWithInfo
-toDescriptorInfo tc d@(Descriptor dk _) =
-  DescriptorWithInfo d <$> hasInfraRelations dk tc
+toDescriptorInfo :: TaggedConnection -> Descriptor -> IO (IntMap.IntMap DescriptorInfo)
+toDescriptorInfo tc d@(Descriptor dk p) = do
+  di <- flip DescriptorInfo p <$> hasInfraRelations dk tc
+  return $ IntMap.singleton (fromIntegral dk) di
