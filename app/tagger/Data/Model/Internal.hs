@@ -8,6 +8,10 @@
 module Data.Model.Internal (
   TaggerModel (..),
   createTaggerModel,
+  FileSelectionModel (..),
+  createFileSelectionModel,
+  FileInfo (..),
+  createFileInfo,
   FocusedFileModel (..),
   focusedFileDefaultDataFile,
   focusedFileDefaultRecordKey,
@@ -23,6 +27,11 @@ import Data.HierarchyMap (empty)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Model.Shared
+import Data.OccurrenceMap (OccurrenceMap)
+import qualified Data.OccurrenceMap as OM
+import Data.Sequence (Seq)
+import qualified Data.Sequence as S
+import Data.Tagger
 import Data.Text (Text)
 import Database.Tagger.Type
 
@@ -30,11 +39,17 @@ data TaggerModel = TaggerModel
   { _taggermodelConf :: TaggerConfig
   , _taggermodelDescriptorTreeModel :: DescriptorTreeModel
   , _taggermodelFocusedFileModel :: FocusedFileModel
+  , _taggermodelFileSelectionModel :: FileSelectionModel
   , _taggermodelVisibilityModel :: VisibilityModel
   , _taggermodelConnection :: TaggedConnection
   , _taggermodelIsMassOperation :: Bool
   , _taggermodelIsTagMode :: Bool
   , _taggerFileSelection :: [File]
+  , _taggerQueryCriteria :: QueryCriteria
+  , _taggerSetOp :: SetOp
+  , _taggerQueryText :: Text
+  , _taggerTagText :: Text
+  , _taggerShellText :: Text
   }
   deriving (Show, Eq)
 
@@ -50,12 +65,41 @@ createTaggerModel conf tc d unRelatedD defaultFilePath =
     { _taggermodelConf = conf
     , _taggermodelDescriptorTreeModel = createDescriptorTreeModel d unRelatedD
     , _taggermodelFocusedFileModel = createFocusedFileModel defaultFilePath
+    , _taggermodelFileSelectionModel = createFileSelectionModel
     , _taggermodelVisibilityModel = createVisibilityModel
     , _taggermodelConnection = tc
     , _taggermodelIsMassOperation = False
     , _taggermodelIsTagMode = True
     , _taggerFileSelection = []
+    , _taggerQueryCriteria = MetaDescriptorCriteria
+    , _taggerSetOp = Union
+    , _taggerQueryText = ""
+    , _taggerTagText = ""
+    , _taggerShellText = ""
     }
+
+data FileSelectionModel = FileSelectionModel
+  { _fileselectionSelection :: Seq File
+  , _fileselectionTagOccurrences :: OccurrenceMap
+  , _fileselectionFileSelectionInfoMap :: IntMap FileInfo
+  }
+  deriving (Show, Eq)
+
+createFileSelectionModel :: FileSelectionModel
+createFileSelectionModel =
+  FileSelectionModel
+    { _fileselectionSelection = S.empty
+    , _fileselectionTagOccurrences = OM.empty
+    , _fileselectionFileSelectionInfoMap = IntMap.empty
+    }
+
+data FileInfo = FileInfo
+  { _fileinfoFileInfoRenameText :: Text
+  }
+  deriving (Show, Eq)
+
+createFileInfo :: FileInfo
+createFileInfo = FileInfo ""
 
 data FocusedFileModel = FocusedFileModel
   { _focusedfilemodelFocusedFile :: ConcreteTaggedFile
