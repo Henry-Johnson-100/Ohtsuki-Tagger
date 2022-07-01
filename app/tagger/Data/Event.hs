@@ -30,6 +30,8 @@ data TaggerEvent
 data FocusedFileEvent
   = PutConcreteFile_ ConcreteTaggedFile
   | PutFile File
+  | TagFile (RecordKey Descriptor) (Maybe (RecordKey Tag))
+  | ToggleDetailPaneVisibility
   deriving (Show, Eq)
 
 data DescriptorTreeEvent

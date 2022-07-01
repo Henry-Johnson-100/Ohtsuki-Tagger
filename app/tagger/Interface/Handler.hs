@@ -75,11 +75,39 @@ focusedFileEventHandler
                 maybe
                   ( DoFocusedFileEvent . PutConcreteFile_ <$> do
                       defaultFile <- T.pack <$> getDataFileName focusedFileDefaultDataFile
-                      return $ ConcreteTaggedFile (File (-1) defaultFile) empty
+                      return $
+                        ConcreteTaggedFile
+                          ( File
+                              focusedFileDefaultRecordKey
+                              defaultFile
+                          )
+                          empty
                   )
                   (return . DoFocusedFileEvent . PutConcreteFile_)
                   cft
             )
+        ]
+      -- Should:
+      -- submit a tag in the db
+      -- refresh the focused file detail widget
+      -- refresh the selection if tag counts are displayed (?)
+      TagFile dk mtk ->
+        let f@(File fk _) =
+              concreteTaggedFile $
+                model
+                  ^. focusedFileModel . focusedFile
+         in [ Task
+                ( IOEvent
+                    <$> unless
+                      (fk == focusedFileDefaultRecordKey)
+                      (void (insertTags [(fk, dk, mtk)] conn))
+                )
+            , Event . DoFocusedFileEvent . PutFile $ f
+            ]
+      ToggleDetailPaneVisibility ->
+        [ Model $
+            model
+              & focusedFileModel . focusedFileVis %~ toggleAltVis
         ]
 
 -- this is kind of stupid but whatever.

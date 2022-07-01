@@ -10,6 +10,7 @@ module Data.Model.Internal (
   createTaggerModel,
   FocusedFileModel (..),
   focusedFileDefaultDataFile,
+  focusedFileDefaultRecordKey,
   DescriptorTreeModel (..),
   DescriptorInfo (..),
   createDescriptorInfo,
@@ -59,18 +60,31 @@ createTaggerModel conf tc d unRelatedD defaultFilePath =
 data FocusedFileModel = FocusedFileModel
   { _focusedfilemodelFocusedFile :: ConcreteTaggedFile
   , _focusedfilemodelRenderability :: Renderability
+  , _focusedfilemodelFocusedFileVis :: Visibility
   }
   deriving (Show, Eq)
 
 createFocusedFileModel :: Text -> FocusedFileModel
 createFocusedFileModel fp =
   FocusedFileModel
-    { _focusedfilemodelFocusedFile = ConcreteTaggedFile (File (-1) fp) empty
+    { _focusedfilemodelFocusedFile =
+        ConcreteTaggedFile (File focusedFileDefaultRecordKey fp) empty
     , _focusedfilemodelRenderability = RenderingNotSupported
+    , _focusedfilemodelFocusedFileVis = VisibilityMain
     }
 
 focusedFileDefaultDataFile :: FilePath
 focusedFileDefaultDataFile = "Yui_signature_SS.png"
+
+{- |
+ placeholder file id for a default file.
+ events for this id should be filtered. (if negative file ids are common in the tagger db
+  for some reason though they shouldn't be.)
+
+ \-1
+-}
+focusedFileDefaultRecordKey :: RecordKey File
+focusedFileDefaultRecordKey = -1
 
 data DescriptorTreeModel = DescriptorTreeModel
   { _descriptortreeUnrelatedNode :: Descriptor

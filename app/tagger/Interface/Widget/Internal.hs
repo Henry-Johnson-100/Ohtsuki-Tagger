@@ -44,14 +44,16 @@ __        _____ ____   ____ _____ _____
 -}
 
 focusedFileWidget :: TaggerModel -> TaggerWidget
-focusedFileWidget m = filePreview
+focusedFileWidget m =
+  hstack_
+    []
+    [focusedFileMainPane, detailPane m]
  where
-  filePreview =
-    withStyleBasic
-      [ if not (m ^. isMassOperation)
-          then border 1 yuiOrange
-          else border 1 black
-      ]
+  focusedFileMainPane =
+    dropTarget_
+      (\(Descriptor dk _) -> DoFocusedFileEvent (TagFile dk Nothing))
+      [dropTargetStyle [border 3 yuiBlue]]
+      . withStyleBasic [border 1 (if m ^. isMassOperation then yuiOrange else black)]
       $ ( case m ^. focusedFileModel . renderability of
             RenderAsImage -> imagePreviewRender
             _ -> imagePreviewRender
@@ -60,6 +62,18 @@ focusedFileWidget m = filePreview
 
 imagePreviewRender :: Text -> TaggerWidget
 imagePreviewRender fp = image_ fp [fitEither, alignCenter]
+
+detailPane :: TaggerModel -> TaggerWidget
+detailPane m =
+  hstack_
+    []
+    [ styledButton
+        "<-"
+        (DoFocusedFileEvent ToggleDetailPaneVisibility)
+    , separatorLine
+    , withNodeVisible (VisibilityAlt == (m ^. focusedFileModel . focusedFileVis)) $
+        label "Detail widget goes here fam."
+    ]
 
 {-
  ____  _____ ____   ____ ____  ___ ____ _____ ___  ____
