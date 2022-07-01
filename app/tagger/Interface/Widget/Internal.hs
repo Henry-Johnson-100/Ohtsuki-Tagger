@@ -11,12 +11,10 @@ module Interface.Widget.Internal (
 import Control.Lens
 import Data.Config
 import Data.Event
-import qualified Data.IntSet as IntSet
 import qualified Data.List as L
 import Data.Model
 import Data.Model.Shared
 import Data.Text (Text)
-import qualified Data.Text as T
 import Database.Tagger.Type
 import Interface.Theme
 import Monomer
@@ -125,9 +123,7 @@ descriptorTreeWidget m =
     withStyleBasic [border 1 black] $
       vstack_
         []
-        [ updateDescriptorWidget m
-        , spacer
-        , insertDescriptorWidget
+        [ insertDescriptorWidget
         , spacer
         , box_ [alignMiddle] deleteDescriptorWidget
         , spacer
@@ -210,37 +206,6 @@ descriptorTreeUnrelatedWidget m =
       (DoDescriptorTreeEvent . CreateRelation (m ^. descriptorTreeModel . unrelatedNode))
       [dropTargetStyle [border 3 yuiBlue]]
 
-updateDescriptorWidget :: TaggerModel -> TaggerWidget
-updateDescriptorWidget m =
-  dropTarget_
-    (DoDescriptorTreeEvent . PutUpdateDescriptorFrom)
-    [dropTargetStyle [border 1 yuiOrange]]
-    . keystroke_ [("Enter", DoDescriptorTreeEvent UpdateDescriptor)] [ignoreChildrenEvts]
-    $ hstack_
-      []
-      [ updateDescriptorButton
-      , hgrid_
-          []
-          [ box_ [alignMiddle] updateDescriptorFromLabelWidget
-          , updateDescriptorToTextField
-          ]
-      ]
- where
-  updateDescriptorButton :: TaggerWidget
-  updateDescriptorButton = styledButton "Rename" (DoDescriptorTreeEvent UpdateDescriptor)
-
-  updateDescriptorFromLabelWidget :: TaggerWidget
-  updateDescriptorFromLabelWidget =
-    label
-      ( maybe
-          "No Descriptor"
-          (\(Descriptor dk dp) -> (T.pack . show $ dk) <> " : " <> dp)
-          (m ^. descriptorTreeModel . updateDescriptorFrom)
-      )
-
-  updateDescriptorToTextField :: TaggerWidget
-  updateDescriptorToTextField = textField_ (descriptorTreeModel . updateDescriptorTo) []
-
 insertDescriptorWidget :: TaggerWidget
 insertDescriptorWidget =
   keystroke_ [("Enter", DoDescriptorTreeEvent InsertDescriptor)] [] . hstack_ [] $
@@ -263,13 +228,41 @@ descriptorTreeLeaf
     let di = m ^. descriptorInfoMapAt (fromIntegral dk)
      in zstack_
           []
-          [ draggable d
-              . withStyleHover [border 1 yuiOrange, bgColor yuiLightPeach]
-              . withStyleBasic
-                [ textColor (if di ^. descriptorIsMeta then yuiBlue else black)
-                , textLeft
+          [ withNodeVisible
+              (VisibilityMain == di ^. descriptorInfoVis)
+              $ hstack_
+                []
+                [ styledButton
+                    "sus"
+                    ( DoDescriptorTreeEvent
+                        (ToggleDescriptorLeafVisibility dk)
+                    )
+                , draggable d
+                    . withStyleHover [border 1 yuiOrange, bgColor yuiLightPeach]
+                    . withStyleBasic
+                      [ textColor (if di ^. descriptorIsMeta then yuiBlue else black)
+                      , textLeft
+                      ]
+                    $ button p (DoDescriptorTreeEvent (RequestFocusedNode p))
                 ]
-              $ button p (DoDescriptorTreeEvent (RequestFocusedNode p))
+          , withNodeVisible
+              (VisibilityAlt == di ^. descriptorInfoVis)
+              . hstack_ []
+              $ [ styledButton
+                    "Back"
+                    (DoDescriptorTreeEvent (ToggleDescriptorLeafVisibility dk))
+                , styledButton "Commit" (DoDescriptorTreeEvent (UpdateDescriptor dk))
+                , keystroke_
+                    [("Enter", DoDescriptorTreeEvent (UpdateDescriptor dk))]
+                    []
+                    $ textField_
+                      ( descriptorTreeModel
+                          . descriptorInfoMap
+                          . descriptorInfoMapAt (fromIntegral dk)
+                          . renameText
+                      )
+                      []
+                ]
           ]
 
 -- ((^. descriptorTreeModel . configuringLeaves) -> configuringLeavesSet)

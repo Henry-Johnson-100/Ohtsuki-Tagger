@@ -21,8 +21,6 @@ import Data.Config.Internal (TaggerConfig)
 import Data.HierarchyMap (empty)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
-import Data.IntSet (IntSet)
-import qualified Data.IntSet as IntSet
 import Data.Model.Shared
 import Data.Text (Text)
 import Database.Tagger.Type
@@ -81,9 +79,6 @@ data DescriptorTreeModel = DescriptorTreeModel
   , _descriptortreeFocusedTree :: [Descriptor]
   , _descriptortreeDescriptorInfoMap :: IntMap DescriptorInfo
   , _descriptortreeNewDescriptorText :: Text
-  , _descriptortreeUpdateDescriptorFrom :: Maybe Descriptor
-  , _descriptortreeUpdateDescriptorTo :: Text
-  , _descriptortreeConfiguringLeaves :: IntSet
   }
   deriving (Show, Eq)
 
@@ -96,11 +91,12 @@ data DescriptorWithInfo = DescriptorWithInfo
 data DescriptorInfo = DescriptorInfo
   { _descriptorinfoDescriptorIsMeta :: Bool
   , _descriptorinfoRenameText :: Text
+  , _descriptorinfoDescriptorInfoVis :: Visibility
   }
   deriving (Show, Eq)
 
 createDescriptorInfo :: DescriptorInfo
-createDescriptorInfo = DescriptorInfo False ""
+createDescriptorInfo = DescriptorInfo False "" VisibilityMain
 
 data Renderability
   = RenderAsImage
@@ -121,7 +117,4 @@ createDescriptorTreeModel n unrelatedD =
     , _descriptortreeFocusedTree = []
     , _descriptortreeDescriptorInfoMap = IntMap.empty
     , _descriptortreeNewDescriptorText = ""
-    , _descriptortreeUpdateDescriptorFrom = Nothing
-    , _descriptortreeUpdateDescriptorTo = ""
-    , _descriptortreeConfiguringLeaves = IntSet.empty
     }

@@ -16,7 +16,6 @@ import Data.Config
 import Data.Event
 import Data.HierarchyMap (empty)
 import qualified Data.IntMap.Strict as IntMap
-import qualified Data.IntSet as IntSet
 import Data.Model
 import Data.Model.Shared
 import Data.Text (Text)
@@ -109,17 +108,6 @@ descriptorTreeEventHandler
             )
         , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
         ]
-      ConfigureDescriptorLeaf (Descriptor dk _) ->
-        [ let lset = model ^. descriptorTreeModel . configuringLeaves
-           in Model $
-                model & descriptorTreeModel . configuringLeaves
-                  .~ ( if IntSet.member (fromIntegral dk) lset
-                        then IntSet.delete
-                        else IntSet.insert
-                     )
-                    (fromIntegral dk)
-                    lset
-        ]
       DeleteDescriptor (Descriptor dk _) ->
         [ Task (IOEvent <$> deleteDescriptors [dk] conn)
         , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
@@ -165,11 +153,6 @@ descriptorTreeEventHandler
               & descriptorTreeModel . descriptorInfoMap %~ IntMap.union desInfoMap
         ]
       PutUnrelatedNode_ d -> [Model $ model & descriptorTreeModel . unrelatedNode .~ d]
-      PutUpdateDescriptorFrom d ->
-        [ Model $
-            model
-              & descriptorTreeModel . updateDescriptorFrom ?~ d
-        ]
       RefreshBothDescriptorTrees ->
         [ Model $ model & descriptorTreeModel . descriptorInfoMap .~ IntMap.empty
         , Event (DoDescriptorTreeEvent RefreshUnrelated)
@@ -225,6 +208,15 @@ descriptorTreeEventHandler
                   pd
             )
         ]
+      ToggleDescriptorLeafVisibility (fromIntegral -> dk) ->
+        [ Model $
+            model
+              & descriptorTreeModel
+                . descriptorInfoMap
+                . descriptorInfoMapAt dk
+                . descriptorInfoVis
+              %~ toggleAltVis
+        ]
       ToggleDescriptorTreeVisibility l ->
         [ let currentVis = model ^. visibilityModel . descriptorTreeVis
            in Model $
@@ -234,30 +226,26 @@ descriptorTreeEventHandler
                         else VisibilityMain
                      )
         ]
-      UpdateDescriptor ->
-        maybe
-          []
-          ( \d ->
-              let updateText = T.strip $ model ^. descriptorTreeModel . updateDescriptorTo
-               in if T.null updateText
-                    then []
-                    else
-                      [ Task
-                          ( IOEvent
-                              <$> updateDescriptors [(updateText, descriptorId d)] conn
-                          )
-                      , Event
-                          . ClearTextField
-                          $ TaggerLens (descriptorTreeModel . updateDescriptorTo)
-                      , Model $
-                          model
-                            & descriptorTreeModel . updateDescriptorFrom .~ Nothing
-                      , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
-                      ]
-          )
-          (model ^. descriptorTreeModel . updateDescriptorFrom)
+      UpdateDescriptor rkd@(RecordKey (fromIntegral -> dk)) ->
+        let updateText =
+              T.strip $
+                model
+                  ^. descriptorTreeModel
+                    . descriptorInfoMap
+                    . descriptorInfoMapAt dk
+                    . renameText
+         in if T.null updateText
+              then [Task (IOEvent <$> putStrLn "null text")]
+              else
+                [ Task
+                    ( IOEvent
+                        <$> updateDescriptors [(updateText, rkd)] conn
+                    )
+                , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
+                ]
 
 toDescriptorInfo :: TaggedConnection -> Descriptor -> IO (IntMap.IntMap DescriptorInfo)
-toDescriptorInfo tc d@(Descriptor dk p) = do
-  di <- flip DescriptorInfo p <$> hasInfraRelations dk tc
+toDescriptorInfo tc (Descriptor dk p) = do
+  let consDes b = DescriptorInfo b p VisibilityMain
+  di <- consDes <$> hasInfraRelations dk tc
   return $ IntMap.singleton (fromIntegral dk) di
