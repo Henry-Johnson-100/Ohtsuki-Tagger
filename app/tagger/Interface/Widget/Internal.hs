@@ -226,7 +226,7 @@ descriptorTreeLeaf :: TaggerModel -> Descriptor -> TaggerWidget
 descriptorTreeLeaf
   ((^. descriptorTreeModel . descriptorInfoMap) -> m)
   d@(Descriptor dk p) =
-    let di = m ^. descriptorInfoMapAt (fromIntegral dk)
+    let di = m ^. descriptorInfoAt (fromIntegral dk)
      in box_ [alignLeft] $
           zstack_
             []
@@ -274,7 +274,7 @@ descriptorTreeLeaf
             $ textField_
               ( descriptorTreeModel
                   . descriptorInfoMap
-                  . descriptorInfoMapAt (fromIntegral dk)
+                  . descriptorInfoAt (fromIntegral dk)
                   . renameText
               )
               []
@@ -328,4 +328,4 @@ withNodeVisible = flip nodeVisible
 descriptorIsMetaInInfoMap :: TaggerModel -> Descriptor -> Bool
 descriptorIsMetaInInfoMap
   ((^. descriptorTreeModel . descriptorInfoMap) -> m)
-  (Descriptor (fromIntegral -> dk) _) = m ^. descriptorInfoMapAt dk . descriptorIsMeta
+  (Descriptor (fromIntegral -> dk) _) = m ^. descriptorInfoAt dk . descriptorIsMeta

@@ -62,23 +62,24 @@ focusedFileEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
-      PutFocusedFile (File fk _) ->
+      PutConcreteFile_ cf@(ConcreteTaggedFile (File _ fp) _) ->
+        [ Model $
+            model
+              & focusedFileModel . focusedFile .~ cf
+              & focusedFileModel . renderability .~ getRenderability fp
+        ]
+      PutFile (File fk _) ->
         [ Task
             ( do
                 cft <- runMaybeT $ queryForConcreteTaggedFileWithFileId fk conn
                 maybe
-                  ( DoFocusedFileEvent . PutFocusedFile_ <$> do
+                  ( DoFocusedFileEvent . PutConcreteFile_ <$> do
                       defaultFile <- T.pack <$> getDataFileName focusedFileDefaultDataFile
                       return $ ConcreteTaggedFile (File (-1) defaultFile) empty
                   )
-                  (return . DoFocusedFileEvent . PutFocusedFile_)
+                  (return . DoFocusedFileEvent . PutConcreteFile_)
                   cft
             )
-        ]
-      PutFocusedFile_ cf@(ConcreteTaggedFile (File _ fp) _) ->
-        [ Model $
-            model & focusedFileModel . focusedFile .~ cf
-              & focusedFileModel . renderability .~ getRenderability fp
         ]
 
 -- this is kind of stupid but whatever.
@@ -216,7 +217,7 @@ descriptorTreeEventHandler
                 model
                   & descriptorTreeModel
                     . descriptorInfoMap
-                    . descriptorInfoMapAt dk
+                    . descriptorInfoAt dk
                     . descriptorInfoVis
                   %~ toggleAltVis
         ]
@@ -235,7 +236,7 @@ descriptorTreeEventHandler
                 model
                   ^. descriptorTreeModel
                     . descriptorInfoMap
-                    . descriptorInfoMapAt dk
+                    . descriptorInfoAt dk
                     . renameText
          in if T.null updateText
               then [Task (IOEvent <$> putStrLn "null text")]

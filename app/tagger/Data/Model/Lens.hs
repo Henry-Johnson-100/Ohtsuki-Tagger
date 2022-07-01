@@ -31,8 +31,8 @@ makeLensesWith abbreviatedFields ''FocusedFileModel
 
 makeLensesWith abbreviatedFields ''DescriptorInfo
 
-descriptorInfoMapAt :: Int -> Lens' (IntMap DescriptorInfo) DescriptorInfo
-descriptorInfoMapAt n =
+descriptorInfoAt :: Int -> Lens' (IntMap DescriptorInfo) DescriptorInfo
+descriptorInfoAt n =
   lens
     (fromMaybe createDescriptorInfo . IntMap.lookup n)
     (flip (IntMap.insert n))
