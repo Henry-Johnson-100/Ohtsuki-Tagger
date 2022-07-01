@@ -30,6 +30,7 @@ common haskell-common
 common tagger-common
   other-extensions:    OverloadedStrings
                       ,TemplateHaskell
+                      ,FlexibleContexts
                       ,FlexibleInstances
                       ,FunctionalDependencies
                       ,StrictData
@@ -181,7 +182,6 @@ library tagger-lib
                       ,BangPatterns
                       ,QuasiQuotes
                       ,TupleSections
-                      ,FlexibleContexts
                       ,BangPatterns
 
   hs-source-dirs:      lib

@@ -5,6 +5,7 @@ module Data.Model.Shared.Core (
   VisibilityModel (..),
   Visibility (..),
   createVisibilityModel,
+  toggleAltVis,
 ) where
 
 import Data.Text (Text)
@@ -32,3 +33,13 @@ data Visibility
   | VisibilityNum Int
   | VisibilityLabel Text
   deriving (Show, Eq)
+
+{- |
+ Switches between Main and Alt visibility.
+
+ Does nothing if the visibility is not either of these two constructors.
+-}
+toggleAltVis :: Visibility -> Visibility
+toggleAltVis VisibilityAlt = VisibilityMain
+toggleAltVis VisibilityMain = VisibilityAlt
+toggleAltVis x = x

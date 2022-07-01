@@ -10,6 +10,7 @@ module Data.Event (
   FocusedFileEvent (..),
 ) where
 
+import Data.IntMap.Strict (IntMap)
 import Data.Model
 import Data.Text (Text)
 import Database.Tagger.Type
@@ -36,15 +37,15 @@ data DescriptorTreeEvent
   | DeleteDescriptor Descriptor
   | DescriptorTreeInit
   | InsertDescriptor
-  | PutFocusedTree_ Descriptor [DescriptorWithInfo]
-  | PutUnrelated_ [DescriptorWithInfo]
+  | PutFocusedTree_ Descriptor [Descriptor] (IntMap DescriptorInfo)
+  | PutUnrelated_ [Descriptor] (IntMap DescriptorInfo)
   | PutUnrelatedNode_ Descriptor
-  | PutUpdateDescriptorFrom Descriptor
   | RefreshBothDescriptorTrees
   | RefreshFocusedTree
   | RefreshUnrelated
   | RequestFocusedNode Text
   | RequestFocusedNodeParent
+  | ToggleDescriptorLeafVisibility Descriptor
   | ToggleDescriptorTreeVisibility Text
-  | UpdateDescriptor
+  | UpdateDescriptor (RecordKey Descriptor)
   deriving (Show, Eq)

@@ -15,6 +15,7 @@ import Control.Monad.Trans.Maybe
 import Data.Config
 import Data.Event
 import Data.HierarchyMap (empty)
+import qualified Data.IntMap.Strict as IntMap
 import Data.Model
 import Data.Model.Shared
 import Data.Text (Text)
@@ -139,21 +140,22 @@ descriptorTreeEventHandler
         , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
         , Event . ClearTextField $ TaggerLens (descriptorTreeModel . newDescriptorText)
         ]
-      PutFocusedTree_ nodeName ds ->
+      PutFocusedTree_ nodeName ds desInfoMap ->
         [ Model $
             model
               & descriptorTreeModel . focusedTree .~ ds
               & descriptorTreeModel . focusedNode .~ nodeName
+              & descriptorTreeModel . descriptorInfoMap %~ IntMap.union desInfoMap
         ]
-      PutUnrelated_ ds -> [Model $ model & descriptorTreeModel . unrelated .~ ds]
-      PutUnrelatedNode_ d -> [Model $ model & descriptorTreeModel . unrelatedNode .~ d]
-      PutUpdateDescriptorFrom d ->
+      PutUnrelated_ ds desInfoMap ->
         [ Model $
-            model
-              & descriptorTreeModel . updateDescriptorFrom ?~ d
+            model & descriptorTreeModel . unrelated .~ ds
+              & descriptorTreeModel . descriptorInfoMap %~ IntMap.union desInfoMap
         ]
+      PutUnrelatedNode_ d -> [Model $ model & descriptorTreeModel . unrelatedNode .~ d]
       RefreshBothDescriptorTrees ->
-        [ Event (DoDescriptorTreeEvent RefreshUnrelated)
+        [ Model $ model & descriptorTreeModel . descriptorInfoMap .~ IntMap.empty
+        , Event (DoDescriptorTreeEvent RefreshUnrelated)
         , Event (DoDescriptorTreeEvent RefreshFocusedTree)
         ]
       RefreshFocusedTree ->
@@ -166,19 +168,20 @@ descriptorTreeEventHandler
         ]
       RefreshUnrelated ->
         [ Task
-            ( DoDescriptorTreeEvent . PutUnrelated_ <$> do
+            ( DoDescriptorTreeEvent . uncurry PutUnrelated_ <$> do
                 unrelatedDs <- queryForDescriptorByPattern "#UNRELATED#" conn
                 ds <-
                   concat
                     <$> mapM
                       (flip getInfraChildren conn . descriptorId)
                       unrelatedDs
-                mapM (toDescriptorInfo conn) ds
+                dsInfos <- IntMap.unions <$> mapM (toDescriptorInfo conn) ds
+                return (ds, dsInfos)
             )
         ]
       RequestFocusedNode p ->
         [ Task
-            ( DoDescriptorTreeEvent . uncurry PutFocusedTree_ <$> do
+            ( DoDescriptorTreeEvent . (\(x, y, z) -> PutFocusedTree_ x y z) <$> do
                 ds <- queryForDescriptorByPattern p conn
                 d <-
                   maybe
@@ -187,8 +190,8 @@ descriptorTreeEventHandler
                     . head'
                     $ ds
                 ids <- getInfraChildren (descriptorId d) conn
-                idsInfo <- mapM (toDescriptorInfo conn) ids
-                return (d, idsInfo)
+                idsInfoMap <- IntMap.unions <$> mapM (toDescriptorInfo conn) ids
+                return (d, ids, idsInfoMap)
             )
         ]
       RequestFocusedNodeParent ->
@@ -205,6 +208,18 @@ descriptorTreeEventHandler
                   pd
             )
         ]
+      ToggleDescriptorLeafVisibility (Descriptor (fromIntegral -> dk) p) ->
+        [ Model $
+            if isHashPattern p
+              then model
+              else
+                model
+                  & descriptorTreeModel
+                    . descriptorInfoMap
+                    . descriptorInfoMapAt dk
+                    . descriptorInfoVis
+                  %~ toggleAltVis
+        ]
       ToggleDescriptorTreeVisibility l ->
         [ let currentVis = model ^. visibilityModel . descriptorTreeVis
            in Model $
@@ -214,29 +229,29 @@ descriptorTreeEventHandler
                         else VisibilityMain
                      )
         ]
-      UpdateDescriptor ->
-        maybe
-          []
-          ( \d ->
-              let updateText = T.strip $ model ^. descriptorTreeModel . updateDescriptorTo
-               in if T.null updateText
-                    then []
-                    else
-                      [ Task
-                          ( IOEvent
-                              <$> updateDescriptors [(updateText, descriptorId d)] conn
-                          )
-                      , Event
-                          . ClearTextField
-                          $ TaggerLens (descriptorTreeModel . updateDescriptorTo)
-                      , Model $
-                          model
-                            & descriptorTreeModel . updateDescriptorFrom .~ Nothing
-                      , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
-                      ]
-          )
-          (model ^. descriptorTreeModel . updateDescriptorFrom)
+      UpdateDescriptor rkd@(RecordKey (fromIntegral -> dk)) ->
+        let updateText =
+              T.strip $
+                model
+                  ^. descriptorTreeModel
+                    . descriptorInfoMap
+                    . descriptorInfoMapAt dk
+                    . renameText
+         in if T.null updateText
+              then [Task (IOEvent <$> putStrLn "null text")]
+              else
+                [ Task
+                    ( IOEvent
+                        <$> updateDescriptors [(updateText, rkd)] conn
+                    )
+                , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
+                ]
 
-toDescriptorInfo :: TaggedConnection -> Descriptor -> IO DescriptorWithInfo
-toDescriptorInfo tc d@(Descriptor dk _) =
-  DescriptorWithInfo d <$> hasInfraRelations dk tc
+toDescriptorInfo :: TaggedConnection -> Descriptor -> IO (IntMap.IntMap DescriptorInfo)
+toDescriptorInfo tc (Descriptor dk p) = do
+  let consDes b = DescriptorInfo b p VisibilityMain
+  di <- consDes <$> hasInfraRelations dk tc
+  return $ IntMap.singleton (fromIntegral dk) di
+
+isHashPattern :: Text -> Bool
+isHashPattern p = "#" `T.isPrefixOf` p && "#" `T.isSuffixOf` p

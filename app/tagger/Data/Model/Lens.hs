@@ -1,13 +1,18 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Data.Model.Lens (
   module Data.Model.Lens,
 ) where
 
 import Control.Lens
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap
+import Data.Maybe
 import Data.Model.Internal
 
 newtype TaggerLens a b = TaggerLens {taggerLens :: Lens' a b}
@@ -24,4 +29,10 @@ makeLensesWith abbreviatedFields ''DescriptorTreeModel
 
 makeLensesWith abbreviatedFields ''FocusedFileModel
 
-makeLensesWith abbreviatedFields ''DescriptorWithInfo
+makeLensesWith abbreviatedFields ''DescriptorInfo
+
+descriptorInfoMapAt :: Int -> Lens' (IntMap DescriptorInfo) DescriptorInfo
+descriptorInfoMapAt n =
+  lens
+    (fromMaybe createDescriptorInfo . IntMap.lookup n)
+    (flip (IntMap.insert n))
