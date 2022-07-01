@@ -208,14 +208,17 @@ descriptorTreeEventHandler
                   pd
             )
         ]
-      ToggleDescriptorLeafVisibility (fromIntegral -> dk) ->
+      ToggleDescriptorLeafVisibility (Descriptor (fromIntegral -> dk) p) ->
         [ Model $
-            model
-              & descriptorTreeModel
-                . descriptorInfoMap
-                . descriptorInfoMapAt dk
-                . descriptorInfoVis
-              %~ toggleAltVis
+            if isHashPattern p
+              then model
+              else
+                model
+                  & descriptorTreeModel
+                    . descriptorInfoMap
+                    . descriptorInfoMapAt dk
+                    . descriptorInfoVis
+                  %~ toggleAltVis
         ]
       ToggleDescriptorTreeVisibility l ->
         [ let currentVis = model ^. visibilityModel . descriptorTreeVis
@@ -249,3 +252,6 @@ toDescriptorInfo tc (Descriptor dk p) = do
   let consDes b = DescriptorInfo b p VisibilityMain
   di <- consDes <$> hasInfraRelations dk tc
   return $ IntMap.singleton (fromIntegral dk) di
+
+isHashPattern :: Text -> Bool
+isHashPattern p = "#" `T.isPrefixOf` p && "#" `T.isSuffixOf` p

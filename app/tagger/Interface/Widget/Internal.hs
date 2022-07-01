@@ -247,7 +247,7 @@ descriptorTreeLeaf
             $ button
               "->"
               ( DoDescriptorTreeEvent
-                  (ToggleDescriptorLeafVisibility dk)
+                  (ToggleDescriptorLeafVisibility d)
               )
         , draggable d
             . box_ [alignLeft]
@@ -266,7 +266,7 @@ descriptorTreeLeaf
             . withStyleBasic [bgColor yuiLightPeach]
             $ button
               "<-"
-              (DoDescriptorTreeEvent (ToggleDescriptorLeafVisibility dk))
+              (DoDescriptorTreeEvent (ToggleDescriptorLeafVisibility d))
         , box_ [alignLeft]
             . keystroke_
               [("Enter", DoDescriptorTreeEvent (UpdateDescriptor dk))]
