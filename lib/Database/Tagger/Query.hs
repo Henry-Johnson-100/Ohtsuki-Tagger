@@ -78,6 +78,9 @@ module Database.Tagger.Query (
   -- | Queries that return 'Tag`s.
   allTags,
   queryForTagByFileAndDescriptorKey,
+  queryForTagByFileAndDescriptorKeyAndNullSubTagOf,
+  queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf,
+  queryForTagBySubTagTriple,
 
   -- *** On 'File`
   queryForFileTagsByFileId,
@@ -111,6 +114,9 @@ module Database.Tagger.Query (
   insertDescriptorRelation,
 
   -- ** 'Tag` Operations
+
+  -- *** 'Tag` Insertion
+  -- $FailedInsertion
   insertTags,
   unsafeInsertTag,
 ) where
@@ -123,6 +129,7 @@ import qualified Data.HashSet as HashSet
 import qualified Data.HierarchyMap as HAM
 import Data.Maybe
 import qualified Data.OccurrenceMap.Internal as OM
+import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger.Connection
 import Database.Tagger.Query.Type (TaggerQuery)
@@ -979,6 +986,29 @@ getTagOccurrences ds tc = do
         |]
 
 {- |
+ For the given Tag Triple, return 'True` if it will violate the UNIQUE constraint in
+ the Tag table.
+-}
+tagUniqueConstraintExists ::
+  (RecordKey File, RecordKey Descriptor, Maybe (RecordKey Tag)) ->
+  TaggedConnection ->
+  IO Bool
+tagUniqueConstraintExists tagToCheck tc = do
+  result <- map (\(Only n) -> n) <$> query tc q tagToCheck :: IO [Int]
+  return $ elem 1 result
+ where
+  q =
+    [r|
+    SELECT EXISTS(
+      SELECT *
+      FROM Tag
+      WHERE fileId = ?
+        AND descriptorId = ?
+        AND subTagOfId = ?
+    )
+    |]
+
+{- |
  Returns all 'Tag`s in the database.
 
  Will likely be a pretty large set for mature databases.
@@ -1016,6 +1046,80 @@ queryForTagByFileAndDescriptorKey fk dk tc =
     FROM Tag
     WHERE fileId = :fileKey
       AND descriptorId = :desKey
+    |]
+
+{- |
+ Like 'queryForTagByFileAndDescriptorKey` with the added constraint
+ of requiring a null subTagOfId column.
+-}
+queryForTagByFileAndDescriptorKeyAndNullSubTagOf ::
+  RecordKey File ->
+  RecordKey Descriptor ->
+  TaggedConnection ->
+  IO [Tag]
+queryForTagByFileAndDescriptorKeyAndNullSubTagOf fk dk tc = query tc q (fk, dk)
+ where
+  q =
+    [r|
+    SELECT
+      id
+      ,fileId
+      ,descriptorId
+      ,subTagOfId
+    FROM Tag
+    WHERE fileId = ?
+      AND descriptorId = ?
+      AND subTagOfId IS NULL
+    |]
+
+{- |
+ Like 'queryForTagByFileAndDescriptorKey` with the added constraints
+ of requiring a null subTagOfId column and searching on a 'Descriptor` pattern rather
+ than key.
+-}
+queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf ::
+  RecordKey File ->
+  Text ->
+  TaggedConnection ->
+  IO [Tag]
+queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf fk dk tc = query tc q (fk, dk)
+ where
+  q =
+    [r|
+    SELECT
+      t.id
+      ,t.fileId
+      ,t.descriptorId
+      ,t.subTagOfId
+    FROM Tag t
+    JOIN Descriptor d
+      ON t.descriptorId = d.id
+    WHERE t.fileId = ?
+      AND d.descriptor LIKE ? ESCAPE '\'
+      AND t.subTagOfId IS NULL
+    |]
+
+{- |
+ Given a 'Tag` triple with a non-null subTagOfId,
+ return the 'Tag`s that match.
+-}
+queryForTagBySubTagTriple ::
+  (RecordKey File, RecordKey Descriptor, RecordKey Tag) ->
+  TaggedConnection ->
+  IO [Tag]
+queryForTagBySubTagTriple triple tc = query tc q triple
+ where
+  q =
+    [r|
+    SELECT
+      id
+      ,fileId
+      ,descriptorId
+      ,subTagOfId
+    FROM Tag
+    WHERE fileId = ?
+      AND descriptorId = ?
+      AND subTagOfId = ?
     |]
 
 {- |
@@ -1102,37 +1206,57 @@ getUnrelatedDescriptor tc = do
  Given a list of tag triples,
   Insert them as 'Tag`s into the database.
 
-For each triple, if its third member is 'Nothing` and there exists at least one
-  'Tag` in the database that matches that 'File` ID and 'Descriptor` ID whose subTagOfId
-  column is NOT NULL then it is not inserted.
+Some insertions may fail. Failed insertions are not included in the result set of
+  of this function's 'RecordKey`s
 
 If this behavior is not desired, see 'unsafeInsertTag`
 -}
 insertTags ::
   [(RecordKey File, RecordKey Descriptor, Maybe (RecordKey Tag))] ->
   TaggedConnection ->
-  IO ()
-insertTags toInsert tc = mapM_ (`insertTag` tc) toInsert
+  IO [RecordKey Tag]
+insertTags toInsert tc = catMaybes <$> mapM (`insertTag` tc) toInsert
+
+{- $FailedInsertion
+ For each Tag Triple, if its third member is 'Nothing` and there exists at least one
+  'Tag` in the database that matches that 'File` ID and 'Descriptor` ID whose subTagOfId
+  column is NOT NULL then it is not inserted and an @IO Nothing@ is returned.
+
+If the third member is not 'Nothing` then a precheck occurs if the given triple will
+  violate the database's UNIQUE constraint. If it does, then @IO Nothing@ is returned.
+-}
 
 {- |
  Insert one 'Tag` and retrieve its ID.
 
  For each triple, if its third member is 'Nothing` and there exists at least one
   'Tag` in the database that matches that 'File` ID and 'Descriptor` ID whose subTagOfId
-  column is NOT NULL then it is not inserted.
+  column is NOT NULL then it is not inserted and an @IO Nothing@ is returned.
+
+If the third member is not 'Nothing` then a precheck occurs if the given triple will
+  violate the database's UNIQUE constraint. If it does, then @IO Nothing@ is returned.
+
+Otherwise, an @IO (Just (RecordKey Tag))@ is returned, corresponding to the successful
+insertion.
 -}
 insertTag ::
   (RecordKey File, RecordKey Descriptor, Maybe (RecordKey Tag)) ->
   TaggedConnection ->
-  IO ()
+  IO (Maybe (RecordKey Tag))
 insertTag toInsert@(fk, dk, subTagOf) tc =
   case subTagOf of
     Nothing -> do
       topLevelTagExists <-
         any (isNothing . tagSubtagOfId)
           <$> queryForTagByFileAndDescriptorKey fk dk tc
-      unless topLevelTagExists $ void (unsafeInsertTag toInsert tc)
-    _ -> void $ unsafeInsertTag toInsert tc
+      if topLevelTagExists
+        then return Nothing
+        else Just <$> unsafeInsertTag toInsert tc
+    _ -> do
+      willViolateUniqueConstraint <- tagUniqueConstraintExists toInsert tc
+      if willViolateUniqueConstraint
+        then return Nothing
+        else Just <$> unsafeInsertTag toInsert tc
 
 {- |
  Insert the given 'Tag` triple into the database.
