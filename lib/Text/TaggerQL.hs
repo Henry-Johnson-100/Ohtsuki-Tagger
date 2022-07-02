@@ -448,19 +448,14 @@ envInsertComplexTerm True ct = do
             p
             c
         )
-envInsertComplexTerm _ (_ :<- ((Bottom bst) :| sts)) =
-  if null sts
-    then envInsertSubTag bst
-    else concat <$> mapM (envInsertComplexTerm False) sts
-envInsertComplexTerm _ (_ :<- (st@(complexTermNode -> stt) :| sts)) =
-  if null sts
-    then do
-      subTagEnv <- envInsertSubTag stt
-      local (setTagList subTagEnv) $ envInsertComplexTerm False st
-    else do
-      subTagEnv <- envInsertSubTag stt
-      void $ local (setTagList subTagEnv) $ envInsertComplexTerm False st
-      concat <$> mapM (envInsertComplexTerm False) sts
+envInsertComplexTerm _ (_ :<- (ct :| sts)) = do
+  void $ case ct of
+    Bottom t -> envInsertSubTag t
+    (complexTermNode -> ctt) -> do
+      lowerLayerEnv <- envInsertSubTag ctt
+      local (setTagList lowerLayerEnv) $ envInsertComplexTerm False ct
+  mapM_ (envInsertComplexTerm False) sts
+  return []
 
 envInsertSubTag ::
   Term (RecordKey File, Text) ->
