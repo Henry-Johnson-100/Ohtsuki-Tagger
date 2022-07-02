@@ -101,7 +101,10 @@ module Database.Tagger.Query (
 
   -- ** 'Descriptor` Operations
   insertDescriptors,
+  -- #TODO modify this function to not delete #_# descriptors
+  -- #TODO create a function that can delete #_# descriptors
   deleteDescriptors,
+  -- #TODO See the two above.
   updateDescriptors,
 
   -- ** 'Relation` Operations
@@ -109,7 +112,7 @@ module Database.Tagger.Query (
 
   -- ** 'Tag` Operations
   insertTags,
-  insertTag,
+  unsafeInsertTag,
 ) where
 
 import Control.Monad
@@ -1098,21 +1101,50 @@ getUnrelatedDescriptor tc = do
 {- |
  Given a list of tag triples,
   Insert them as 'Tag`s into the database.
+
+For each triple, if its third member is 'Nothing` and there exists at least one
+  'Tag` in the database that matches that 'File` ID and 'Descriptor` ID whose subTagOfId
+  column is NOT NULL then it is not inserted.
+
+If this behavior is not desired, see 'unsafeInsertTag`
 -}
 insertTags ::
   [(RecordKey File, RecordKey Descriptor, Maybe (RecordKey Tag))] ->
   TaggedConnection ->
-  IO [RecordKey Tag]
-insertTags toInsert tc = mapM (`insertTag` tc) toInsert
+  IO ()
+insertTags toInsert tc = mapM_ (`insertTag` tc) toInsert
 
 {- |
  Insert one 'Tag` and retrieve its ID.
+
+ For each triple, if its third member is 'Nothing` and there exists at least one
+  'Tag` in the database that matches that 'File` ID and 'Descriptor` ID whose subTagOfId
+  column is NOT NULL then it is not inserted.
 -}
 insertTag ::
   (RecordKey File, RecordKey Descriptor, Maybe (RecordKey Tag)) ->
   TaggedConnection ->
+  IO ()
+insertTag toInsert@(fk, dk, subTagOf) tc =
+  case subTagOf of
+    Nothing -> do
+      topLevelTagExists <-
+        any (isNothing . tagSubtagOfId)
+          <$> queryForTagByFileAndDescriptorKey fk dk tc
+      unless topLevelTagExists $ void (unsafeInsertTag toInsert tc)
+    _ -> void $ unsafeInsertTag toInsert tc
+
+{- |
+ Insert the given 'Tag` triple into the database.
+
+ Other than the database-level unique constraints, performs no validation on the
+ given triple.
+-}
+unsafeInsertTag ::
+  (RecordKey File, RecordKey Descriptor, Maybe (RecordKey Tag)) ->
+  TaggedConnection ->
   IO (RecordKey Tag)
-insertTag toInsert tc = do
+unsafeInsertTag toInsert tc = do
   execute tc q toInsert
   lastInsertRowId tc
  where
