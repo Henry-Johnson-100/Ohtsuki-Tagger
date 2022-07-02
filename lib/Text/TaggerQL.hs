@@ -423,23 +423,23 @@ insertTagSentence tc (Sentence tts) = mapM_ (insertTagTree tc) tts
 insertTagTree :: TaggedConnection -> TermTree (RecordKey File, Text) -> IO ()
 insertTagTree tc tt =
   case tt of
-    Simple t -> void (runReaderT (envInsertSimpleTerm t) (tc, []))
+    Simple t -> void (runReaderT (insertSimpleTerm t) (tc, []))
     Complex t ->
       void
-        (runReaderT (envInsertComplexTerm True t) (tc, []))
+        (runReaderT (insertComplexTerm True t) (tc, []))
 
-envInsertComplexTerm ::
+insertComplexTerm ::
   Bool -> ComplexTerm (RecordKey File, Text) -> TaggingReader [RecordKey Tag]
-envInsertComplexTerm _ (Bottom _) = return []
-envInsertComplexTerm True ct = do
-  newEnvList <- envInsertTopLevelComplexTerm ct
-  local (setTagList newEnvList) $ envInsertComplexTerm False ct
+insertComplexTerm _ (Bottom _) = return []
+insertComplexTerm True ct = do
+  newEnvList <- insertTopLevelComplexTerm ct
+  local (setTagList newEnvList) $ insertComplexTerm False ct
  where
-  envInsertTopLevelComplexTerm ::
+  insertTopLevelComplexTerm ::
     ComplexTerm (RecordKey File, Text) ->
     TaggingReader [RecordKey Tag]
-  envInsertTopLevelComplexTerm (complexTermNode -> t@(Term _ (fk, p))) = do
-    void $ envInsertTerm t
+  insertTopLevelComplexTerm (complexTermNode -> t@(Term _ (fk, p))) = do
+    void $ insertTerm t
     c <- asks fst
     map tagId
       <$> lift
@@ -448,19 +448,19 @@ envInsertComplexTerm True ct = do
             p
             c
         )
-envInsertComplexTerm _ (_ :<- (ct :| sts)) = do
+insertComplexTerm _ (_ :<- (ct :| sts)) = do
   void $ case ct of
-    Bottom t -> envInsertSubTag t
+    Bottom t -> insertSubTag t
     (complexTermNode -> ctt) -> do
-      lowerLayerEnv <- envInsertSubTag ctt
-      local (setTagList lowerLayerEnv) $ envInsertComplexTerm False ct
-  mapM_ (envInsertComplexTerm False) sts
+      lowerLayerEnv <- insertSubTag ctt
+      local (setTagList lowerLayerEnv) $ insertComplexTerm False ct
+  mapM_ (insertComplexTerm False) sts
   return []
 
-envInsertSubTag ::
+insertSubTag ::
   Term (RecordKey File, Text) ->
   ReaderT TaggingEnvironment IO [RecordKey Tag]
-envInsertSubTag (Term _ (fk, p)) = do
+insertSubTag (Term _ (fk, p)) = do
   te <- ask
   subTagDescriptorIds <-
     map descriptorId
@@ -476,13 +476,13 @@ envInsertSubTag (Term _ (fk, p)) = do
  where
   third f (x, y, z) = (x, y, f z)
 
-envInsertSimpleTerm ::
+insertSimpleTerm ::
   SimpleTerm (RecordKey File, Text) ->
   TaggingReader [RecordKey Tag]
-envInsertSimpleTerm (SimpleTerm t) = envInsertTerm t
+insertSimpleTerm (SimpleTerm t) = insertTerm t
 
-envInsertTerm :: Term (RecordKey File, Text) -> TaggingReader [RecordKey Tag]
-envInsertTerm (Term _ (fk, p)) = do
+insertTerm :: Term (RecordKey File, Text) -> TaggingReader [RecordKey Tag]
+insertTerm (Term _ (fk, p)) = do
   c <- asks fst
   ds <- map descriptorId <$> lift (queryForDescriptorByPattern p c)
   let tagTriples = (fk,,Nothing) <$> ds
