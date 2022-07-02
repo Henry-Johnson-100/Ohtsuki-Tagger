@@ -32,11 +32,18 @@ module Text.TaggerQL (
 import Control.Monad (void, (<=<))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Maybe (MaybeT)
+import Control.Monad.Trans.Reader (
+  ReaderT (runReaderT),
+  ask,
+  asks,
+  local,
+ )
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
 import qualified Data.List as L
 import Data.List.NonEmpty (NonEmpty ((:|)))
+import Data.Maybe (fromJust)
 import Data.String (IsString (..))
 import Data.Tagger (
   QueryCriteria (
@@ -63,8 +70,6 @@ import Database.Tagger.Query (
   queryForFileByMetaDescriptorSubTagDescriptor,
   queryForFileByMetaDescriptorSubTagMetaDescriptor,
   queryForFileByPattern,
-  queryForTagByFileAndDescriptorKey,
-  queryForTagByFileAndDescriptorKeyAndNullSubTagOf,
   queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf,
   queryForTagBySubTagTriple,
   queryForUntaggedFiles,
@@ -383,6 +388,13 @@ combFun so =
     Intersect -> HS.intersection
     Difference -> HS.difference
 
+type TaggingEnvironment = (TaggedConnection, [RecordKey Tag])
+
+type TaggingReader a = ReaderT TaggingEnvironment IO a
+
+setTagList :: [RecordKey Tag] -> TaggingEnvironment -> TaggingEnvironment
+setTagList t (c, _) = (c, t)
+
 {- |
  Run a subset of the TaggerQL as 'Descriptor` patterns to insert as tags on the given
  'File`.
@@ -411,175 +423,75 @@ insertTagSentence tc (Sentence tts) = mapM_ (insertTagTree tc) tts
 insertTagTree :: TaggedConnection -> TermTree (RecordKey File, Text) -> IO ()
 insertTagTree tc tt =
   case tt of
-    Simple t -> insertSimpleTerm tc t
-    Complex t -> void $ insertComplexTerm tc True [] t
+    Simple t -> void (runReaderT (envInsertSimpleTerm t) (tc, []))
+    Complex t ->
+      void
+        (runReaderT (envInsertComplexTerm True t) (tc, []))
 
-insertComplexTerm ::
-  TaggedConnection ->
-  Bool ->
-  [RecordKey Tag] ->
-  ComplexTerm (RecordKey File, Text) ->
-  IO [RecordKey Tag]
-insertComplexTerm tc True basisTagList ct@(complexTermNode -> t@(Term _ (fk, dp))) = do
-  putStrLn $ "In match 1: inserting" ++ show t
-  -- Insert all necessary top-level descriptors
-  void $ insertTerm tc t
-  -- Collect all top-level tags that match the given pattern,
-  -- including the tags just inserted
-  newBasisTagList <-
+envInsertComplexTerm ::
+  Bool -> ComplexTerm (RecordKey File, Text) -> TaggingReader [RecordKey Tag]
+envInsertComplexTerm _ (Bottom _) = return []
+envInsertComplexTerm True ct = do
+  newEnvList <- envInsertTopLevelComplexTerm ct
+  local (setTagList newEnvList) $ envInsertComplexTerm False ct
+ where
+  envInsertTopLevelComplexTerm ::
+    ComplexTerm (RecordKey File, Text) ->
+    TaggingReader [RecordKey Tag]
+  envInsertTopLevelComplexTerm (complexTermNode -> t@(Term _ (fk, p))) = do
+    void $ envInsertTerm t
+    c <- asks fst
     map tagId
-      <$> queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf fk dp tc
-  putStrLn $ "In match 1: new basis list: " ++ show newBasisTagList
-  -- proceed to the tree traversal with the list of top-level tags.
-  insertComplexTerm tc False (newBasisTagList `L.union` basisTagList) ct
-insertComplexTerm _ _ _ (Bottom _) = do
-  putStrLn "In match 2: Bottom"
-  mempty
-insertComplexTerm tc _ basisTagList (t :<- ((Bottom bst) :| sts)) =
+      <$> lift
+        ( queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf
+            fk
+            p
+            c
+        )
+envInsertComplexTerm _ (_ :<- ((Bottom bst) :| sts)) =
+  if null sts
+    then envInsertSubTag bst
+    else concat <$> mapM (envInsertComplexTerm False) sts
+envInsertComplexTerm _ (_ :<- (st@(complexTermNode -> stt) :| sts)) =
   if null sts
     then do
-      putStrLn $ "In match 3.1: inserting" ++ show t ++ " | " ++ show bst
-      void $ insertComplexTermRelation tc basisTagList t bst
-      putStrLn $ "Returning basis: " ++ show basisTagList
-      return basisTagList
+      subTagEnv <- envInsertSubTag stt
+      local (setTagList subTagEnv) $ envInsertComplexTerm False st
     else do
-      putStrLn $ "In match 3.2: inserting" ++ show t ++ " | " ++ show bst
-      void $ insertComplexTermRelation tc basisTagList t bst
-      putStrLn $ "mapping over adjacencies: " ++ show sts
-      mapM_ (\ct' -> insertComplexTerm tc False basisTagList (t :<- [ct'])) sts
-      putStrLn $ "Return basis" ++ show basisTagList
-      return basisTagList
-insertComplexTerm tc _ basisTagList (t :<- (st :| sts)) =
-  if null sts
-    then do
-      putStrLn $ "In match 4.1: inserting" ++ show t ++ " | " ++ (show . complexTermNode) st
-      nextLevelOfTags <- insertComplexTermRelation tc basisTagList t (complexTermNode st)
-      putStrLn $ "next tag basis level" ++ show nextLevelOfTags
-      void $ insertComplexTerm tc False nextLevelOfTags st
-      return basisTagList
-    else do
-      putStrLn $ "in match 4.2: inserting" ++ show t ++ " | " ++ (show . complexTermNode) st
-      nextLevelOfTags <- insertComplexTermRelation tc basisTagList t (complexTermNode st)
-      putStrLn $ "next tag basis level" ++ show nextLevelOfTags
-      void $ insertComplexTerm tc False nextLevelOfTags st
-      putStrLn $ "mapping of adjacencies" ++ show sts
-      mapM_ (\ct' -> insertComplexTerm tc False basisTagList (t :<- [ct'])) sts
-      return basisTagList
+      subTagEnv <- envInsertSubTag stt
+      void $ local (setTagList subTagEnv) $ envInsertComplexTerm False st
+      concat <$> mapM (envInsertComplexTerm False) sts
 
-insertComplexTermRelation ::
-  TaggedConnection ->
-  [RecordKey Tag] ->
+envInsertSubTag ::
   Term (RecordKey File, Text) ->
-  Term (RecordKey File, Text) ->
-  IO [RecordKey Tag]
-insertComplexTermRelation tc prevBasisTagList basis@(Term _ (fk, basisP)) subtag@(Term _ (_, subTagP)) = do
-  putStrLn $ "In ICTR: Recieved basis " ++ show prevBasisTagList
-  putStrLn $ "For: " ++ show basis ++ " | " ++ show subtag
-  -- basisDescriptors <- queryForDescriptorByPattern basisP tc
-  -- let basisSuperTagTriples = (fk,,) <$> (descriptorId <$> basisDescriptors) <*> prevBasisTagList
-  -- basisSuperTags <- unions <$> mapM (`queryForTagBySubTagTriple` tc) basisSuperTagTriples
-  -- putStrLn $ "Found new basis super tags" ++ show basisSuperTags
-  subTagDescriptors <- queryForDescriptorByPattern subTagP tc
-  putStrLn $ "Found subtag descriptors: " ++ show subTagDescriptors
-  let newTagTriples = (fk,,) <$> (descriptorId <$> subTagDescriptors) <*> (Just <$> prevBasisTagList)
-  newBasis <- insertTags newTagTriples tc
-  allCollectedNewSubtags <- do
-    existingTags <- map tagId . unions <$> mapM (`queryForTagBySubTagTriple` tc) ((fk,,) <$> (descriptorId <$> subTagDescriptors) <*> prevBasisTagList)
-    return $ L.union newBasis existingTags
-  putStrLn $ "Collected all subtags: " ++ show allCollectedNewSubtags
-  return allCollectedNewSubtags
-  -- putStrLn $ "found new basis: " ++ show newBasis
-  -- return newBasis
+  ReaderT TaggingEnvironment IO [RecordKey Tag]
+envInsertSubTag (Term _ (fk, p)) = do
+  te <- ask
+  subTagDescriptorIds <-
+    map descriptorId
+      <$> lift (queryForDescriptorByPattern p (fst te))
+  let subTagTriples = (fk,,) <$> subTagDescriptorIds <*> (Just <$> snd te)
+  lift . void $ insertTags subTagTriples (fst te)
+  map tagId . unions
+    <$> lift
+      ( mapM
+          (`queryForTagBySubTagTriple` fst te)
+          (third fromJust <$> subTagTriples)
+      )
+ where
+  third f (x, y, z) = (x, y, f z)
 
-{- |
- Insert descriptors that match a text in the given simple term as top-level
- tags.
--}
-insertSimpleTerm :: TaggedConnection -> SimpleTerm (RecordKey File, Text) -> IO ()
-insertSimpleTerm tc (SimpleTerm t) =
-  void $ insertTerm tc t
+envInsertSimpleTerm ::
+  SimpleTerm (RecordKey File, Text) ->
+  TaggingReader [RecordKey Tag]
+envInsertSimpleTerm (SimpleTerm t) = envInsertTerm t
 
-insertTerm :: TaggedConnection -> Term (RecordKey File, Text) -> IO [RecordKey Tag]
-insertTerm tc (Term _ (fk, dp)) = do
-  matchingDescriptors <- queryForDescriptorByPattern dp tc
-  let tagTriples = (fk,,Nothing) . descriptorId <$> matchingDescriptors
-  insertTags tagTriples tc
+envInsertTerm :: Term (RecordKey File, Text) -> TaggingReader [RecordKey Tag]
+envInsertTerm (Term _ (fk, p)) = do
+  c <- asks fst
+  ds <- map descriptorId <$> lift (queryForDescriptorByPattern p c)
+  let tagTriples = (fk,,Nothing) <$> ds
+  lift $ insertTags tagTriples c
 
 unions :: (Foldable t, Eq a) => t [a] -> [a]
 unions xs = if null xs then [] else L.foldl' L.union [] xs
-
--- {- |
---  See 'queryComplexTerm` for an example of why this function's pattern matches
---  are structured this way. It is the same type of tree traversal.
--- -}
--- insertComplexTerm ::
---   TaggedConnection ->
---   -- | Boolean switch for when the inserter is at the top-level.
---   -- This is required because each lower-level insertion is operating on the assumption
---   -- that the tags they are subtagging already exist.
---   -- For the z+1st layer, this is not true without first inserting every possible
---   -- tag for the given descriptor at the zth level.
---   --
---   -- Therefore this boolean, tells the inserter it is currently at the z=0th level
---   -- and to insert every tag then just move to the z=1st layer.
---   Bool ->
---   ComplexTerm (RecordKey File, Text) ->
---   IO ()
--- -- this match creates top-level terms, which are necessary for traversing the tree
--- -- and adding sub-terms.
--- --
--- -- It blanket adds all 'Descriptor`s descripbed by the term, since the underlying call
--- -- to 'insertTags` will ignore any top-level duplicates.
--- insertComplexTerm tc True ct@(complexTermNode -> t) = do
---   insertTerm tc t
---   insertComplexTerm tc False ct
--- -- Do nothing in the Bottom case, since there is not enough information to
--- -- insert a tag, the appopriate tag for this given Bottom should have been created
--- -- by the insertComplexTerm call one level above this one.
--- insertComplexTerm _ _ (Bottom _) = mempty
--- insertComplexTerm tc _ (t :<- ((Bottom bst) :| sts)) =
---   if null sts
---     then -- terminal case for when the inserter has reached the bottom of a branch.
---       insertComplexTermRelation tc t bst
---     else -- terminal case for when the insert has reach the bottom of the right-most
---     -- branch in the term tree.
---     do
---       -- insert current child as subterm
---       insertComplexTermRelation tc t bst
---       -- map over and insert every adjacent child.
---       mapM_ (\ct' -> insertComplexTerm tc False (t :<- [ct'])) sts
--- insertComplexTerm tc _ (t :<- (st :| sts)) =
---   if null sts
---     then do
---       -- insert current child
---       insertComplexTermRelation tc t (complexTermNode st)
---       -- insert nested children as not-top-level terms
---       insertComplexTerm tc False st
---     else do
---       -- insert current child
---       insertComplexTermRelation tc t (complexTermNode st)
---       -- insert nested children as not-top-level terms
---       insertComplexTerm tc False st
---       -- map over adjacent children after the nested subterms are inserted.
---       mapM_ (\ct' -> insertComplexTerm tc False (t :<- [ct'])) sts
-
--- -- operates on the sub term so top-level tags need to be created before calling this.
--- insertComplexTermRelation ::
---   TaggedConnection ->
---   Term (RecordKey File, Text) ->
---   Term (RecordKey File, Text) ->
---   IO ()
--- insertComplexTermRelation tc (Term _ (fk, basisP)) (Term _ (_, subTagP)) = do
---   basisDescriptors <- queryForDescriptorByPattern basisP tc
---   basisTags <-
---     unions
---       <$> mapM
---         (\dk -> queryForTagByFileAndDescriptorKey fk (descriptorId dk) tc)
---         basisDescriptors
---   subTagDescriptors <- queryForDescriptorByPattern subTagP tc
---   let tagTriples =
---         (fk,,)
---           <$> (descriptorId <$> subTagDescriptors) <*> (Just . tagId <$> basisTags)
---   insertTags tagTriples tc
---  where
---   unions xs = case xs of [] -> []; _ -> L.foldl' L.union [] xs
