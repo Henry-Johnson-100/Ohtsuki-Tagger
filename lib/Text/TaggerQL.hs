@@ -1,5 +1,8 @@
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# HLINT ignore "Redundant if" #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# HLINT ignore "Use concatMap" #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
@@ -29,12 +32,18 @@ module Text.TaggerQL (
 import Control.Monad (void, (<=<))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Maybe (MaybeT)
+import Control.Monad.Trans.Reader (
+  ReaderT (runReaderT),
+  ask,
+  asks,
+  local,
+ )
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
 import qualified Data.List as L
 import Data.List.NonEmpty (NonEmpty ((:|)))
-import qualified Data.List.NonEmpty as NE
+import Data.Maybe (fromJust)
 import Data.String (IsString (..))
 import Data.Tagger (
   QueryCriteria (
@@ -61,7 +70,8 @@ import Database.Tagger.Query (
   queryForFileByMetaDescriptorSubTagDescriptor,
   queryForFileByMetaDescriptorSubTagMetaDescriptor,
   queryForFileByPattern,
-  queryForTagByFileAndDescriptorKey,
+  queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf,
+  queryForTagBySubTagTriple,
   queryForUntaggedFiles,
  )
 import Database.Tagger.Type (
@@ -194,7 +204,7 @@ queryTermTree tc tt =
 {- |
  A depth-first query with 'ComplexTerm`s.
  Each 'Term` in a given 'ComplexTerm` will first find its relation
- query with its immediate sub-term then interesect that result with the results
+ query with its immediate sub-term then intersect that result with the results
  of its sub-term's sub-terms. It will do this until it reaches a term-bottom relation
  where it will perform one final query then move on to query relations of the term
  and any sub-terms adjacent to the first.
@@ -378,6 +388,13 @@ combFun so =
     Intersect -> HS.intersection
     Difference -> HS.difference
 
+type TaggingEnvironment = (TaggedConnection, [RecordKey Tag])
+
+type TaggingReader a = ReaderT TaggingEnvironment IO a
+
+setTagList :: [RecordKey Tag] -> TaggingEnvironment -> TaggingEnvironment
+setTagList t (c, _) = (c, t)
+
 {- |
  Run a subset of the TaggerQL as 'Descriptor` patterns to insert as tags on the given
  'File`.
@@ -406,47 +423,70 @@ insertTagSentence tc (Sentence tts) = mapM_ (insertTagTree tc) tts
 insertTagTree :: TaggedConnection -> TermTree (RecordKey File, Text) -> IO ()
 insertTagTree tc tt =
   case tt of
-    Simple t -> insertSimpleTerm tc t
-    Complex t -> insertComplexTerm tc Nothing t
+    Simple t -> void (runReaderT (insertSimpleTerm t) (tc, []))
+    Complex t ->
+      void
+        (runReaderT (insertComplexTerm True t) (tc, []))
 
 insertComplexTerm ::
-  TaggedConnection ->
-  Maybe (RecordKey Descriptor) ->
-  ComplexTerm (RecordKey File, Text) ->
-  IO ()
-insertComplexTerm tc maybePrevBasisDK ct =
-  case ct of
-    (Bottom t) -> insertTerm tc maybePrevBasisDK t
-    (Term _ (fk, p)) :<- sts -> do
-      -- insert the top-level tags (as subtags if necessary)
-      thisDks <- map descriptorId <$> queryForDescriptorByPattern p tc
-      superDks <-
-        maybe
-          (pure [Nothing])
-          (\bdk -> map (Just . tagId) <$> queryForTagByFileAndDescriptorKey fk bdk tc)
-          maybePrevBasisDK
-      let thisTagTuples = (fk,,) <$> thisDks <*> superDks
-      void $ insertTags thisTagTuples tc
-      -- map this function over the subterms with the current node's descriptors as the
-      -- basis
-      let subterms = NE.toList sts
-      sequence_ $ insertComplexTerm tc . Just <$> thisDks <*> subterms
+  Bool -> ComplexTerm (RecordKey File, Text) -> TaggingReader [RecordKey Tag]
+insertComplexTerm _ (Bottom _) = return []
+insertComplexTerm True ct = do
+  newEnvList <- insertTopLevelComplexTerm ct
+  local (setTagList newEnvList) $ insertComplexTerm False ct
+ where
+  insertTopLevelComplexTerm ::
+    ComplexTerm (RecordKey File, Text) ->
+    TaggingReader [RecordKey Tag]
+  insertTopLevelComplexTerm (complexTermNode -> t@(Term _ (fk, p))) = do
+    void $ insertTerm t
+    c <- asks fst
+    map tagId
+      <$> lift
+        ( queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf
+            fk
+            p
+            c
+        )
+insertComplexTerm _ (_ :<- (ct :| sts)) = do
+  void $ case ct of
+    Bottom t -> insertSubTag t
+    (complexTermNode -> ctt) -> do
+      lowerLayerEnv <- insertSubTag ctt
+      local (setTagList lowerLayerEnv) $ insertComplexTerm False ct
+  mapM_ (insertComplexTerm False) sts
+  return []
 
-insertSimpleTerm :: TaggedConnection -> SimpleTerm (RecordKey File, Text) -> IO ()
-insertSimpleTerm tc (SimpleTerm t) =
-  insertTerm tc Nothing t
-
-insertTerm ::
-  TaggedConnection ->
-  Maybe (RecordKey Descriptor) ->
+insertSubTag ::
   Term (RecordKey File, Text) ->
-  IO ()
-insertTerm tc maybeBasisDK (Term _ (fk, p)) = do
-  thisDks <- map descriptorId <$> queryForDescriptorByPattern p tc
-  subTagIds <-
-    maybe
-      (pure [Nothing])
-      (\bdk -> map (Just . tagId) <$> queryForTagByFileAndDescriptorKey fk bdk tc)
-      maybeBasisDK
-  let tagTuples = (fk,,) <$> thisDks <*> subTagIds
-  void $ insertTags tagTuples tc
+  ReaderT TaggingEnvironment IO [RecordKey Tag]
+insertSubTag (Term _ (fk, p)) = do
+  te <- ask
+  subTagDescriptorIds <-
+    map descriptorId
+      <$> lift (queryForDescriptorByPattern p (fst te))
+  let subTagTriples = (fk,,) <$> subTagDescriptorIds <*> (Just <$> snd te)
+  lift . void $ insertTags subTagTriples (fst te)
+  map tagId . unions
+    <$> lift
+      ( mapM
+          (`queryForTagBySubTagTriple` fst te)
+          (third fromJust <$> subTagTriples)
+      )
+ where
+  third f (x, y, z) = (x, y, f z)
+
+insertSimpleTerm ::
+  SimpleTerm (RecordKey File, Text) ->
+  TaggingReader [RecordKey Tag]
+insertSimpleTerm (SimpleTerm t) = insertTerm t
+
+insertTerm :: Term (RecordKey File, Text) -> TaggingReader [RecordKey Tag]
+insertTerm (Term _ (fk, p)) = do
+  c <- asks fst
+  ds <- map descriptorId <$> lift (queryForDescriptorByPattern p c)
+  let tagTriples = (fk,,Nothing) <$> ds
+  lift $ insertTags tagTriples c
+
+unions :: (Foldable t, Eq a) => t [a] -> [a]
+unions xs = if null xs then [] else L.foldl' L.union [] xs
