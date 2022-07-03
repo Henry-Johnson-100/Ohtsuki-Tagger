@@ -57,10 +57,15 @@ fileSelectionWidget m = fileSelectionMainPage
 
 fileSelectionLeaf :: TaggerModel -> File -> TaggerWidget
 fileSelectionLeaf m f@(File fk fp) =
-  label fp
+  draggable f $
+    label fp
 
 fileSelectionQueryTextField :: TaggerWidget
-fileSelectionQueryTextField = textField_ (fileSelectionModel . queryText) []
+fileSelectionQueryTextField =
+  keystroke_
+    [("Enter", DoFileSelectionEvent Query)]
+    [ignoreChildrenEvts]
+    $ textField_ (fileSelectionModel . queryText) []
 
 {-
  _____ ___   ____ _   _ ____  _____ ____
@@ -91,8 +96,11 @@ focusedFileWidget m =
  where
   focusedFileMainPane =
     dropTarget_
-      (\(Descriptor dk _) -> DoFocusedFileEvent (TagFile dk Nothing))
-      [dropTargetStyle [border 3 yuiBlue]]
+      (DoFocusedFileEvent . PutFile)
+      [dropTargetStyle [border 3 yuiOrange]]
+      . dropTarget_
+        (\(Descriptor dk _) -> DoFocusedFileEvent (TagFile dk Nothing))
+        [dropTargetStyle [border 3 yuiBlue]]
       . withStyleBasic []
       $ ( case m ^. focusedFileModel . renderability of
             RenderAsImage -> imagePreviewRender

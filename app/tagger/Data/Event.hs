@@ -6,10 +6,12 @@
 
 module Data.Event (
   TaggerEvent (..),
+  FileSelectionEvent (..),
   DescriptorTreeEvent (..),
   FocusedFileEvent (..),
 ) where
 
+import Data.HashSet
 import Data.IntMap.Strict (IntMap)
 import Data.Model
 import Data.Text (Text)
@@ -17,6 +19,7 @@ import Database.Tagger.Type
 
 data TaggerEvent
   = DoFocusedFileEvent FocusedFileEvent
+  | DoFileSelectionEvent FileSelectionEvent
   | DoDescriptorTreeEvent DescriptorTreeEvent
   | TaggerInit
   | RefreshUI
@@ -24,6 +27,11 @@ data TaggerEvent
   | CloseConnection
   | IOEvent ()
   | ClearTextField (TaggerLens TaggerModel Text)
+  deriving (Show, Eq)
+
+data FileSelectionEvent
+  = PutFiles (HashSet File)
+  | Query
   deriving (Show, Eq)
 
 data FocusedFileEvent

@@ -14,16 +14,21 @@ import Control.Monad
 import Control.Monad.Trans.Maybe
 import Data.Config
 import Data.Event
+import qualified Data.Foldable as F
+import qualified Data.HashSet as HS
 import Data.HierarchyMap (empty)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Model
 import Data.Model.Shared
+import qualified Data.Sequence as Seq
+import Data.Tagger
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger
 import Monomer
 import Paths_tagger
 import System.FilePath
+import Text.TaggerQL
 import Util
 
 taggerEventHandler ::
@@ -39,6 +44,7 @@ taggerEventHandler
   event =
     case event of
       DoFocusedFileEvent e -> focusedFileEventHandler wenv node model e
+      DoFileSelectionEvent e -> fileSelectionEventHandler wenv node model e
       DoDescriptorTreeEvent e -> descriptorTreeEventHandler wenv node model e
       TaggerInit -> [Event (DoDescriptorTreeEvent DescriptorTreeInit)]
       RefreshUI ->
@@ -48,6 +54,45 @@ taggerEventHandler
       CloseConnection -> [Task (IOEvent <$> close conn)]
       IOEvent _ -> []
       ClearTextField (TaggerLens l) -> [Model $ model & l .~ ""]
+
+fileSelectionEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  FileSelectionEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+fileSelectionEventHandler
+  _
+  _
+  model@(_taggermodelConnection -> conn)
+  event =
+    case event of
+      PutFiles fs ->
+        [ let currentSet =
+                HS.fromList
+                  . F.toList
+                  $ model ^. fileSelectionModel . selection
+              combFun =
+                case model ^. fileSelectionModel . setOp of
+                  Union -> HS.union
+                  Intersect -> HS.intersection
+                  Difference -> HS.difference
+           in Model $
+                model
+                  & fileSelectionModel
+                    . selection
+                  .~ (Seq.fromList . HS.toList $ combFun currentSet fs)
+        ]
+      Query ->
+        [ Task
+            ( DoFileSelectionEvent
+                . PutFiles
+                <$> taggerQL
+                  (TaggerQLQuery $ model ^. fileSelectionModel . queryText)
+                  conn
+            )
+        , Event (ClearTextField (TaggerLens (fileSelectionModel . queryText)))
+        ]
 
 focusedFileEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->

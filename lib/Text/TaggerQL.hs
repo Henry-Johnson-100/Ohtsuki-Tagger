@@ -15,12 +15,12 @@ Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL (
   -- * Query with TaggerQL
-  TaggerQLQuery,
+  TaggerQLQuery (..),
   taggerQL,
   queryRequest,
 
   -- * Tag with TaggerQL
-  TaggerQLTagStmnt,
+  TaggerQLTagStmnt (..),
   taggerQLTag,
 
   -- * Other
