@@ -53,7 +53,7 @@ focusedFileWidget m =
     dropTarget_
       (\(Descriptor dk _) -> DoFocusedFileEvent (TagFile dk Nothing))
       [dropTargetStyle [border 3 yuiBlue]]
-      . withStyleBasic [border 1 (if m ^. isMassOperation then yuiOrange else black)]
+      . withStyleBasic []
       $ ( case m ^. focusedFileModel . renderability of
             RenderAsImage -> imagePreviewRender
             _ -> imagePreviewRender
@@ -71,7 +71,7 @@ detailPane m =
         "<-"
         (DoFocusedFileEvent ToggleDetailPaneVisibility)
     , separatorLine
-    , withNodeVisible (VisibilityAlt == (m ^. focusedFileModel . focusedFileVis)) $
+    , withNodeVisible ((m ^. focusedFileModel . focusedFileVis) `hasVis` VisibilityAlt) $
         label "Detail widget goes here fam."
     ]
 
@@ -95,6 +95,12 @@ __        _____ ____   ____ _____ _____
    \_/\_/  |___|____/ \____|_____| |_|
 -}
 
+editDescriptorVis :: Text
+editDescriptorVis = "edit-descriptor"
+
+manageDescriptorPaneVis :: Text
+manageDescriptorPaneVis = "manage"
+
 descriptorTreeWidget :: TaggerModel -> TaggerWidget
 descriptorTreeWidget m =
   flip nodeKey "descriptorTree" $
@@ -104,9 +110,11 @@ descriptorTreeWidget m =
       $ vstack_
         []
         [ mainPane
-        , nodeVisible
+        , withNodeVisible
+            ( (m ^. descriptorTreeModel . descriptorTreeVis)
+                `hasVis` VisibilityLabel manageDescriptorPaneVis
+            )
             altPane
-            (VisibilityLabel "manage" == (m ^. descriptorTreeModel . descriptorTreeVis))
         ]
  where
   mainPane =
@@ -140,7 +148,11 @@ descriptorTreeWidget m =
         []
         [ insertDescriptorWidget
         , spacer
-        , box_ [alignMiddle] deleteDescriptorWidget
+        , styledButton
+            "Edit"
+            ( DoDescriptorTreeEvent
+                (ToggleDescriptorTreeVisibility editDescriptorVis)
+            )
         , spacer
         ]
 
@@ -228,42 +240,31 @@ insertDescriptorWidget =
  where
   insertButton = styledButton "Insert" (DoDescriptorTreeEvent InsertDescriptor)
 
-deleteDescriptorWidget :: TaggerWidget
-deleteDescriptorWidget =
-  withStyleBasic [border 1 yuiRed]
-    . dropTarget_
-      (DoDescriptorTreeEvent . DeleteDescriptor)
-      [dropTargetStyle [bgColor yuiRed, border 1 yuiYellow]]
-    $ label "Delete"
-
 descriptorTreeLeaf :: TaggerModel -> Descriptor -> TaggerWidget
 descriptorTreeLeaf
-  ((^. descriptorTreeModel . descriptorInfoMap) -> m)
+  model@((^. descriptorTreeModel . descriptorInfoMap) -> m)
   d@(Descriptor dk p) =
     let di = m ^. descriptorInfoAt (fromIntegral dk)
      in box_ [alignLeft] $
           zstack_
             []
             [ withNodeVisible
-                (VisibilityMain == di ^. descriptorInfoVis)
-                $ mainPage di
+                ( not $
+                    (model ^. descriptorTreeModel . descriptorTreeVis)
+                      `hasVis` VisibilityLabel editDescriptorVis
+                )
+                $ mainDescriptorLeafPageWidget di
             , withNodeVisible
-                (VisibilityAlt == di ^. descriptorInfoVis)
-                altPage
+                ( (model ^. descriptorTreeModel . descriptorTreeVis)
+                    `hasVis` VisibilityLabel editDescriptorVis
+                )
+                editDescriptorLeafPageWidget
             ]
    where
-    mainPage di =
+    mainDescriptorLeafPageWidget di =
       hstack_
         []
-        [ box_ [alignCenter]
-            . withStyleHover [border 0 black, bgColor yuiLightPeach]
-            . withStyleBasic [border 0 black, bgColor yuiLightPeach]
-            $ button
-              "->"
-              ( DoDescriptorTreeEvent
-                  (ToggleDescriptorLeafVisibility d)
-              )
-        , draggable d
+        [ draggable d
             . box_ [alignLeft]
             . withStyleHover [border 1 yuiOrange, bgColor yuiLightPeach]
             . withStyleBasic
@@ -272,16 +273,10 @@ descriptorTreeLeaf
               ]
             $ button p (DoDescriptorTreeEvent (RequestFocusedNode p))
         ]
-    altPage =
+    editDescriptorLeafPageWidget =
       hstack_
         []
-        [ box_ [alignCenter]
-            . withStyleHover [border 0 black, bgColor yuiLightPeach]
-            . withStyleBasic [bgColor yuiLightPeach]
-            $ button
-              "<-"
-              (DoDescriptorTreeEvent (ToggleDescriptorLeafVisibility d))
-        , box_ [alignLeft]
+        [ box_ [alignLeft]
             . keystroke_
               [("Enter", DoDescriptorTreeEvent (UpdateDescriptor dk))]
               []

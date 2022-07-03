@@ -13,7 +13,7 @@ import Control.Lens
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Maybe
-import Data.Model.Internal
+import Data.Model.Core
 
 newtype TaggerLens a b = TaggerLens {taggerLens :: Lens' a b}
 

@@ -4,8 +4,13 @@
 module Data.Model.Shared.Core (
   Visibility (..),
   toggleAltVis,
+  setPaneVis,
+  unsetPaneVis,
+  hasVis,
 ) where
 
+import Data.Set (Set)
+import qualified Data.Set as S
 import Data.Text (Text)
 
 {- |
@@ -19,7 +24,28 @@ data Visibility
   | VisibilityAlt
   | VisibilityNum Int
   | VisibilityLabel Text
-  deriving (Show, Eq)
+  | VisibilityPanes Visibility (Set Visibility)
+  deriving (Show, Eq, Ord)
+
+setPaneVis :: Visibility -> Visibility -> Visibility
+setPaneVis x y =
+  case x of
+    VisibilityPanes x' s -> VisibilityPanes x' (S.insert y s)
+    _ -> VisibilityPanes x (S.singleton y)
+
+unsetPaneVis :: Visibility -> Visibility -> Visibility
+unsetPaneVis x y =
+  case x of
+    VisibilityPanes x' s ->
+      let newVisSet = S.delete y s
+       in if S.null newVisSet then x' else VisibilityPanes x' newVisSet
+    _ -> x
+
+hasVis :: Visibility -> Visibility -> Bool
+hasVis x y =
+  case x of
+    VisibilityPanes x' s -> x' == y || S.member y s
+    _ -> x == y
 
 {- |
  Switches between Main and Alt visibility.

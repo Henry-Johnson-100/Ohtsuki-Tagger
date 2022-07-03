@@ -20,7 +20,6 @@ data TaggerEvent
   | DoDescriptorTreeEvent DescriptorTreeEvent
   | TaggerInit
   | RefreshUI
-  | ToggleMassOperate
   | ToggleTagMode
   | CloseConnection
   | IOEvent ()
@@ -47,7 +46,6 @@ data DescriptorTreeEvent
   | RefreshUnrelated
   | RequestFocusedNode Text
   | RequestFocusedNodeParent
-  | ToggleDescriptorLeafVisibility Descriptor
   | ToggleDescriptorTreeVisibility Text
   | UpdateDescriptor (RecordKey Descriptor)
   deriving (Show, Eq)
