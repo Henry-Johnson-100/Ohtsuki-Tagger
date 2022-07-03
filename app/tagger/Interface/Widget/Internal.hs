@@ -5,6 +5,7 @@
 
 module Interface.Widget.Internal (
   TaggerWidget,
+  fileSelectionWidget,
   focusedFileWidget,
   descriptorTreeWidget,
 ) where
@@ -15,12 +16,51 @@ import Data.Event
 import qualified Data.List as L
 import Data.Model
 import Data.Model.Shared
+import qualified Data.Sequence as Seq
 import Data.Text (Text)
 import Database.Tagger.Type
 import Interface.Theme
 import Monomer
 
 type TaggerWidget = WidgetNode TaggerModel TaggerEvent
+
+{-
+ _____ ___ _     _____
+|  ___|_ _| |   | ____|
+| |_   | || |   |  _|
+|  _|  | || |___| |___
+|_|   |___|_____|_____|
+
+ ____  _____ _     _____ ____ _____ ___ ___  _   _
+/ ___|| ____| |   | ____/ ___|_   _|_ _/ _ \| \ | |
+\___ \|  _| | |   |  _|| |     | |  | | | | |  \| |
+ ___) | |___| |___| |__| |___  | |  | | |_| | |\  |
+|____/|_____|_____|_____\____| |_| |___\___/|_| \_|
+
+__        _____ ____   ____ _____ _____
+\ \      / /_ _|  _ \ / ___| ____|_   _|
+ \ \ /\ / / | || | | | |  _|  _|   | |
+  \ V  V /  | || |_| | |_| | |___  | |
+   \_/\_/  |___|____/ \____|_____| |_|
+
+-}
+
+fileSelectionWidget :: TaggerModel -> TaggerWidget
+fileSelectionWidget m = fileSelectionMainPage
+ where
+  fileSelectionMainPage =
+    vstack_
+      []
+      [ fileSelectionQueryTextField
+      , vstack_ [] (fmap (fileSelectionLeaf m) (m ^. fileSelectionModel . selection))
+      ]
+
+fileSelectionLeaf :: TaggerModel -> File -> TaggerWidget
+fileSelectionLeaf m f@(File fk fp) =
+  label fp
+
+fileSelectionQueryTextField :: TaggerWidget
+fileSelectionQueryTextField = textField_ (fileSelectionModel . queryText) []
 
 {-
  _____ ___   ____ _   _ ____  _____ ____

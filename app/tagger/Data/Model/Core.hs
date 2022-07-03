@@ -46,7 +46,6 @@ data TaggerModel = TaggerModel
   , _taggerFileSelection :: [File]
   , _taggerQueryCriteria :: QueryCriteria
   , _taggerSetOp :: SetOp
-  , _taggerQueryText :: Text
   , _taggerMassTagText :: Text
   , _taggerShellText :: Text
   }
@@ -71,7 +70,6 @@ createTaggerModel conf tc d unRelatedD defaultFilePath =
     , _taggerFileSelection = []
     , _taggerQueryCriteria = MetaDescriptorCriteria
     , _taggerSetOp = Union
-    , _taggerQueryText = ""
     , _taggerMassTagText = ""
     , _taggerShellText = ""
     }
@@ -80,6 +78,7 @@ data FileSelectionModel = FileSelectionModel
   { _fileselectionSelection :: Seq File
   , _fileselectionTagOccurrences :: OccurrenceMap
   , _fileselectionFileSelectionInfoMap :: IntMap FileInfo
+  , _fileselectionQueryText :: Text
   }
   deriving (Show, Eq)
 
@@ -89,6 +88,7 @@ createFileSelectionModel =
     { _fileselectionSelection = S.empty
     , _fileselectionTagOccurrences = OM.empty
     , _fileselectionFileSelectionInfoMap = IntMap.empty
+    , _fileselectionQueryText = ""
     }
 
 data FileInfo = FileInfo
