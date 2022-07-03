@@ -106,7 +106,7 @@ descriptorTreeWidget m =
         [ mainPane
         , nodeVisible
             altPane
-            (VisibilityLabel "manage" == (m ^. visibilityModel . descriptorTreeVis))
+            (VisibilityLabel "manage" == (m ^. descriptorTreeModel . descriptorTreeVis))
         ]
  where
   mainPane =

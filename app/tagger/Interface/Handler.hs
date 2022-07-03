@@ -250,9 +250,9 @@ descriptorTreeEventHandler
                   %~ toggleAltVis
         ]
       ToggleDescriptorTreeVisibility l ->
-        [ let currentVis = model ^. visibilityModel . descriptorTreeVis
+        [ let currentVis = model ^. descriptorTreeModel . descriptorTreeVis
            in Model $
-                model & visibilityModel . descriptorTreeVis
+                model & descriptorTreeModel . descriptorTreeVis
                   .~ ( if currentVis == VisibilityMain
                         then VisibilityLabel l
                         else VisibilityMain

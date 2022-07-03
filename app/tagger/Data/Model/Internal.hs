@@ -40,7 +40,7 @@ data TaggerModel = TaggerModel
   , _taggermodelDescriptorTreeModel :: DescriptorTreeModel
   , _taggermodelFocusedFileModel :: FocusedFileModel
   , _taggermodelFileSelectionModel :: FileSelectionModel
-  , _taggermodelVisibilityModel :: VisibilityModel
+  , _taggermodelVisibilityModel :: Visibility
   , _taggermodelConnection :: TaggedConnection
   , _taggermodelIsMassOperation :: Bool
   , _taggermodelIsTagMode :: Bool
@@ -66,7 +66,7 @@ createTaggerModel conf tc d unRelatedD defaultFilePath =
     , _taggermodelDescriptorTreeModel = createDescriptorTreeModel d unRelatedD
     , _taggermodelFocusedFileModel = createFocusedFileModel defaultFilePath
     , _taggermodelFileSelectionModel = createFileSelectionModel
-    , _taggermodelVisibilityModel = createVisibilityModel
+    , _taggermodelVisibilityModel = VisibilityMain
     , _taggermodelConnection = tc
     , _taggermodelIsMassOperation = False
     , _taggermodelIsTagMode = True
@@ -137,6 +137,7 @@ data DescriptorTreeModel = DescriptorTreeModel
   , _descriptortreeFocusedTree :: [Descriptor]
   , _descriptortreeDescriptorInfoMap :: IntMap DescriptorInfo
   , _descriptortreeNewDescriptorText :: Text
+  , _descriptortreeDescriptorTreeVis :: Visibility
   }
   deriving (Show, Eq)
 
@@ -175,4 +176,5 @@ createDescriptorTreeModel n unrelatedD =
     , _descriptortreeFocusedTree = []
     , _descriptortreeDescriptorInfoMap = IntMap.empty
     , _descriptortreeNewDescriptorText = ""
+    , _descriptortreeDescriptorTreeVis = VisibilityMain
     }
