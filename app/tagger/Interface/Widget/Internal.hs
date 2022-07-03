@@ -53,7 +53,7 @@ focusedFileWidget m =
     dropTarget_
       (\(Descriptor dk _) -> DoFocusedFileEvent (TagFile dk Nothing))
       [dropTargetStyle [border 3 yuiBlue]]
-      . withStyleBasic [border 1 (if m ^. isMassOperation then yuiOrange else black)]
+      . withStyleBasic []
       $ ( case m ^. focusedFileModel . renderability of
             RenderAsImage -> imagePreviewRender
             _ -> imagePreviewRender

@@ -5,7 +5,7 @@
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# HLINT ignore "Eta reduce" #-}
 
-module Data.Model.Internal (
+module Data.Model.Core (
   TaggerModel (..),
   createTaggerModel,
   FileSelectionModel (..),
@@ -42,13 +42,12 @@ data TaggerModel = TaggerModel
   , _taggermodelFileSelectionModel :: FileSelectionModel
   , _taggermodelVisibilityModel :: Visibility
   , _taggermodelConnection :: TaggedConnection
-  , _taggermodelIsMassOperation :: Bool
   , _taggermodelIsTagMode :: Bool
   , _taggerFileSelection :: [File]
   , _taggerQueryCriteria :: QueryCriteria
   , _taggerSetOp :: SetOp
   , _taggerQueryText :: Text
-  , _taggerTagText :: Text
+  , _taggerMassTagText :: Text
   , _taggerShellText :: Text
   }
   deriving (Show, Eq)
@@ -68,13 +67,12 @@ createTaggerModel conf tc d unRelatedD defaultFilePath =
     , _taggermodelFileSelectionModel = createFileSelectionModel
     , _taggermodelVisibilityModel = VisibilityMain
     , _taggermodelConnection = tc
-    , _taggermodelIsMassOperation = False
     , _taggermodelIsTagMode = True
     , _taggerFileSelection = []
     , _taggerQueryCriteria = MetaDescriptorCriteria
     , _taggerSetOp = Union
     , _taggerQueryText = ""
-    , _taggerTagText = ""
+    , _taggerMassTagText = ""
     , _taggerShellText = ""
     }
 
@@ -105,6 +103,7 @@ data FocusedFileModel = FocusedFileModel
   { _focusedfilemodelFocusedFile :: ConcreteTaggedFile
   , _focusedfilemodelRenderability :: Renderability
   , _focusedfilemodelFocusedFileVis :: Visibility
+  , _focusedfilemodelTagText :: Text
   }
   deriving (Show, Eq)
 
@@ -115,6 +114,7 @@ createFocusedFileModel fp =
         ConcreteTaggedFile (File focusedFileDefaultRecordKey fp) empty
     , _focusedfilemodelRenderability = RenderingNotSupported
     , _focusedfilemodelFocusedFileVis = VisibilityMain
+    , _focusedfilemodelTagText = ""
     }
 
 focusedFileDefaultDataFile :: FilePath

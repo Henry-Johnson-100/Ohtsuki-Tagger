@@ -20,7 +20,6 @@ data TaggerEvent
   | DoDescriptorTreeEvent DescriptorTreeEvent
   | TaggerInit
   | RefreshUI
-  | ToggleMassOperate
   | ToggleTagMode
   | CloseConnection
   | IOEvent ()

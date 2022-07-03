@@ -44,7 +44,6 @@ taggerEventHandler
       RefreshUI ->
         [ Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
         ]
-      ToggleMassOperate -> [Model $ model & isMassOperation %~ not]
       ToggleTagMode -> [Model $ model & isTagMode %~ not]
       CloseConnection -> [Task (IOEvent <$> close conn)]
       IOEvent _ -> []

@@ -56,7 +56,7 @@ executable tagger
                       ,Data.Config.Internal
                       ,Data.Event
                       ,Data.Model
-                      ,Data.Model.Internal
+                      ,Data.Model.Core
                       ,Data.Model.Lens
                       ,Data.Model.Shared
                       ,Data.Model.Shared.Core
