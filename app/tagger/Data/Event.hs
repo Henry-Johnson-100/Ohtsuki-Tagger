@@ -47,7 +47,6 @@ data DescriptorTreeEvent
   | RefreshUnrelated
   | RequestFocusedNode Text
   | RequestFocusedNodeParent
-  | ToggleDescriptorLeafVisibility Descriptor
   | ToggleDescriptorTreeVisibility Text
   | UpdateDescriptor (RecordKey Descriptor)
   deriving (Show, Eq)

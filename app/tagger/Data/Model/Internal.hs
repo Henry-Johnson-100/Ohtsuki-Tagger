@@ -150,12 +150,11 @@ data DescriptorWithInfo = DescriptorWithInfo
 data DescriptorInfo = DescriptorInfo
   { _descriptorinfoDescriptorIsMeta :: Bool
   , _descriptorinfoRenameText :: Text
-  , _descriptorinfoDescriptorInfoVis :: Visibility
   }
   deriving (Show, Eq)
 
 createDescriptorInfo :: DescriptorInfo
-createDescriptorInfo = DescriptorInfo False "" VisibilityMain
+createDescriptorInfo = DescriptorInfo False ""
 
 data Renderability
   = RenderAsImage

@@ -237,26 +237,14 @@ descriptorTreeEventHandler
                   pd
             )
         ]
-      ToggleDescriptorLeafVisibility (Descriptor (fromIntegral -> dk) p) ->
-        [ Model $
-            if isHashPattern p
-              then model
-              else
-                model
-                  & descriptorTreeModel
-                    . descriptorInfoMap
-                    . descriptorInfoAt dk
-                    . descriptorInfoVis
-                  %~ toggleAltVis
-        ]
       ToggleDescriptorTreeVisibility l ->
         [ let currentVis = model ^. descriptorTreeModel . descriptorTreeVis
-           in Model $
-                model & descriptorTreeModel . descriptorTreeVis
-                  .~ ( if currentVis == VisibilityMain
-                        then VisibilityLabel l
-                        else VisibilityMain
-                     )
+              newLabel = VisibilityLabel l
+              newVis =
+                if currentVis `hasVis` newLabel
+                  then currentVis `unsetPaneVis` newLabel
+                  else currentVis `setPaneVis` newLabel
+           in Model $ model & descriptorTreeModel . descriptorTreeVis .~ newVis
         ]
       UpdateDescriptor rkd@(RecordKey (fromIntegral -> dk)) ->
         let updateText =
@@ -278,7 +266,7 @@ descriptorTreeEventHandler
 
 toDescriptorInfo :: TaggedConnection -> Descriptor -> IO (IntMap.IntMap DescriptorInfo)
 toDescriptorInfo tc (Descriptor dk p) = do
-  let consDes b = DescriptorInfo b p VisibilityMain
+  let consDes b = DescriptorInfo b p
   di <- consDes <$> hasInfraRelations dk tc
   return $ IntMap.singleton (fromIntegral dk) di
 
