@@ -71,7 +71,7 @@ detailPane m =
         "<-"
         (DoFocusedFileEvent ToggleDetailPaneVisibility)
     , separatorLine
-    , withNodeVisible (VisibilityAlt == (m ^. focusedFileModel . focusedFileVis)) $
+    , withNodeVisible ((m ^. focusedFileModel . focusedFileVis) `hasVis` VisibilityAlt) $
         label "Detail widget goes here fam."
     ]
 
@@ -104,9 +104,11 @@ descriptorTreeWidget m =
       $ vstack_
         []
         [ mainPane
-        , nodeVisible
+        , withNodeVisible
+            ( (m ^. descriptorTreeModel . descriptorTreeVis)
+                `hasVis` VisibilityLabel "manage"
+            )
             altPane
-            (VisibilityLabel "manage" == (m ^. descriptorTreeModel . descriptorTreeVis))
         ]
  where
   mainPane =
