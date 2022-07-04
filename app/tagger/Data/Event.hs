@@ -33,6 +33,8 @@ data TaggerEvent
 
 data FileSelectionEvent
   = ClearSelection
+  | CycleTagOrderCriteria
+  | CycleTagOrderDirection
   | MakeFileSelectionInfoMap (Seq File)
   | PutFiles (HashSet File)
   | PutTagOccurrenceHashMap_ (OccurrenceHashMap Descriptor)

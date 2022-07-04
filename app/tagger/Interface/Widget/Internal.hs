@@ -89,7 +89,10 @@ tagListWidget m =
   vscroll_ [wheelRate 50] $
     vstack_
       []
-      (tagListLeaf <$> sortedOccurrenceMapList)
+      [ hstack_ [] [tagListOrderCritCycleButton, tagListOrderDirCycleButton]
+      , separatorLine
+      , vstack_ [] (tagListLeaf <$> sortedOccurrenceMapList)
+      ]
  where
   sortedOccurrenceMapList =
     let (OrderBy ordCrit ordDir) = m ^. fileSelectionModel . tagOrdering
@@ -99,10 +102,27 @@ tagListWidget m =
           (Alphabetic, Desc) -> L.sortOn (O.Down . descriptor . fst) occurrenceMapList
           (Numeric, Asc) -> L.sortOn snd occurrenceMapList
           (Numeric, Desc) -> L.sortOn (O.Down . snd) occurrenceMapList
+  tagListOrderCritCycleButton =
+    let (OrderBy ordCrit _) = m ^. fileSelectionModel . tagOrdering
+        btnText =
+          case ordCrit of
+            Alphabetic -> "ABC"
+            Numeric -> "123"
+     in styledButton btnText (DoFileSelectionEvent CycleTagOrderCriteria)
+  tagListOrderDirCycleButton =
+    let (OrderBy _ ordDir) = m ^. fileSelectionModel . tagOrdering
+     in styledButton
+          (T.pack . show $ ordDir)
+          (DoFileSelectionEvent CycleTagOrderDirection)
   tagListLeaf (d, n) =
     hgrid_
       []
-      [label . descriptor $ d, spacer_ [width 10], label . T.pack . show $ n]
+      [ label . descriptor $ d
+      , withStyleBasic
+          [paddingL 1.5, paddingR 1.5]
+          separatorLine
+      , label . T.pack . show $ n
+      ]
 
 fileSelectionQueryTextField :: TaggerWidget
 fileSelectionQueryTextField =
@@ -417,7 +437,7 @@ descriptorTreeRefreshBothButton =
 styledButton :: Text -> TaggerEvent -> TaggerWidget
 styledButton t e =
   withStyleHover [bgColor yuiYellow, border 1 yuiOrange]
-    . withStyleBasic [bgColor yuiLightPeach, border 0 yuiPeach]
+    . withStyleBasic [bgColor yuiLightPeach, border 1 yuiPeach]
     $ button t e
 
 withStyleBasic ::

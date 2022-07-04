@@ -74,6 +74,16 @@ fileSelectionEventHandler
               & fileSelectionModel . tagOccurrences .~ OHM.empty
               & fileSelectionModel . fileSelectionInfoMap .~ IntMap.empty
         ]
+      CycleTagOrderCriteria ->
+        [ Model $
+            model & fileSelectionModel . tagOrdering
+              %~ cycleOrderCriteria
+        ]
+      CycleTagOrderDirection ->
+        [ Model $
+            model & fileSelectionModel . tagOrdering
+              %~ cycleOrderDir
+        ]
       MakeFileSelectionInfoMap fseq ->
         [ let fiTuple (File fk fp) = (fromIntegral fk, FileInfo fp)
               m = F.toList $ fiTuple <$> fseq
