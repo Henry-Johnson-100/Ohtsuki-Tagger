@@ -67,6 +67,10 @@ fileSelectionEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
+      ClearSelection ->
+        [ Model $ model & fileSelectionModel . selection .~ Seq.empty
+        -- , Task RefreshSelection
+        ]
       PutFiles fs ->
         [ let currentSet =
                 HS.fromList
@@ -82,6 +86,7 @@ fileSelectionEventHandler
                   & fileSelectionModel
                     . selection
                   .~ (Seq.fromList . HS.toList $ combFun currentSet fs)
+                  -- , Task RefreshSelection
         ]
       Query ->
         [ Task

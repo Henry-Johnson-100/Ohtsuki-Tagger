@@ -51,14 +51,24 @@ fileSelectionWidget m = fileSelectionMainPage
   fileSelectionMainPage =
     vstack_
       []
-      [ fileSelectionQueryTextField
-      , vstack_ [] (fmap (fileSelectionLeaf m) (m ^. fileSelectionModel . selection))
+      [ hstack_ [] [fileSelectionQueryTextField, clearSelectionButton]
+      , fileSelectionListWidget m (m ^. fileSelectionModel . selection)
       ]
 
-fileSelectionLeaf :: TaggerModel -> File -> TaggerWidget
-fileSelectionLeaf m f@(File fk fp) =
-  draggable f $
-    label fp
+fileSelectionListWidget ::
+  Traversable t =>
+  TaggerModel ->
+  t File ->
+  WidgetNode TaggerModel TaggerEvent
+fileSelectionListWidget m fs =
+  vscroll_ [wheelRate 50]
+    . vstack_ []
+    $ fmap fileSelectionLeaf fs
+ where
+  fileSelectionLeaf :: File -> TaggerWidget
+  fileSelectionLeaf f@(File _ fp) =
+    draggable f $
+      label_ fp [ellipsis]
 
 fileSelectionQueryTextField :: TaggerWidget
 fileSelectionQueryTextField =
@@ -66,6 +76,9 @@ fileSelectionQueryTextField =
     [("Enter", DoFileSelectionEvent Query)]
     [ignoreChildrenEvts]
     $ textField_ (fileSelectionModel . queryText) []
+
+clearSelectionButton :: TaggerWidget
+clearSelectionButton = styledButton "Clear" (DoFileSelectionEvent ClearSelection)
 
 {-
  _____ ___   ____ _   _ ____  _____ ____

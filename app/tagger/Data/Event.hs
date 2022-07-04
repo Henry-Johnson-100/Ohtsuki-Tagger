@@ -30,7 +30,8 @@ data TaggerEvent
   deriving (Show, Eq)
 
 data FileSelectionEvent
-  = PutFiles (HashSet File)
+  = ClearSelection
+  | PutFiles (HashSet File)
   | Query
   deriving (Show, Eq)
 

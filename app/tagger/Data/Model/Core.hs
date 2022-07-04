@@ -43,7 +43,6 @@ data TaggerModel = TaggerModel
   , _taggermodelVisibilityModel :: Visibility
   , _taggermodelConnection :: TaggedConnection
   , _taggermodelIsTagMode :: Bool
-  , _taggerFileSelection :: [File]
   , _taggerMassTagText :: Text
   , _taggerShellText :: Text
   }
@@ -65,7 +64,6 @@ createTaggerModel conf tc d unRelatedD defaultFilePath =
     , _taggermodelVisibilityModel = VisibilityMain
     , _taggermodelConnection = tc
     , _taggermodelIsTagMode = True
-    , _taggerFileSelection = []
     , _taggerMassTagText = ""
     , _taggerShellText = ""
     }
