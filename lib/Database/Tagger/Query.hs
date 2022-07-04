@@ -92,7 +92,8 @@ module Database.Tagger.Query (
 
   -- ** Misc.
   hasInfraRelations,
-  getTagOccurrences,
+  getTagOccurrencesByDescriptorKeys,
+  getTagOccurrencesByFileKey,
 
   -- * Operations
   -- $Operations
@@ -128,6 +129,8 @@ import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
 import qualified Data.HashSet as HashSet
 import qualified Data.HierarchyMap as HAM
 import Data.Maybe
+import Data.OccurrenceHashMap (OccurrenceHashMap)
+import qualified Data.OccurrenceHashMap as OHM
 import qualified Data.OccurrenceMap.Internal as OM
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -969,8 +972,8 @@ hasInfraRelations dk tc = do
  Given a list of 'Descriptor`s, retrieve an 'OccurrenceMap` for how many distinct
  'File`s are tagged for each one.
 -}
-getTagOccurrences :: [RecordKey Descriptor] -> TaggedConnection -> IO OM.OccurrenceMap
-getTagOccurrences ds tc = do
+getTagOccurrencesByDescriptorKeys :: [RecordKey Descriptor] -> TaggedConnection -> IO OM.OccurrenceMap
+getTagOccurrencesByDescriptorKeys ds tc = do
   ots <- mapM getOccurrenceTuple ds :: IO [(RecordKey Descriptor, Int)]
   return . OM.fromList $ ots
  where
@@ -984,6 +987,36 @@ getTagOccurrences ds tc = do
         FROM Tag
         WHERE descriptorId = ?
         |]
+
+{- |
+ Returns an 'OccurrenceHashMap` with occurrences of each 'Descriptor` that are
+ taggond on the 'File`s provided.
+-}
+getTagOccurrencesByFileKey ::
+  [RecordKey File] ->
+  TaggedConnection ->
+  IO (OccurrenceHashMap Descriptor)
+getTagOccurrencesByFileKey fks tc = do
+  results <-
+    mapM
+      ( query tc q . Only :: RecordKey File -> IO [(RecordKey Descriptor, Text, Int)]
+      )
+      fks
+  let constructFromTuple (dk, dp, o) = (Descriptor dk dp, o)
+  return . OHM.unions $ OHM.fromList . map constructFromTuple <$> results
+ where
+  q =
+    [r|
+    SELECT
+      d.id
+      ,d.descriptor
+      ,COUNT(*)
+    FROM Tag t
+    JOIN Descriptor d
+      ON t.descriptorId = d.id
+    WHERE fileId = ?
+    GROUP BY descriptorId
+    |]
 
 {- |
  For the given Tag Triple, return 'True` if it will violate the UNIQUE constraint in

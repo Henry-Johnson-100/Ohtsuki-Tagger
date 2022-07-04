@@ -155,6 +155,7 @@ library tagger-lib
   exposed-modules:     Database.Tagger
                       ,Database.Tagger.Type
                       ,Data.HierarchyMap
+                      ,Data.OccurrenceHashMap
                       ,Data.OccurrenceMap
                       ,Data.Tagger
                       ,Text.TaggerQL
@@ -168,6 +169,7 @@ library tagger-lib
                       ,Database.Tagger.Query.Type
                       ,Database.Tagger.Connection
                       ,Data.Hierarchy.Internal
+                      ,Data.OccurrenceHashMap.Internal
                       ,Data.OccurrenceMap.Internal
                       ,Tagger.Info
                       ,Tagger.Util

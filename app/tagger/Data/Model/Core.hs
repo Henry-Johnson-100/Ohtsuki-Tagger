@@ -27,8 +27,8 @@ import Data.HierarchyMap (empty)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Model.Shared
-import Data.OccurrenceMap (OccurrenceMap)
-import qualified Data.OccurrenceMap as OM
+import Data.OccurrenceHashMap (OccurrenceHashMap)
+import qualified Data.OccurrenceHashMap as OHM
 import Data.Sequence (Seq)
 import qualified Data.Sequence as S
 import Data.Tagger
@@ -70,7 +70,7 @@ createTaggerModel conf tc d unRelatedD defaultFilePath =
 
 data FileSelectionModel = FileSelectionModel
   { _fileselectionSelection :: Seq File
-  , _fileselectionTagOccurrences :: OccurrenceMap
+  , _fileselectionTagOccurrences :: OccurrenceHashMap Descriptor
   , _fileselectionFileSelectionInfoMap :: IntMap FileInfo
   , _fileselectionSetOp :: SetOp
   , _fileselectionQueryText :: Text
@@ -81,7 +81,7 @@ createFileSelectionModel :: FileSelectionModel
 createFileSelectionModel =
   FileSelectionModel
     { _fileselectionSelection = S.empty
-    , _fileselectionTagOccurrences = OM.empty
+    , _fileselectionTagOccurrences = OHM.empty
     , _fileselectionFileSelectionInfoMap = IntMap.empty
     , _fileselectionSetOp = Union
     , _fileselectionQueryText = ""
