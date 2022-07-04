@@ -18,5 +18,10 @@ taggerApplicationUI _ m =
     vsplit_
       [splitIgnoreChildResize True]
       ( focusedFileWidget m
-      , hgrid_ [] [descriptorTreeWidget m, fileSelectionWidget m]
+      , hgrid_
+          []
+          [ descriptorTreeWidget m
+          , fileSelectionQueryWidget m
+          , fileSelectionWidget m
+          ]
       )

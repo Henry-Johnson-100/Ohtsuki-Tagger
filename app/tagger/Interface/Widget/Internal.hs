@@ -7,6 +7,7 @@
 module Interface.Widget.Internal (
   TaggerWidget,
   fileSelectionWidget,
+  fileSelectionQueryWidget,
   focusedFileWidget,
   descriptorTreeWidget,
 ) where
@@ -57,37 +58,17 @@ editFileMode :: Text
 editFileMode = "edit-file"
 
 fileSelectionWidget :: TaggerModel -> TaggerWidget
-fileSelectionWidget m = fileSelectionMainPage
- where
-  fileSelectionMainPage =
-    vstack_
-      []
-      [ hsplit_
-          [splitIgnoreChildResize True]
-          ( vstack_
-              []
-              [ hstack_
-                  []
-                  [ fileSelectionQueryTextField
-                  , clearSelectionButton
-                  ]
-              , fileSelectionListWidget m (m ^. fileSelectionModel . selection)
-              ]
-          , tagListWidget m
-          )
-      , separatorLine
-      , fileSelectionManagePane m
-      ]
+fileSelectionWidget m =
+  hsplit_ [] (fileSelectionFileList m, tagListWidget m)
 
-fileSelectionListWidget ::
-  Traversable t =>
-  TaggerModel ->
-  t File ->
-  WidgetNode TaggerModel TaggerEvent
-fileSelectionListWidget m fs =
+fileSelectionQueryWidget :: TaggerModel -> TaggerWidget
+fileSelectionQueryWidget m = label "Query stuff goes here."
+
+fileSelectionFileList :: TaggerModel -> TaggerWidget
+fileSelectionFileList m =
   vscroll_ [wheelRate 50]
     . vstack_ []
-    $ fmap fileSelectionLeaf fs
+    $ fmap fileSelectionLeaf (m ^. fileSelectionModel . selection)
  where
   fileSelectionLeaf :: File -> TaggerWidget
   fileSelectionLeaf f@(File _ fp) =
