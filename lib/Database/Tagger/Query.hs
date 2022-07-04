@@ -126,6 +126,7 @@ import Control.Monad
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT, throwE)
 import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
+import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
 import qualified Data.HierarchyMap as HAM
 import Data.Maybe
@@ -993,15 +994,17 @@ getTagOccurrencesByDescriptorKeys ds tc = do
  taggond on the 'File`s provided.
 -}
 getTagOccurrencesByFileKey ::
-  [RecordKey File] ->
+  Traversable t =>
+  t (RecordKey File) ->
   TaggedConnection ->
   IO (OccurrenceHashMap Descriptor)
 getTagOccurrencesByFileKey fks tc = do
   results <-
-    mapM
-      ( query tc q . Only :: RecordKey File -> IO [(RecordKey Descriptor, Text, Int)]
-      )
-      fks
+    F.toList
+      <$> mapM
+        ( query tc q . Only :: RecordKey File -> IO [(RecordKey Descriptor, Text, Int)]
+        )
+        fks
   let constructFromTuple (dk, dp, o) = (Descriptor dk dp, o)
   return . OHM.unions $ OHM.fromList . map constructFromTuple <$> results
  where

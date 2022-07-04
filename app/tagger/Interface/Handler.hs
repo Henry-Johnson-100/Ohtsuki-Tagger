@@ -20,6 +20,7 @@ import Data.HierarchyMap (empty)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Model
 import Data.Model.Shared
+import qualified Data.OccurrenceHashMap as OHM
 import qualified Data.Sequence as Seq
 import Data.Tagger
 import Data.Text (Text)
@@ -68,25 +69,42 @@ fileSelectionEventHandler
   event =
     case event of
       ClearSelection ->
-        [ Model $ model & fileSelectionModel . selection .~ Seq.empty
-        -- , Task RefreshSelection
+        [ Model $
+            model & fileSelectionModel . selection .~ Seq.empty
+              & fileSelectionModel . tagOccurrences .~ OHM.empty
+              & fileSelectionModel . fileSelectionInfoMap .~ IntMap.empty
         ]
-      PutFiles fs ->
-        [ let currentSet =
-                HS.fromList
-                  . F.toList
-                  $ model ^. fileSelectionModel . selection
-              combFun =
-                case model ^. fileSelectionModel . setOp of
-                  Union -> HS.union
-                  Intersect -> HS.intersection
-                  Difference -> HS.difference
+      MakeFileSelectionInfoMap fseq ->
+        [ let fiTuple (File fk fp) = (fromIntegral fk, FileInfo fp)
+              m = F.toList $ fiTuple <$> fseq
            in Model $
                 model
                   & fileSelectionModel
-                    . selection
-                  .~ (Seq.fromList . HS.toList $ combFun currentSet fs)
-                  -- , Task RefreshSelection
+                    . fileSelectionInfoMap
+                  .~ IntMap.fromList m
+        ]
+      PutFiles fs ->
+        let currentSet =
+              HS.fromList
+                . F.toList
+                $ model ^. fileSelectionModel . selection
+            combFun =
+              case model ^. fileSelectionModel . setOp of
+                Union -> HS.union
+                Intersect -> HS.intersection
+                Difference -> HS.difference
+            newSeq = Seq.fromList . HS.toList . combFun currentSet $ fs
+         in [ Model $ model & fileSelectionModel . selection .~ newSeq
+            , Event
+                ( DoFileSelectionEvent
+                    (RefreshTagOccurrencesWith (fmap fileId newSeq))
+                )
+            , Event (DoFileSelectionEvent . MakeFileSelectionInfoMap $ newSeq)
+            ]
+      PutTagOccurrenceHashMap_ m ->
+        [ Model $
+            model
+              & fileSelectionModel . tagOccurrences .~ m
         ]
       Query ->
         [ Task
@@ -97,6 +115,29 @@ fileSelectionEventHandler
                   conn
             )
         , Event (ClearTextField (TaggerLens (fileSelectionModel . queryText)))
+        ]
+      RefreshFileSelection ->
+        [ Event (DoFileSelectionEvent RefreshTagOccurrences)
+        , Event
+            ( DoFileSelectionEvent
+                ( MakeFileSelectionInfoMap $
+                    model ^. fileSelectionModel . selection
+                )
+            )
+        ]
+      RefreshTagOccurrences ->
+        [ Task
+            ( DoFileSelectionEvent . PutTagOccurrenceHashMap_
+                <$> getTagOccurrencesByFileKey
+                  (map fileId . F.toList $ model ^. fileSelectionModel . selection)
+                  conn
+            )
+        ]
+      RefreshTagOccurrencesWith fks ->
+        [ Task
+            ( DoFileSelectionEvent . PutTagOccurrenceHashMap_
+                <$> getTagOccurrencesByFileKey fks conn
+            )
         ]
 
 focusedFileEventHandler ::
