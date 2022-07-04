@@ -7,6 +7,7 @@ module Data.OccurrenceHashMap.Internal (
   empty,
   unions,
   fromList,
+  toList,
 ) where
 
 import Data.HashMap.Strict (HashMap)
@@ -37,7 +38,8 @@ union ::
   OccurrenceHashMap a ->
   OccurrenceHashMap a ->
   OccurrenceHashMap a
-union (OccurrenceHashMap x) (OccurrenceHashMap y) = OccurrenceHashMap $ HashMap.union x y
+union (OccurrenceHashMap x) (OccurrenceHashMap y) =
+  OccurrenceHashMap $ HashMap.unionWith (+) x y
 
 empty :: OccurrenceHashMap a
 empty = OccurrenceHashMap HashMap.empty
@@ -48,3 +50,6 @@ unions xs = L.foldl1' union xs
 
 fromList :: Hashable k => [(k, Int)] -> OccurrenceHashMap k
 fromList = OccurrenceHashMap . HashMap.fromList
+
+toList :: OccurrenceHashMap k -> [(k, Int)]
+toList = HashMap.toList . occurrenceHashMap

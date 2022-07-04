@@ -71,6 +71,7 @@ createTaggerModel conf tc d unRelatedD defaultFilePath =
 data FileSelectionModel = FileSelectionModel
   { _fileselectionSelection :: Seq File
   , _fileselectionTagOccurrences :: OccurrenceHashMap Descriptor
+  , _fileselectionTagOrdering :: OrderBy
   , _fileselectionFileSelectionInfoMap :: IntMap FileInfo
   , _fileselectionSetOp :: SetOp
   , _fileselectionQueryText :: Text
@@ -82,6 +83,7 @@ createFileSelectionModel =
   FileSelectionModel
     { _fileselectionSelection = S.empty
     , _fileselectionTagOccurrences = OHM.empty
+    , _fileselectionTagOrdering = OrderBy Numeric Desc
     , _fileselectionFileSelectionInfoMap = IntMap.empty
     , _fileselectionSetOp = Union
     , _fileselectionQueryText = ""

@@ -7,6 +7,7 @@ module Data.OccurrenceHashMap (
   empty,
   unions,
   fromList,
+  toList,
 ) where
 
 import Data.OccurrenceHashMap.Internal (
@@ -16,6 +17,7 @@ import Data.OccurrenceHashMap.Internal (
   get,
   occur,
   set,
+  toList,
   union,
   unions,
  )

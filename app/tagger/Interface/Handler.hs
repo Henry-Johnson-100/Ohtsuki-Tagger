@@ -359,6 +359,3 @@ toDescriptorInfo tc (Descriptor dk p) = do
   let consDes b = DescriptorInfo b p
   di <- consDes <$> hasInfraRelations dk tc
   return $ IntMap.singleton (fromIntegral dk) di
-
-isHashPattern :: Text -> Bool
-isHashPattern p = "#" `T.isPrefixOf` p && "#" `T.isSuffixOf` p

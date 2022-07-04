@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -13,11 +14,15 @@ module Interface.Widget.Internal (
 import Control.Lens
 import Data.Config
 import Data.Event
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as L
 import Data.Model
 import Data.Model.Shared
+import qualified Data.OccurrenceHashMap as OHM
+import qualified Data.Ord as O
 import qualified Data.Sequence as Seq
 import Data.Text (Text)
+import qualified Data.Text as T
 import Database.Tagger.Type
 import Interface.Theme
 import Monomer
@@ -49,11 +54,20 @@ fileSelectionWidget :: TaggerModel -> TaggerWidget
 fileSelectionWidget m = fileSelectionMainPage
  where
   fileSelectionMainPage =
-    vstack_
-      []
-      [ hstack_ [] [fileSelectionQueryTextField, clearSelectionButton]
-      , fileSelectionListWidget m (m ^. fileSelectionModel . selection)
-      ]
+    hsplit_
+      [splitIgnoreChildResize True]
+      ( vstack_
+          []
+          [ hstack_
+              []
+              [ fileSelectionQueryTextField
+              , clearSelectionButton
+              , refreshFileSelectionButton
+              ]
+          , fileSelectionListWidget m (m ^. fileSelectionModel . selection)
+          ]
+      , tagListWidget m
+      )
 
 fileSelectionListWidget ::
   Traversable t =>
@@ -70,6 +84,26 @@ fileSelectionListWidget m fs =
     draggable f $
       label_ fp [ellipsis]
 
+tagListWidget :: TaggerModel -> TaggerWidget
+tagListWidget m =
+  vscroll_ [wheelRate 50] $
+    vstack_
+      []
+      (tagListLeaf <$> sortedOccurrenceMapList)
+ where
+  sortedOccurrenceMapList =
+    let (OrderBy ordCrit ordDir) = m ^. fileSelectionModel . tagOrdering
+        !occurrenceMapList = OHM.toList $ m ^. fileSelectionModel . tagOccurrences
+     in case (ordCrit, ordDir) of
+          (Alphabetic, Asc) -> L.sortOn (descriptor . fst) occurrenceMapList
+          (Alphabetic, Desc) -> L.sortOn (O.Down . descriptor . fst) occurrenceMapList
+          (Numeric, Asc) -> L.sortOn snd occurrenceMapList
+          (Numeric, Desc) -> L.sortOn (O.Down . snd) occurrenceMapList
+  tagListLeaf (d, n) =
+    hgrid_
+      []
+      [label . descriptor $ d, spacer_ [width 10], label . T.pack . show $ n]
+
 fileSelectionQueryTextField :: TaggerWidget
 fileSelectionQueryTextField =
   keystroke_
@@ -79,6 +113,12 @@ fileSelectionQueryTextField =
 
 clearSelectionButton :: TaggerWidget
 clearSelectionButton = styledButton "Clear" (DoFileSelectionEvent ClearSelection)
+
+refreshFileSelectionButton :: TaggerWidget
+refreshFileSelectionButton =
+  styledButton
+    "Refresh"
+    (DoFileSelectionEvent RefreshFileSelection)
 
 {-
  _____ ___   ____ _   _ ____  _____ ____
