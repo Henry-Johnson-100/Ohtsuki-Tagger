@@ -44,6 +44,7 @@ data FileSelectionEvent
   | -- | Given a Traversable of File keys, fetch an OccurrenceHashMap. Saves having to
     -- call toList on the selection Seq in RefreshTagOccurrences.
     RefreshTagOccurrencesWith (Seq (RecordKey File))
+  | TogglePaneVisibility Text
   deriving (Show, Eq)
 
 data FocusedFileEvent

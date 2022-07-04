@@ -75,6 +75,7 @@ data FileSelectionModel = FileSelectionModel
   , _fileselectionFileSelectionInfoMap :: IntMap FileInfo
   , _fileselectionSetOp :: SetOp
   , _fileselectionQueryText :: Text
+  , _fileselectionFileSelectionVis :: Visibility
   }
   deriving (Show, Eq)
 
@@ -87,6 +88,7 @@ createFileSelectionModel =
     , _fileselectionFileSelectionInfoMap = IntMap.empty
     , _fileselectionSetOp = Union
     , _fileselectionQueryText = ""
+    , _fileselectionFileSelectionVis = VisibilityMain
     }
 
 data FileInfo = FileInfo

@@ -50,24 +50,34 @@ __        _____ ____   ____ _____ _____
 
 -}
 
+manageFileSelectionPane :: Text
+manageFileSelectionPane = "manage-file-selection"
+
+editFileMode :: Text
+editFileMode = "edit-file"
+
 fileSelectionWidget :: TaggerModel -> TaggerWidget
 fileSelectionWidget m = fileSelectionMainPage
  where
   fileSelectionMainPage =
-    hsplit_
-      [splitIgnoreChildResize True]
-      ( vstack_
-          []
-          [ hstack_
+    vstack_
+      []
+      [ hsplit_
+          [splitIgnoreChildResize True]
+          ( vstack_
               []
-              [ fileSelectionQueryTextField
-              , clearSelectionButton
-              , refreshFileSelectionButton
+              [ hstack_
+                  []
+                  [ fileSelectionQueryTextField
+                  , clearSelectionButton
+                  ]
+              , fileSelectionListWidget m (m ^. fileSelectionModel . selection)
               ]
-          , fileSelectionListWidget m (m ^. fileSelectionModel . selection)
-          ]
-      , tagListWidget m
-      )
+          , tagListWidget m
+          )
+      , separatorLine
+      , fileSelectionManagePane m
+      ]
 
 fileSelectionListWidget ::
   Traversable t =>
@@ -82,7 +92,18 @@ fileSelectionListWidget m fs =
   fileSelectionLeaf :: File -> TaggerWidget
   fileSelectionLeaf f@(File _ fp) =
     draggable f $
-      label_ fp [ellipsis]
+      zstack_
+        []
+        [ withNodeVisible
+            ( not isEditMode
+            )
+            $ label_ fp [ellipsis]
+        , withNodeVisible isEditMode $ label "edit mode :P"
+        ]
+   where
+    isEditMode =
+      (m ^. fileSelectionModel . fileSelectionVis)
+        `hasVis` VisibilityLabel editFileMode
 
 tagListWidget :: TaggerModel -> TaggerWidget
 tagListWidget m =
@@ -124,6 +145,21 @@ tagListWidget m =
       , label . T.pack . show $ n
       ]
 
+fileSelectionManagePane :: TaggerModel -> TaggerWidget
+fileSelectionManagePane m =
+  vstack_
+    []
+    [ styledButton
+        "Manage Selection"
+        (DoFileSelectionEvent (TogglePaneVisibility manageFileSelectionPane))
+    , separatorLine
+    , withNodeVisible
+        ( (m ^. fileSelectionModel . fileSelectionVis)
+            `hasVis` VisibilityLabel manageFileSelectionPane
+        )
+        $ hstack_ [] [refreshFileSelectionButton, toggleFileEditMode]
+    ]
+
 fileSelectionQueryTextField :: TaggerWidget
 fileSelectionQueryTextField =
   keystroke_
@@ -139,6 +175,12 @@ refreshFileSelectionButton =
   styledButton
     "Refresh"
     (DoFileSelectionEvent RefreshFileSelection)
+
+toggleFileEditMode :: TaggerWidget
+toggleFileEditMode =
+  styledButton
+    "Edit"
+    (DoFileSelectionEvent (TogglePaneVisibility editFileMode))
 
 {-
  _____ ___   ____ _   _ ____  _____ ____

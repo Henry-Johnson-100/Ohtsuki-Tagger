@@ -149,6 +149,18 @@ fileSelectionEventHandler
                 <$> getTagOccurrencesByFileKey fks conn
             )
         ]
+      TogglePaneVisibility t ->
+        [ let newPane = VisibilityLabel t
+              paneIsVisible =
+                (model ^. fileSelectionModel . fileSelectionVis)
+                  `hasVis` newPane
+           in Model $
+                model & fileSelectionModel . fileSelectionVis
+                  %~ ( if paneIsVisible
+                        then (`unsetPaneVis` newPane)
+                        else (`setPaneVis` newPane)
+                     )
+        ]
 
 focusedFileEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
