@@ -96,21 +96,14 @@ fileSelectionEventHandler
           (f :<| fs) ->
             [ Event . DoFocusedFileEvent . PutFile $ f
             , Model $ model & fileSelectionModel . selection .~ (fs |> f)
-            , Task (IOEvent <$> print f)
-            , Task (IOEvent <$> print fs)
             ]
       CyclePrevFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []
           (fs :|> f) ->
-            -- if f == concreteTaggedFile (model ^. focusedFileModel . focusedFile)
-            --   then [Event . DoFileSelectionEvent $ CyclePrevFile]
-            --   else
-                [ Event . DoFocusedFileEvent . PutFile $ f
-                , Model $ model & fileSelectionModel . selection .~ (f <| fs)
-                , Task (IOEvent <$> print f)
-                , Task (IOEvent <$> print fs)
-                ]
+            [ Event . DoFocusedFileEvent . PutFile $ f
+            , Model $ model & fileSelectionModel . selection .~ (f <| fs)
+            ]
       CycleTagOrderCriteria ->
         [ Model $
             model & fileSelectionModel . tagOrdering
