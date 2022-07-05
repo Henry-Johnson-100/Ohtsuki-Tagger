@@ -309,12 +309,12 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile f hm)) 
                 )
             )
         , vstack
-            . map (label . descriptor)
+            . map (label . descriptor . concreteTagDescriptor)
             . HM.keys
             $ hm
         ]
-  isMetaTagWidget :: Descriptor -> HierarchyMap Descriptor -> TaggerWidget
-  isMetaTagWidget d@(Descriptor _ dp) hierMap =
+  isMetaTagWidget :: ConcreteTag -> HierarchyMap ConcreteTag -> TaggerWidget
+  isMetaTagWidget t@(ConcreteTag tk d@(Descriptor _ dp) mstk) hierMap =
     withStyleBasic [borderB 1 black] $
       hgrid_
         []
@@ -323,11 +323,11 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile f hm)) 
         , vstack_
             []
             $ map
-              ( \d'@(Descriptor _ dp') ->
+              ( \(ConcreteTag _ d'@(Descriptor _ dp') _) ->
                   box_ [alignLeft] . draggable d' . label $ dp'
               )
               . HS.toList
-              $ HM.find d hierMap
+              $ HM.find t hierMap
         ]
 
 {-

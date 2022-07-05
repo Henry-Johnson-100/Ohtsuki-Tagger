@@ -2,10 +2,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TupleSections #-}
+{-# HLINT ignore "Use second" #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use second" #-}
 
 {- |
 Module      : Database.Tagger.Query.Basic
@@ -633,24 +633,41 @@ queryForConcreteTaggedFileWithFileId ::
 queryForConcreteTaggedFileWithFileId rk tc = do
   file <- queryForSingleFileByFileId rk tc
   fileTags <- lift $ queryForFileTagsByFileId rk tc
-  concreteFileTags <-
-    lift
-      . fmap (map (second HashSet.fromList) . catMaybes)
-      . mapM (runMaybeT . traverseRelationTuple . getRelationTuple)
-      $ fileTags
-  let fileTagMap = HAM.inserts concreteFileTags HAM.empty
-  return $ ConcreteTaggedFile file fileTagMap
+  let tagRelationTuples = getRelationTuple <$> fileTags
+  concreteTagRelationTuples <-
+    map (second HashSet.fromList)
+      <$> mapM traverseRelationTuple tagRelationTuples
+  return $ ConcreteTaggedFile file (HAM.fromList concreteTagRelationTuples)
  where
   getRelationTuple (Tag t _ _ ms) =
     maybe (t, []) (,[t]) ms
   traverseRelationTuple (x, xs) = do
-    md <- queryForSingleDescriptorByTagId x tc
+    md <- derefTag x
     ids <-
       lift
-        . catMaybeTM (`queryForSingleDescriptorByTagId` tc)
+        . catMaybeTM derefTag
         $ xs
     return (md, ids)
   second f (x, y) = (x, f y)
+  derefTag :: RecordKey Tag -> MaybeT IO ConcreteTag
+  derefTag tid = do
+    results <- lift $ query tc q [tid]
+    let result = head' results
+    hoistMaybe (toConcreteTag <$> result)
+   where
+    toConcreteTag (tid', did, dp, mstid) = ConcreteTag tid' (Descriptor did dp) mstid
+    q =
+      [r|
+      SELECT
+        t.id
+        ,d.id
+        ,d.descriptor
+        ,t.subTagOfId
+      FROM Tag t
+      JOIN Descriptor d
+        ON t.descriptorId = d.id
+      WHERE t.id = ?
+      |]
 
 {- |
  Query for 'File`s without tags.

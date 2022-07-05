@@ -46,6 +46,7 @@ module Data.HierarchyMap (
   isInfraTo,
   insert,
   inserts,
+  fromList,
   empty,
   Data.HierarchyMap.null,
   getAllInfraTo,
@@ -90,6 +91,12 @@ inserts ::
   HierarchyMap a ->
   HierarchyMap a
 inserts = flip $ F.foldl' (flip (uncurry insert))
+
+{- |
+ Convert a list of relation tuples to a 'HierarchyMap`
+-}
+fromList :: (Hashable a, Foldable t) => t (a, HashSet.HashSet a) -> HierarchyMap a
+fromList = flip inserts empty
 
 {- |
  'True` if the given value exists as either a meta or infra member.
