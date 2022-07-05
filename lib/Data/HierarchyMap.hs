@@ -132,9 +132,16 @@ metaMember x (HierarchyMap m) = maybe False (not . HashSet.null) (HashMap.lookup
 
 {- |
  'True` if the given value has an infra relationship to any member of the map.
+
+  That is:
+
+  - It exists in the map
+  - It appears in the values of any key of the map.
 -}
 infraMember :: Hashable a => a -> HierarchyMap a -> Bool
-infraMember x (HierarchyMap m) = maybe False HashSet.null $ HashMap.lookup x m
+infraMember x (HierarchyMap m) =
+  HashMap.member x m
+    && any (HashSet.member x) (HashMap.elems m)
 
 {- |
  'True` if the first given value is infra to the second in the given map.
