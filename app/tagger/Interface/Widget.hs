@@ -14,5 +14,19 @@ taggerApplicationUI ::
   TaggerModel ->
   TaggerWidget
 taggerApplicationUI _ m =
-  keystroke_ [("Ctrl-R", RefreshUI)] [ignoreChildrenEvts] $
-    vsplit_ [splitIgnoreChildResize True] (focusedFileWidget m, descriptorTreeWidget m)
+  keystroke_
+    [ ("Ctrl-r", RefreshUI)
+    , ("Ctrl-i", DoFileSelectionEvent CycleNextFile)
+    , ("Ctrl-k", DoFileSelectionEvent CyclePrevFile)
+    ]
+    []
+    $ vsplit_
+      [splitIgnoreChildResize True]
+      ( focusedFileWidget m
+      , hgrid_
+          []
+          [ descriptorTreeWidget m
+          , fileSelectionOperationWidget m
+          , fileSelectionWidget m
+          ]
+      )

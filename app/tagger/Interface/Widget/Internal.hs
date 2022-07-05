@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -5,6 +6,8 @@
 
 module Interface.Widget.Internal (
   TaggerWidget,
+  fileSelectionWidget,
+  fileSelectionOperationWidget,
   focusedFileWidget,
   descriptorTreeWidget,
 ) where
@@ -12,15 +15,212 @@ module Interface.Widget.Internal (
 import Control.Lens
 import Data.Config
 import Data.Event
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as L
 import Data.Model
 import Data.Model.Shared
+import qualified Data.OccurrenceHashMap as OHM
+import qualified Data.Ord as O
+import qualified Data.Sequence as Seq
+import Data.Tagger
 import Data.Text (Text)
+import qualified Data.Text as T
 import Database.Tagger.Type
 import Interface.Theme
 import Monomer
 
 type TaggerWidget = WidgetNode TaggerModel TaggerEvent
+
+{-
+ _____ ___ _     _____
+|  ___|_ _| |   | ____|
+| |_   | || |   |  _|
+|  _|  | || |___| |___
+|_|   |___|_____|_____|
+
+ ____  _____ _     _____ ____ _____ ___ ___  _   _
+/ ___|| ____| |   | ____/ ___|_   _|_ _/ _ \| \ | |
+\___ \|  _| | |   |  _|| |     | |  | | | | |  \| |
+ ___) | |___| |___| |__| |___  | |  | | |_| | |\  |
+|____/|_____|_____|_____\____| |_| |___\___/|_| \_|
+
+__        _____ ____   ____ _____ _____
+\ \      / /_ _|  _ \ / ___| ____|_   _|
+ \ \ /\ / / | || | | | |  _|  _|   | |
+  \ V  V /  | || |_| | |_| | |___  | |
+   \_/\_/  |___|____/ \____|_____| |_|
+
+-}
+
+manageFileSelectionPane :: Text
+manageFileSelectionPane = "manage-file-selection"
+
+editFileMode :: Text
+editFileMode = "edit-file"
+
+fileSelectionWidget :: TaggerModel -> TaggerWidget
+fileSelectionWidget m =
+  vstack_
+    []
+    [ zstack_
+        []
+        [ withNodeVisible (not selectionIsVisible) $ tagListWidget m
+        , withNodeVisible selectionIsVisible $ fileSelectionFileList m
+        ]
+    , withNodeVisible (not . Seq.null $ m ^. fileSelectionModel . selection) $
+        hstack_
+          []
+          [clearSelectionButton, toggleViewSelectionButton]
+    ]
+ where
+  selectionIsVisible =
+    (m ^. fileSelectionModel . fileSelectionVis) `hasVis` VisibilityAlt
+  toggleViewSelectionButton =
+    styledButton
+      (if selectionIsVisible then "Tags" else "Selection")
+      (DoFileSelectionEvent ToggleSelectionView)
+
+fileSelectionOperationWidget :: TaggerModel -> TaggerWidget
+fileSelectionOperationWidget m = queryWidget
+ where
+  queryWidget =
+    keystroke_
+      [("Enter", DoFileSelectionEvent Query)]
+      []
+      . box_ [alignTop, alignCenter]
+      $ hstack_ [] [runQueryButton, queryTextField, setOpDropdown]
+   where
+    runQueryButton = styledButton "Search" (DoFileSelectionEvent Query)
+    queryTextFieldKey = "queryTextField"
+    queryTextField =
+      dropTarget_
+        (DoFileSelectionEvent . AppendQueryText . filePath)
+        [dropTargetStyle [border 1 yuiOrange]]
+        . dropTarget_
+          (DoFileSelectionEvent . AppendQueryText . descriptor)
+          [dropTargetStyle [border 1 yuiBlue]]
+        . withNodeKey queryTextFieldKey
+        $ textField_ (fileSelectionModel . queryText) []
+    setOpDropdown :: TaggerWidget
+    setOpDropdown =
+      dropdown_
+        (fileSelectionModel . setOp)
+        [Union, Intersect, Difference]
+        (label . T.pack . show)
+        (label . T.pack . show)
+        []
+
+fileSelectionFileList :: TaggerModel -> TaggerWidget
+fileSelectionFileList m =
+  vstack_
+    []
+    [ vscroll_ [wheelRate 50]
+        . vstack_ []
+        $ fmap fileSelectionLeaf (m ^. fileSelectionModel . selection)
+    , withNodeVisible (not . Seq.null $ m ^. fileSelectionModel . selection) $
+        fileSelectionManagePane m
+    ]
+ where
+  fileSelectionLeaf :: File -> TaggerWidget
+  fileSelectionLeaf f@(File _ fp) =
+    draggable f $
+      zstack_
+        []
+        [ withNodeVisible
+            ( not isEditMode
+            )
+            . withStyleBasic [textLeft]
+            $ label_ fp []
+        , withNodeVisible isEditMode $ label "edit mode :P"
+        ]
+   where
+    isEditMode =
+      (m ^. fileSelectionModel . fileSelectionVis)
+        `hasVis` VisibilityLabel editFileMode
+
+tagListWidget :: TaggerModel -> TaggerWidget
+tagListWidget m =
+  vscroll_ [wheelRate 50] $
+    vstack_
+      []
+      [ tagListHeader
+      , separatorLine
+      , vstack_ [] (tagListLeaf <$> sortedOccurrenceMapList)
+      ]
+ where
+  tagListHeader =
+    hstack_
+      []
+      [ tagListOrderCritCycleButton
+      , tagListOrderDirCycleButton
+      , spacer
+      , label $
+          "In Selection: ("
+            <> ( T.pack . show
+                  . Seq.length
+                  $ m ^. fileSelectionModel . selection
+               )
+            <> ")"
+      ]
+  sortedOccurrenceMapList =
+    let (OrderBy ordCrit ordDir) = m ^. fileSelectionModel . tagOrdering
+        !occurrenceMapList = OHM.toList $ m ^. fileSelectionModel . tagOccurrences
+     in case (ordCrit, ordDir) of
+          (Alphabetic, Asc) -> L.sortOn (descriptor . fst) occurrenceMapList
+          (Alphabetic, Desc) -> L.sortOn (O.Down . descriptor . fst) occurrenceMapList
+          (Numeric, Asc) -> L.sortOn snd occurrenceMapList
+          (Numeric, Desc) -> L.sortOn (O.Down . snd) occurrenceMapList
+  tagListOrderCritCycleButton =
+    let (OrderBy ordCrit _) = m ^. fileSelectionModel . tagOrdering
+        btnText =
+          case ordCrit of
+            Alphabetic -> "ABC"
+            Numeric -> "123"
+     in styledButton btnText (DoFileSelectionEvent CycleTagOrderCriteria)
+  tagListOrderDirCycleButton =
+    let (OrderBy _ ordDir) = m ^. fileSelectionModel . tagOrdering
+     in styledButton
+          (T.pack . show $ ordDir)
+          (DoFileSelectionEvent CycleTagOrderDirection)
+  tagListLeaf (d, n) =
+    hgrid_
+      []
+      [ draggable d . label . descriptor $ d
+      , withStyleBasic
+          [paddingL 1.5, paddingR 1.5]
+          separatorLine
+      , label . T.pack . show $ n
+      ]
+
+fileSelectionManagePane :: TaggerModel -> TaggerWidget
+fileSelectionManagePane m =
+  vstack_
+    []
+    [ styledButton
+        "Manage Selection"
+        (DoFileSelectionEvent (TogglePaneVisibility manageFileSelectionPane))
+    , separatorLine
+    , withNodeVisible
+        ( (m ^. fileSelectionModel . fileSelectionVis)
+            `hasVis` VisibilityLabel manageFileSelectionPane
+        )
+        $ hstack_ [] [refreshFileSelectionButton, toggleFileEditMode]
+    ]
+
+clearSelectionButton :: TaggerWidget
+clearSelectionButton = styledButton "Clear" (DoFileSelectionEvent ClearSelection)
+
+refreshFileSelectionButton :: TaggerWidget
+refreshFileSelectionButton =
+  styledButton
+    "Refresh"
+    (DoFileSelectionEvent RefreshFileSelection)
+
+toggleFileEditMode :: TaggerWidget
+toggleFileEditMode =
+  styledButton
+    "Edit"
+    (DoFileSelectionEvent (TogglePaneVisibility editFileMode))
 
 {-
  _____ ___   ____ _   _ ____  _____ ____
@@ -45,14 +245,19 @@ __        _____ ____   ____ _____ _____
 
 focusedFileWidget :: TaggerModel -> TaggerWidget
 focusedFileWidget m =
-  hstack_
-    []
-    [focusedFileMainPane, detailPane m]
+  box_ []
+    . withStyleBasic [minHeight 300]
+    $ hstack_
+      []
+      [focusedFileMainPane, detailPane m]
  where
   focusedFileMainPane =
     dropTarget_
-      (\(Descriptor dk _) -> DoFocusedFileEvent (TagFile dk Nothing))
-      [dropTargetStyle [border 3 yuiBlue]]
+      (DoFocusedFileEvent . PutFile)
+      [dropTargetStyle [border 3 yuiOrange]]
+      . dropTarget_
+        (\(Descriptor dk _) -> DoFocusedFileEvent (TagFile dk Nothing))
+        [dropTargetStyle [border 3 yuiBlue]]
       . withStyleBasic []
       $ ( case m ^. focusedFileModel . renderability of
             RenderAsImage -> imagePreviewRender
@@ -103,7 +308,7 @@ manageDescriptorPaneVis = "manage"
 
 descriptorTreeWidget :: TaggerModel -> TaggerWidget
 descriptorTreeWidget m =
-  flip nodeKey "descriptorTree" $
+  withNodeKey "descriptorTree" $
     keystroke_
       [("Ctrl-m", DoDescriptorTreeEvent (ToggleDescriptorTreeVisibility "manage"))]
       [ignoreChildrenEvts]
@@ -316,7 +521,7 @@ descriptorTreeRefreshBothButton =
 styledButton :: Text -> TaggerEvent -> TaggerWidget
 styledButton t e =
   withStyleHover [bgColor yuiYellow, border 1 yuiOrange]
-    . withStyleBasic [bgColor yuiLightPeach, border 0 yuiPeach]
+    . withStyleBasic [bgColor yuiLightPeach, border 1 yuiPeach]
     $ button t e
 
 withStyleBasic ::
@@ -333,6 +538,9 @@ withStyleHover = flip styleHover
 
 withNodeVisible :: Bool -> TaggerWidget -> TaggerWidget
 withNodeVisible = flip nodeVisible
+
+withNodeKey :: Text -> TaggerWidget -> TaggerWidget
+withNodeKey = flip nodeKey
 
 descriptorIsMetaInInfoMap :: TaggerModel -> Descriptor -> Bool
 descriptorIsMetaInInfoMap

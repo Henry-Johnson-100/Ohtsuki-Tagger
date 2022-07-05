@@ -27,8 +27,8 @@ import Data.HierarchyMap (empty)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Model.Shared
-import Data.OccurrenceMap (OccurrenceMap)
-import qualified Data.OccurrenceMap as OM
+import Data.OccurrenceHashMap (OccurrenceHashMap)
+import qualified Data.OccurrenceHashMap as OHM
 import Data.Sequence (Seq)
 import qualified Data.Sequence as S
 import Data.Tagger
@@ -43,10 +43,6 @@ data TaggerModel = TaggerModel
   , _taggermodelVisibilityModel :: Visibility
   , _taggermodelConnection :: TaggedConnection
   , _taggermodelIsTagMode :: Bool
-  , _taggerFileSelection :: [File]
-  , _taggerQueryCriteria :: QueryCriteria
-  , _taggerSetOp :: SetOp
-  , _taggerQueryText :: Text
   , _taggerMassTagText :: Text
   , _taggerShellText :: Text
   }
@@ -68,18 +64,18 @@ createTaggerModel conf tc d unRelatedD defaultFilePath =
     , _taggermodelVisibilityModel = VisibilityMain
     , _taggermodelConnection = tc
     , _taggermodelIsTagMode = True
-    , _taggerFileSelection = []
-    , _taggerQueryCriteria = MetaDescriptorCriteria
-    , _taggerSetOp = Union
-    , _taggerQueryText = ""
     , _taggerMassTagText = ""
     , _taggerShellText = ""
     }
 
 data FileSelectionModel = FileSelectionModel
   { _fileselectionSelection :: Seq File
-  , _fileselectionTagOccurrences :: OccurrenceMap
+  , _fileselectionTagOccurrences :: OccurrenceHashMap Descriptor
+  , _fileselectionTagOrdering :: OrderBy
   , _fileselectionFileSelectionInfoMap :: IntMap FileInfo
+  , _fileselectionSetOp :: SetOp
+  , _fileselectionQueryText :: Text
+  , _fileselectionFileSelectionVis :: Visibility
   }
   deriving (Show, Eq)
 
@@ -87,8 +83,12 @@ createFileSelectionModel :: FileSelectionModel
 createFileSelectionModel =
   FileSelectionModel
     { _fileselectionSelection = S.empty
-    , _fileselectionTagOccurrences = OM.empty
+    , _fileselectionTagOccurrences = OHM.empty
+    , _fileselectionTagOrdering = OrderBy Numeric Desc
     , _fileselectionFileSelectionInfoMap = IntMap.empty
+    , _fileselectionSetOp = Union
+    , _fileselectionQueryText = ""
+    , _fileselectionFileSelectionVis = VisibilityMain
     }
 
 data FileInfo = FileInfo

@@ -1,16 +1,23 @@
+{-# HLINT ignore "Use newtype instead of data" #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Use newtype instead of data" #-}
 module Data.Model.Shared.Core (
   Visibility (..),
   toggleAltVis,
   setPaneVis,
   unsetPaneVis,
   hasVis,
+  OrderDirection (..),
+  OrderCriteria (..),
+  OrderBy (..),
+  cycleOrderCriteria,
+  cycleOrderDir,
 ) where
 
 import Data.Set (Set)
 import qualified Data.Set as S
+import Data.Tagger
 import Data.Text (Text)
 
 {- |
@@ -55,4 +62,21 @@ hasVis x y =
 toggleAltVis :: Visibility -> Visibility
 toggleAltVis VisibilityAlt = VisibilityMain
 toggleAltVis VisibilityMain = VisibilityAlt
+toggleAltVis (VisibilityPanes x ps) = VisibilityPanes (toggleAltVis x) ps
 toggleAltVis x = x
+
+data OrderDirection = Asc | Desc
+  deriving
+    (Show, Eq, Ord, Enum, Bounded, CyclicEnum)
+
+data OrderCriteria = Alphabetic | Numeric
+  deriving
+    (Show, Eq, Ord, Enum, Bounded, CyclicEnum)
+
+data OrderBy = OrderBy OrderCriteria OrderDirection deriving (Show, Eq)
+
+cycleOrderCriteria :: OrderBy -> OrderBy
+cycleOrderCriteria (OrderBy c d) = OrderBy (next c) d
+
+cycleOrderDir :: OrderBy -> OrderBy
+cycleOrderDir (OrderBy c d) = OrderBy c (next d)

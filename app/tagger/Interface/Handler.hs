@@ -14,16 +14,23 @@ import Control.Monad
 import Control.Monad.Trans.Maybe
 import Data.Config
 import Data.Event
+import qualified Data.Foldable as F
+import qualified Data.HashSet as HS
 import Data.HierarchyMap (empty)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Model
 import Data.Model.Shared
+import qualified Data.OccurrenceHashMap as OHM
+import Data.Sequence (Seq ((:<|), (:|>)))
+import qualified Data.Sequence as Seq
+import Data.Tagger
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger
 import Monomer
 import Paths_tagger
 import System.FilePath
+import Text.TaggerQL
 import Util
 
 taggerEventHandler ::
@@ -39,6 +46,7 @@ taggerEventHandler
   event =
     case event of
       DoFocusedFileEvent e -> focusedFileEventHandler wenv node model e
+      DoFileSelectionEvent e -> fileSelectionEventHandler wenv node model e
       DoDescriptorTreeEvent e -> descriptorTreeEventHandler wenv node model e
       TaggerInit -> [Event (DoDescriptorTreeEvent DescriptorTreeInit)]
       RefreshUI ->
@@ -48,6 +56,148 @@ taggerEventHandler
       CloseConnection -> [Task (IOEvent <$> close conn)]
       IOEvent _ -> []
       ClearTextField (TaggerLens l) -> [Model $ model & l .~ ""]
+
+fileSelectionEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  FileSelectionEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+fileSelectionEventHandler
+  _
+  _
+  model@(_taggermodelConnection -> conn)
+  event =
+    case event of
+      AppendQueryText t ->
+        [ Model $
+            model
+              & fileSelectionModel
+                . queryText
+              %~ flip
+                T.append
+                ( ( if T.null (model ^. fileSelectionModel . queryText)
+                      then ""
+                      else " "
+                  )
+                    <> t
+                )
+        ]
+      ClearSelection ->
+        [ Model $
+            model & fileSelectionModel . selection .~ Seq.empty
+              & fileSelectionModel . tagOccurrences .~ OHM.empty
+              & fileSelectionModel . fileSelectionInfoMap .~ IntMap.empty
+              & fileSelectionModel . fileSelectionVis .~ VisibilityMain
+        ]
+      CycleNextFile ->
+        case model ^. fileSelectionModel . selection of
+          Seq.Empty -> []
+          (f :<| fs) ->
+            [ Event . DoFocusedFileEvent . PutFile $ f
+            , Model $ model & fileSelectionModel . selection .~ (fs |> f)
+            ]
+      CyclePrevFile ->
+        case model ^. fileSelectionModel . selection of
+          Seq.Empty -> []
+          (fs :|> f) ->
+            [ Event . DoFocusedFileEvent . PutFile $ f
+            , Model $ model & fileSelectionModel . selection .~ (f <| fs)
+            ]
+      CycleTagOrderCriteria ->
+        [ Model $
+            model & fileSelectionModel . tagOrdering
+              %~ cycleOrderCriteria
+        ]
+      CycleTagOrderDirection ->
+        [ Model $
+            model & fileSelectionModel . tagOrdering
+              %~ cycleOrderDir
+        ]
+      MakeFileSelectionInfoMap fseq ->
+        [ let fiTuple (File fk fp) = (fromIntegral fk, FileInfo fp)
+              m = F.toList $ fiTuple <$> fseq
+           in Model $
+                model
+                  & fileSelectionModel
+                    . fileSelectionInfoMap
+                  .~ IntMap.fromList m
+        ]
+      PutFiles fs ->
+        let currentSet =
+              HS.fromList
+                . F.toList
+                $ model ^. fileSelectionModel . selection
+            combFun =
+              case model ^. fileSelectionModel . setOp of
+                Union -> HS.union
+                Intersect -> HS.intersection
+                Difference -> HS.difference
+            newSeq = Seq.fromList . HS.toList . combFun currentSet $ fs
+         in [ Model $ model & fileSelectionModel . selection .~ newSeq
+            , Event
+                ( DoFileSelectionEvent
+                    (RefreshTagOccurrencesWith (fmap fileId newSeq))
+                )
+            , Event (DoFileSelectionEvent . MakeFileSelectionInfoMap $ newSeq)
+            ]
+      PutTagOccurrenceHashMap_ m ->
+        [ Model $
+            model
+              & fileSelectionModel . tagOccurrences .~ m
+        ]
+      Query ->
+        [ Task
+            ( DoFileSelectionEvent
+                . PutFiles
+                <$> taggerQL
+                  (TaggerQLQuery . T.strip $ model ^. fileSelectionModel . queryText)
+                  conn
+            )
+        , Event (ClearTextField (TaggerLens (fileSelectionModel . queryText)))
+        ]
+      RefreshFileSelection ->
+        [ Event (DoFileSelectionEvent RefreshTagOccurrences)
+        , Event
+            ( DoFileSelectionEvent
+                ( MakeFileSelectionInfoMap $
+                    model ^. fileSelectionModel . selection
+                )
+            )
+        ]
+      RefreshTagOccurrences ->
+        [ Task
+            ( DoFileSelectionEvent . PutTagOccurrenceHashMap_
+                <$> getTagOccurrencesByFileKey
+                  (map fileId . F.toList $ model ^. fileSelectionModel . selection)
+                  conn
+            )
+        ]
+      RefreshTagOccurrencesWith fks ->
+        [ Task
+            ( DoFileSelectionEvent . PutTagOccurrenceHashMap_
+                <$> getTagOccurrencesByFileKey fks conn
+            )
+        ]
+      TogglePaneVisibility t ->
+        [ let newPane = VisibilityLabel t
+              paneIsVisible =
+                (model ^. fileSelectionModel . fileSelectionVis)
+                  `hasVis` newPane
+           in Model $
+                model & fileSelectionModel . fileSelectionVis
+                  %~ ( if paneIsVisible
+                        then (`unsetPaneVis` newPane)
+                        else (`setPaneVis` newPane)
+                     )
+        ]
+      ToggleSelectionView ->
+        [ Model $
+            model
+              & fileSelectionModel
+                . fileSelectionVis
+              %~ toggleAltVis
+        ]
 
 focusedFileEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -268,6 +418,3 @@ toDescriptorInfo tc (Descriptor dk p) = do
   let consDes b = DescriptorInfo b p
   di <- consDes <$> hasInfraRelations dk tc
   return $ IntMap.singleton (fromIntegral dk) di
-
-isHashPattern :: Text -> Bool
-isHashPattern p = "#" `T.isPrefixOf` p && "#" `T.isSuffixOf` p
