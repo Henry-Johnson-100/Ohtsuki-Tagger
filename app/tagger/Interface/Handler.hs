@@ -87,6 +87,7 @@ fileSelectionEventHandler
             model & fileSelectionModel . selection .~ Seq.empty
               & fileSelectionModel . tagOccurrences .~ OHM.empty
               & fileSelectionModel . fileSelectionInfoMap .~ IntMap.empty
+              & fileSelectionModel . fileSelectionVis .~ VisibilityMain
         ]
       CycleTagOrderCriteria ->
         [ Model $

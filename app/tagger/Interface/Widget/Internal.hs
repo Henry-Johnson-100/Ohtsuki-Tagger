@@ -77,7 +77,7 @@ fileSelectionWidget m =
     (m ^. fileSelectionModel . fileSelectionVis) `hasVis` VisibilityAlt
   toggleViewSelectionButton =
     styledButton
-      "Selection"
+      (if selectionIsVisible then "Tags" else "Selection")
       (DoFileSelectionEvent ToggleSelectionView)
 
 fileSelectionOperationWidget :: TaggerModel -> TaggerWidget
@@ -185,7 +185,7 @@ tagListWidget m =
   tagListLeaf (d, n) =
     hgrid_
       []
-      [ label . descriptor $ d
+      [ draggable d . label . descriptor $ d
       , withStyleBasic
           [paddingL 1.5, paddingR 1.5]
           separatorLine
@@ -245,9 +245,11 @@ __        _____ ____   ____ _____ _____
 
 focusedFileWidget :: TaggerModel -> TaggerWidget
 focusedFileWidget m =
-  hstack_
-    []
-    [focusedFileMainPane, detailPane m]
+  box_ []
+    . withStyleBasic [minHeight 300]
+    $ hstack_
+      []
+      [focusedFileMainPane, detailPane m]
  where
   focusedFileMainPane =
     dropTarget_
