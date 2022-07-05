@@ -180,16 +180,9 @@ fileSelectionEventHandler
             )
         ]
       TogglePaneVisibility t ->
-        [ let newPane = VisibilityLabel t
-              paneIsVisible =
-                (model ^. fileSelectionModel . fileSelectionVis)
-                  `hasVis` newPane
-           in Model $
-                model & fileSelectionModel . fileSelectionVis
-                  %~ ( if paneIsVisible
-                        then (`unsetPaneVis` newPane)
-                        else (`setPaneVis` newPane)
-                     )
+        [ Model $
+            model & fileSelectionModel . fileSelectionVis
+              %~ togglePaneVis (VisibilityLabel t)
         ]
       ToggleSelectionView ->
         [ Model $
@@ -236,6 +229,14 @@ focusedFileEventHandler
                   cft
             )
         ]
+      RefreshFocusedFileAndSelection ->
+        [ Event
+            . DoFocusedFileEvent
+            . PutFile
+            . concreteTaggedFile
+            $ model ^. focusedFileModel . focusedFile
+        , Event . DoFileSelectionEvent $ RefreshFileSelection
+        ]
       -- Should:
       -- submit a tag in the db
       -- refresh the focused file detail widget
@@ -251,12 +252,12 @@ focusedFileEventHandler
                       (fk == focusedFileDefaultRecordKey)
                       (void (insertTags [(fk, dk, mtk)] conn))
                 )
-            , Event . DoFocusedFileEvent . PutFile $ f
+            , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
             ]
-      ToggleDetailPaneVisibility ->
+      ToggleFocusedFilePaneVisibility t ->
         [ Model $
-            model
-              & focusedFileModel . focusedFileVis %~ toggleAltVis
+            model & focusedFileModel . focusedFileVis
+              %~ flip togglePaneVis (VisibilityLabel t)
         ]
 
 -- this is kind of stupid but whatever.
@@ -387,13 +388,9 @@ descriptorTreeEventHandler
             )
         ]
       ToggleDescriptorTreeVisibility l ->
-        [ let currentVis = model ^. descriptorTreeModel . descriptorTreeVis
-              newLabel = VisibilityLabel l
-              newVis =
-                if currentVis `hasVis` newLabel
-                  then currentVis `unsetPaneVis` newLabel
-                  else currentVis `setPaneVis` newLabel
-           in Model $ model & descriptorTreeModel . descriptorTreeVis .~ newVis
+        [ Model $
+            model & descriptorTreeModel . descriptorTreeVis
+              %~ flip togglePaneVis (VisibilityLabel l)
         ]
       UpdateDescriptor rkd@(RecordKey (fromIntegral -> dk)) ->
         let updateText =

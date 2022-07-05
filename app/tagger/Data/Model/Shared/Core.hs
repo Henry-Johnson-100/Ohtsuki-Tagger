@@ -8,6 +8,7 @@ module Data.Model.Shared.Core (
   setPaneVis,
   unsetPaneVis,
   hasVis,
+  togglePaneVis,
   OrderDirection (..),
   OrderCriteria (..),
   OrderBy (..),
@@ -64,6 +65,12 @@ toggleAltVis VisibilityAlt = VisibilityMain
 toggleAltVis VisibilityMain = VisibilityAlt
 toggleAltVis (VisibilityPanes x ps) = VisibilityPanes (toggleAltVis x) ps
 toggleAltVis x = x
+
+togglePaneVis :: Visibility -> Visibility -> Visibility
+togglePaneVis x y =
+  if x `hasVis` y
+    then unsetPaneVis x y
+    else setPaneVis x y
 
 data OrderDirection = Asc | Desc
   deriving

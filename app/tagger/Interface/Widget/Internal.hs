@@ -243,6 +243,9 @@ __        _____ ____   ____ _____ _____
 
 -}
 
+imageDetailPaneVis :: Text
+imageDetailPaneVis = "image-detail"
+
 focusedFileWidget :: TaggerModel -> TaggerWidget
 focusedFileWidget m =
   box_ []
@@ -273,12 +276,17 @@ detailPane m =
   hstack_
     []
     [ styledButton
-        "<-"
-        (DoFocusedFileEvent ToggleDetailPaneVisibility)
+        (if detailPaneIsVisible then "->" else "<-")
+        (DoFocusedFileEvent . ToggleFocusedFilePaneVisibility $ imageDetailPaneVis)
     , separatorLine
-    , withNodeVisible ((m ^. focusedFileModel . focusedFileVis) `hasVis` VisibilityAlt) $
-        label "Detail widget goes here fam."
+    , withNodeVisible
+        detailPaneIsVisible
+        $ label "Detail widget goes here fam."
     ]
+ where
+  detailPaneIsVisible =
+    (m ^. focusedFileModel . focusedFileVis)
+      `hasVis` VisibilityLabel imageDetailPaneVis
 
 {-
  ____  _____ ____   ____ ____  ___ ____ _____ ___  ____

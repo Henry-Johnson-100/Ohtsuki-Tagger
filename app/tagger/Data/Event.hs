@@ -54,8 +54,9 @@ data FileSelectionEvent
 data FocusedFileEvent
   = PutConcreteFile_ ConcreteTaggedFile
   | PutFile File
+  | RefreshFocusedFileAndSelection
   | TagFile (RecordKey Descriptor) (Maybe (RecordKey Tag))
-  | ToggleDetailPaneVisibility
+  | ToggleFocusedFilePaneVisibility Text
   deriving (Show, Eq)
 
 data DescriptorTreeEvent
