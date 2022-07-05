@@ -7,7 +7,7 @@
 module Interface.Widget.Internal (
   TaggerWidget,
   fileSelectionWidget,
-  fileSelectionQueryWidget,
+  fileSelectionOperationWidget,
   focusedFileWidget,
   descriptorTreeWidget,
 ) where
@@ -22,6 +22,7 @@ import Data.Model.Shared
 import qualified Data.OccurrenceHashMap as OHM
 import qualified Data.Ord as O
 import qualified Data.Sequence as Seq
+import Data.Tagger
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger.Type
@@ -61,8 +62,28 @@ fileSelectionWidget :: TaggerModel -> TaggerWidget
 fileSelectionWidget m =
   hsplit_ [] (fileSelectionFileList m, tagListWidget m)
 
-fileSelectionQueryWidget :: TaggerModel -> TaggerWidget
-fileSelectionQueryWidget m = label "Query stuff goes here."
+fileSelectionOperationWidget :: TaggerModel -> TaggerWidget
+fileSelectionOperationWidget m = queryWidget
+ where
+  queryWidget =
+    keystroke_
+      [("Enter", DoFileSelectionEvent Query)]
+      []
+      . box_ [alignTop, alignCenter]
+      $ hstack_ [] [queryTextField, setOpDropdown]
+   where
+    queryTextFieldKey = "queryTextField"
+    queryTextField =
+      withNodeKey queryTextFieldKey $
+        textField_ (fileSelectionModel . queryText) []
+    setOpDropdown :: TaggerWidget
+    setOpDropdown =
+      dropdown_
+        (fileSelectionModel . setOp)
+        [Union, Intersect, Difference]
+        (label . T.pack . show)
+        (label . T.pack . show)
+        []
 
 fileSelectionFileList :: TaggerModel -> TaggerWidget
 fileSelectionFileList m =
@@ -91,11 +112,25 @@ tagListWidget m =
   vscroll_ [wheelRate 50] $
     vstack_
       []
-      [ hstack_ [] [tagListOrderCritCycleButton, tagListOrderDirCycleButton]
+      [ tagListHeader
       , separatorLine
       , vstack_ [] (tagListLeaf <$> sortedOccurrenceMapList)
       ]
  where
+  tagListHeader =
+    hstack_
+      []
+      [ tagListOrderCritCycleButton
+      , tagListOrderDirCycleButton
+      , spacer
+      , label $
+          "In Selection: ("
+            <> ( T.pack . show
+                  . Seq.length
+                  $ m ^. fileSelectionModel . selection
+               )
+            <> ")"
+      ]
   sortedOccurrenceMapList =
     let (OrderBy ordCrit ordDir) = m ^. fileSelectionModel . tagOrdering
         !occurrenceMapList = OHM.toList $ m ^. fileSelectionModel . tagOccurrences
@@ -247,7 +282,7 @@ manageDescriptorPaneVis = "manage"
 
 descriptorTreeWidget :: TaggerModel -> TaggerWidget
 descriptorTreeWidget m =
-  flip nodeKey "descriptorTree" $
+  withNodeKey "descriptorTree" $
     keystroke_
       [("Ctrl-m", DoDescriptorTreeEvent (ToggleDescriptorTreeVisibility "manage"))]
       [ignoreChildrenEvts]
@@ -477,6 +512,9 @@ withStyleHover = flip styleHover
 
 withNodeVisible :: Bool -> TaggerWidget -> TaggerWidget
 withNodeVisible = flip nodeVisible
+
+withNodeKey :: Text -> TaggerWidget -> TaggerWidget
+withNodeKey = flip nodeKey
 
 descriptorIsMetaInInfoMap :: TaggerModel -> Descriptor -> Bool
 descriptorIsMetaInInfoMap

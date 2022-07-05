@@ -21,7 +21,7 @@ taggerApplicationUI _ m =
       , hgrid_
           []
           [ descriptorTreeWidget m
-          , fileSelectionQueryWidget m
+          , fileSelectionOperationWidget m
           , fileSelectionWidget m
           ]
       )
