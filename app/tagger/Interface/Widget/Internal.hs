@@ -60,7 +60,25 @@ editFileMode = "edit-file"
 
 fileSelectionWidget :: TaggerModel -> TaggerWidget
 fileSelectionWidget m =
-  hsplit_ [] (fileSelectionFileList m, tagListWidget m)
+  vstack_
+    []
+    [ zstack_
+        []
+        [ withNodeVisible (not selectionIsVisible) $ tagListWidget m
+        , withNodeVisible selectionIsVisible $ fileSelectionFileList m
+        ]
+    , withNodeVisible (not . Seq.null $ m ^. fileSelectionModel . selection) $
+        hstack_
+          []
+          [clearSelectionButton, toggleViewSelectionButton]
+    ]
+ where
+  selectionIsVisible =
+    (m ^. fileSelectionModel . fileSelectionVis) `hasVis` VisibilityAlt
+  toggleViewSelectionButton =
+    styledButton
+      "Selection"
+      (DoFileSelectionEvent ToggleSelectionView)
 
 fileSelectionOperationWidget :: TaggerModel -> TaggerWidget
 fileSelectionOperationWidget m = queryWidget
@@ -70,12 +88,19 @@ fileSelectionOperationWidget m = queryWidget
       [("Enter", DoFileSelectionEvent Query)]
       []
       . box_ [alignTop, alignCenter]
-      $ hstack_ [] [queryTextField, setOpDropdown]
+      $ hstack_ [] [runQueryButton, queryTextField, setOpDropdown]
    where
+    runQueryButton = styledButton "Search" (DoFileSelectionEvent Query)
     queryTextFieldKey = "queryTextField"
     queryTextField =
-      withNodeKey queryTextFieldKey $
-        textField_ (fileSelectionModel . queryText) []
+      dropTarget_
+        (DoFileSelectionEvent . AppendQueryText . filePath)
+        [dropTargetStyle [border 1 yuiOrange]]
+        . dropTarget_
+          (DoFileSelectionEvent . AppendQueryText . descriptor)
+          [dropTargetStyle [border 1 yuiBlue]]
+        . withNodeKey queryTextFieldKey
+        $ textField_ (fileSelectionModel . queryText) []
     setOpDropdown :: TaggerWidget
     setOpDropdown =
       dropdown_
@@ -87,9 +112,14 @@ fileSelectionOperationWidget m = queryWidget
 
 fileSelectionFileList :: TaggerModel -> TaggerWidget
 fileSelectionFileList m =
-  vscroll_ [wheelRate 50]
-    . vstack_ []
-    $ fmap fileSelectionLeaf (m ^. fileSelectionModel . selection)
+  vstack_
+    []
+    [ vscroll_ [wheelRate 50]
+        . vstack_ []
+        $ fmap fileSelectionLeaf (m ^. fileSelectionModel . selection)
+    , withNodeVisible (not . Seq.null $ m ^. fileSelectionModel . selection) $
+        fileSelectionManagePane m
+    ]
  where
   fileSelectionLeaf :: File -> TaggerWidget
   fileSelectionLeaf f@(File _ fp) =
@@ -99,7 +129,8 @@ fileSelectionFileList m =
         [ withNodeVisible
             ( not isEditMode
             )
-            $ label_ fp [ellipsis]
+            . withStyleBasic [textLeft]
+            $ label_ fp []
         , withNodeVisible isEditMode $ label "edit mode :P"
         ]
    where
@@ -175,13 +206,6 @@ fileSelectionManagePane m =
         )
         $ hstack_ [] [refreshFileSelectionButton, toggleFileEditMode]
     ]
-
-fileSelectionQueryTextField :: TaggerWidget
-fileSelectionQueryTextField =
-  keystroke_
-    [("Enter", DoFileSelectionEvent Query)]
-    [ignoreChildrenEvts]
-    $ textField_ (fileSelectionModel . queryText) []
 
 clearSelectionButton :: TaggerWidget
 clearSelectionButton = styledButton "Clear" (DoFileSelectionEvent ClearSelection)

@@ -68,6 +68,20 @@ fileSelectionEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
+      AppendQueryText t ->
+        [ Model $
+            model
+              & fileSelectionModel
+                . queryText
+              %~ flip
+                T.append
+                ( ( if T.null (model ^. fileSelectionModel . queryText)
+                      then ""
+                      else " "
+                  )
+                    <> t
+                )
+        ]
       ClearSelection ->
         [ Model $
             model & fileSelectionModel . selection .~ Seq.empty
@@ -121,7 +135,7 @@ fileSelectionEventHandler
             ( DoFileSelectionEvent
                 . PutFiles
                 <$> taggerQL
-                  (TaggerQLQuery $ model ^. fileSelectionModel . queryText)
+                  (TaggerQLQuery . T.strip $ model ^. fileSelectionModel . queryText)
                   conn
             )
         , Event (ClearTextField (TaggerLens (fileSelectionModel . queryText)))
@@ -160,6 +174,13 @@ fileSelectionEventHandler
                         then (`unsetPaneVis` newPane)
                         else (`setPaneVis` newPane)
                      )
+        ]
+      ToggleSelectionView ->
+        [ Model $
+            model
+              & fileSelectionModel
+                . fileSelectionVis
+              %~ toggleAltVis
         ]
 
 focusedFileEventHandler ::

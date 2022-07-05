@@ -62,6 +62,7 @@ hasVis x y =
 toggleAltVis :: Visibility -> Visibility
 toggleAltVis VisibilityAlt = VisibilityMain
 toggleAltVis VisibilityMain = VisibilityAlt
+toggleAltVis (VisibilityPanes x ps) = VisibilityPanes (toggleAltVis x) ps
 toggleAltVis x = x
 
 data OrderDirection = Asc | Desc

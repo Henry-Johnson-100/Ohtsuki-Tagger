@@ -32,7 +32,8 @@ data TaggerEvent
   deriving (Show, Eq)
 
 data FileSelectionEvent
-  = ClearSelection
+  = AppendQueryText Text
+  | ClearSelection
   | CycleTagOrderCriteria
   | CycleTagOrderDirection
   | MakeFileSelectionInfoMap (Seq File)
@@ -44,6 +45,7 @@ data FileSelectionEvent
   | -- | Given a Traversable of File keys, fetch an OccurrenceHashMap. Saves having to
     -- call toList on the selection Seq in RefreshTagOccurrences.
     RefreshTagOccurrencesWith (Seq (RecordKey File))
+  | ToggleSelectionView
   | TogglePaneVisibility Text
   deriving (Show, Eq)
 
