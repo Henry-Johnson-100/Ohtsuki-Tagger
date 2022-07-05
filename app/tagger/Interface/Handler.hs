@@ -21,6 +21,7 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.Model
 import Data.Model.Shared
 import qualified Data.OccurrenceHashMap as OHM
+import Data.Sequence (Seq ((:<|), (:|>)))
 import qualified Data.Sequence as Seq
 import Data.Tagger
 import Data.Text (Text)
@@ -89,6 +90,27 @@ fileSelectionEventHandler
               & fileSelectionModel . fileSelectionInfoMap .~ IntMap.empty
               & fileSelectionModel . fileSelectionVis .~ VisibilityMain
         ]
+      CycleNextFile ->
+        case model ^. fileSelectionModel . selection of
+          Seq.Empty -> []
+          (f :<| fs) ->
+            [ Event . DoFocusedFileEvent . PutFile $ f
+            , Model $ model & fileSelectionModel . selection .~ (fs |> f)
+            , Task (IOEvent <$> print f)
+            , Task (IOEvent <$> print fs)
+            ]
+      CyclePrevFile ->
+        case model ^. fileSelectionModel . selection of
+          Seq.Empty -> []
+          (fs :|> f) ->
+            -- if f == concreteTaggedFile (model ^. focusedFileModel . focusedFile)
+            --   then [Event . DoFileSelectionEvent $ CyclePrevFile]
+            --   else
+                [ Event . DoFocusedFileEvent . PutFile $ f
+                , Model $ model & fileSelectionModel . selection .~ (f <| fs)
+                , Task (IOEvent <$> print f)
+                , Task (IOEvent <$> print fs)
+                ]
       CycleTagOrderCriteria ->
         [ Model $
             model & fileSelectionModel . tagOrdering

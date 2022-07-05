@@ -34,6 +34,8 @@ data TaggerEvent
 data FileSelectionEvent
   = AppendQueryText Text
   | ClearSelection
+  | CycleNextFile
+  | CyclePrevFile
   | CycleTagOrderCriteria
   | CycleTagOrderDirection
   | MakeFileSelectionInfoMap (Seq File)
