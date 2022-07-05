@@ -50,6 +50,7 @@ module Data.HierarchyMap (
   Data.HierarchyMap.null,
   getAllInfraTo,
   getAllMetaTo,
+  keys,
 ) where
 
 import qualified Data.Foldable as F
@@ -161,3 +162,9 @@ getAllInfraTo x hm =
         . map (`getAllInfraTo` hm)
         . HashSet.toList
         $ layerInfra
+
+{- |
+ Returns a list containing every member of the 'HierarchyMap`
+-}
+keys :: HierarchyMap k -> [k]
+keys (HierarchyMap m) = HashMap.keys m

@@ -16,6 +16,9 @@ import Control.Lens
 import Data.Config
 import Data.Event
 import qualified Data.HashMap.Strict as HashMap
+import qualified Data.HashSet as HS
+import Data.HierarchyMap (HierarchyMap)
+import qualified Data.HierarchyMap as HM
 import qualified Data.List as L
 import Data.Model
 import Data.Model.Shared
@@ -272,7 +275,7 @@ imagePreviewRender :: Text -> TaggerWidget
 imagePreviewRender fp = image_ fp [fitEither, alignCenter]
 
 detailPane :: TaggerModel -> TaggerWidget
-detailPane m =
+detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile f hm)) =
   hstack_
     []
     [ styledButton
@@ -281,12 +284,51 @@ detailPane m =
     , separatorLine
     , withNodeVisible
         detailPaneIsVisible
-        $ label "Detail widget goes here fam."
+        . vscroll_ [wheelRate 50]
+        $ detailPaneTagsWidget
     ]
  where
   detailPaneIsVisible =
     (m ^. focusedFileModel . focusedFileVis)
       `hasVis` VisibilityLabel imageDetailPaneVis
+  detailPaneTagsWidget =
+    withStyleBasic [paddingR 10, paddingL 10] $
+      vstack_
+        []
+        [ vstack_
+            []
+            ( map
+                (`isMetaTagWidget` hm)
+                ( filter
+                    ( \d ->
+                        HM.metaMember d hm
+                          && not (HM.infraMember d hm)
+                    )
+                    . HM.keys
+                    $ hm
+                )
+            )
+        , vstack
+            . map (label . descriptor)
+            . HM.keys
+            $ hm
+        ]
+  isMetaTagWidget :: Descriptor -> HierarchyMap Descriptor -> TaggerWidget
+  isMetaTagWidget d@(Descriptor _ dp) hierMap =
+    withStyleBasic [borderB 1 black] $
+      hgrid_
+        []
+        [ box_ [alignTop, alignLeft] . draggable d . label $ dp
+        , separatorLine
+        , vstack_
+            []
+            $ map
+              ( \d'@(Descriptor _ dp') ->
+                  box_ [alignLeft] . draggable d' . label $ dp'
+              )
+              . HS.toList
+              $ HM.find d hierMap
+        ]
 
 {-
  ____  _____ ____   ____ ____  ___ ____ _____ ___  ____
