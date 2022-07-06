@@ -1,9 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# HLINT ignore "Use const" #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use const" #-}
 
 module Interface.Handler (
   taggerEventHandler,
@@ -208,20 +208,25 @@ focusedFileEventHandler
         [ Task (IOEvent <$> deleteTags [t] conn)
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
-      MoveTag (ConcreteTag tk (Descriptor dk _) _) mst ->
-        let (File fk _) =
-              concreteTaggedFile $
-                model
-                  ^. focusedFileModel . focusedFile
-         in [ Task
-                ( IOEvent
-                    <$> unless
-                      (fk == focusedFileDefaultRecordKey)
-                      (void (insertTags [(fk, dk, mst)] conn))
-                )
-            , Task (IOEvent <$> deleteTags [tk] conn)
-            , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
-            ]
+      MoveTag
+        (ConcreteTag oldTagKey (Descriptor dk _) _)
+        newMaybeSubTagKey ->
+          let (File fk _) =
+                concreteTaggedFile $
+                  model
+                    ^. focusedFileModel . focusedFile
+           in [ Task
+                  ( IOEvent
+                      <$> do
+                        unless (fk == focusedFileDefaultRecordKey) $ do
+                          newTags <- insertTags [(fk, dk, newMaybeSubTagKey)] conn
+                          -- moving all old subtags to the new tag
+                          -- or else they will be cascade deleted when the old tag is.
+                          moveSubTags ((oldTagKey,) <$> newTags) conn
+                          deleteTags [oldTagKey] conn
+                  )
+              , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
+              ]
       PutConcreteFile_ cf@(ConcreteTaggedFile (File _ fp) _) ->
         [ Model $
             model

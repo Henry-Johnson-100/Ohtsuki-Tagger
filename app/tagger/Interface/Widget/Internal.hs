@@ -273,7 +273,7 @@ imagePreviewRender :: Text -> TaggerWidget
 imagePreviewRender fp = image_ fp [fitEither, alignCenter]
 
 detailPane :: TaggerModel -> TaggerWidget
-detailPane ((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) =
+detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) =
   hstack_
     []
     [ separatorLine
@@ -296,10 +296,12 @@ detailPane ((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) =
      in vscroll_ [wheelRate 50] . withStyleBasic [] $
           vstack_
             []
-            [ metaLeaves metaMembers
+            [ label (filePath . concreteTaggedFile $m ^. focusedFileModel . focusedFile)
+            , separatorLine
+            , metaLeaves metaMembers
             , nullMemberLeaves topNullMembers
             , spacer
-            , hstack_ [] [deleteTagZone, unsubTagZone]
+            , hstack_ [] [deleteTagZone]
             ]
    where
     nullMemberLeaves topNullMembers =
@@ -340,15 +342,6 @@ detailPane ((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) =
         . flip styleHoverSet []
         . withStyleBasic [bgColor yuiLightPeach, border 1 yuiPeach]
         $ buttonD_ "Delete" []
-    unsubTagZone =
-      dropTarget_
-        (DoFocusedFileEvent . UnSubTag . concreteTagId)
-        [ dropTargetStyle
-            [border 1 yuiRed]
-        ]
-        . flip styleHoverSet []
-        . withStyleBasic [bgColor yuiLightPeach, border 1 yuiPeach]
-        $ buttonD_ "Lift" []
     subTagDropTarget tk =
       dropTarget_
         (\(Descriptor dk _) -> DoFocusedFileEvent (TagFile dk (Just tk)))

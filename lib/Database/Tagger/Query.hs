@@ -117,6 +117,7 @@ module Database.Tagger.Query (
   -- ** 'Tag` Operations
   deleteTags,
   unSubTags,
+  moveSubTags,
 
   -- *** 'Tag` Insertion
   -- $FailedInsertion
@@ -1275,6 +1276,26 @@ unSubTags tids tc = executeMany tc q (Only <$> tids)
   q =
     [r|
     UPDATE Tag SET subTagOfId = NULL WHERE id = ?
+    |]
+
+{- |
+ Given a list of tuples consisting of 'Tag` keys, update all 'Tag`s that
+ are subtags of the first to be subtags of the second.
+-}
+moveSubTags :: [(RecordKey Tag, RecordKey Tag)] -> TaggedConnection -> IO ()
+moveSubTags tids tc =
+  mapM_
+    ( \(oldTK, newTK) ->
+        executeNamed
+          tc
+          q
+          [":oldSuperKey" := oldTK, ":newSuperKey" := newTK]
+    )
+    tids
+ where
+  q =
+    [r|
+    UPDATE Tag SET subTagOfId = :newSuperKey WHERE subTagOfId = :oldSuperKey
     |]
 
 {- |
