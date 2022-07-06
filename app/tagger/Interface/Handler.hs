@@ -1,9 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# HLINT ignore "Use const" #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use const" #-}
 
 module Interface.Handler (
   taggerEventHandler,
@@ -18,6 +18,7 @@ import qualified Data.Foldable as F
 import qualified Data.HashSet as HS
 import Data.HierarchyMap (empty)
 import qualified Data.IntMap.Strict as IntMap
+import Data.Maybe
 import Data.Model
 import Data.Model.Shared
 import qualified Data.OccurrenceHashMap as OHM
@@ -27,6 +28,7 @@ import Data.Tagger
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger
+import Interface.Handler.Internal
 import Monomer
 import Paths_tagger
 import System.FilePath
@@ -51,6 +53,7 @@ taggerEventHandler
       TaggerInit -> [Event (DoDescriptorTreeEvent DescriptorTreeInit)]
       RefreshUI ->
         [ Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
+        , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
       ToggleTagMode -> [Model $ model & isTagMode %~ not]
       CloseConnection -> [Task (IOEvent <$> close conn)]
@@ -69,6 +72,10 @@ fileSelectionEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
+      AddFiles ->
+        [ Task (IOEvent <$> addFiles conn (model ^. fileSelectionModel . addFileText))
+        , Event (ClearTextField (TaggerLens (fileSelectionModel . addFileText)))
+        ]
       AppendQueryText t ->
         [ Model $
             model
@@ -182,7 +189,7 @@ fileSelectionEventHandler
       TogglePaneVisibility t ->
         [ Model $
             model & fileSelectionModel . fileSelectionVis
-              %~ togglePaneVis (VisibilityLabel t)
+              %~ flip togglePaneVis (VisibilityLabel t)
         ]
       ToggleSelectionView ->
         [ Model $
@@ -204,6 +211,54 @@ focusedFileEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
+      AppendTagText t ->
+        [ Model $
+            model
+              & focusedFileModel
+                . tagText
+              %~ flip
+                T.append
+                ( ( if T.null (model ^. focusedFileModel . tagText)
+                      then ""
+                      else " "
+                  )
+                    <> t
+                )
+        ]
+      CommitTagText ->
+        [ Task
+            ( IOEvent
+                <$> taggerQLTag
+                  (fileId . concreteTaggedFile $ model ^. focusedFileModel . focusedFile)
+                  (TaggerQLTagStmnt . T.strip $ model ^. focusedFileModel . tagText)
+                  conn
+            )
+        , Event (ClearTextField (TaggerLens $ focusedFileModel . tagText))
+        , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
+        ]
+      DeleteTag t ->
+        [ Task (IOEvent <$> deleteTags [t] conn)
+        , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
+        ]
+      MoveTag
+        (ConcreteTag oldTagKey (Descriptor dk _) _)
+        newMaybeSubTagKey ->
+          let (File fk _) =
+                concreteTaggedFile $
+                  model
+                    ^. focusedFileModel . focusedFile
+           in [ Task
+                  ( IOEvent
+                      <$> do
+                        unless (fk == focusedFileDefaultRecordKey) $ do
+                          newTags <- insertTags [(fk, dk, newMaybeSubTagKey)] conn
+                          -- moving all old subtags to the new tag
+                          -- or else they will be cascade deleted when the old tag is.
+                          moveSubTags ((oldTagKey,) <$> newTags) conn
+                          deleteTags [oldTagKey] conn
+                  )
+              , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
+              ]
       PutConcreteFile_ cf@(ConcreteTaggedFile (File _ fp) _) ->
         [ Model $
             model
@@ -237,12 +292,23 @@ focusedFileEventHandler
             $ model ^. focusedFileModel . focusedFile
         , Event . DoFileSelectionEvent $ RefreshFileSelection
         ]
+      RenameFile ->
+        [ let fk = fileId . concreteTaggedFile $ model ^. focusedFileModel . focusedFile
+              newRenameText =
+                model
+                  ^. fileSelectionModel
+                    . fileSelectionInfoMap
+                    . fileInfoAt (fromIntegral fk)
+                    . fileInfoRenameText
+           in Task (IOEvent <$> renameFile conn fk newRenameText)
+        , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
+        ]
       -- Should:
       -- submit a tag in the db
       -- refresh the focused file detail widget
       -- refresh the selection if tag counts are displayed (?)
       TagFile dk mtk ->
-        let f@(File fk _) =
+        let (File fk _) =
               concreteTaggedFile $
                 model
                   ^. focusedFileModel . focusedFile
@@ -258,6 +324,10 @@ focusedFileEventHandler
         [ Model $
             model & focusedFileModel . focusedFileVis
               %~ flip togglePaneVis (VisibilityLabel t)
+        ]
+      UnSubTag tk ->
+        [ Task (IOEvent <$> unSubTags [tk] conn)
+        , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
 
 -- this is kind of stupid but whatever.

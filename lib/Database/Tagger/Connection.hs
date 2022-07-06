@@ -18,6 +18,7 @@ module Database.Tagger.Connection (
   query_,
   execute,
   execute_,
+  executeNamed,
   executeMany,
   lastInsertRowId,
   initializeDatabase,
@@ -176,6 +177,13 @@ execute_ tc (TaggerQuery queryStmnt) =
   withBareConnection
     (`bareExecute_` queryStmnt)
     tc
+
+{- |
+ Execute a statement with named parameters.
+-}
+executeNamed :: TaggedConnection -> TaggerQuery -> [Simple.NamedParam] -> IO ()
+executeNamed tc (TaggerQuery queryStmnt) params =
+  withBareConnection (\c -> bareExecuteNamed c queryStmnt params) tc
 
 {- |
  Execute a statement on a list of parameters.
@@ -337,6 +345,9 @@ bareExecute = withConnection Simple.execute
 
 bareExecute_ :: BareConnection -> Simple.Query -> IO ()
 bareExecute_ = withConnection Simple.execute_
+
+bareExecuteNamed :: BareConnection -> Simple.Query -> [Simple.NamedParam] -> IO ()
+bareExecuteNamed = withConnection Simple.executeNamed
 
 bareExecuteMany :: Simple.ToRow q => BareConnection -> Simple.Query -> [q] -> IO ()
 bareExecuteMany = withConnection Simple.executeMany

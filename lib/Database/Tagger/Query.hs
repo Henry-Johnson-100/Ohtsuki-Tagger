@@ -2,10 +2,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TupleSections #-}
+{-# HLINT ignore "Use second" #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use second" #-}
 
 {- |
 Module      : Database.Tagger.Query.Basic
@@ -115,6 +115,9 @@ module Database.Tagger.Query (
   insertDescriptorRelation,
 
   -- ** 'Tag` Operations
+  deleteTags,
+  unSubTags,
+  moveSubTags,
 
   -- *** 'Tag` Insertion
   -- $FailedInsertion
@@ -122,23 +125,46 @@ module Database.Tagger.Query (
   unsafeInsertTag,
 ) where
 
-import Control.Monad
+import Control.Monad (guard)
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT, throwE)
-import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
+import Control.Monad.Trans.Maybe (MaybeT)
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
 import qualified Data.HierarchyMap as HAM
-import Data.Maybe
-import Data.OccurrenceHashMap (OccurrenceHashMap)
-import qualified Data.OccurrenceHashMap as OHM
+import Data.Maybe (catMaybes, fromMaybe, isNothing)
+import Data.OccurrenceHashMap.Internal (OccurrenceHashMap)
+import qualified Data.OccurrenceHashMap.Internal as OHM (
+  fromList,
+  unions,
+ )
 import qualified Data.OccurrenceMap.Internal as OM
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger.Connection
+import Database.Tagger.Connection (
+  NamedParam ((:=)),
+  Only (Only),
+  execute,
+  executeMany,
+  executeNamed,
+  execute_,
+  lastInsertRowId,
+  query,
+  queryNamed,
+  query_,
+ )
 import Database.Tagger.Query.Type (TaggerQuery)
-import Database.Tagger.Type
-import Tagger.Util
+import Database.Tagger.Type (
+  ConcreteTag (ConcreteTag),
+  ConcreteTaggedFile (ConcreteTaggedFile),
+  Descriptor (Descriptor),
+  File,
+  RecordKey,
+  Tag (Tag, tagSubtagOfId),
+  TaggedConnection,
+  TaggedFile (TaggedFile),
+ )
+import Tagger.Util (catMaybeTM, head', hoistMaybe)
 import Text.RawString.QQ (r)
 
 {- |
@@ -633,24 +659,41 @@ queryForConcreteTaggedFileWithFileId ::
 queryForConcreteTaggedFileWithFileId rk tc = do
   file <- queryForSingleFileByFileId rk tc
   fileTags <- lift $ queryForFileTagsByFileId rk tc
-  concreteFileTags <-
-    lift
-      . fmap (map (second HashSet.fromList) . catMaybes)
-      . mapM (runMaybeT . traverseRelationTuple . getRelationTuple)
-      $ fileTags
-  let fileTagMap = HAM.inserts concreteFileTags HAM.empty
-  return $ ConcreteTaggedFile file fileTagMap
+  let tagRelationTuples = getRelationTuple <$> fileTags
+  concreteTagRelationTuples <-
+    map (second HashSet.fromList)
+      <$> mapM traverseRelationTuple tagRelationTuples
+  return $ ConcreteTaggedFile file (HAM.fromList concreteTagRelationTuples)
  where
   getRelationTuple (Tag t _ _ ms) =
     maybe (t, []) (,[t]) ms
   traverseRelationTuple (x, xs) = do
-    md <- queryForSingleDescriptorByTagId x tc
+    md <- derefTag x
     ids <-
       lift
-        . catMaybeTM (`queryForSingleDescriptorByTagId` tc)
+        . catMaybeTM derefTag
         $ xs
     return (md, ids)
   second f (x, y) = (x, f y)
+  derefTag :: RecordKey Tag -> MaybeT IO ConcreteTag
+  derefTag tid = do
+    results <- lift $ query tc q [tid]
+    let result = head' results
+    hoistMaybe (toConcreteTag <$> result)
+   where
+    toConcreteTag (tid', did, dp, mstid) = ConcreteTag tid' (Descriptor did dp) mstid
+    q =
+      [r|
+      SELECT
+        t.id
+        ,d.id
+        ,d.descriptor
+        ,t.subTagOfId
+      FROM Tag t
+      JOIN Descriptor d
+        ON t.descriptorId = d.id
+      WHERE t.id = ?
+      |]
 
 {- |
  Query for 'File`s without tags.
@@ -1210,6 +1253,49 @@ insertDescriptorRelation newMeta newInfra tc =
     [r|
     INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId)
       VALUES (?,?)
+    |]
+
+{- |
+ Given 'Tag` ID's, delete them from the database.
+-}
+deleteTags :: [RecordKey Tag] -> TaggedConnection -> IO ()
+deleteTags tids tc =
+  mapM_ (\t -> executeNamed tc q [":tagId" := t]) tids
+ where
+  q =
+    [r|
+    DELETE FROM Tag WHERE id = :tagId OR subTagOfId = :tagId
+    |]
+
+{- |
+ For all given 'Tag`s, remove them as subtags and set as normal top-level tags.
+-}
+unSubTags :: [RecordKey Tag] -> TaggedConnection -> IO ()
+unSubTags tids tc = executeMany tc q (Only <$> tids)
+ where
+  q =
+    [r|
+    UPDATE Tag SET subTagOfId = NULL WHERE id = ?
+    |]
+
+{- |
+ Given a list of tuples consisting of 'Tag` keys, update all 'Tag`s that
+ are subtags of the first to be subtags of the second.
+-}
+moveSubTags :: [(RecordKey Tag, RecordKey Tag)] -> TaggedConnection -> IO ()
+moveSubTags tids tc =
+  mapM_
+    ( \(oldTK, newTK) ->
+        executeNamed
+          tc
+          q
+          [":oldSuperKey" := oldTK, ":newSuperKey" := newTK]
+    )
+    tids
+ where
+  q =
+    [r|
+    UPDATE Tag SET subTagOfId = :newSuperKey WHERE subTagOfId = :oldSuperKey
     |]
 
 {- |

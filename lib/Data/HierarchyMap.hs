@@ -46,10 +46,12 @@ module Data.HierarchyMap (
   isInfraTo,
   insert,
   inserts,
+  fromList,
   empty,
   Data.HierarchyMap.null,
   getAllInfraTo,
   getAllMetaTo,
+  keys,
 ) where
 
 import qualified Data.Foldable as F
@@ -91,6 +93,12 @@ inserts ::
 inserts = flip $ F.foldl' (flip (uncurry insert))
 
 {- |
+ Convert a list of relation tuples to a 'HierarchyMap`
+-}
+fromList :: (Hashable a, Foldable t) => t (a, HashSet.HashSet a) -> HierarchyMap a
+fromList = flip inserts empty
+
+{- |
  'True` if the given value exists as either a meta or infra member.
 -}
 member :: Hashable a => a -> HierarchyMap a -> Bool
@@ -124,9 +132,16 @@ metaMember x (HierarchyMap m) = maybe False (not . HashSet.null) (HashMap.lookup
 
 {- |
  'True` if the given value has an infra relationship to any member of the map.
+
+  That is:
+
+  - It exists in the map
+  - It appears in the values of any key of the map.
 -}
 infraMember :: Hashable a => a -> HierarchyMap a -> Bool
-infraMember x (HierarchyMap m) = maybe False HashSet.null $ HashMap.lookup x m
+infraMember x (HierarchyMap m) =
+  HashMap.member x m
+    && any (HashSet.member x) (HashMap.elems m)
 
 {- |
  'True` if the first given value is infra to the second in the given map.
@@ -161,3 +176,9 @@ getAllInfraTo x hm =
         . map (`getAllInfraTo` hm)
         . HashSet.toList
         $ layerInfra
+
+{- |
+ Returns a list containing every member of the 'HierarchyMap`
+-}
+keys :: HierarchyMap k -> [k]
+keys (HierarchyMap m) = HashMap.keys m

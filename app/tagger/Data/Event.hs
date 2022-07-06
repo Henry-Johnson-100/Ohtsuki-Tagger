@@ -32,7 +32,8 @@ data TaggerEvent
   deriving (Show, Eq)
 
 data FileSelectionEvent
-  = AppendQueryText Text
+  = AddFiles
+  | AppendQueryText Text
   | ClearSelection
   | CycleNextFile
   | CyclePrevFile
@@ -52,11 +53,17 @@ data FileSelectionEvent
   deriving (Show, Eq)
 
 data FocusedFileEvent
-  = PutConcreteFile_ ConcreteTaggedFile
+  = AppendTagText Text
+  | CommitTagText
+  | DeleteTag (RecordKey Tag)
+  | MoveTag ConcreteTag (Maybe (RecordKey Tag))
+  | PutConcreteFile_ ConcreteTaggedFile
   | PutFile File
   | RefreshFocusedFileAndSelection
+  | RenameFile
   | TagFile (RecordKey Descriptor) (Maybe (RecordKey Tag))
   | ToggleFocusedFilePaneVisibility Text
+  | UnSubTag (RecordKey Tag)
   deriving (Show, Eq)
 
 data DescriptorTreeEvent

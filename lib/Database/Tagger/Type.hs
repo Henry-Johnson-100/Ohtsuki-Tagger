@@ -26,6 +26,7 @@ module Database.Tagger.Type (
   isSubTagOf,
   MetaDescriptor (..),
   DescriptorTree,
+  ConcreteTag (..),
   TaggedFile (..),
   ConcreteTaggedFile (..),
 
@@ -163,6 +164,22 @@ data TaggedFile = TaggedFile
   deriving (Show, Eq, Generic, Hashable)
 
 {- |
+ Data type corresponding to a \"dereferenced\" 'Tag`.
+
+ Contains the ID of the 'Tag`, its 'Descriptor` and the ID of its supertag if it is
+ a subtag.
+
+ Does not contain the 'File` the 'Tag` is attached to because this type is only meant
+ for use in the 'ConcreteTaggedFile` where the 'File` would be redundant.
+-}
+data ConcreteTag = ConcreteTag
+  { concreteTagId :: RecordKey Tag
+  , concreteTagDescriptor :: Descriptor
+  , concreteTagSubTagOfId :: Maybe (RecordKey Tag)
+  }
+  deriving (Show, Eq, Generic, Hashable)
+
+{- |
  Data type representing a \"dereferenced\" TaggedFile
 
  Contains the actual file and a 'HierarchyMap` of the 'Descriptor`s it is tagged with.
@@ -171,6 +188,6 @@ data TaggedFile = TaggedFile
 -}
 data ConcreteTaggedFile = ConcreteTaggedFile
   { concreteTaggedFile :: File
-  , concreteTaggedFileDescriptors :: HierarchyMap Descriptor
+  , concreteTaggedFileDescriptors :: HierarchyMap ConcreteTag
   }
   deriving (Show, Eq)
