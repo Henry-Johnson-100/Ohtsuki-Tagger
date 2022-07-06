@@ -292,8 +292,10 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile f hm)) 
     (m ^. focusedFileModel . focusedFileVis)
       `hasVis` VisibilityLabel imageDetailPaneVis
   detailPaneTagsWidget =
-    let a = 0
-        metaMembers = filter (`HM.metaMember` hm) . HM.keys $ hm
+    let metaMembers =
+          filter (\x -> HM.metaMember x hm && not (HM.infraMember x hm))
+            . HM.keys
+            $ hm
         topNullMembers =
           filter
             ( \x ->
@@ -305,35 +307,33 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile f hm)) 
      in withStyleBasic [] $
           vstack_
             []
-            [ infraLeaves topNullMembers
+            [ metaLeaves metaMembers
+            , nullMemberLeaves topNullMembers
             ]
    where
-    infraLeaves topNullMembers =
+    nullMemberLeaves topNullMembers =
       withStyleBasic [borderB 1 black]
         . vstack_ []
         $ ( \(ConcreteTag tk d@(Descriptor _ dp) _) ->
-              draggable tk
+              box_ [alignLeft, alignTop]
+                . draggable tk
                 . draggable d
                 $ label dp
           )
           <$> topNullMembers
-
-  isMetaTagWidget :: ConcreteTag -> HierarchyMap ConcreteTag -> TaggerWidget
-  isMetaTagWidget t@(ConcreteTag tk d@(Descriptor _ dp) mstk) hierMap =
-    withStyleBasic [borderB 1 black] $
-      hgrid_
-        []
-        [ box_ [alignTop, alignLeft] . draggable d . label $ dp
-        , separatorLine
-        , vstack_
-            []
-            $ map
-              ( \(ConcreteTag _ d'@(Descriptor _ dp') _) ->
-                  box_ [alignLeft] . draggable d' . label $ dp'
-              )
-              . HS.toList
-              $ HM.find t hierMap
-        ]
+    metaLeaves :: [ConcreteTag] -> TaggerWidget
+    metaLeaves metaMembers = vstack_ [] (flip metaLeaf hm <$> metaMembers)
+     where
+      metaLeaf l@(ConcreteTag tk d@(Descriptor _ dp) mstk) hmap =
+        let subtags = HS.toList $ HM.find l hmap
+         in if null subtags
+              then box_ [alignLeft, alignTop] . draggable tk . draggable d $ label dp
+              else
+                box_ [alignLeft, alignTop]
+                  . hstack_ []
+                  $ [ box_ [alignLeft, alignTop] . draggable tk . draggable d $ label dp
+                    , hscroll_ [wheelRate 50] $ vstack (flip metaLeaf hmap <$> subtags)
+                    ]
 
 {-
  ____  _____ ____   ____ ____  ___ ____ _____ ___  ____
