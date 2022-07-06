@@ -296,7 +296,7 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
      in vscroll_ [wheelRate 50] . withStyleBasic [] $
           vstack_
             []
-            [ label (filePath . concreteTaggedFile $m ^. focusedFileModel . focusedFile)
+            [ filePathWidget
             , separatorLine
             , metaLeaves metaMembers
             , nullMemberLeaves topNullMembers
@@ -306,6 +306,40 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
             , deleteTagZone
             ]
    where
+    filePathWidget :: TaggerWidget
+    filePathWidget =
+      hstack_
+        []
+        [ withNodeVisible (focusedFileDefaultRecordKey /= (fileId . concreteTaggedFile $ m ^. focusedFileModel . focusedFile)) $
+            styledButton
+              "Rename"
+              ( DoFocusedFileEvent
+                  (ToggleFocusedFilePaneVisibility fileRenameModeVis)
+              )
+        , zstack_
+            []
+            [ withNodeVisible (not isFileRenameMode) $
+                label (filePath . concreteTaggedFile $m ^. focusedFileModel . focusedFile)
+            , withNodeVisible isFileRenameMode $
+                textField_
+                  ( fileSelectionModel
+                      . fileSelectionInfoMap
+                      . fileInfoAt
+                        ( fromIntegral
+                            . fileId
+                            . concreteTaggedFile
+                            $ m ^. focusedFileModel . focusedFile
+                        )
+                      . fileInfoRenameText
+                  )
+                  []
+            ]
+        ]
+     where
+      fileRenameModeVis = "file-rename"
+      isFileRenameMode =
+        (m ^. focusedFileModel . focusedFileVis)
+          `hasVis` VisibilityLabel fileRenameModeVis
     nullMemberLeaves topNullMembers =
       withStyleBasic [borderB 1 black]
         . vstack_ []
