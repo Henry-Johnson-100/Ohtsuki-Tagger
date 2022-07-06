@@ -208,6 +208,20 @@ focusedFileEventHandler
         [ Task (IOEvent <$> deleteTags [t] conn)
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
+      MoveTag (ConcreteTag tk (Descriptor dk _) _) mst ->
+        let (File fk _) =
+              concreteTaggedFile $
+                model
+                  ^. focusedFileModel . focusedFile
+         in [ Task
+                ( IOEvent
+                    <$> unless
+                      (fk == focusedFileDefaultRecordKey)
+                      (void (insertTags [(fk, dk, mst)] conn))
+                )
+            , Task (IOEvent <$> deleteTags [tk] conn)
+            , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
+            ]
       PutConcreteFile_ cf@(ConcreteTaggedFile (File _ fp) _) ->
         [ Model $
             model
@@ -246,7 +260,7 @@ focusedFileEventHandler
       -- refresh the focused file detail widget
       -- refresh the selection if tag counts are displayed (?)
       TagFile dk mtk ->
-        let f@(File fk _) =
+        let (File fk _) =
               concreteTaggedFile $
                 model
                   ^. focusedFileModel . focusedFile

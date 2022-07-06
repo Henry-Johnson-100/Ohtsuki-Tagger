@@ -347,9 +347,9 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile f hm)) 
         (\(Descriptor dk _) -> DoFocusedFileEvent (TagFile dk (Just tk)))
         [dropTargetStyle [border 1 yuiBlue]]
         . dropTarget_
-          ( \(ConcreteTag _ (Descriptor dk _) _) ->
+          ( \ct ->
               DoFocusedFileEvent
-                (TagFile dk (Just tk))
+                (MoveTag ct (Just tk))
           )
           [dropTargetStyle [border 1 yuiRed]]
 

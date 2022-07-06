@@ -53,6 +53,7 @@ data FileSelectionEvent
 
 data FocusedFileEvent
   = DeleteTag (RecordKey Tag)
+  | MoveTag ConcreteTag (Maybe (RecordKey Tag))
   | PutConcreteFile_ ConcreteTaggedFile
   | PutFile File
   | RefreshFocusedFileAndSelection
