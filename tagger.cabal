@@ -63,6 +63,7 @@ executable tagger
                       ,Data.Model.Shared.Lens
                       ,Interface
                       ,Interface.Handler
+                      ,Interface.Handler.Internal
                       ,Interface.Theme
                       ,Interface.Widget
                       ,Interface.Widget.Internal
