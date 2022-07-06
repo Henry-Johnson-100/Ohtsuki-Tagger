@@ -391,7 +391,7 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
                         [ label "{"
                         , hstack
                             [ spacer
-                            , hscroll_ [wheelRate 50] . box_ [alignTop, alignLeft] $
+                            , box_ [alignTop, alignLeft] $
                                 vstack (flip metaLeaf hmap <$> subtags)
                             ]
                         , label "}"
