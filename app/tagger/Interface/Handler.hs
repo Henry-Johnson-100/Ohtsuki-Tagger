@@ -183,7 +183,7 @@ fileSelectionEventHandler
       TogglePaneVisibility t ->
         [ Model $
             model & fileSelectionModel . fileSelectionVis
-              %~ togglePaneVis (VisibilityLabel t)
+              %~ flip togglePaneVis (VisibilityLabel t)
         ]
       ToggleSelectionView ->
         [ Model $
