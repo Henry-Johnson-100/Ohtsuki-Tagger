@@ -379,15 +379,24 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
                   . draggable l
                   $ label dp
               else
-                withStyleBasic [border 1 black]
-                  . hstack_ []
-                  $ [ subTagDropTarget tk
-                        . box_ [alignLeft, alignTop]
-                        . draggable l
-                        $ label dp
-                    , withStyleBasic [paddingR 2.5, paddingL 2.5] separatorLine
-                    , hscroll_ [wheelRate 50] $ vstack (flip metaLeaf hmap <$> subtags)
-                    ]
+                hstack_
+                  []
+                  [ subTagDropTarget tk
+                      . box_ [alignLeft, alignTop]
+                      . draggable l
+                      $ label dp
+                  , spacer
+                  , box_ [alignTop, alignLeft] $
+                      vstack
+                        [ label "{"
+                        , hstack
+                            [ spacer
+                            , hscroll_ [wheelRate 50] . box_ [alignTop, alignLeft] $
+                                vstack (flip metaLeaf hmap <$> subtags)
+                            ]
+                        , label "}"
+                        ]
+                  ]
     tagTextField :: TaggerWidget
     tagTextField =
       keystroke_
