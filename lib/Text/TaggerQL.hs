@@ -448,13 +448,13 @@ insertComplexTerm True ct = do
             p
             c
         )
-insertComplexTerm _ (_ :<- (ct :| sts)) = do
+insertComplexTerm _ (currentTerm :<- (ct :| sts)) = do
   void $ case ct of
     Bottom t -> insertSubTag t
     (complexTermNode -> ctt) -> do
       lowerLayerEnv <- insertSubTag ctt
       local (setTagList lowerLayerEnv) $ insertComplexTerm False ct
-  mapM_ (insertComplexTerm False) sts
+  mapM_ (\ct' -> insertComplexTerm False (currentTerm :<- (ct' :| []))) sts
   return []
 
 insertSubTag ::
