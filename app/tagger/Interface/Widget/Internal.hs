@@ -304,14 +304,14 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
             )
             . HM.keys
             $ hm
-     in vscroll_ [wheelRate 50] . withStyleBasic [] $
+     in vscroll_ [wheelRate 50] . withStyleBasic [paddingR 20] $
           vstack_
             []
             [ filePathWidget
             , separatorLine
             , metaLeaves metaMembers
             , nullMemberLeaves topNullMembers
-            , spacer
+            , separatorLine
             , tagTextField
             , spacer
             , deleteTagZone
