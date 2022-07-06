@@ -51,6 +51,7 @@ taggerEventHandler
       TaggerInit -> [Event (DoDescriptorTreeEvent DescriptorTreeInit)]
       RefreshUI ->
         [ Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
+        , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
       ToggleTagMode -> [Model $ model & isTagMode %~ not]
       CloseConnection -> [Task (IOEvent <$> close conn)]
@@ -204,6 +205,31 @@ focusedFileEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
+      AppendTagText t ->
+        [ Model $
+            model
+              & focusedFileModel
+                . tagText
+              %~ flip
+                T.append
+                ( ( if T.null (model ^. focusedFileModel . tagText)
+                      then ""
+                      else " "
+                  )
+                    <> t
+                )
+        ]
+      CommitTagText ->
+        [ Task
+            ( IOEvent
+                <$> taggerQLTag
+                  (fileId . concreteTaggedFile $ model ^. focusedFileModel . focusedFile)
+                  (TaggerQLTagStmnt . T.strip $ model ^. focusedFileModel . tagText)
+                  conn
+            )
+        , Event (ClearTextField (TaggerLens $ focusedFileModel . tagText))
+        , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
+        ]
       DeleteTag t ->
         [ Task (IOEvent <$> deleteTags [t] conn)
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection

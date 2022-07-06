@@ -52,7 +52,9 @@ data FileSelectionEvent
   deriving (Show, Eq)
 
 data FocusedFileEvent
-  = DeleteTag (RecordKey Tag)
+  = AppendTagText Text
+  | CommitTagText
+  | DeleteTag (RecordKey Tag)
   | MoveTag ConcreteTag (Maybe (RecordKey Tag))
   | PutConcreteFile_ ConcreteTaggedFile
   | PutFile File

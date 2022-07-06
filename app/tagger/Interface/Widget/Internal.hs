@@ -301,7 +301,9 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
             , metaLeaves metaMembers
             , nullMemberLeaves topNullMembers
             , spacer
-            , hstack_ [] [deleteTagZone]
+            , tagTextField
+            , spacer
+            , deleteTagZone
             ]
    where
     nullMemberLeaves topNullMembers =
@@ -334,6 +336,18 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
                     , withStyleBasic [paddingR 2.5, paddingL 2.5] separatorLine
                     , hscroll_ [wheelRate 50] $ vstack (flip metaLeaf hmap <$> subtags)
                     ]
+    tagTextField :: TaggerWidget
+    tagTextField =
+      keystroke_
+        [("Enter", DoFocusedFileEvent CommitTagText)]
+        []
+        . dropTarget_
+          (DoFocusedFileEvent . AppendTagText . descriptor . concreteTagDescriptor)
+          [dropTargetStyle [border 1 yuiRed]]
+        . dropTarget_
+          (DoFocusedFileEvent . AppendTagText . descriptor)
+          [dropTargetStyle [border 1 yuiBlue]]
+        $ textField_ (focusedFileModel . tagText) []
     deleteTagZone :: TaggerWidget
     deleteTagZone =
       dropTarget_
