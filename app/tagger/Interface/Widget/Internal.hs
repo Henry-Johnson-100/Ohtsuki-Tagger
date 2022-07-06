@@ -292,27 +292,32 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile f hm)) 
     (m ^. focusedFileModel . focusedFileVis)
       `hasVis` VisibilityLabel imageDetailPaneVis
   detailPaneTagsWidget =
-    withStyleBasic [paddingR 10, paddingL 10] $
-      vstack_
-        []
-        [ vstack_
-            []
-            ( map
-                (`isMetaTagWidget` hm)
-                ( filter
-                    ( \d ->
-                        HM.metaMember d hm
-                          && not (HM.infraMember d hm)
-                    )
-                    . HM.keys
-                    $ hm
-                )
+    let a = 0
+        metaMembers = filter (`HM.metaMember` hm) . HM.keys $ hm
+        topNullMembers =
+          filter
+            ( \x ->
+                not (HM.metaMember x hm)
+                  && not (HM.infraMember x hm)
             )
-        , vstack
-            . map (label . descriptor . concreteTagDescriptor)
             . HM.keys
             $ hm
-        ]
+     in withStyleBasic [] $
+          vstack_
+            []
+            [ infraLeaves topNullMembers
+            ]
+   where
+    infraLeaves topNullMembers =
+      withStyleBasic [borderB 1 black]
+        . vstack_ []
+        $ ( \(ConcreteTag tk d@(Descriptor _ dp) _) ->
+              draggable tk
+                . draggable d
+                $ label dp
+          )
+          <$> topNullMembers
+
   isMetaTagWidget :: ConcreteTag -> HierarchyMap ConcreteTag -> TaggerWidget
   isMetaTagWidget t@(ConcreteTag tk d@(Descriptor _ dp) mstk) hierMap =
     withStyleBasic [borderB 1 black] $
