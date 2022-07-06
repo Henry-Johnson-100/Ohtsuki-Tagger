@@ -87,9 +87,9 @@ renameFile c fk (T.unpack -> newFilePath') = do
   subsequent nested paths are made relative to that.
 -}
 addFiles :: TaggedConnection -> Text -> IO ()
-addFiles c (T.unpack -> fp) = do
+addFiles c (T.unpack -> givenPath) = do
   curDir <- getCurrentDirectory
-  let fpRelativeToCurDir = makeRelative curDir fp
+  let fpRelativeToCurDir = makeRelative curDir givenPath
   getPathsToAdd [] fpRelativeToCurDir >>= flip insertFiles c
  where
   getPathsToAdd :: [FilePath] -> FilePath -> IO [FilePath]
