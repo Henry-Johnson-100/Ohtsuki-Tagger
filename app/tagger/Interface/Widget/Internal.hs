@@ -89,7 +89,7 @@ fileSelectionOperationWidget _ = queryWidget
       [("Enter", DoFileSelectionEvent Query)]
       []
       . box_ [alignTop, alignCenter]
-      $ hstack_ [] [runQueryButton, queryTextField, setOpDropdown]
+      $ vstack_ [] [setOpDropdown, hstack_ [] [runQueryButton, queryTextField]]
    where
     runQueryButton = styledButton "Search" (DoFileSelectionEvent Query)
     queryTextFieldKey = "queryTextField"
