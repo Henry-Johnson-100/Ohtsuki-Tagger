@@ -310,6 +310,7 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
             [ filePathWidget
             , separatorLine
             , metaLeaves metaMembers
+            , spacer
             , nullMemberLeaves topNullMembers
             , separatorLine
             , tagTextField
@@ -369,7 +370,9 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
           )
           <$> topNullMembers
     metaLeaves :: [ConcreteTag] -> TaggerWidget
-    metaLeaves metaMembers = vstack_ [] (flip metaLeaf hm <$> metaMembers)
+    metaLeaves metaMembers =
+      vstack_ [] . L.intersperse spacer $
+        (flip metaLeaf hm <$> metaMembers)
      where
       metaLeaf l@(ConcreteTag tk (Descriptor _ dp) _) hmap =
         let subtags = HS.toList $ HM.find l hmap
