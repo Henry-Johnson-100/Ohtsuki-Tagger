@@ -115,6 +115,7 @@ module Database.Tagger.Query (
   insertDescriptorRelation,
 
   -- ** 'Tag` Operations
+  deleteTags,
 
   -- *** 'Tag` Insertion
   -- $FailedInsertion
@@ -122,23 +123,46 @@ module Database.Tagger.Query (
   unsafeInsertTag,
 ) where
 
-import Control.Monad
+import Control.Monad (guard)
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT, throwE)
-import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
+import Control.Monad.Trans.Maybe (MaybeT)
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
 import qualified Data.HierarchyMap as HAM
-import Data.Maybe
-import Data.OccurrenceHashMap (OccurrenceHashMap)
-import qualified Data.OccurrenceHashMap as OHM
+import Data.Maybe (catMaybes, fromMaybe, isNothing)
+import Data.OccurrenceHashMap.Internal (OccurrenceHashMap)
+import qualified Data.OccurrenceHashMap.Internal as OHM (
+  fromList,
+  unions,
+ )
 import qualified Data.OccurrenceMap.Internal as OM
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger.Connection
+import Database.Tagger.Connection (
+  NamedParam ((:=)),
+  Only (Only),
+  execute,
+  executeMany,
+  executeNamed,
+  execute_,
+  lastInsertRowId,
+  query,
+  queryNamed,
+  query_,
+ )
 import Database.Tagger.Query.Type (TaggerQuery)
-import Database.Tagger.Type
-import Tagger.Util
+import Database.Tagger.Type (
+  ConcreteTag (ConcreteTag),
+  ConcreteTaggedFile (ConcreteTaggedFile),
+  Descriptor (Descriptor),
+  File,
+  RecordKey,
+  Tag (Tag, tagSubtagOfId),
+  TaggedConnection,
+  TaggedFile (TaggedFile),
+ )
+import Tagger.Util (catMaybeTM, head', hoistMaybe)
 import Text.RawString.QQ (r)
 
 {- |
@@ -1227,6 +1251,18 @@ insertDescriptorRelation newMeta newInfra tc =
     [r|
     INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId)
       VALUES (?,?)
+    |]
+
+{- |
+ Given 'Tag` ID's, delete them from the database.
+-}
+deleteTags :: [RecordKey Tag] -> TaggedConnection -> IO ()
+deleteTags tids tc =
+  mapM_ (\t -> executeNamed tc q [":tagId" := t]) tids
+ where
+  q =
+    [r|
+    DELETE FROM Tag WHERE id = :tagId OR subTagOfId = :tagId
     |]
 
 {- |

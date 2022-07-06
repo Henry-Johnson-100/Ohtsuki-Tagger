@@ -301,36 +301,57 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile f hm)) 
             [ metaLeaves metaMembers
             , nullMemberLeaves topNullMembers
             , spacer
+            , deleteTagZone
             ]
    where
     nullMemberLeaves topNullMembers =
       withStyleBasic [borderB 1 black]
         . vstack_ []
-        $ ( \(ConcreteTag tk d@(Descriptor _ dp) _) ->
-              box_ [alignLeft, alignTop]
-                . draggable tk
-                . draggable d
+        $ ( \ct@(ConcreteTag tk (Descriptor _ dp) _) ->
+              subTagDropTarget tk
+                . box_ [alignLeft, alignTop]
+                . draggable ct
                 $ label dp
           )
           <$> topNullMembers
     metaLeaves :: [ConcreteTag] -> TaggerWidget
     metaLeaves metaMembers = vstack_ [] (flip metaLeaf hm <$> metaMembers)
      where
-      metaLeaf l@(ConcreteTag tk d@(Descriptor _ dp) mstk) hmap =
+      metaLeaf l@(ConcreteTag tk (Descriptor _ dp) _) hmap =
         let subtags = HS.toList $ HM.find l hmap
          in if null subtags
-              then box_ [alignLeft, alignTop] . draggable tk . draggable d $ label dp
+              then
+                subTagDropTarget tk . box_ [alignLeft, alignTop]
+                  . draggable l
+                  $ label dp
               else
                 withStyleBasic [border 1 black]
-                  -- . box_ [alignLeft, alignTop]
                   . hstack_ []
-                  $ [ box_ [alignLeft, alignTop]
-                        . draggable tk
-                        . draggable d
+                  $ [ subTagDropTarget tk
+                        . box_ [alignLeft, alignTop]
+                        . draggable l
                         $ label dp
                     , withStyleBasic [paddingR 2.5, paddingL 2.5] separatorLine
                     , hscroll_ [wheelRate 50] $ vstack (flip metaLeaf hmap <$> subtags)
                     ]
+    deleteTagZone :: TaggerWidget
+    deleteTagZone =
+      dropTarget_
+        (DoFocusedFileEvent . DeleteTag . concreteTagId)
+        [dropTargetStyle [border 1 yuiRed]]
+        . flip styleHoverSet []
+        . withStyleBasic [bgColor yuiLightPeach, border 1 yuiPeach]
+        $ buttonD_ "Delete" []
+    subTagDropTarget tk =
+      dropTarget_
+        (\(Descriptor dk _) -> DoFocusedFileEvent (TagFile dk (Just tk)))
+        [dropTargetStyle [border 1 yuiBlue]]
+        . dropTarget_
+          ( \(ConcreteTag _ (Descriptor dk _) _) ->
+              DoFocusedFileEvent
+                (TagFile dk (Just tk))
+          )
+          [dropTargetStyle [border 1 yuiRed]]
 
 {-
  ____  _____ ____   ____ ____  ___ ____ _____ ___  ____

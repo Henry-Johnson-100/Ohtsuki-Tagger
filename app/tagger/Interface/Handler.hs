@@ -204,6 +204,10 @@ focusedFileEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
+      DeleteTag t ->
+        [ Task (IOEvent <$> deleteTags [t] conn)
+        , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
+        ]
       PutConcreteFile_ cf@(ConcreteTaggedFile (File _ fp) _) ->
         [ Model $
             model

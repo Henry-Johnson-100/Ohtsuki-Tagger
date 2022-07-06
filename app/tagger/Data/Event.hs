@@ -52,7 +52,8 @@ data FileSelectionEvent
   deriving (Show, Eq)
 
 data FocusedFileEvent
-  = PutConcreteFile_ ConcreteTaggedFile
+  = DeleteTag (RecordKey Tag)
+  | PutConcreteFile_ ConcreteTaggedFile
   | PutFile File
   | RefreshFocusedFileAndSelection
   | TagFile (RecordKey Descriptor) (Maybe (RecordKey Tag))
