@@ -19,7 +19,7 @@ import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
 import qualified Data.Either as E
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger.Query (
+import Database.Tagger (
   insertFiles,
   queryForSingleFileByFileId,
   updateFilePaths,

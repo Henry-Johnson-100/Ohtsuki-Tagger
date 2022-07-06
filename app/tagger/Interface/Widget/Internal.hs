@@ -68,10 +68,10 @@ fileSelectionWidget m =
         [ withNodeVisible (not selectionIsVisible) $ tagListWidget m
         , withNodeVisible selectionIsVisible $ fileSelectionFileList m
         ]
-    , withNodeVisible (not . Seq.null $ m ^. fileSelectionModel . selection) $
-        hstack_
-          []
-          [clearSelectionButton, toggleViewSelectionButton]
+    , -- withNodeVisible (not . Seq.null $ m ^. fileSelectionModel . selection) $
+      hstack_
+        []
+        [clearSelectionButton, toggleViewSelectionButton]
     ]
  where
   selectionIsVisible =
@@ -118,8 +118,8 @@ fileSelectionFileList m =
     [ vscroll_ [wheelRate 50]
         . vstack_ []
         $ fmap fileSelectionLeaf (m ^. fileSelectionModel . selection)
-    , withNodeVisible (not . Seq.null $ m ^. fileSelectionModel . selection) $
-        fileSelectionManagePane m
+    , --  withNodeVisible (not . Seq.null $ m ^. fileSelectionModel . selection) $
+      fileSelectionManagePane m
     ]
  where
   fileSelectionLeaf :: File -> TaggerWidget
@@ -201,12 +201,23 @@ fileSelectionManagePane m =
         "Manage Selection"
         (DoFileSelectionEvent (TogglePaneVisibility manageFileSelectionPane))
     , separatorLine
+    , withNodeVisible fileSelectionManagePaneIsVisible
+        . keystroke_ [("Enter", DoFileSelectionEvent AddFiles)] []
+        $ vstack_
+          []
+          [ spacer
+          , withStyleBasic [textSize 15] $ label "Add files"
+          , textField (fileSelectionModel . addFileText)
+          , spacer
+          ]
     , withNodeVisible
-        ( (m ^. fileSelectionModel . fileSelectionVis)
-            `hasVis` VisibilityLabel manageFileSelectionPane
-        )
+        fileSelectionManagePaneIsVisible
         $ hstack_ [] [refreshFileSelectionButton, toggleFileEditMode]
     ]
+ where
+  fileSelectionManagePaneIsVisible =
+    (m ^. fileSelectionModel . fileSelectionVis)
+      `hasVis` VisibilityLabel manageFileSelectionPane
 
 clearSelectionButton :: TaggerWidget
 clearSelectionButton = styledButton "Clear" (DoFileSelectionEvent ClearSelection)
@@ -310,11 +321,12 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
     filePathWidget =
       hstack_
         []
-        [ withNodeVisible
-            ( focusedFileDefaultRecordKey
-                /= (fileId . concreteTaggedFile $ m ^. focusedFileModel . focusedFile)
-            )
-            $ styledButton
+        [ withNodeVisible False
+          -- ( focusedFileDefaultRecordKey
+          --     /= (fileId . concreteTaggedFile $ m ^. focusedFileModel . focusedFile)
+          -- )
+          $
+            styledButton
               "Rename"
               ( DoFocusedFileEvent
                   (ToggleFocusedFilePaneVisibility fileRenameModeVis)
@@ -323,8 +335,11 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
             []
             [ withNodeVisible (not isFileRenameMode) $
                 label (filePath . concreteTaggedFile $m ^. focusedFileModel . focusedFile)
-            , withNodeVisible isFileRenameMode $
-                textField_
+            , withNodeVisible isFileRenameMode
+                . keystroke_
+                  [("Enter", DoFocusedFileEvent RenameFile)]
+                  []
+                $ textField_
                   ( fileSelectionModel
                       . fileSelectionInfoMap
                       . fileInfoAt

@@ -18,6 +18,7 @@ import qualified Data.Foldable as F
 import qualified Data.HashSet as HS
 import Data.HierarchyMap (empty)
 import qualified Data.IntMap.Strict as IntMap
+import Data.Maybe
 import Data.Model
 import Data.Model.Shared
 import qualified Data.OccurrenceHashMap as OHM
@@ -27,6 +28,7 @@ import Data.Tagger
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger
+import Interface.Handler.Internal
 import Monomer
 import Paths_tagger
 import System.FilePath
@@ -70,6 +72,10 @@ fileSelectionEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
+      AddFiles ->
+        [ Task (IOEvent <$> addFiles conn (model ^. fileSelectionModel . addFileText))
+        , Event (ClearTextField (TaggerLens (fileSelectionModel . addFileText)))
+        ]
       AppendQueryText t ->
         [ Model $
             model
@@ -285,6 +291,17 @@ focusedFileEventHandler
             . concreteTaggedFile
             $ model ^. focusedFileModel . focusedFile
         , Event . DoFileSelectionEvent $ RefreshFileSelection
+        ]
+      RenameFile ->
+        [ let fk = fileId . concreteTaggedFile $ model ^. focusedFileModel . focusedFile
+              newRenameText =
+                model
+                  ^. fileSelectionModel
+                    . fileSelectionInfoMap
+                    . fileInfoAt (fromIntegral fk)
+                    . fileInfoRenameText
+           in Task (IOEvent <$> renameFile conn fk newRenameText)
+        , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
       -- Should:
       -- submit a tag in the db

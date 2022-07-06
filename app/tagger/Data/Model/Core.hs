@@ -76,6 +76,7 @@ data FileSelectionModel = FileSelectionModel
   , _fileselectionSetOp :: SetOp
   , _fileselectionQueryText :: Text
   , _fileselectionFileSelectionVis :: Visibility
+  , _fileselectionAddFileText :: Text
   }
   deriving (Show, Eq)
 
@@ -89,6 +90,7 @@ createFileSelectionModel =
     , _fileselectionSetOp = Union
     , _fileselectionQueryText = ""
     , _fileselectionFileSelectionVis = VisibilityMain
+    , _fileselectionAddFileText = ""
     }
 
 data FileInfo = FileInfo
