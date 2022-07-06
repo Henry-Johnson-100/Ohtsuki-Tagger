@@ -253,9 +253,9 @@ focusedFileWidget :: TaggerModel -> TaggerWidget
 focusedFileWidget m =
   box_ []
     . withStyleBasic [minHeight 300]
-    $ hstack_
-      []
-      [focusedFileMainPane, detailPane m]
+    $ hsplit_
+      [splitIgnoreChildResize True, splitHandleSize 10]
+      (focusedFileMainPane, detailPane m)
  where
   focusedFileMainPane =
     dropTarget_
@@ -278,19 +278,10 @@ detailPane :: TaggerModel -> TaggerWidget
 detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile f hm)) =
   hstack_
     []
-    [ styledButton
-        (if detailPaneIsVisible then "->" else "<-")
-        (DoFocusedFileEvent . ToggleFocusedFilePaneVisibility $ imageDetailPaneVis)
-    , separatorLine
-    , withNodeVisible
-        detailPaneIsVisible
-        . vscroll_ [wheelRate 50]
-        $ detailPaneTagsWidget
+    [ separatorLine
+    , detailPaneTagsWidget
     ]
  where
-  detailPaneIsVisible =
-    (m ^. focusedFileModel . focusedFileVis)
-      `hasVis` VisibilityLabel imageDetailPaneVis
   detailPaneTagsWidget =
     let metaMembers =
           filter (\x -> HM.metaMember x hm && not (HM.infraMember x hm))
@@ -304,11 +295,12 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile f hm)) 
             )
             . HM.keys
             $ hm
-     in withStyleBasic [] $
+     in vscroll_ [wheelRate 50] . withStyleBasic [] $
           vstack_
             []
             [ metaLeaves metaMembers
             , nullMemberLeaves topNullMembers
+            , spacer
             ]
    where
     nullMemberLeaves topNullMembers =
@@ -329,9 +321,14 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile f hm)) 
          in if null subtags
               then box_ [alignLeft, alignTop] . draggable tk . draggable d $ label dp
               else
-                box_ [alignLeft, alignTop]
+                withStyleBasic [border 1 black]
+                  -- . box_ [alignLeft, alignTop]
                   . hstack_ []
-                  $ [ box_ [alignLeft, alignTop] . draggable tk . draggable d $ label dp
+                  $ [ box_ [alignLeft, alignTop]
+                        . draggable tk
+                        . draggable d
+                        $ label dp
+                    , withStyleBasic [paddingR 2.5, paddingL 2.5] separatorLine
                     , hscroll_ [wheelRate 50] $ vstack (flip metaLeaf hmap <$> subtags)
                     ]
 
