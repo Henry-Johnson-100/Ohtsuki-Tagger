@@ -116,6 +116,7 @@ module Database.Tagger.Query (
 
   -- ** 'Tag` Operations
   deleteTags,
+  unSubTags,
 
   -- *** 'Tag` Insertion
   -- $FailedInsertion
@@ -1263,6 +1264,17 @@ deleteTags tids tc =
   q =
     [r|
     DELETE FROM Tag WHERE id = :tagId OR subTagOfId = :tagId
+    |]
+
+{- |
+ For all given 'Tag`s, remove them as subtags and set as normal top-level tags.
+-}
+unSubTags :: [RecordKey Tag] -> TaggedConnection -> IO ()
+unSubTags tids tc = executeMany tc q (Only <$> tids)
+ where
+  q =
+    [r|
+    UPDATE Tag SET subTagOfId = NULL WHERE id = ?
     |]
 
 {- |

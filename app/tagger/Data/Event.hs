@@ -59,6 +59,7 @@ data FocusedFileEvent
   | RefreshFocusedFileAndSelection
   | TagFile (RecordKey Descriptor) (Maybe (RecordKey Tag))
   | ToggleFocusedFilePaneVisibility Text
+  | UnSubTag (RecordKey Tag)
   deriving (Show, Eq)
 
 data DescriptorTreeEvent

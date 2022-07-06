@@ -277,6 +277,10 @@ focusedFileEventHandler
             model & focusedFileModel . focusedFileVis
               %~ flip togglePaneVis (VisibilityLabel t)
         ]
+      UnSubTag tk ->
+        [ Task (IOEvent <$> unSubTags [tk] conn)
+        , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
+        ]
 
 -- this is kind of stupid but whatever.
 getRenderability :: Text -> Renderability
