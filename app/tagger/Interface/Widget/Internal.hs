@@ -310,6 +310,7 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
             [ filePathWidget
             , separatorLine
             , metaLeaves metaMembers
+            , spacer
             , nullMemberLeaves topNullMembers
             , separatorLine
             , tagTextField
@@ -369,7 +370,9 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
           )
           <$> topNullMembers
     metaLeaves :: [ConcreteTag] -> TaggerWidget
-    metaLeaves metaMembers = vstack_ [] (flip metaLeaf hm <$> metaMembers)
+    metaLeaves metaMembers =
+      vstack_ [] . L.intersperse spacer $
+        (flip metaLeaf hm <$> metaMembers)
      where
       metaLeaf l@(ConcreteTag tk (Descriptor _ dp) _) hmap =
         let subtags = HS.toList $ HM.find l hmap
@@ -379,15 +382,31 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
                   . draggable l
                   $ label dp
               else
-                withStyleBasic [border 1 black]
-                  . hstack_ []
-                  $ [ subTagDropTarget tk
-                        . box_ [alignLeft, alignTop]
-                        . draggable l
-                        $ label dp
-                    , withStyleBasic [paddingR 2.5, paddingL 2.5] separatorLine
-                    , hscroll_ [wheelRate 50] $ vstack (flip metaLeaf hmap <$> subtags)
-                    ]
+                vstack_
+                  []
+                  [ hstack_
+                      []
+                      [ subTagDropTarget tk
+                          . box_ [alignLeft, alignTop]
+                          . draggable l
+                          . withStyleBasic [textColor yuiBlue]
+                          $ label dp
+                      , spacer
+                      , label "{"
+                      ]
+                  , hstack_
+                      []
+                      [ metaTagLeafSpacer
+                      , box_ [alignLeft, alignTop] $
+                          vstack
+                            ( flip metaLeaf hmap
+                                <$> subtags
+                            )
+                      ]
+                  , label "}"
+                  ]
+       where
+        metaTagLeafSpacer = spacer_ [width 20]
     tagTextField :: TaggerWidget
     tagTextField =
       keystroke_
