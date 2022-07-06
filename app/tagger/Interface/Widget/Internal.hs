@@ -382,24 +382,31 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
                   . draggable l
                   $ label dp
               else
-                hstack_
+                vstack_
                   []
-                  [ subTagDropTarget tk
-                      . box_ [alignLeft, alignTop]
-                      . draggable l
-                      $ label dp
-                  , spacer
-                  , box_ [alignTop, alignLeft] $
-                      vstack
-                        [ label "{"
-                        , hstack
-                            [ spacer
-                            , box_ [alignTop, alignLeft] $
-                                vstack (flip metaLeaf hmap <$> subtags)
-                            ]
-                        , label "}"
-                        ]
+                  [ hstack_
+                      []
+                      [ subTagDropTarget tk
+                          . box_ [alignLeft, alignTop]
+                          . draggable l
+                          . withStyleBasic [textColor yuiBlue]
+                          $ label dp
+                      , spacer
+                      , label "{"
+                      ]
+                  , hstack_
+                      []
+                      [ metaTagLeafSpacer
+                      , box_ [alignLeft, alignTop] $
+                          vstack
+                            ( flip metaLeaf hmap
+                                <$> subtags
+                            )
+                      ]
+                  , label "}"
                   ]
+       where
+        metaTagLeafSpacer = spacer_ [width 20]
     tagTextField :: TaggerWidget
     tagTextField =
       keystroke_
