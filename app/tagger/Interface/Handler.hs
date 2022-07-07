@@ -31,6 +31,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger
 import Interface.Handler.Internal
+import Interface.Widget.Internal (queryTextFieldKey)
 import Monomer
 import Paths_tagger
 import System.FilePath
@@ -53,7 +54,10 @@ taggerEventHandler
       DoFocusedFileEvent e -> focusedFileEventHandler wenv node model e
       DoFileSelectionEvent e -> fileSelectionEventHandler wenv node model e
       DoDescriptorTreeEvent e -> descriptorTreeEventHandler wenv node model e
-      TaggerInit -> [Event (DoDescriptorTreeEvent DescriptorTreeInit)]
+      TaggerInit ->
+        [ Event (DoDescriptorTreeEvent DescriptorTreeInit)
+        , SetFocusOnKey . WidgetKey $ queryTextFieldKey
+        ]
       RefreshUI ->
         [ Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
@@ -302,12 +306,6 @@ focusedFileEventHandler
                             lift $ moveSubTags ((oldTagKey,) <$> newTags) conn
                             lift $ deleteTags [oldTagKey] conn
                         either (hPutStrLn stderr) return result
-                        --  do
-                        -- newTags <- insertTags [(fk, dk, newMaybeSubTagKey)] conn
-                        -- -- moving all old subtags to the new tag
-                        -- -- or else they will be cascade deleted when the old tag is.
-                        -- moveSubTags ((oldTagKey,) <$> newTags) conn
-                        -- deleteTags [oldTagKey] conn
                   )
               , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
               ]

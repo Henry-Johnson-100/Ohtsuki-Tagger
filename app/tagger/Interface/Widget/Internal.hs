@@ -8,6 +8,7 @@ module Interface.Widget.Internal (
   TaggerWidget,
   fileSelectionWidget,
   fileSelectionOperationWidget,
+  queryTextFieldKey,
   focusedFileWidget,
   descriptorTreeWidget,
 ) where
@@ -53,6 +54,9 @@ __        _____ ____   ____ _____ _____
 
 -}
 
+queryTextFieldKey :: Text
+queryTextFieldKey = "queryTextField"
+
 manageFileSelectionPane :: Text
 manageFileSelectionPane = "manage-file-selection"
 
@@ -92,7 +96,6 @@ fileSelectionOperationWidget _ = queryWidget
       $ vstack_ [] [setOpDropdown, hstack_ [] [runQueryButton, queryTextField]]
    where
     runQueryButton = styledButton "Search" (DoFileSelectionEvent Query)
-    queryTextFieldKey = "queryTextField"
     queryTextField =
       dropTarget_
         (DoFileSelectionEvent . AppendQueryText . filePath)
