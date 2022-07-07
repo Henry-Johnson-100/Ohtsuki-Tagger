@@ -11,14 +11,16 @@ module Interface.Handler (
 
 import Control.Lens
 import Control.Monad
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import Data.Config
 import Data.Event
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HS
 import Data.HierarchyMap (empty)
+import qualified Data.HierarchyMap as HAM
 import qualified Data.IntMap.Strict as IntMap
-import Data.Maybe
 import Data.Model
 import Data.Model.Shared
 import qualified Data.OccurrenceHashMap as OHM
@@ -32,6 +34,7 @@ import Interface.Handler.Internal
 import Monomer
 import Paths_tagger
 import System.FilePath
+import System.IO
 import Text.TaggerQL
 import Util
 
@@ -241,7 +244,7 @@ focusedFileEventHandler
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
       MoveTag
-        (ConcreteTag oldTagKey (Descriptor dk _) _)
+        (ConcreteTag oldTagKey (Descriptor dk dp) oldSubTagKey)
         newMaybeSubTagKey ->
           let (File fk _) =
                 concreteTaggedFile $
@@ -250,12 +253,61 @@ focusedFileEventHandler
            in [ Task
                   ( IOEvent
                       <$> do
-                        unless (fk == focusedFileDefaultRecordKey) $ do
-                          newTags <- insertTags [(fk, dk, newMaybeSubTagKey)] conn
-                          -- moving all old subtags to the new tag
-                          -- or else they will be cascade deleted when the old tag is.
-                          moveSubTags ((oldTagKey,) <$> newTags) conn
-                          deleteTags [oldTagKey] conn
+                        result <-
+                          runExceptT $ do
+                            withExceptT
+                              (const "Cannot move tags of the default file.")
+                              ( guard (fk /= focusedFileDefaultRecordKey) ::
+                                  ExceptT String IO ()
+                              )
+                            withExceptT
+                              ( const
+                                  ( "Cannot move tag, "
+                                      ++ T.unpack dp
+                                      ++ ", to be a subtag of itself."
+                                  )
+                              )
+                              ( guard
+                                  ( maybe
+                                      True
+                                      ( \newSubTagKey ->
+                                          not
+                                            . HAM.isInfraTo newSubTagKey oldTagKey
+                                            . HAM.mapHierarchyMap concreteTagId
+                                            . concreteTaggedFileDescriptors
+                                            $ model ^. focusedFileModel . focusedFile
+                                      )
+                                      newMaybeSubTagKey
+                                  ) ::
+                                  ExceptT String IO ()
+                              )
+                            withExceptT
+                              ( const
+                                  ( "Tag, "
+                                      ++ T.unpack dp
+                                      ++ ", is already subtagged to the destination."
+                                  )
+                              )
+                              ( guard
+                                  ( oldSubTagKey
+                                      /= newMaybeSubTagKey
+                                  ) ::
+                                  ExceptT String IO ()
+                              )
+                            newTags <-
+                              lift $
+                                insertTags [(fk, dk, newMaybeSubTagKey)] conn
+                            -- moving all old subtags to the new tag
+                            -- or else they will be cascade deleted when the old tag is.
+                            lift $ moveSubTags ((oldTagKey,) <$> newTags) conn
+                            lift $ deleteTags [oldTagKey] conn
+                        either (hPutStrLn stderr) return result
+                        --  do
+                        -- newTags <- insertTags [(fk, dk, newMaybeSubTagKey)] conn
+                        -- -- moving all old subtags to the new tag
+                        -- -- or else they will be cascade deleted when the old tag is.
+                        -- moveSubTags ((oldTagKey,) <$> newTags) conn
+                        -- deleteTags [oldTagKey] conn
                   )
               , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
               ]
@@ -314,9 +366,9 @@ focusedFileEventHandler
                   ^. focusedFileModel . focusedFile
          in [ Task
                 ( IOEvent
-                    <$> unless
-                      (fk == focusedFileDefaultRecordKey)
-                      (void (insertTags [(fk, dk, mtk)] conn))
+                    <$> if or [fk == focusedFileDefaultRecordKey]
+                      then hPutStrLn stderr "Cannot tag the default file."
+                      else void $ insertTags [(fk, dk, mtk)] conn
                 )
             , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
             ]
