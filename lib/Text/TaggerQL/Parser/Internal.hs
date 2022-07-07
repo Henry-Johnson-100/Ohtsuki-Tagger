@@ -113,6 +113,7 @@ sentenceTreeBranchParser = do
   queryOpenParser
   cs <- sepBy1 sentenceTreeParser spaces
   queryCloseParser
+  spaces
   return $ SentenceBranch so cs
 
 sentenceTreeNodeParser :: Parser (SentenceTree T.Text)
