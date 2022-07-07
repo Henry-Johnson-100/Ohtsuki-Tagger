@@ -277,6 +277,13 @@ focusedFileWidget m =
         (DoFocusedFileEvent . UnSubTag . concreteTagId)
         [dropTargetStyle [border 1 yuiRed]]
       . withStyleBasic []
+      . box_
+        [ mergeRequired
+            ( \_ m1 m2 ->
+                concreteTaggedFile (m1 ^. focusedFileModel . focusedFile)
+                  /= concreteTaggedFile (m2 ^. focusedFileModel . focusedFile)
+            )
+        ]
       $ ( case m ^. focusedFileModel . renderability of
             RenderAsImage -> imagePreviewRender
             _ -> imagePreviewRender
