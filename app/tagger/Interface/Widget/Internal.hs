@@ -540,7 +540,15 @@ descriptorTreeWidget m =
 
 descriptorTreeFocusedNodeWidget :: TaggerModel -> TaggerWidget
 descriptorTreeFocusedNodeWidget m =
-  withStyleBasic [borderR 1 black]
+  box_
+    [ expandContent
+    , mergeRequired
+        ( \_ ((^. descriptorTreeModel) -> dm1) ((^. descriptorTreeModel) -> dm2) ->
+            (dm1 ^. focusedTree /= dm2 ^. focusedTree)
+              || (dm1 ^. focusedNode /= dm2 ^. focusedNode)
+        )
+    ]
+    . withStyleBasic [borderR 1 black]
     . createRelationDropTarget
     $ descriptorTreeFocusedNodeWidgetBody
  where
@@ -581,7 +589,15 @@ descriptorTreeFocusedNodeWidget m =
 
 descriptorTreeUnrelatedWidget :: TaggerModel -> TaggerWidget
 descriptorTreeUnrelatedWidget m =
-  withStyleBasic [borderL 1 black]
+  box_
+    [ expandContent
+    , mergeRequired
+        ( \_ ((^. descriptorTreeModel) -> dm1) ((^. descriptorTreeModel) -> dm2) ->
+            (dm1 ^. unrelated /= dm2 ^. unrelated)
+              || (dm1 ^. unrelatedNode /= dm2 ^. unrelatedNode)
+        )
+    ]
+    . withStyleBasic [borderL 1 black]
     . createUnrelationDropTargetWidget
       $descriptorTreeUnrelatedWidgetBody
  where
