@@ -3,6 +3,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Redundant flip" #-}
 
 module Interface.Widget.Internal (
   TaggerWidget,
@@ -314,7 +317,7 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
             )
             . HM.keys
             $ hm
-     in vscroll_ [wheelRate 50] . withStyleBasic [paddingR 20]
+     in withStyleBasic [paddingR 20]
           . box_
             [ expandContent
             , mergeRequired
@@ -328,9 +331,12 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
             []
             [ filePathWidget
             , separatorLine
-            , metaLeaves metaMembers
-            , spacer
-            , nullMemberLeaves topNullMembers
+            , vscroll_ [wheelRate 50] $
+                vstack
+                  [ metaLeaves metaMembers
+                  , spacer
+                  , nullMemberLeaves topNullMembers
+                  ]
             , separatorLine
             , tagTextField
             , spacer
@@ -354,7 +360,7 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
         , zstack_
             []
             [ withNodeVisible (not isFileRenameMode) $
-                label (filePath . concreteTaggedFile $m ^. focusedFileModel . focusedFile)
+                flip label_ [resizeFactorW (-1)] (filePath . concreteTaggedFile $m ^. focusedFileModel . focusedFile)
             , withNodeVisible isFileRenameMode
                 . keystroke_
                   [("Enter", DoFocusedFileEvent RenameFile)]
@@ -445,7 +451,7 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
         [dropTargetStyle [border 1 yuiRed]]
         . flip styleHoverSet []
         . withStyleBasic [bgColor yuiLightPeach, border 1 yuiPeach]
-        $ buttonD_ "Delete" []
+        $ buttonD_ "Delete" [resizeFactorW (-1)]
     subTagDropTarget tk =
       dropTarget_
         (\(Descriptor dk _) -> DoFocusedFileEvent (TagFile dk (Just tk)))
