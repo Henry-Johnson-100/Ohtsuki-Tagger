@@ -314,8 +314,17 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
             )
             . HM.keys
             $ hm
-     in vscroll_ [wheelRate 50] . withStyleBasic [paddingR 20] $
-          vstack_
+     in vscroll_ [wheelRate 50] . withStyleBasic [paddingR 20]
+          . box_
+            [ expandContent
+            , mergeRequired
+                ( \_
+                   ((^. focusedFileModel . focusedFile) -> ffile1)
+                   ((^. focusedFileModel . focusedFile) -> ffile2) ->
+                      ffile1 /= ffile2
+                )
+            ]
+          $ vstack_
             []
             [ filePathWidget
             , separatorLine
