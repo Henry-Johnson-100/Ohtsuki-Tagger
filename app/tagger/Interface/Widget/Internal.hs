@@ -360,7 +360,10 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
         , zstack_
             []
             [ withNodeVisible (not isFileRenameMode) $
-                flip label_ [resizeFactorW (-1)] (filePath . concreteTaggedFile $m ^. focusedFileModel . focusedFile)
+                flip
+                  label_
+                  [resizeFactorW (-1)]
+                  (filePath . concreteTaggedFile $m ^. focusedFileModel . focusedFile)
             , withNodeVisible isFileRenameMode
                 . keystroke_
                   [("Enter", DoFocusedFileEvent RenameFile)]
@@ -585,7 +588,10 @@ descriptorTreeFocusedNodeWidget m =
             <$> (metaDescriptors ++ infraDescriptors)
 
   nodeHeader :: TaggerWidget
-  nodeHeader = label . descriptor $ m ^. descriptorTreeModel . focusedNode
+  nodeHeader =
+    flip label_ [resizeFactorW (-1)]
+      . descriptor
+      $ m ^. descriptorTreeModel . focusedNode
 
   createRelationDropTarget :: TaggerWidget -> TaggerWidget
   createRelationDropTarget =
@@ -611,7 +617,7 @@ descriptorTreeUnrelatedWidget m =
   descriptorTreeUnrelatedWidgetBody =
     vstack_
       []
-      [ label "Unrelated"
+      [ flip label_ [resizeFactorW (-1)] "Unrelated"
       , separatorLine
       , unrelatedTreeLeafWidget
       ]
@@ -705,15 +711,22 @@ descriptorTreeToggleVisButton =
 
 descriptorTreeFixedRequestButton :: Text -> TaggerWidget
 descriptorTreeFixedRequestButton t =
-  styledButton "Top" (DoDescriptorTreeEvent . RequestFocusedNode $ t)
+  styledButton_
+    [resizeFactor (-1)]
+    "Top"
+    (DoDescriptorTreeEvent . RequestFocusedNode $ t)
 
 descriptorTreeRequestParentButton :: TaggerWidget
 descriptorTreeRequestParentButton =
-  styledButton "Up" (DoDescriptorTreeEvent RequestFocusedNodeParent)
+  styledButton_
+    [resizeFactor (-1)]
+    "Up"
+    (DoDescriptorTreeEvent RequestFocusedNodeParent)
 
 descriptorTreeRefreshBothButton :: TaggerWidget
 descriptorTreeRefreshBothButton =
-  styledButton
+  styledButton_
+    [resizeFactor (-1)]
     "Refresh"
     (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
 
@@ -722,6 +735,16 @@ styledButton t e =
   withStyleHover [bgColor yuiYellow, border 1 yuiOrange]
     . withStyleBasic [bgColor yuiLightPeach, border 1 yuiPeach]
     $ button t e
+
+styledButton_ ::
+  [ButtonCfg TaggerModel TaggerEvent] ->
+  Text ->
+  TaggerEvent ->
+  TaggerWidget
+styledButton_ opts t e =
+  withStyleHover [bgColor yuiYellow, border 1 yuiOrange]
+    . withStyleBasic [bgColor yuiLightPeach, border 1 yuiPeach]
+    $ button_ t e opts
 
 withStyleBasic ::
   [StyleState] ->
