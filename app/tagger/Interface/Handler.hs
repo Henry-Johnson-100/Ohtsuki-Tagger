@@ -511,6 +511,8 @@ descriptorTreeEventHandler
         [ Model $
             model & descriptorTreeModel . descriptorTreeVis
               %~ flip togglePaneVis (VisibilityLabel l)
+          , Task (IOEvent <$> print l)
+          , Task (IOEvent <$> print  (model ^. descriptorTreeModel . descriptorTreeVis))
         ]
       UpdateDescriptor rkd@(RecordKey (fromIntegral -> dk)) ->
         let updateText =

@@ -552,8 +552,7 @@ descriptorTreeFocusedNodeWidget m =
     [ expandContent
     , mergeRequired
         ( \_ ((^. descriptorTreeModel) -> dm1) ((^. descriptorTreeModel) -> dm2) ->
-            (dm1 ^. focusedTree /= dm2 ^. focusedTree)
-              || (dm1 ^. focusedNode /= dm2 ^. focusedNode)
+            dm1 /= dm2
         )
     ]
     . withStyleBasic [borderR 1 black]
@@ -604,8 +603,7 @@ descriptorTreeUnrelatedWidget m =
     [ expandContent
     , mergeRequired
         ( \_ ((^. descriptorTreeModel) -> dm1) ((^. descriptorTreeModel) -> dm2) ->
-            (dm1 ^. unrelated /= dm2 ^. unrelated)
-              || (dm1 ^. unrelatedNode /= dm2 ^. unrelatedNode)
+            dm1 /= dm2
         )
     ]
     . withStyleBasic [borderL 1 black]
