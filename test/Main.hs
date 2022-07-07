@@ -22,11 +22,11 @@ parserEdgeCases =
                 ( Request
                     [ SentenceNode
                         ( CombinableSentence
-                            Intersect
+                            Union
                             ( Sentence
                                 [ Simple
                                     ( SimpleTerm
-                                        (Term MetaDescriptorCriteria "Otsuki%")
+                                        (Term MetaDescriptorCriteria "otsuki%")
                                     )
                                 ]
                             )
@@ -35,7 +35,7 @@ parserEdgeCases =
                         Difference
                         [ SentenceNode
                             ( CombinableSentence
-                                Intersect
+                                Union
                                 ( Sentence
                                     [ Simple
                                         ( SimpleTerm
@@ -48,7 +48,7 @@ parserEdgeCases =
                             Union
                             [ SentenceNode
                                 ( CombinableSentence
-                                    Intersect
+                                    Union
                                     ( Sentence
                                         [ Simple
                                             ( SimpleTerm
@@ -65,6 +65,56 @@ parserEdgeCases =
             (parse requestParser "test" "otsuki% d|(bruh u| (squad) )")
         )
     , testCase
+        "Parse a nested subquery without trailing whitespace."
+        ( assertEqual
+            ""
+            ( Right
+                ( Request
+                    [ SentenceNode
+                        ( CombinableSentence
+                            Union
+                            ( Sentence
+                                [ Simple
+                                    ( SimpleTerm
+                                        (Term MetaDescriptorCriteria "otsuki%")
+                                    )
+                                ]
+                            )
+                        )
+                    , SentenceBranch
+                        Difference
+                        [ SentenceNode
+                            ( CombinableSentence
+                                Union
+                                ( Sentence
+                                    [ Simple
+                                        ( SimpleTerm
+                                            (Term MetaDescriptorCriteria "bruh")
+                                        )
+                                    ]
+                                )
+                            )
+                        , SentenceBranch
+                            Union
+                            [ SentenceNode
+                                ( CombinableSentence
+                                    Union
+                                    ( Sentence
+                                        [ Simple
+                                            ( SimpleTerm
+                                                (Term MetaDescriptorCriteria "squad")
+                                            )
+                                        ]
+                                    )
+                                )
+                            ]
+                        ]
+                    ]
+                )
+            )
+            (parse requestParser "test" "otsuki% d|(bruh u| (squad))")
+        )
+    , testCase
         "Use a parenthetical query in the middle of a query"
         ( assertEqual
             ""
@@ -72,7 +122,7 @@ parserEdgeCases =
                 ( Request
                     [ SentenceNode
                         ( CombinableSentence
-                            Intersect
+                            Union
                             ( Sentence
                                 [ Simple
                                     ( SimpleTerm
@@ -96,7 +146,7 @@ parserEdgeCases =
                         Union
                         [ SentenceNode
                             ( CombinableSentence
-                                Intersect
+                                Union
                                 ( Sentence
                                     [ Simple
                                         ( SimpleTerm
