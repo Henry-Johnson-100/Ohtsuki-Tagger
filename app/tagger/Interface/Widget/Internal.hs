@@ -147,13 +147,12 @@ fileSelectionFileList m =
 
 tagListWidget :: TaggerModel -> TaggerWidget
 tagListWidget m =
-  vscroll_ [wheelRate 50] $
-    vstack_
-      []
-      [ tagListHeader
-      , separatorLine
-      , vstack_ [] (tagListLeaf <$> sortedOccurrenceMapList)
-      ]
+  vstack_
+    []
+    [ tagListHeader
+    , separatorLine
+    , vscroll_ [wheelRate 50] $ vstack_ [] (tagListLeaf <$> sortedOccurrenceMapList)
+    ]
  where
   tagListHeader =
     hstack_
