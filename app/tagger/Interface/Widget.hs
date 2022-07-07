@@ -21,12 +21,13 @@ taggerApplicationUI _ m =
     ]
     []
     $ vsplit_
-      [splitIgnoreChildResize True]
+      [splitIgnoreChildResize True, splitHandleSize 10]
       ( focusedFileWidget m
-      , hgrid_
-          []
-          [ descriptorTreeWidget m
-          , fileSelectionOperationWidget m
-          , fileSelectionWidget m
-          ]
+      , flip styleBasic [borderT 1 black] $
+          hgrid_
+            []
+            [ descriptorTreeWidget m
+            , fileSelectionOperationWidget m
+            , fileSelectionWidget m
+            ]
       )

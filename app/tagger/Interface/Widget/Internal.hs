@@ -263,7 +263,7 @@ focusedFileWidget m =
   box_ []
     . withStyleBasic [minHeight 300]
     $ hsplit_
-      [splitIgnoreChildResize True, splitHandleSize 10, splitHandlePosV 1]
+      [splitIgnoreChildResize True, splitHandleSize 10]
       (withStyleBasic [borderR 1 black] focusedFileMainPane, detailPane m)
  where
   focusedFileMainPane =
