@@ -12,6 +12,8 @@ module Interface.Widget.Internal (
   fileSelectionWidget,
   fileSelectionOperationWidget,
   queryTextFieldKey,
+  tagTextNodeKey,
+  zstackTaggingWidgetVis,
   focusedFileWidget,
   descriptorTreeWidget,
 ) where
@@ -280,6 +282,12 @@ __        _____ ____   ____ _____ _____
 
 -}
 
+tagTextNodeKey :: Text
+tagTextNodeKey = "tag-text-field"
+
+zstackTaggingWidgetVis :: Text
+zstackTaggingWidgetVis = "show-tag-field"
+
 focusedFileWidget :: TaggerModel -> TaggerWidget
 focusedFileWidget m =
   box_ []
@@ -316,7 +324,6 @@ focusedFileWidget m =
       , zstackTaggingWidget
       ]
    where
-    zstackTaggingWidgetVis = "show-tag-field"
     zstackTaggingWidget :: TaggerWidget
     zstackTaggingWidget =
       box_ [alignBottom, alignLeft, ignoreEmptyArea]
@@ -508,6 +515,7 @@ tagTextField =
     . dropTarget_
       (DoFocusedFileEvent . AppendTagText . descriptor)
       [dropTargetStyle [border 1 yuiBlue]]
+    . withNodeKey tagTextNodeKey
     $ textField_ (focusedFileModel . tagText) []
 
 {-

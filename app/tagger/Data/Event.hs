@@ -23,6 +23,8 @@ data TaggerEvent
   = DoFocusedFileEvent FocusedFileEvent
   | DoFileSelectionEvent FileSelectionEvent
   | DoDescriptorTreeEvent DescriptorTreeEvent
+  | FocusTagTextField
+  | FocusQueryTextField
   | TaggerInit
   | RefreshUI
   | ToggleTagMode
