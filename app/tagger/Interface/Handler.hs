@@ -21,6 +21,7 @@ import qualified Data.HashSet as HS
 import Data.HierarchyMap (empty)
 import qualified Data.HierarchyMap as HAM
 import qualified Data.IntMap.Strict as IntMap
+import Data.Maybe
 import Data.Model
 import Data.Model.Shared
 import qualified Data.OccurrenceHashMap as OHM
@@ -151,6 +152,20 @@ fileSelectionEventHandler
                     . fileSelectionInfoMap
                   .~ IntMap.fromList m
         ]
+      NextQueryHist ->
+        [ Model $
+            model
+              & fileSelectionModel . queryText
+                .~ (fromMaybe "" . getHist $ (model ^. fileSelectionModel . queryHistory))
+              & fileSelectionModel . queryHistory %~ nextHist
+        ]
+      PrevQueryHist ->
+        [ Model $
+            model
+              & fileSelectionModel . queryText
+                .~ (fromMaybe "" . getHist $ (model ^. fileSelectionModel . queryHistory))
+              & fileSelectionModel . queryHistory %~ prevHist
+        ]
       PutFiles fs ->
         let currentSet =
               HS.fromList
@@ -182,7 +197,11 @@ fileSelectionEventHandler
                   (TaggerQLQuery . T.strip $ model ^. fileSelectionModel . queryText)
                   conn
             )
+        , Model $
+            model & fileSelectionModel . queryHistory
+              %~ putHist (T.strip $ model ^. fileSelectionModel . queryText)
         , Event (ClearTextField (TaggerLens (fileSelectionModel . queryText)))
+        , Event (DoFileSelectionEvent ResetQueryHistIndex)
         ]
       RefreshFileSelection ->
         [ Event (DoFileSelectionEvent RefreshTagOccurrences)
@@ -200,6 +219,11 @@ fileSelectionEventHandler
                   (map fileId . F.toList $ model ^. fileSelectionModel . selection)
                   conn
             )
+        ]
+      ResetQueryHistIndex ->
+        [ Model $
+            model
+              & fileSelectionModel . queryHistory . historyIndex .~ 0
         ]
       RefreshTagOccurrencesWith fks ->
         [ Task

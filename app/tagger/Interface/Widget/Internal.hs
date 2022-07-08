@@ -94,7 +94,10 @@ fileSelectionOperationWidget _ =
  where
   queryWidget =
     keystroke_
-      [("Enter", DoFileSelectionEvent Query)]
+      [ ("Enter", DoFileSelectionEvent Query)
+      , ("Up", DoFileSelectionEvent NextQueryHist)
+      , ("Down", DoFileSelectionEvent PrevQueryHist)
+      ]
       []
       . box_ [alignTop, alignCenter]
       $ hstack_ [] [runQueryButton, queryTextField]
@@ -108,7 +111,15 @@ fileSelectionOperationWidget _ =
           (DoFileSelectionEvent . AppendQueryText . descriptor)
           [dropTargetStyle [border 1 yuiBlue]]
         . withNodeKey queryTextFieldKey
-        $ textField_ (fileSelectionModel . queryText) []
+        $ textField_
+          (fileSelectionModel . queryText)
+          [ onChange
+              ( \t ->
+                  if T.null t
+                    then DoFileSelectionEvent ResetQueryHistIndex
+                    else IOEvent ()
+              )
+          ]
 
 fileSelectionFileList :: TaggerModel -> TaggerWidget
 fileSelectionFileList m =
