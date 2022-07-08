@@ -269,28 +269,54 @@ focusedFileWidget m =
       (withStyleBasic [borderR 1 black] focusedFileMainPane, detailPane m)
  where
   focusedFileMainPane =
-    dropTarget_
-      (DoFocusedFileEvent . PutFile)
-      [dropTargetStyle [border 3 yuiOrange]]
-      . dropTarget_
-        (\(Descriptor dk _) -> DoFocusedFileEvent (TagFile dk Nothing))
-        [dropTargetStyle [border 3 yuiBlue]]
-      . dropTarget_
-        (DoFocusedFileEvent . UnSubTag . concreteTagId)
-        [dropTargetStyle [border 1 yuiRed]]
-      . withStyleBasic []
-      . box_
-        [ mergeRequired
-            ( \_ m1 m2 ->
-                concreteTaggedFile (m1 ^. focusedFileModel . focusedFile)
-                  /= concreteTaggedFile (m2 ^. focusedFileModel . focusedFile)
+    zstack_
+      [onlyTopActive_ False]
+      [ dropTarget_
+          (DoFocusedFileEvent . PutFile)
+          [dropTargetStyle [border 3 yuiOrange]]
+          . dropTarget_
+            (\(Descriptor dk _) -> DoFocusedFileEvent (TagFile dk Nothing))
+            [dropTargetStyle [border 3 yuiBlue]]
+          . dropTarget_
+            (DoFocusedFileEvent . UnSubTag . concreteTagId)
+            [dropTargetStyle [border 1 yuiRed]]
+          . withStyleBasic []
+          . box_
+            [ mergeRequired
+                ( \_ m1 m2 ->
+                    concreteTaggedFile (m1 ^. focusedFileModel . focusedFile)
+                      /= concreteTaggedFile (m2 ^. focusedFileModel . focusedFile)
+                )
+            ]
+          $ ( case m ^. focusedFileModel . renderability of
+                RenderAsImage -> imagePreviewRender
+                _ -> imagePreviewRender
             )
-        ]
-      $ ( case m ^. focusedFileModel . renderability of
-            RenderAsImage -> imagePreviewRender
-            _ -> imagePreviewRender
-        )
-        (filePath . concreteTaggedFile $ (m ^. focusedFileModel . focusedFile))
+            (filePath . concreteTaggedFile $ (m ^. focusedFileModel . focusedFile))
+      , zstackTaggingWidget
+      ]
+   where
+    zstackTaggingWidgetVis = "show-tag-field"
+    zstackTaggingWidget :: TaggerWidget
+    zstackTaggingWidget =
+      box_ [alignBottom, alignLeft, ignoreEmptyArea]
+        . withStyleBasic [maxWidth 400]
+        $ hstack
+          [ vstack . (: []) $
+              styledButton_
+                [resizeFactor (-1)]
+                "Tag"
+                ( DoFocusedFileEvent
+                    (ToggleFocusedFilePaneVisibility zstackTaggingWidgetVis)
+                )
+          , withNodeVisible
+              isVisible
+              tagTextField
+          ]
+     where
+      isVisible =
+        (m ^. focusedFileModel . focusedFileVis)
+          `hasVis` VisibilityLabel zstackTaggingWidgetVis
 
 imagePreviewRender :: Text -> TaggerWidget
 imagePreviewRender fp = image_ fp [fitEither, alignCenter]
@@ -337,8 +363,6 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
                   , nullMemberLeaves topNullMembers
                   ]
             , separatorLine
-            , tagTextField
-            , spacer
             , deleteTagZone
             ]
    where
@@ -434,18 +458,6 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
                   ]
        where
         metaTagLeafSpacer = spacer_ [width 20]
-    tagTextField :: TaggerWidget
-    tagTextField =
-      keystroke_
-        [("Enter", DoFocusedFileEvent CommitTagText)]
-        []
-        . dropTarget_
-          (DoFocusedFileEvent . AppendTagText . descriptor . concreteTagDescriptor)
-          [dropTargetStyle [border 1 yuiRed]]
-        . dropTarget_
-          (DoFocusedFileEvent . AppendTagText . descriptor)
-          [dropTargetStyle [border 1 yuiBlue]]
-        $ textField_ (focusedFileModel . tagText) []
     deleteTagZone :: TaggerWidget
     deleteTagZone =
       dropTarget_
@@ -464,6 +476,19 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
                 (MoveTag ct (Just tk))
           )
           [dropTargetStyle [border 1 yuiRed]]
+
+tagTextField :: TaggerWidget
+tagTextField =
+  keystroke_
+    [("Enter", DoFocusedFileEvent CommitTagText)]
+    []
+    . dropTarget_
+      (DoFocusedFileEvent . AppendTagText . descriptor . concreteTagDescriptor)
+      [dropTargetStyle [border 1 yuiRed]]
+    . dropTarget_
+      (DoFocusedFileEvent . AppendTagText . descriptor)
+      [dropTargetStyle [border 1 yuiBlue]]
+    $ textField_ (focusedFileModel . tagText) []
 
 {-
  ____  _____ ____   ____ ____  ___ ____ _____ ___  ____
