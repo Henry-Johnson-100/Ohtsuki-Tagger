@@ -3,12 +3,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Redundant flip" #-}
 
 module Interface.Widget.Internal (
   TaggerWidget,
   fileSelectionWidget,
   fileSelectionOperationWidget,
   queryTextFieldKey,
+  tagTextNodeKey,
+  zstackTaggingWidgetVis,
   focusedFileWidget,
   descriptorTreeWidget,
 ) where
@@ -67,33 +72,35 @@ fileSelectionWidget :: TaggerModel -> TaggerWidget
 fileSelectionWidget m =
   vstack_
     []
-    [ zstack_
+    [ fileSelectionWidgetHeader
+    , zstack_
         []
         [ withNodeVisible (not selectionIsVisible) $ tagListWidget m
         , withNodeVisible selectionIsVisible $ fileSelectionFileList m
         ]
-    , -- withNodeVisible (not . Seq.null $ m ^. fileSelectionModel . selection) $
-      hstack_
-        []
-        [clearSelectionButton, toggleViewSelectionButton]
+    , fileSelectionManagePane m
     ]
  where
   selectionIsVisible =
     (m ^. fileSelectionModel . fileSelectionVis) `hasVis` VisibilityAlt
-  toggleViewSelectionButton =
-    styledButton
-      (if selectionIsVisible then "Tags" else "Selection")
-      (DoFileSelectionEvent ToggleSelectionView)
+  fileSelectionWidgetHeader =
+    hstack_ [] [setOpDropdown, clearSelectionButton, selectionSizeLabel m]
 
 fileSelectionOperationWidget :: TaggerModel -> TaggerWidget
-fileSelectionOperationWidget _ = queryWidget
+fileSelectionOperationWidget _ =
+  withStyleBasic
+    [borderL 1 black, borderR 1 black]
+    queryWidget
  where
   queryWidget =
     keystroke_
-      [("Enter", DoFileSelectionEvent Query)]
+      [ ("Enter", DoFileSelectionEvent Query)
+      , ("Up", DoFileSelectionEvent NextQueryHist)
+      , ("Down", DoFileSelectionEvent PrevQueryHist)
+      ]
       []
       . box_ [alignTop, alignCenter]
-      $ vstack_ [] [setOpDropdown, hstack_ [] [runQueryButton, queryTextField]]
+      $ hstack_ [] [runQueryButton, queryTextField]
    where
     runQueryButton = styledButton "Search" (DoFileSelectionEvent Query)
     queryTextField =
@@ -104,27 +111,29 @@ fileSelectionOperationWidget _ = queryWidget
           (DoFileSelectionEvent . AppendQueryText . descriptor)
           [dropTargetStyle [border 1 yuiBlue]]
         . withNodeKey queryTextFieldKey
-        $ textField_ (fileSelectionModel . queryText) []
-    setOpDropdown :: TaggerWidget
-    setOpDropdown =
-      dropdown_
-        (fileSelectionModel . setOp)
-        [Union, Intersect, Difference]
-        (label . T.pack . show)
-        (label . T.pack . show)
-        []
+        $ textField_
+          (fileSelectionModel . queryText)
+          [ onChange
+              ( \t ->
+                  if T.null t
+                    then DoFileSelectionEvent ResetQueryHistIndex
+                    else IOEvent ()
+              )
+          ]
 
 fileSelectionFileList :: TaggerModel -> TaggerWidget
 fileSelectionFileList m =
   vstack_
     []
-    [ vscroll_ [wheelRate 50]
+    [ fileSelectionHeader
+    , separatorLine
+    , vscroll_ [wheelRate 50]
         . vstack_ []
         $ fmap fileSelectionLeaf (m ^. fileSelectionModel . selection)
-    , --  withNodeVisible (not . Seq.null $ m ^. fileSelectionModel . selection) $
-      fileSelectionManagePane m
     ]
  where
+  fileSelectionHeader :: TaggerWidget
+  fileSelectionHeader = hstack_ [] [toggleViewSelectionButton m]
   fileSelectionLeaf :: File -> TaggerWidget
   fileSelectionLeaf f@(File _ fp) =
     draggable f $
@@ -144,27 +153,19 @@ fileSelectionFileList m =
 
 tagListWidget :: TaggerModel -> TaggerWidget
 tagListWidget m =
-  vscroll_ [wheelRate 50] $
-    vstack_
-      []
-      [ tagListHeader
-      , separatorLine
-      , vstack_ [] (tagListLeaf <$> sortedOccurrenceMapList)
-      ]
+  vstack_
+    []
+    [ tagListHeader
+    , separatorLine
+    , vscroll_ [wheelRate 50] $ vstack_ [] (tagListLeaf <$> sortedOccurrenceMapList)
+    ]
  where
   tagListHeader =
     hstack_
       []
       [ tagListOrderCritCycleButton
       , tagListOrderDirCycleButton
-      , spacer
-      , label $
-          "In Selection: ("
-            <> ( T.pack . show
-                  . Seq.length
-                  $ m ^. fileSelectionModel . selection
-               )
-            <> ")"
+      , toggleViewSelectionButton m
       ]
   sortedOccurrenceMapList =
     let (OrderBy ordCrit ordDir) = m ^. fileSelectionModel . tagOrdering
@@ -180,10 +181,11 @@ tagListWidget m =
           case ordCrit of
             Alphabetic -> "ABC"
             Numeric -> "123"
-     in styledButton btnText (DoFileSelectionEvent CycleTagOrderCriteria)
+     in styledButton_ [resizeFactorH (-1)] btnText (DoFileSelectionEvent CycleTagOrderCriteria)
   tagListOrderDirCycleButton =
     let (OrderBy _ ordDir) = m ^. fileSelectionModel . tagOrdering
-     in styledButton
+     in styledButton_
+          [resizeFactorH (-1)]
           (T.pack . show $ ordDir)
           (DoFileSelectionEvent CycleTagOrderDirection)
   tagListLeaf (d, n) =
@@ -200,19 +202,14 @@ fileSelectionManagePane :: TaggerModel -> TaggerWidget
 fileSelectionManagePane m =
   vstack_
     []
-    [ styledButton
+    [ styledButton_
+        [resizeFactorH (-1)]
         "Manage Selection"
         (DoFileSelectionEvent (TogglePaneVisibility manageFileSelectionPane))
     , separatorLine
-    , withNodeVisible fileSelectionManagePaneIsVisible
-        . keystroke_ [("Enter", DoFileSelectionEvent AddFiles)] []
-        $ vstack_
-          []
-          [ spacer
-          , withStyleBasic [textSize 15] $ label "Add files"
-          , textField (fileSelectionModel . addFileText)
-          , spacer
-          ]
+    , withNodeVisible
+        fileSelectionManagePaneIsVisible
+        addFilesWidget
     , withNodeVisible
         fileSelectionManagePaneIsVisible
         $ hstack_ [] [refreshFileSelectionButton, toggleFileEditMode]
@@ -224,6 +221,44 @@ fileSelectionManagePane m =
 
 clearSelectionButton :: TaggerWidget
 clearSelectionButton = styledButton "Clear" (DoFileSelectionEvent ClearSelection)
+
+toggleViewSelectionButton :: TaggerModel -> TaggerWidget
+toggleViewSelectionButton m =
+  styledButton_
+    [resizeFactorH (-1)]
+    ( if (m ^. fileSelectionModel . fileSelectionVis) `hasVis` VisibilityAlt
+        then "Tags"
+        else "Selection"
+    )
+    (DoFileSelectionEvent ToggleSelectionView)
+
+addFilesWidget :: TaggerWidget
+addFilesWidget =
+  keystroke [("Enter", DoFileSelectionEvent AddFiles)] $
+    hstack_
+      []
+      [ styledButton_ [] "Add" (DoFileSelectionEvent AddFiles)
+      , textField (fileSelectionModel . addFileText)
+      ]
+
+setOpDropdown :: TaggerWidget
+setOpDropdown =
+  dropdown_
+    (fileSelectionModel . setOp)
+    [Union, Intersect, Difference]
+    (label . T.pack . show)
+    (label . T.pack . show)
+    []
+
+selectionSizeLabel :: TaggerModel -> TaggerWidget
+selectionSizeLabel m =
+  label $
+    "In Selection: ("
+      <> ( T.pack . show
+            . Seq.length
+            $ m ^. fileSelectionModel . selection
+         )
+      <> ")"
 
 refreshFileSelectionButton :: TaggerWidget
 refreshFileSelectionButton =
@@ -258,30 +293,68 @@ __        _____ ____   ____ _____ _____
 
 -}
 
+tagTextNodeKey :: Text
+tagTextNodeKey = "tag-text-field"
+
+zstackTaggingWidgetVis :: Text
+zstackTaggingWidgetVis = "show-tag-field"
+
 focusedFileWidget :: TaggerModel -> TaggerWidget
 focusedFileWidget m =
   box_ []
     . withStyleBasic [minHeight 300]
     $ hsplit_
       [splitIgnoreChildResize True, splitHandleSize 10]
-      (focusedFileMainPane, detailPane m)
+      (withStyleBasic [borderR 1 black] focusedFileMainPane, detailPane m)
  where
   focusedFileMainPane =
-    dropTarget_
-      (DoFocusedFileEvent . PutFile)
-      [dropTargetStyle [border 3 yuiOrange]]
-      . dropTarget_
-        (\(Descriptor dk _) -> DoFocusedFileEvent (TagFile dk Nothing))
-        [dropTargetStyle [border 3 yuiBlue]]
-      . dropTarget_
-        (DoFocusedFileEvent . UnSubTag . concreteTagId)
-        [dropTargetStyle [border 1 yuiRed]]
-      . withStyleBasic []
-      $ ( case m ^. focusedFileModel . renderability of
-            RenderAsImage -> imagePreviewRender
-            _ -> imagePreviewRender
-        )
-        (filePath . concreteTaggedFile $ (m ^. focusedFileModel . focusedFile))
+    zstack_
+      [onlyTopActive_ False]
+      [ dropTarget_
+          (DoFocusedFileEvent . PutFile)
+          [dropTargetStyle [border 3 yuiOrange]]
+          . dropTarget_
+            (\(Descriptor dk _) -> DoFocusedFileEvent (TagFile dk Nothing))
+            [dropTargetStyle [border 3 yuiBlue]]
+          . dropTarget_
+            (DoFocusedFileEvent . UnSubTag . concreteTagId)
+            [dropTargetStyle [border 1 yuiRed]]
+          . withStyleBasic []
+          . box_
+            [ mergeRequired
+                ( \_ m1 m2 ->
+                    concreteTaggedFile (m1 ^. focusedFileModel . focusedFile)
+                      /= concreteTaggedFile (m2 ^. focusedFileModel . focusedFile)
+                )
+            ]
+          $ ( case m ^. focusedFileModel . renderability of
+                RenderAsImage -> imagePreviewRender
+                _ -> imagePreviewRender
+            )
+            (filePath . concreteTaggedFile $ (m ^. focusedFileModel . focusedFile))
+      , zstackTaggingWidget
+      ]
+   where
+    zstackTaggingWidget :: TaggerWidget
+    zstackTaggingWidget =
+      box_ [alignBottom, alignLeft, ignoreEmptyArea]
+        . withStyleBasic [maxWidth 400]
+        $ hstack
+          [ vstack . (: []) $
+              styledButton_
+                [resizeFactor (-1)]
+                "Tag"
+                ( DoFocusedFileEvent
+                    (ToggleFocusedFilePaneVisibility zstackTaggingWidgetVis)
+                )
+          , withNodeVisible
+              isVisible
+              tagTextField
+          ]
+     where
+      isVisible =
+        (m ^. focusedFileModel . focusedFileVis)
+          `hasVis` VisibilityLabel zstackTaggingWidgetVis
 
 imagePreviewRender :: Text -> TaggerWidget
 imagePreviewRender fp = image_ fp [fitEither, alignCenter]
@@ -307,17 +380,27 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
             )
             . HM.keys
             $ hm
-     in vscroll_ [wheelRate 50] . withStyleBasic [paddingR 20] $
-          vstack_
+     in withStyleBasic [paddingR 20]
+          . box_
+            [ expandContent
+            , mergeRequired
+                ( \_
+                   ((^. focusedFileModel . focusedFile) -> ffile1)
+                   ((^. focusedFileModel . focusedFile) -> ffile2) ->
+                      ffile1 /= ffile2
+                )
+            ]
+          $ vstack_
             []
             [ filePathWidget
             , separatorLine
-            , metaLeaves metaMembers
-            , spacer
-            , nullMemberLeaves topNullMembers
+            , vscroll_ [wheelRate 50] $
+                vstack
+                  [ metaLeaves metaMembers
+                  , spacer
+                  , nullMemberLeaves topNullMembers
+                  ]
             , separatorLine
-            , tagTextField
-            , spacer
             , deleteTagZone
             ]
    where
@@ -338,7 +421,10 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
         , zstack_
             []
             [ withNodeVisible (not isFileRenameMode) $
-                label (filePath . concreteTaggedFile $m ^. focusedFileModel . focusedFile)
+                flip
+                  label_
+                  [resizeFactorW (-1)]
+                  (filePath . concreteTaggedFile $m ^. focusedFileModel . focusedFile)
             , withNodeVisible isFileRenameMode
                 . keystroke_
                   [("Enter", DoFocusedFileEvent RenameFile)]
@@ -410,18 +496,6 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
                   ]
        where
         metaTagLeafSpacer = spacer_ [width 20]
-    tagTextField :: TaggerWidget
-    tagTextField =
-      keystroke_
-        [("Enter", DoFocusedFileEvent CommitTagText)]
-        []
-        . dropTarget_
-          (DoFocusedFileEvent . AppendTagText . descriptor . concreteTagDescriptor)
-          [dropTargetStyle [border 1 yuiRed]]
-        . dropTarget_
-          (DoFocusedFileEvent . AppendTagText . descriptor)
-          [dropTargetStyle [border 1 yuiBlue]]
-        $ textField_ (focusedFileModel . tagText) []
     deleteTagZone :: TaggerWidget
     deleteTagZone =
       dropTarget_
@@ -429,7 +503,7 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
         [dropTargetStyle [border 1 yuiRed]]
         . flip styleHoverSet []
         . withStyleBasic [bgColor yuiLightPeach, border 1 yuiPeach]
-        $ buttonD_ "Delete" []
+        $ buttonD_ "Delete" [resizeFactorW (-1)]
     subTagDropTarget tk =
       dropTarget_
         (\(Descriptor dk _) -> DoFocusedFileEvent (TagFile dk (Just tk)))
@@ -440,6 +514,20 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
                 (MoveTag ct (Just tk))
           )
           [dropTargetStyle [border 1 yuiRed]]
+
+tagTextField :: TaggerWidget
+tagTextField =
+  keystroke_
+    [("Enter", DoFocusedFileEvent CommitTagText)]
+    []
+    . dropTarget_
+      (DoFocusedFileEvent . AppendTagText . descriptor . concreteTagDescriptor)
+      [dropTargetStyle [border 1 yuiRed]]
+    . dropTarget_
+      (DoFocusedFileEvent . AppendTagText . descriptor)
+      [dropTargetStyle [border 1 yuiBlue]]
+    . withNodeKey tagTextNodeKey
+    $ textField_ (focusedFileModel . tagText) []
 
 {-
  ____  _____ ____   ____ ____  ___ ____ _____ ___  ____
@@ -476,11 +564,7 @@ descriptorTreeWidget m =
       $ vstack_
         []
         [ mainPane
-        , withNodeVisible
-            ( (m ^. descriptorTreeModel . descriptorTreeVis)
-                `hasVis` VisibilityLabel manageDescriptorPaneVis
-            )
-            altPane
+        , altPane
         ]
  where
   mainPane =
@@ -496,8 +580,6 @@ descriptorTreeWidget m =
               , descriptorTreeUnrelatedWidget m
               )
           ]
-      , separatorLine
-      , descriptorTreeToggleVisButton
       ]
    where
     mainPaneLeftButtonStack =
@@ -512,19 +594,32 @@ descriptorTreeWidget m =
     withStyleBasic [border 1 black] $
       vstack_
         []
-        [ insertDescriptorWidget
-        , spacer
-        , styledButton
-            "Edit"
-            ( DoDescriptorTreeEvent
-                (ToggleDescriptorTreeVisibility editDescriptorVis)
+        [ descriptorTreeToggleVisButton
+        , withNodeVisible
+            ( (m ^. descriptorTreeModel . descriptorTreeVis)
+                `hasVis` VisibilityLabel manageDescriptorPaneVis
             )
-        , spacer
+            $vstack
+            [ insertDescriptorWidget
+            , spacer
+            , styledButton
+                "Edit"
+                ( DoDescriptorTreeEvent
+                    (ToggleDescriptorTreeVisibility editDescriptorVis)
+                )
+            ]
         ]
 
 descriptorTreeFocusedNodeWidget :: TaggerModel -> TaggerWidget
 descriptorTreeFocusedNodeWidget m =
-  withStyleBasic [borderR 1 black]
+  box_
+    [ expandContent
+    , mergeRequired
+        ( \_ ((^. descriptorTreeModel) -> dm1) ((^. descriptorTreeModel) -> dm2) ->
+            dm1 /= dm2
+        )
+    ]
+    . withStyleBasic [borderR 1 black]
     . createRelationDropTarget
     $ descriptorTreeFocusedNodeWidgetBody
  where
@@ -555,7 +650,10 @@ descriptorTreeFocusedNodeWidget m =
             <$> (metaDescriptors ++ infraDescriptors)
 
   nodeHeader :: TaggerWidget
-  nodeHeader = label . descriptor $ m ^. descriptorTreeModel . focusedNode
+  nodeHeader =
+    flip label_ [resizeFactorW (-1)]
+      . descriptor
+      $ m ^. descriptorTreeModel . focusedNode
 
   createRelationDropTarget :: TaggerWidget -> TaggerWidget
   createRelationDropTarget =
@@ -565,7 +663,14 @@ descriptorTreeFocusedNodeWidget m =
 
 descriptorTreeUnrelatedWidget :: TaggerModel -> TaggerWidget
 descriptorTreeUnrelatedWidget m =
-  withStyleBasic [borderL 1 black]
+  box_
+    [ expandContent
+    , mergeRequired
+        ( \_ ((^. descriptorTreeModel) -> dm1) ((^. descriptorTreeModel) -> dm2) ->
+            dm1 /= dm2
+        )
+    ]
+    . withStyleBasic [borderL 1 black]
     . createUnrelationDropTargetWidget
       $descriptorTreeUnrelatedWidgetBody
  where
@@ -573,7 +678,7 @@ descriptorTreeUnrelatedWidget m =
   descriptorTreeUnrelatedWidgetBody =
     vstack_
       []
-      [ label "Unrelated"
+      [ flip label_ [resizeFactorW (-1)] "Unrelated"
       , separatorLine
       , unrelatedTreeLeafWidget
       ]
@@ -661,21 +766,29 @@ descriptorTreeLeaf
 
 descriptorTreeToggleVisButton :: TaggerWidget
 descriptorTreeToggleVisButton =
-  styledButton
+  styledButton_
+    [resizeFactorH (-1)]
     "Manage Descriptors"
     (DoDescriptorTreeEvent (ToggleDescriptorTreeVisibility "manage"))
 
 descriptorTreeFixedRequestButton :: Text -> TaggerWidget
 descriptorTreeFixedRequestButton t =
-  styledButton "Top" (DoDescriptorTreeEvent . RequestFocusedNode $ t)
+  styledButton_
+    [resizeFactor (-1)]
+    "Top"
+    (DoDescriptorTreeEvent . RequestFocusedNode $ t)
 
 descriptorTreeRequestParentButton :: TaggerWidget
 descriptorTreeRequestParentButton =
-  styledButton "Up" (DoDescriptorTreeEvent RequestFocusedNodeParent)
+  styledButton_
+    [resizeFactor (-1)]
+    "Up"
+    (DoDescriptorTreeEvent RequestFocusedNodeParent)
 
 descriptorTreeRefreshBothButton :: TaggerWidget
 descriptorTreeRefreshBothButton =
-  styledButton
+  styledButton_
+    [resizeFactor (-1)]
     "Refresh"
     (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
 
@@ -684,6 +797,16 @@ styledButton t e =
   withStyleHover [bgColor yuiYellow, border 1 yuiOrange]
     . withStyleBasic [bgColor yuiLightPeach, border 1 yuiPeach]
     $ button t e
+
+styledButton_ ::
+  [ButtonCfg TaggerModel TaggerEvent] ->
+  Text ->
+  TaggerEvent ->
+  TaggerWidget
+styledButton_ opts t e =
+  withStyleHover [bgColor yuiYellow, border 1 yuiOrange]
+    . withStyleBasic [bgColor yuiLightPeach, border 1 yuiPeach]
+    $ button_ t e opts
 
 withStyleBasic ::
   [StyleState] ->

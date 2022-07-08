@@ -21,6 +21,7 @@ import qualified Data.HashSet as HS
 import Data.HierarchyMap (empty)
 import qualified Data.HierarchyMap as HAM
 import qualified Data.IntMap.Strict as IntMap
+import Data.Maybe
 import Data.Model
 import Data.Model.Shared
 import qualified Data.OccurrenceHashMap as OHM
@@ -31,7 +32,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger
 import Interface.Handler.Internal
-import Interface.Widget.Internal (queryTextFieldKey)
+import Interface.Widget.Internal (queryTextFieldKey, tagTextNodeKey, zstackTaggingWidgetVis)
 import Monomer
 import Paths_tagger
 import System.FilePath
@@ -54,9 +55,21 @@ taggerEventHandler
       DoFocusedFileEvent e -> focusedFileEventHandler wenv node model e
       DoFileSelectionEvent e -> fileSelectionEventHandler wenv node model e
       DoDescriptorTreeEvent e -> descriptorTreeEventHandler wenv node model e
+      FocusTagTextField ->
+        if (model ^. focusedFileModel . focusedFileVis)
+          `hasVis` VisibilityLabel zstackTaggingWidgetVis
+          then [SetFocusOnKey . WidgetKey $ tagTextNodeKey]
+          else
+            [ Event
+                ( DoFocusedFileEvent
+                    (ToggleFocusedFilePaneVisibility zstackTaggingWidgetVis)
+                )
+            , SetFocusOnKey . WidgetKey $ tagTextNodeKey
+            ]
+      FocusQueryTextField -> [SetFocusOnKey . WidgetKey $ queryTextFieldKey]
       TaggerInit ->
         [ Event (DoDescriptorTreeEvent DescriptorTreeInit)
-        , SetFocusOnKey . WidgetKey $ queryTextFieldKey
+        , Event FocusQueryTextField
         ]
       RefreshUI ->
         [ Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
@@ -111,6 +124,7 @@ fileSelectionEventHandler
             [ Event . DoFocusedFileEvent . PutFile $ f
             , Model $ model & fileSelectionModel . selection .~ (fs |> f)
             ]
+      CycleNextSetOp -> [Model $ model & fileSelectionModel . setOp %~ next]
       CyclePrevFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []
@@ -118,6 +132,7 @@ fileSelectionEventHandler
             [ Event . DoFocusedFileEvent . PutFile $ f
             , Model $ model & fileSelectionModel . selection .~ (f <| fs)
             ]
+      CyclePrevSetOp -> [Model $ model & fileSelectionModel . setOp %~ prev]
       CycleTagOrderCriteria ->
         [ Model $
             model & fileSelectionModel . tagOrdering
@@ -136,6 +151,20 @@ fileSelectionEventHandler
                   & fileSelectionModel
                     . fileSelectionInfoMap
                   .~ IntMap.fromList m
+        ]
+      NextQueryHist ->
+        [ Model $
+            model
+              & fileSelectionModel . queryText
+                .~ (fromMaybe "" . getHist $ (model ^. fileSelectionModel . queryHistory))
+              & fileSelectionModel . queryHistory %~ nextHist
+        ]
+      PrevQueryHist ->
+        [ Model $
+            model
+              & fileSelectionModel . queryText
+                .~ (fromMaybe "" . getHist $ (model ^. fileSelectionModel . queryHistory))
+              & fileSelectionModel . queryHistory %~ prevHist
         ]
       PutFiles fs ->
         let currentSet =
@@ -168,7 +197,11 @@ fileSelectionEventHandler
                   (TaggerQLQuery . T.strip $ model ^. fileSelectionModel . queryText)
                   conn
             )
+        , Model $
+            model & fileSelectionModel . queryHistory
+              %~ putHist (T.strip $ model ^. fileSelectionModel . queryText)
         , Event (ClearTextField (TaggerLens (fileSelectionModel . queryText)))
+        , Event (DoFileSelectionEvent ResetQueryHistIndex)
         ]
       RefreshFileSelection ->
         [ Event (DoFileSelectionEvent RefreshTagOccurrences)
@@ -186,6 +219,11 @@ fileSelectionEventHandler
                   (map fileId . F.toList $ model ^. fileSelectionModel . selection)
                   conn
             )
+        ]
+      ResetQueryHistIndex ->
+        [ Model $
+            model
+              & fileSelectionModel . queryHistory . historyIndex .~ 0
         ]
       RefreshTagOccurrencesWith fks ->
         [ Task
@@ -521,7 +559,7 @@ descriptorTreeEventHandler
                     . descriptorInfoAt dk
                     . renameText
          in if T.null updateText
-              then [Task (IOEvent <$> putStrLn "null text")]
+              then []
               else
                 [ Task
                     ( IOEvent

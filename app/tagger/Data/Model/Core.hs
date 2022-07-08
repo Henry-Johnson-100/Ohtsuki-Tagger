@@ -1,9 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# HLINT ignore "Eta reduce" #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Data.Model.Core (
   TaggerModel (..),
@@ -75,6 +76,7 @@ data FileSelectionModel = FileSelectionModel
   , _fileselectionFileSelectionInfoMap :: IntMap FileInfo
   , _fileselectionSetOp :: SetOp
   , _fileselectionQueryText :: Text
+  , _fileselectionQueryHistory :: TextHistory
   , _fileselectionFileSelectionVis :: Visibility
   , _fileselectionAddFileText :: Text
   }
@@ -89,6 +91,7 @@ createFileSelectionModel =
     , _fileselectionFileSelectionInfoMap = IntMap.empty
     , _fileselectionSetOp = Union
     , _fileselectionQueryText = ""
+    , _fileselectionQueryHistory = createHistory 10
     , _fileselectionFileSelectionVis = VisibilityMain
     , _fileselectionAddFileText = ""
     }

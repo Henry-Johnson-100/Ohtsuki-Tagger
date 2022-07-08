@@ -18,15 +18,20 @@ taggerApplicationUI _ m =
     [ ("Ctrl-r", RefreshUI)
     , ("Ctrl-i", DoFileSelectionEvent CycleNextFile)
     , ("Ctrl-k", DoFileSelectionEvent CyclePrevFile)
+    , ("Ctrl-t", FocusTagTextField)
+    , ("Ctrl-f", FocusQueryTextField)
+    , ("Ctrl-g", DoFileSelectionEvent CycleNextSetOp)
+    , ("Ctrl-Shift-g", DoFileSelectionEvent CyclePrevSetOp)
     ]
     []
     $ vsplit_
-      [splitIgnoreChildResize True]
+      [splitIgnoreChildResize True, splitHandleSize 10]
       ( focusedFileWidget m
-      , hgrid_
-          []
-          [ descriptorTreeWidget m
-          , fileSelectionOperationWidget m
-          , fileSelectionWidget m
-          ]
+      , flip styleBasic [borderT 1 black] $
+          hgrid_
+            []
+            [ descriptorTreeWidget m
+            , fileSelectionOperationWidget m
+            , fileSelectionWidget m
+            ]
       )

@@ -14,12 +14,21 @@ module Data.Model.Shared.Core (
   OrderBy (..),
   cycleOrderCriteria,
   cycleOrderDir,
+  TextHistory (..),
+  createHistory,
+  nextHist,
+  prevHist,
+  putHist,
+  getHist,
 ) where
 
+import Data.Sequence (Seq ((:<|)), (<|))
+import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as S
-import Data.Tagger
+import Data.Tagger (CyclicEnum (next))
 import Data.Text (Text)
+import qualified Data.Text as T
 
 {- |
  Generic data type for changing visibility of a widget.
@@ -87,3 +96,40 @@ cycleOrderCriteria (OrderBy c d) = OrderBy (next c) d
 
 cycleOrderDir :: OrderBy -> OrderBy
 cycleOrderDir (OrderBy c d) = OrderBy c (next d)
+
+data TextHistory = TextHistory
+  { _textHistorySize :: Int
+  , _textHistoryIndex :: Int
+  , _textHistoryContents :: Seq Text
+  }
+  deriving (Show, Eq)
+
+createHistory :: Int -> TextHistory
+createHistory n = TextHistory n 0 Seq.empty
+
+getHist :: TextHistory -> Maybe Text
+getHist (TextHistory _ ix h) = Seq.lookup ix h
+
+nextHist :: TextHistory -> TextHistory
+nextHist (TextHistory n ix h) =
+  TextHistory
+    n
+    ( if ix >= n
+        then n
+        else
+          let histSize = Seq.length h - 1
+           in if ix >= histSize then histSize else ix + 1
+    )
+    h
+
+prevHist :: TextHistory -> TextHistory
+prevHist (TextHistory n ix h) =
+  TextHistory n (if ix <= 0 then 0 else ix - 1) h
+
+putHist :: Text -> TextHistory -> TextHistory
+putHist t th@(TextHistory n ix h)
+  | T.null t = th
+  | Seq.length h >= (n - 1) = case h of
+    Seq.Empty -> TextHistory n ix h
+    (_ :<| h') -> TextHistory n ix (t <| h')
+  | otherwise = TextHistory n ix (t <| h)

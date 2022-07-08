@@ -23,6 +23,8 @@ data TaggerEvent
   = DoFocusedFileEvent FocusedFileEvent
   | DoFileSelectionEvent FileSelectionEvent
   | DoDescriptorTreeEvent DescriptorTreeEvent
+  | FocusTagTextField
+  | FocusQueryTextField
   | TaggerInit
   | RefreshUI
   | ToggleTagMode
@@ -36,10 +38,14 @@ data FileSelectionEvent
   | AppendQueryText Text
   | ClearSelection
   | CycleNextFile
+  | CycleNextSetOp
   | CyclePrevFile
+  | CyclePrevSetOp
   | CycleTagOrderCriteria
   | CycleTagOrderDirection
   | MakeFileSelectionInfoMap (Seq File)
+  | NextQueryHist
+  | PrevQueryHist
   | PutFiles (HashSet File)
   | PutTagOccurrenceHashMap_ (OccurrenceHashMap Descriptor)
   | Query
@@ -48,6 +54,7 @@ data FileSelectionEvent
   | -- | Given a Traversable of File keys, fetch an OccurrenceHashMap. Saves having to
     -- call toList on the selection Seq in RefreshTagOccurrences.
     RefreshTagOccurrencesWith (Seq (RecordKey File))
+  | ResetQueryHistIndex
   | ToggleSelectionView
   | TogglePaneVisibility Text
   deriving (Show, Eq)
