@@ -70,33 +70,32 @@ fileSelectionWidget :: TaggerModel -> TaggerWidget
 fileSelectionWidget m =
   vstack_
     []
-    [ zstack_
+    [ fileSelectionWidgetHeader
+    , zstack_
         []
         [ withNodeVisible (not selectionIsVisible) $ tagListWidget m
         , withNodeVisible selectionIsVisible $ fileSelectionFileList m
         ]
-    , -- withNodeVisible (not . Seq.null $ m ^. fileSelectionModel . selection) $
-      hstack_
-        []
-        [clearSelectionButton, toggleViewSelectionButton]
+    , fileSelectionManagePane m
     ]
  where
   selectionIsVisible =
     (m ^. fileSelectionModel . fileSelectionVis) `hasVis` VisibilityAlt
-  toggleViewSelectionButton =
-    styledButton
-      (if selectionIsVisible then "Tags" else "Selection")
-      (DoFileSelectionEvent ToggleSelectionView)
+  fileSelectionWidgetHeader =
+    hstack_ [] [setOpDropdown, clearSelectionButton, selectionSizeLabel m]
 
 fileSelectionOperationWidget :: TaggerModel -> TaggerWidget
-fileSelectionOperationWidget _ = queryWidget
+fileSelectionOperationWidget _ =
+  withStyleBasic
+    [borderL 1 black, borderR 1 black]
+    queryWidget
  where
   queryWidget =
     keystroke_
       [("Enter", DoFileSelectionEvent Query)]
       []
       . box_ [alignTop, alignCenter]
-      $ vstack_ [] [setOpDropdown, hstack_ [] [runQueryButton, queryTextField]]
+      $ hstack_ [] [runQueryButton, queryTextField]
    where
     runQueryButton = styledButton "Search" (DoFileSelectionEvent Query)
     queryTextField =
@@ -108,26 +107,20 @@ fileSelectionOperationWidget _ = queryWidget
           [dropTargetStyle [border 1 yuiBlue]]
         . withNodeKey queryTextFieldKey
         $ textField_ (fileSelectionModel . queryText) []
-    setOpDropdown :: TaggerWidget
-    setOpDropdown =
-      dropdown_
-        (fileSelectionModel . setOp)
-        [Union, Intersect, Difference]
-        (label . T.pack . show)
-        (label . T.pack . show)
-        []
 
 fileSelectionFileList :: TaggerModel -> TaggerWidget
 fileSelectionFileList m =
   vstack_
     []
-    [ vscroll_ [wheelRate 50]
+    [ fileSelectionHeader
+    , separatorLine
+    , vscroll_ [wheelRate 50]
         . vstack_ []
         $ fmap fileSelectionLeaf (m ^. fileSelectionModel . selection)
-    , --  withNodeVisible (not . Seq.null $ m ^. fileSelectionModel . selection) $
-      fileSelectionManagePane m
     ]
  where
+  fileSelectionHeader :: TaggerWidget
+  fileSelectionHeader = hstack_ [] [toggleViewSelectionButton m]
   fileSelectionLeaf :: File -> TaggerWidget
   fileSelectionLeaf f@(File _ fp) =
     draggable f $
@@ -159,14 +152,7 @@ tagListWidget m =
       []
       [ tagListOrderCritCycleButton
       , tagListOrderDirCycleButton
-      , spacer
-      , label $
-          "In Selection: ("
-            <> ( T.pack . show
-                  . Seq.length
-                  $ m ^. fileSelectionModel . selection
-               )
-            <> ")"
+      , toggleViewSelectionButton m
       ]
   sortedOccurrenceMapList =
     let (OrderBy ordCrit ordDir) = m ^. fileSelectionModel . tagOrdering
@@ -182,10 +168,11 @@ tagListWidget m =
           case ordCrit of
             Alphabetic -> "ABC"
             Numeric -> "123"
-     in styledButton btnText (DoFileSelectionEvent CycleTagOrderCriteria)
+     in styledButton_ [resizeFactorH (-1)] btnText (DoFileSelectionEvent CycleTagOrderCriteria)
   tagListOrderDirCycleButton =
     let (OrderBy _ ordDir) = m ^. fileSelectionModel . tagOrdering
-     in styledButton
+     in styledButton_
+          [resizeFactorH (-1)]
           (T.pack . show $ ordDir)
           (DoFileSelectionEvent CycleTagOrderDirection)
   tagListLeaf (d, n) =
@@ -202,19 +189,14 @@ fileSelectionManagePane :: TaggerModel -> TaggerWidget
 fileSelectionManagePane m =
   vstack_
     []
-    [ styledButton
+    [ styledButton_
+        [resizeFactorH (-1)]
         "Manage Selection"
         (DoFileSelectionEvent (TogglePaneVisibility manageFileSelectionPane))
     , separatorLine
-    , withNodeVisible fileSelectionManagePaneIsVisible
-        . keystroke_ [("Enter", DoFileSelectionEvent AddFiles)] []
-        $ vstack_
-          []
-          [ spacer
-          , withStyleBasic [textSize 15] $ label "Add files"
-          , textField (fileSelectionModel . addFileText)
-          , spacer
-          ]
+    , withNodeVisible
+        fileSelectionManagePaneIsVisible
+        addFilesWidget
     , withNodeVisible
         fileSelectionManagePaneIsVisible
         $ hstack_ [] [refreshFileSelectionButton, toggleFileEditMode]
@@ -226,6 +208,44 @@ fileSelectionManagePane m =
 
 clearSelectionButton :: TaggerWidget
 clearSelectionButton = styledButton "Clear" (DoFileSelectionEvent ClearSelection)
+
+toggleViewSelectionButton :: TaggerModel -> TaggerWidget
+toggleViewSelectionButton m =
+  styledButton_
+    [resizeFactorH (-1)]
+    ( if (m ^. fileSelectionModel . fileSelectionVis) `hasVis` VisibilityAlt
+        then "Tags"
+        else "Selection"
+    )
+    (DoFileSelectionEvent ToggleSelectionView)
+
+addFilesWidget :: TaggerWidget
+addFilesWidget =
+  keystroke [("Enter", DoFileSelectionEvent AddFiles)] $
+    hstack_
+      []
+      [ styledButton_ [] "Add" (DoFileSelectionEvent AddFiles)
+      , textField (fileSelectionModel . addFileText)
+      ]
+
+setOpDropdown :: TaggerWidget
+setOpDropdown =
+  dropdown_
+    (fileSelectionModel . setOp)
+    [Union, Intersect, Difference]
+    (label . T.pack . show)
+    (label . T.pack . show)
+    []
+
+selectionSizeLabel :: TaggerModel -> TaggerWidget
+selectionSizeLabel m =
+  label $
+    "In Selection: ("
+      <> ( T.pack . show
+            . Seq.length
+            $ m ^. fileSelectionModel . selection
+         )
+      <> ")"
 
 refreshFileSelectionButton :: TaggerWidget
 refreshFileSelectionButton =
@@ -525,11 +545,7 @@ descriptorTreeWidget m =
       $ vstack_
         []
         [ mainPane
-        , withNodeVisible
-            ( (m ^. descriptorTreeModel . descriptorTreeVis)
-                `hasVis` VisibilityLabel manageDescriptorPaneVis
-            )
-            altPane
+        , altPane
         ]
  where
   mainPane =
@@ -545,8 +561,6 @@ descriptorTreeWidget m =
               , descriptorTreeUnrelatedWidget m
               )
           ]
-      , separatorLine
-      , descriptorTreeToggleVisButton
       ]
    where
     mainPaneLeftButtonStack =
@@ -561,14 +575,20 @@ descriptorTreeWidget m =
     withStyleBasic [border 1 black] $
       vstack_
         []
-        [ insertDescriptorWidget
-        , spacer
-        , styledButton
-            "Edit"
-            ( DoDescriptorTreeEvent
-                (ToggleDescriptorTreeVisibility editDescriptorVis)
+        [ descriptorTreeToggleVisButton
+        , withNodeVisible
+            ( (m ^. descriptorTreeModel . descriptorTreeVis)
+                `hasVis` VisibilityLabel manageDescriptorPaneVis
             )
-        , spacer
+            $vstack
+            [ insertDescriptorWidget
+            , spacer
+            , styledButton
+                "Edit"
+                ( DoDescriptorTreeEvent
+                    (ToggleDescriptorTreeVisibility editDescriptorVis)
+                )
+            ]
         ]
 
 descriptorTreeFocusedNodeWidget :: TaggerModel -> TaggerWidget
@@ -727,7 +747,8 @@ descriptorTreeLeaf
 
 descriptorTreeToggleVisButton :: TaggerWidget
 descriptorTreeToggleVisButton =
-  styledButton
+  styledButton_
+    [resizeFactorH (-1)]
     "Manage Descriptors"
     (DoDescriptorTreeEvent (ToggleDescriptorTreeVisibility "manage"))
 

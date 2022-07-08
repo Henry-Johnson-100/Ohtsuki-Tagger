@@ -511,8 +511,6 @@ descriptorTreeEventHandler
         [ Model $
             model & descriptorTreeModel . descriptorTreeVis
               %~ flip togglePaneVis (VisibilityLabel l)
-          , Task (IOEvent <$> print l)
-          , Task (IOEvent <$> print  (model ^. descriptorTreeModel . descriptorTreeVis))
         ]
       UpdateDescriptor rkd@(RecordKey (fromIntegral -> dk)) ->
         let updateText =
@@ -523,7 +521,7 @@ descriptorTreeEventHandler
                     . descriptorInfoAt dk
                     . renameText
          in if T.null updateText
-              then [Task (IOEvent <$> putStrLn "null text")]
+              then []
               else
                 [ Task
                     ( IOEvent
