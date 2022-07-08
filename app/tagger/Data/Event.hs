@@ -38,7 +38,9 @@ data FileSelectionEvent
   | AppendQueryText Text
   | ClearSelection
   | CycleNextFile
+  | CycleNextSetOp
   | CyclePrevFile
+  | CyclePrevSetOp
   | CycleTagOrderCriteria
   | CycleTagOrderDirection
   | MakeFileSelectionInfoMap (Seq File)

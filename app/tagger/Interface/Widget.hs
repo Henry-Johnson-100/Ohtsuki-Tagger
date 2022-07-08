@@ -20,6 +20,8 @@ taggerApplicationUI _ m =
     , ("Ctrl-k", DoFileSelectionEvent CyclePrevFile)
     , ("Ctrl-t", FocusTagTextField)
     , ("Ctrl-f", FocusQueryTextField)
+    , ("Ctrl-g", DoFileSelectionEvent CycleNextSetOp)
+    , ("Ctrl-Shift-g", DoFileSelectionEvent CyclePrevSetOp)
     ]
     []
     $ vsplit_

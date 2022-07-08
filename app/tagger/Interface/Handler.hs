@@ -123,6 +123,7 @@ fileSelectionEventHandler
             [ Event . DoFocusedFileEvent . PutFile $ f
             , Model $ model & fileSelectionModel . selection .~ (fs |> f)
             ]
+      CycleNextSetOp -> [Model $ model & fileSelectionModel . setOp %~ next]
       CyclePrevFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []
@@ -130,6 +131,7 @@ fileSelectionEventHandler
             [ Event . DoFocusedFileEvent . PutFile $ f
             , Model $ model & fileSelectionModel . selection .~ (f <| fs)
             ]
+      CyclePrevSetOp -> [Model $ model & fileSelectionModel . setOp %~ prev]
       CycleTagOrderCriteria ->
         [ Model $
             model & fileSelectionModel . tagOrdering
