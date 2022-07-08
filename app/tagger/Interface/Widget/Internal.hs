@@ -234,11 +234,23 @@ toggleViewSelectionButton m =
 
 addFilesWidget :: TaggerWidget
 addFilesWidget =
-  keystroke [("Enter", DoFileSelectionEvent AddFiles)] $
-    hstack_
+  keystroke
+    [ ("Enter", DoFileSelectionEvent AddFiles)
+    , ("Up", DoFileSelectionEvent NextAddFileHist)
+    , ("Down", DoFileSelectionEvent PrevAddFileHist)
+    ]
+    $ hstack_
       []
       [ styledButton_ [] "Add" (DoFileSelectionEvent AddFiles)
-      , textField (fileSelectionModel . addFileText)
+      , textField_
+          (fileSelectionModel . addFileText)
+          [ onChange
+              ( \t ->
+                  if T.null t
+                    then DoFileSelectionEvent ResetAddFileHistIndex
+                    else IOEvent ()
+              )
+          ]
       ]
 
 setOpDropdown :: TaggerWidget

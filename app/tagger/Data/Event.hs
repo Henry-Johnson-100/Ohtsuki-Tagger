@@ -43,7 +43,9 @@ data FileSelectionEvent
   | CycleTagOrderCriteria
   | CycleTagOrderDirection
   | MakeFileSelectionInfoMap (Seq File)
+  | NextAddFileHist
   | NextQueryHist
+  | PrevAddFileHist
   | PrevQueryHist
   | PutFiles (HashSet File)
   | PutTagOccurrenceHashMap_ (OccurrenceHashMap Descriptor)
@@ -53,6 +55,7 @@ data FileSelectionEvent
   | -- | Given a Traversable of File keys, fetch an OccurrenceHashMap. Saves having to
     -- call toList on the selection Seq in RefreshTagOccurrences.
     RefreshTagOccurrencesWith (Seq (RecordKey File))
+  | ResetAddFileHistIndex
   | ResetQueryHistIndex
   | ToggleSelectionView
   | TogglePaneVisibility Text

@@ -79,6 +79,7 @@ data FileSelectionModel = FileSelectionModel
   , _fileselectionQueryHistory :: TextHistory
   , _fileselectionFileSelectionVis :: Visibility
   , _fileselectionAddFileText :: Text
+  , _fileselectionAddFileHistory :: TextHistory
   }
   deriving (Show, Eq)
 
@@ -94,6 +95,7 @@ createFileSelectionModel =
     , _fileselectionQueryHistory = createHistory 10
     , _fileselectionFileSelectionVis = VisibilityMain
     , _fileselectionAddFileText = ""
+    , _fileselectionAddFileHistory = createHistory 30
     }
 
 data FileInfo = FileInfo

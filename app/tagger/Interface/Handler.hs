@@ -94,6 +94,9 @@ fileSelectionEventHandler
     case event of
       AddFiles ->
         [ Task (IOEvent <$> addFiles conn (model ^. fileSelectionModel . addFileText))
+        , Model $
+            model & fileSelectionModel . addFileHistory
+              %~ putHist (T.strip $ model ^. fileSelectionModel . addFileText)
         , Event (ClearTextField (TaggerLens (fileSelectionModel . addFileText)))
         ]
       AppendQueryText t ->
@@ -152,12 +155,30 @@ fileSelectionEventHandler
                     . fileSelectionInfoMap
                   .~ IntMap.fromList m
         ]
+      NextAddFileHist ->
+        [ Model $
+            model
+              & fileSelectionModel . addFileText
+                .~ ( fromMaybe "" . getHist $
+                      (model ^. fileSelectionModel . addFileHistory)
+                   )
+              & fileSelectionModel . addFileHistory %~ nextHist
+        ]
       NextQueryHist ->
         [ Model $
             model
               & fileSelectionModel . queryText
                 .~ (fromMaybe "" . getHist $ (model ^. fileSelectionModel . queryHistory))
               & fileSelectionModel . queryHistory %~ nextHist
+        ]
+      PrevAddFileHist ->
+        [ Model $
+            model
+              & fileSelectionModel . addFileText
+                .~ ( fromMaybe "" . getHist $
+                      (model ^. fileSelectionModel . addFileHistory)
+                   )
+              & fileSelectionModel . addFileHistory %~ prevHist
         ]
       PrevQueryHist ->
         [ Model $
@@ -219,6 +240,11 @@ fileSelectionEventHandler
                   (map fileId . F.toList $ model ^. fileSelectionModel . selection)
                   conn
             )
+        ]
+      ResetAddFileHistIndex ->
+        [ Model $
+            model
+              & fileSelectionModel . addFileHistory . historyIndex .~ 0
         ]
       ResetQueryHistIndex ->
         [ Model $
