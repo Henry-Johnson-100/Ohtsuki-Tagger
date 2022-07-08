@@ -109,6 +109,7 @@ data FocusedFileModel = FocusedFileModel
   , _focusedfilemodelRenderability :: Renderability
   , _focusedfilemodelFocusedFileVis :: Visibility
   , _focusedfilemodelTagText :: Text
+  , _focusedfilemodelTagHistory :: TextHistory
   }
   deriving (Show, Eq)
 
@@ -120,6 +121,7 @@ createFocusedFileModel fp =
     , _focusedfilemodelRenderability = RenderingNotSupported
     , _focusedfilemodelFocusedFileVis = VisibilityMain
     , _focusedfilemodelTagText = ""
+    , _focusedfilemodelTagHistory = createHistory 10
     }
 
 focusedFileDefaultDataFile :: FilePath

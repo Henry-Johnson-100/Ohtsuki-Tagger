@@ -1,6 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
 {-# HLINT ignore "Use newtype instead of data" #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StrictData #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
@@ -64,10 +63,13 @@ data FocusedFileEvent
   | CommitTagText
   | DeleteTag (RecordKey Tag)
   | MoveTag ConcreteTag (Maybe (RecordKey Tag))
+  | NextTagHist
+  | PrevTagHist
   | PutConcreteFile_ ConcreteTaggedFile
   | PutFile File
   | RefreshFocusedFileAndSelection
   | RenameFile
+  | ResetTagHistIndex
   | TagFile (RecordKey Descriptor) (Maybe (RecordKey Tag))
   | ToggleFocusedFilePaneVisibility Text
   | UnSubTag (RecordKey Tag)

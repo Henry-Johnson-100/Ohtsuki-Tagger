@@ -278,6 +278,9 @@ focusedFileEventHandler
                   (TaggerQLTagStmnt . T.strip $ model ^. focusedFileModel . tagText)
                   conn
             )
+        , Model $
+            model & focusedFileModel . tagHistory
+              %~ putHist (T.strip $ model ^. focusedFileModel . tagText)
         , Event (ClearTextField (TaggerLens $ focusedFileModel . tagText))
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
@@ -347,6 +350,20 @@ focusedFileEventHandler
                   )
               , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
               ]
+      NextTagHist ->
+        [ Model $
+            model
+              & focusedFileModel . tagText
+                .~ (fromMaybe "" . getHist $ (model ^. focusedFileModel . tagHistory))
+              & focusedFileModel . tagHistory %~ nextHist
+        ]
+      PrevTagHist ->
+        [ Model $
+            model
+              & focusedFileModel . tagText
+                .~ (fromMaybe "" . getHist $ (model ^. focusedFileModel . tagHistory))
+              & focusedFileModel . tagHistory %~ prevHist
+        ]
       PutConcreteFile_ cf@(ConcreteTaggedFile (File _ fp) _) ->
         [ Model $
             model
@@ -390,6 +407,11 @@ focusedFileEventHandler
                     . fileInfoRenameText
            in Task (IOEvent <$> renameFile conn fk newRenameText)
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
+        ]
+      ResetTagHistIndex ->
+        [ Model $
+            model
+              & focusedFileModel . tagHistory . historyIndex .~ 0
         ]
       -- Should:
       -- submit a tag in the db

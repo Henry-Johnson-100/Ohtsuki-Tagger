@@ -518,7 +518,10 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
 tagTextField :: TaggerWidget
 tagTextField =
   keystroke_
-    [("Enter", DoFocusedFileEvent CommitTagText)]
+    [ ("Enter", DoFocusedFileEvent CommitTagText)
+    , ("Up", DoFocusedFileEvent NextTagHist)
+    , ("Down", DoFocusedFileEvent PrevTagHist)
+    ]
     []
     . dropTarget_
       (DoFocusedFileEvent . AppendTagText . descriptor . concreteTagDescriptor)
@@ -527,7 +530,17 @@ tagTextField =
       (DoFocusedFileEvent . AppendTagText . descriptor)
       [dropTargetStyle [border 1 yuiBlue]]
     . withNodeKey tagTextNodeKey
-    $ textField_ (focusedFileModel . tagText) []
+    $ textField_
+      (focusedFileModel . tagText)
+      [ onChange
+          ( \t ->
+              if T.null t
+                then DoFocusedFileEvent ResetTagHistIndex
+                else
+                  IOEvent
+                    ()
+          )
+      ]
 
 {-
  ____  _____ ____   ____ ____  ___ ____ _____ ___  ____
