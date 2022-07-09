@@ -30,13 +30,16 @@ import qualified Data.Sequence as Seq
 import Data.Tagger
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Version (showVersion)
 import Database.Tagger
 import Interface.Handler.Internal
-import Interface.Widget.Internal (queryTextFieldKey, tagTextNodeKey, zstackTaggingWidgetVis)
+import Interface.Widget.Internal (queryTextFieldKey, tagTextNodeKey, zstackQueryWidgetVis, zstackTaggingWidgetVis)
 import Monomer
 import Paths_tagger
+import System.Directory (getCurrentDirectory)
 import System.FilePath
 import System.IO
+import Tagger.Info (taggerVersion)
 import Text.TaggerQL
 import Util
 
@@ -55,6 +58,7 @@ taggerEventHandler
       DoFocusedFileEvent e -> focusedFileEventHandler wenv node model e
       DoFileSelectionEvent e -> fileSelectionEventHandler wenv node model e
       DoDescriptorTreeEvent e -> descriptorTreeEventHandler wenv node model e
+      DoTaggerInfoEvent e -> taggerInfoEventHandler wenv node model e
       FocusTagTextField ->
         if (model ^. focusedFileModel . focusedFileVis)
           `hasVis` VisibilityLabel zstackTaggingWidgetVis
@@ -66,10 +70,45 @@ taggerEventHandler
                 )
             , SetFocusOnKey . WidgetKey $ tagTextNodeKey
             ]
-      FocusQueryTextField -> [SetFocusOnKey . WidgetKey $ queryTextFieldKey]
+      FocusQueryTextField ->
+        if (model ^. focusedFileModel . focusedFileVis)
+          `hasVis` VisibilityLabel zstackQueryWidgetVis
+          then [SetFocusOnKey . WidgetKey $ queryTextFieldKey]
+          else
+            [ Event
+                ( DoFocusedFileEvent
+                    ( ToggleFocusedFilePaneVisibility
+                        zstackQueryWidgetVis
+                    )
+                )
+            , SetFocusOnKey . WidgetKey $ queryTextFieldKey
+            ]
       TaggerInit ->
         [ Event (DoDescriptorTreeEvent DescriptorTreeInit)
         , Event FocusQueryTextField
+        , Task
+            ( DoTaggerInfoEvent . PutWorkingDirectory
+                <$> (T.pack <$> getCurrentDirectory)
+            )
+        , Task
+            ( DoTaggerInfoEvent . PutLastAccessed <$> do
+                la <- runMaybeT $ getLastAccessed conn
+                maybe (return "never") return la
+            )
+        , Task
+            ( DoTaggerInfoEvent . PutLastSaved <$> do
+                la <- runMaybeT $ getLastSaved conn
+                maybe (return "never") return la
+            )
+        , Model $
+            model & taggerInfoModel . Data.Model.version
+              .~ ( T.pack . showVersion $
+                    taggerVersion
+                 )
+              & taggerInfoModel . message
+              .~ "Thank you for using tagger!"
+              & taggerInfoModel . versionMessage
+              .~ "Released on ????/??/??"
         ]
       RefreshUI ->
         [ Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
@@ -615,6 +654,18 @@ descriptorTreeEventHandler
                     )
                 , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
                 ]
+
+taggerInfoEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  TaggerInfoEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+taggerInfoEventHandler _ _ model e =
+  case e of
+    PutLastAccessed t -> [Model $ model & taggerInfoModel . lastAccessed .~ t]
+    PutLastSaved t -> [Model $ model & taggerInfoModel . lastSaved .~ t]
+    PutWorkingDirectory t -> [Model $ model & taggerInfoModel . workingDirectory .~ t]
 
 toDescriptorInfo :: TaggedConnection -> Descriptor -> IO (IntMap.IntMap DescriptorInfo)
 toDescriptorInfo tc (Descriptor dk p) = do

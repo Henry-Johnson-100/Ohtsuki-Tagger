@@ -107,6 +107,7 @@ library tagger-lib
                       ,Data.OccurrenceHashMap
                       ,Data.OccurrenceMap
                       ,Data.Tagger
+                      ,Tagger.Info
                       ,Text.TaggerQL
                       ,Text.TaggerQL.Parser.Internal
                       ,Text.TaggerQL.AST
@@ -120,7 +121,6 @@ library tagger-lib
                       ,Data.Hierarchy.Internal
                       ,Data.OccurrenceHashMap.Internal
                       ,Data.OccurrenceMap.Internal
-                      ,Tagger.Info
                       ,Tagger.Util
 
   other-extensions:    DeriveGeneric
