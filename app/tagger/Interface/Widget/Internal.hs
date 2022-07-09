@@ -85,7 +85,7 @@ fileSelectionWidget m =
   selectionIsVisible =
     (m ^. fileSelectionModel . fileSelectionVis) `hasVis` VisibilityAlt
   fileSelectionWidgetHeader =
-    hstack_ [] [setOpDropdown, clearSelectionButton, selectionSizeLabel m]
+    hstack_ [] [clearSelectionButton, selectionSizeLabel m, setOpDropdown]
 
 fileSelectionOperationWidget :: TaggerModel -> TaggerWidget
 fileSelectionOperationWidget _ =
@@ -325,13 +325,17 @@ focusedFileWidget m =
                 _ -> imagePreviewRender
             )
             (filePath . concreteTaggedFile $ (m ^. focusedFileModel . focusedFile))
-      , zstackTaggingWidget
-      , zstackQueryWidget
+      , box_
+          [alignBottom, alignLeft, ignoreEmptyArea]
+          $ vstack
+            [ zstackTaggingWidget
+            , zstackQueryWidget
+            ]
       ]
    where
     zstackQueryWidget :: TaggerWidget
     zstackQueryWidget =
-      box_ [alignBottom, ignoreEmptyArea]
+      box_ [alignLeft, ignoreEmptyArea]
         . withStyleBasic [maxWidth 450]
         $ hstack_
           []
@@ -350,7 +354,7 @@ focusedFileWidget m =
           `hasVis` VisibilityLabel zstackQueryWidgetVis
     zstackTaggingWidget :: TaggerWidget
     zstackTaggingWidget =
-      box_ [alignBottom, alignLeft, ignoreEmptyArea]
+      box_ [alignLeft, ignoreEmptyArea]
         . withStyleBasic [maxWidth 400]
         $ hstack
           [ vstack . (: []) $

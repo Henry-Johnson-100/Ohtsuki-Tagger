@@ -30,7 +30,7 @@ taggerApplicationUI _ m =
       , flip styleBasic [borderT 1 black] $
           hsplit_
             [splitIgnoreChildResize True]
-            ( descriptorTreeWidget m
-            , fileSelectionWidget m
+            ( flip styleBasic [borderR 1 black] $ descriptorTreeWidget m
+            , flip styleBasic [borderL 1 black] $ fileSelectionWidget m
             )
       )
