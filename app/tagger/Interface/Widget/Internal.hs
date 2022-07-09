@@ -451,7 +451,7 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
             [ withNodeVisible (not isFileRenameMode) $
                 flip
                   label_
-                  [resizeFactorW (-1)]
+                  [resizeFactor (-1)]
                   (filePath . concreteTaggedFile $m ^. focusedFileModel . focusedFile)
             , withNodeVisible isFileRenameMode
                 . keystroke_
@@ -670,8 +670,8 @@ descriptorTreeWidget m =
             )
             $vstack
             [ insertDescriptorWidget
-            , spacer
-            , styledButton
+            , styledButton_
+                [resizeFactor (-1)]
                 "Edit"
                 ( DoDescriptorTreeEvent
                     (ToggleDescriptorTreeVisibility editDescriptorVis)
@@ -720,7 +720,7 @@ descriptorTreeFocusedNodeWidget m =
 
   nodeHeader :: TaggerWidget
   nodeHeader =
-    flip label_ [resizeFactorW (-1)]
+    flip label_ [resizeFactor (-1)]
       . descriptor
       $ m ^. descriptorTreeModel . focusedNode
 
@@ -747,7 +747,7 @@ descriptorTreeUnrelatedWidget m =
   descriptorTreeUnrelatedWidgetBody =
     vstack_
       []
-      [ flip label_ [resizeFactorW (-1)] "Unrelated"
+      [ flip label_ [resizeFactor (-1)] "Unrelated"
       , separatorLine
       , unrelatedTreeLeafWidget
       ]
@@ -778,7 +778,11 @@ insertDescriptorWidget =
   keystroke_ [("Enter", DoDescriptorTreeEvent InsertDescriptor)] [] . hstack_ [] $
     [insertButton, textField_ (descriptorTreeModel . newDescriptorText) []]
  where
-  insertButton = styledButton "Insert" (DoDescriptorTreeEvent InsertDescriptor)
+  insertButton =
+    styledButton_
+      [resizeFactor (-1)]
+      "Insert"
+      (DoDescriptorTreeEvent InsertDescriptor)
 
 descriptorTreeLeaf :: TaggerModel -> Descriptor -> TaggerWidget
 descriptorTreeLeaf
@@ -836,7 +840,7 @@ descriptorTreeLeaf
 descriptorTreeToggleVisButton :: TaggerWidget
 descriptorTreeToggleVisButton =
   styledButton_
-    [resizeFactorH (-1)]
+    [resizeFactor (-1)]
     "Manage Descriptors"
     (DoDescriptorTreeEvent (ToggleDescriptorTreeVisibility "manage"))
 

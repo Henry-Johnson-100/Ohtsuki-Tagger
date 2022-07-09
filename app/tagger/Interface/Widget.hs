@@ -26,7 +26,7 @@ taggerApplicationUI _ m =
     []
     $ vsplit_
       [splitIgnoreChildResize True, splitHandleSize 10]
-      ( focusedFileWidget m
+      ( flip styleBasic [borderB 1 black] $ focusedFileWidget m
       , flip styleBasic [borderT 1 black] $
           descriptorTreeWidget m
       )
