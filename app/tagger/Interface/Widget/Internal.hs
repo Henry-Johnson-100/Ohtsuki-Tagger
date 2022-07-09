@@ -339,11 +339,13 @@ focusedFileWidget m =
       , box_
           [alignBottom, alignLeft, ignoreEmptyArea]
           $ vstack
-            [ zstackTaggingWidget
-            , zstackQueryWidget
+            [ hstack [zstackNextImage, zstackTaggingWidget]
+            , hstack [zstackPrevImage, zstackQueryWidget]
             ]
       ]
    where
+    zstackNextImage = withStyleBasic [bgColor $ yuiLightPeach & a .~ 0.33] $ styledButton_ [resizeFactor (-1)] "↑" (DoFileSelectionEvent CycleNextFile)
+    zstackPrevImage = withStyleBasic [bgColor $ yuiLightPeach & a .~ 0.33] $ styledButton_ [resizeFactor (-1)] "↓" (DoFileSelectionEvent CyclePrevFile)
     zstackQueryWidget :: TaggerWidget
     zstackQueryWidget =
       box_ [alignLeft, ignoreEmptyArea]
