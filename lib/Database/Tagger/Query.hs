@@ -94,6 +94,8 @@ module Database.Tagger.Query (
   hasInfraRelations,
   getTagOccurrencesByDescriptorKeys,
   getTagOccurrencesByFileKey,
+  getLastAccessed,
+  getLastSaved,
 
   -- * Operations
   -- $Operations
@@ -125,7 +127,7 @@ module Database.Tagger.Query (
   unsafeInsertTag,
 ) where
 
-import Control.Monad (guard)
+import Control.Monad (guard, join)
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT, throwE)
 import Control.Monad.Trans.Maybe (MaybeT)
@@ -1062,6 +1064,34 @@ getTagOccurrencesByFileKey fks tc = do
       ON t.descriptorId = d.id
     WHERE fileId = ?
     GROUP BY descriptorId
+    |]
+
+{- |
+ Retrieve the first timestamp from the column lastAccessed in the db info table.
+-}
+getLastAccessed :: TaggedConnection -> MaybeT IO Text
+getLastAccessed tc = do
+  result <- lift (map (\(Only x) -> x) <$> query_ tc q) :: MaybeT IO [Maybe Text]
+  hoistMaybe . join . head' $ result
+ where
+  q =
+    [r|
+    SELECT lastAccessed
+    FROM TaggerDBInfo
+    |]
+
+{- |
+ Retrieve the first timestamp from the column lastBackup in the db info table.
+-}
+getLastSaved :: TaggedConnection -> MaybeT IO Text
+getLastSaved tc = do
+  result <- lift (map (\(Only x) -> x) <$> query_ tc q) :: MaybeT IO [Maybe Text]
+  hoistMaybe . join . head' $ result
+ where
+  q =
+    [r|
+    SELECT lastBackup
+    FROM TaggerDBInfo
     |]
 
 {- |

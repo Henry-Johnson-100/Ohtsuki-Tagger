@@ -8,6 +8,7 @@ module Data.Event (
   FileSelectionEvent (..),
   DescriptorTreeEvent (..),
   FocusedFileEvent (..),
+  TaggerInfoEvent (..),
 ) where
 
 import Data.HashSet
@@ -22,6 +23,7 @@ data TaggerEvent
   = DoFocusedFileEvent FocusedFileEvent
   | DoFileSelectionEvent FileSelectionEvent
   | DoDescriptorTreeEvent DescriptorTreeEvent
+  | DoTaggerInfoEvent TaggerInfoEvent
   | FocusTagTextField
   | FocusQueryTextField
   | TaggerInit
@@ -93,4 +95,10 @@ data DescriptorTreeEvent
   | RequestFocusedNodeParent
   | ToggleDescriptorTreeVisibility Text
   | UpdateDescriptor (RecordKey Descriptor)
+  deriving (Show, Eq)
+
+data TaggerInfoEvent
+  = PutLastAccessed Text
+  | PutLastSaved Text
+  | PutWorkingDirectory Text
   deriving (Show, Eq)

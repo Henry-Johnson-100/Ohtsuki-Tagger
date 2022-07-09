@@ -35,6 +35,8 @@ makeLensesWith abbreviatedFields ''FileSelectionModel
 
 makeLensesWith abbreviatedFields ''FileInfo
 
+makeLensesWith abbreviatedFields ''TaggerInfoModel
+
 fileInfoAt :: Int -> Lens' (IntMap FileInfo) FileInfo
 fileInfoAt n =
   lens

@@ -17,6 +17,7 @@ module Interface.Widget.Internal (
   zstackQueryWidgetVis,
   focusedFileWidget,
   descriptorTreeWidget,
+  taggerInfoWidget,
 ) where
 
 import Control.Lens
@@ -903,3 +904,40 @@ descriptorIsMetaInInfoMap :: TaggerModel -> Descriptor -> Bool
 descriptorIsMetaInInfoMap
   ((^. descriptorTreeModel . descriptorInfoMap) -> m)
   (Descriptor (fromIntegral -> dk) _) = m ^. descriptorInfoAt dk . descriptorIsMeta
+
+{-
+ _____  _    ____  ____ _____ ____
+|_   _|/ \  / ___|/ ___| ____|  _ \
+  | | / _ \| |  _| |  _|  _| | |_) |
+  | |/ ___ \ |_| | |_| | |___|  _ <
+  |_/_/   \_\____|\____|_____|_| \_\
+
+ ___ _   _ _____ ___
+|_ _| \ | |  ___/ _ \
+ | ||  \| | |_ | | | |
+ | || |\  |  _|| |_| |
+|___|_| \_|_|   \___/
+
+__        _____ ____   ____ _____ _____
+\ \      / /_ _|  _ \ / ___| ____|_   _|
+ \ \ /\ / / | || | | | |  _|  _|   | |
+  \ V  V /  | || |_| | |_| | |___  | |
+   \_/\_/  |___|____/ \____|_____| |_|
+-}
+
+taggerInfoWidget :: TaggerModel -> TaggerWidget
+taggerInfoWidget ((^. taggerInfoModel) -> tim) =
+  box_ [alignMiddle] $
+    vstack $
+      withStyleBasic [paddingT 2.5, paddingB 2.5]
+        <$> ( [ flip label_ [resizeFactor (-1)] $ tim ^. message
+              , flip label_ [resizeFactor (-1)] $ tim ^. versionMessage
+              ]
+                ++ ( (\(h, t) -> label_ (h <> ": " <> (tim ^. t)) [resizeFactor (-1)])
+                      <$> [ ("In Directory", workingDirectory)
+                          , ("Version", version)
+                          , ("Last Accessed", lastAccessed)
+                          , ("Last Saved", lastSaved)
+                          ]
+                   )
+            )

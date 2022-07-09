@@ -1,7 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# HLINT ignore "Eta reduce" #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -21,6 +19,8 @@ module Data.Model.Core (
   createDescriptorInfo,
   createDescriptorTreeModel,
   Renderability (..),
+  TaggerInfoModel (..),
+  createTaggerInfoModel,
 ) where
 
 import Data.Config.Internal (TaggerConfig)
@@ -41,6 +41,7 @@ data TaggerModel = TaggerModel
   , _taggermodelDescriptorTreeModel :: DescriptorTreeModel
   , _taggermodelFocusedFileModel :: FocusedFileModel
   , _taggermodelFileSelectionModel :: FileSelectionModel
+  , _taggermodelTaggerInfoModel :: TaggerInfoModel
   , _taggermodelVisibilityModel :: Visibility
   , _taggermodelConnection :: TaggedConnection
   , _taggermodelIsTagMode :: Bool
@@ -62,6 +63,7 @@ createTaggerModel conf tc d unRelatedD defaultFilePath =
     , _taggermodelDescriptorTreeModel = createDescriptorTreeModel d unRelatedD
     , _taggermodelFocusedFileModel = createFocusedFileModel defaultFilePath
     , _taggermodelFileSelectionModel = createFileSelectionModel
+    , _taggermodelTaggerInfoModel = createTaggerInfoModel
     , _taggermodelVisibilityModel = VisibilityMain
     , _taggermodelConnection = tc
     , _taggermodelIsTagMode = True
@@ -186,3 +188,23 @@ createDescriptorTreeModel n unrelatedD =
     , _descriptortreeNewDescriptorText = ""
     , _descriptortreeDescriptorTreeVis = VisibilityMain
     }
+
+data TaggerInfoModel = TaggerInfoModel
+  { _taggerinfoVersion :: Text
+  , _taggerinfoVersionMessage :: Text
+  , _taggerinfoMessage :: Text
+  , _taggerinfoLastAccessed :: Text
+  , _taggerinfoLastSaved :: Text
+  , _taggerinfoWorkingDirectory :: Text
+  }
+  deriving (Show, Eq)
+
+createTaggerInfoModel :: TaggerInfoModel
+createTaggerInfoModel =
+  TaggerInfoModel
+    mempty
+    mempty
+    mempty
+    mempty
+    mempty
+    mempty
