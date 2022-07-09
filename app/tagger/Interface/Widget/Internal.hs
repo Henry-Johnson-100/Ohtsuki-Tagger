@@ -37,6 +37,7 @@ import qualified Data.Text as T
 import Database.Tagger.Type
 import Interface.Theme
 import Monomer
+import Monomer.Graphics.Lens
 
 type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
@@ -350,7 +351,7 @@ focusedFileWidget m =
         . withStyleBasic [maxWidth 450]
         $ hstack_
           []
-          [ vstack . (: []) $
+          [ vstack . (: []) . withStyleBasic [bgColor $ yuiLightPeach & a .~ 0.33] $
               styledButton_
                 [resizeFactor (-1)]
                 "Query"
@@ -368,7 +369,7 @@ focusedFileWidget m =
       box_ [alignLeft, ignoreEmptyArea]
         . withStyleBasic [maxWidth 400]
         $ hstack
-          [ vstack . (: []) $
+          [ vstack . (: []) . withStyleBasic [bgColor $ yuiLightPeach & a .~ 0.33] $
               styledButton_
                 [resizeFactor (-1)]
                 "Tag"
@@ -559,6 +560,7 @@ tagTextField =
       (DoFocusedFileEvent . AppendTagText . descriptor)
       [dropTargetStyle [border 1 yuiBlue]]
     . withNodeKey tagTextNodeKey
+    . withStyleBasic [bgColor (yuiLightPeach & a .~ 0.33)]
     $ textField_
       (focusedFileModel . tagText)
       [ onChange
@@ -589,6 +591,7 @@ queryTextField =
       (DoFileSelectionEvent . AppendQueryText . descriptor)
       [dropTargetStyle [border 1 yuiBlue]]
     . withNodeKey queryTextFieldKey
+    . withStyleBasic [bgColor (yuiLightPeach & a .~ 0.33)]
     $ textField_
       (fileSelectionModel . queryText)
       [ onChange
