@@ -32,7 +32,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger
 import Interface.Handler.Internal
-import Interface.Widget.Internal (queryTextFieldKey, tagTextNodeKey, zstackTaggingWidgetVis)
+import Interface.Widget.Internal (queryTextFieldKey, tagTextNodeKey, zstackQueryWidgetVis, zstackTaggingWidgetVis)
 import Monomer
 import Paths_tagger
 import System.FilePath
@@ -66,7 +66,19 @@ taggerEventHandler
                 )
             , SetFocusOnKey . WidgetKey $ tagTextNodeKey
             ]
-      FocusQueryTextField -> [SetFocusOnKey . WidgetKey $ queryTextFieldKey]
+      FocusQueryTextField ->
+        if (model ^. focusedFileModel . focusedFileVis)
+          `hasVis` VisibilityLabel zstackQueryWidgetVis
+          then [SetFocusOnKey . WidgetKey $ queryTextFieldKey]
+          else
+            [ Event
+                ( DoFocusedFileEvent
+                    ( ToggleFocusedFilePaneVisibility
+                        zstackQueryWidgetVis
+                    )
+                )
+            , SetFocusOnKey . WidgetKey $ queryTextFieldKey
+            ]
       TaggerInit ->
         [ Event (DoDescriptorTreeEvent DescriptorTreeInit)
         , Event FocusQueryTextField
