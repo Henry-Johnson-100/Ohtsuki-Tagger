@@ -190,17 +190,16 @@ fileSelectionManagePane :: TaggerModel -> TaggerWidget
 fileSelectionManagePane m =
   vstack_
     []
-    [ styledButton_
-        [resizeFactor (-1)]
-        "Manage Selection"
-        (DoFileSelectionEvent (TogglePaneVisibility manageFileSelectionPane))
-    , separatorLine
-    , withNodeVisible
+    [ withNodeVisible
         fileSelectionManagePaneIsVisible
         addFilesWidget
     , withNodeVisible
         fileSelectionManagePaneIsVisible
         $ hstack_ [] [refreshFileSelectionButton, toggleFileEditMode]
+    , styledButton_
+        [resizeFactor (-1)]
+        "Manage"
+        (DoFileSelectionEvent (TogglePaneVisibility manageFileSelectionPane))
     ]
  where
   fileSelectionManagePaneIsVisible =
