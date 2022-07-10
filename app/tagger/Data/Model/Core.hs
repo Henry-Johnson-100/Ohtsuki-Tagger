@@ -23,7 +23,6 @@ module Data.Model.Core (
   createTaggerInfoModel,
 ) where
 
-import Data.Config.Internal (TaggerConfig)
 import Data.HierarchyMap (empty)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
@@ -37,8 +36,7 @@ import Data.Text (Text)
 import Database.Tagger.Type
 
 data TaggerModel = TaggerModel
-  { _taggermodelConf :: TaggerConfig
-  , _taggermodelDescriptorTreeModel :: DescriptorTreeModel
+  { _taggermodelDescriptorTreeModel :: DescriptorTreeModel
   , _taggermodelFocusedFileModel :: FocusedFileModel
   , _taggermodelFileSelectionModel :: FileSelectionModel
   , _taggermodelTaggerInfoModel :: TaggerInfoModel
@@ -51,16 +49,14 @@ data TaggerModel = TaggerModel
   deriving (Show, Eq)
 
 createTaggerModel ::
-  TaggerConfig ->
   TaggedConnection ->
   Descriptor ->
   Descriptor ->
   Text ->
   TaggerModel
-createTaggerModel conf tc d unRelatedD defaultFilePath =
+createTaggerModel tc d unRelatedD defaultFilePath =
   TaggerModel
-    { _taggermodelConf = conf
-    , _taggermodelDescriptorTreeModel = createDescriptorTreeModel d unRelatedD
+    { _taggermodelDescriptorTreeModel = createDescriptorTreeModel d unRelatedD
     , _taggermodelFocusedFileModel = createFocusedFileModel defaultFilePath
     , _taggermodelFileSelectionModel = createFileSelectionModel
     , _taggermodelTaggerInfoModel = createTaggerInfoModel

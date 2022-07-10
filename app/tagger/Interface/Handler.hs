@@ -14,7 +14,6 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
-import Data.Config
 import Data.Event
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HS
@@ -574,11 +573,7 @@ descriptorTreeEventHandler
         [ Event (DoDescriptorTreeEvent RefreshUnrelated)
         , Event
             ( DoDescriptorTreeEvent
-                ( RequestFocusedNode $
-                    model
-                      ^. conf
-                        . descriptorTreeConf
-                        . treeRootRequest
+                ( RequestFocusedNode "#META#"
                 )
             )
         , Task

@@ -22,7 +22,6 @@ module Interface.Widget.Internal (
 ) where
 
 import Control.Lens
-import Data.Config
 import Data.Event
 import qualified Data.HashSet as HS
 import qualified Data.HierarchyMap as HM
@@ -692,8 +691,7 @@ descriptorTreeWidget m =
         []
         [ descriptorTreeRefreshBothButton
         , descriptorTreeRequestParentButton
-        , descriptorTreeFixedRequestButton $
-            m ^. conf . descriptorTreeConf . treeRootRequest
+        , descriptorTreeFixedRequestButton "#META#"
         ]
   altPane =
     withStyleBasic [border 1 black] $

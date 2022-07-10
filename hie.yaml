@@ -3,15 +3,6 @@ cradle:
     - path: "app/tagger/Main.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/tagger/Data/Config.hs"
-      component: "tagger:exe:tagger"
-
-    - path: "app/tagger/Data/Config/Lens.hs"
-      component: "tagger:exe:tagger"
-
-    - path: "app/tagger/Data/Config/Internal.hs"
-      component: "tagger:exe:tagger"
-
     - path: "app/tagger/Data/Event.hs"
       component: "tagger:exe:tagger"
 
