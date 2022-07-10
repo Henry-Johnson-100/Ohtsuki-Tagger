@@ -162,17 +162,19 @@ fileSelectionEventHandler
       CycleNextFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []
-          (f :<| fs) ->
+          _ :<| Seq.Empty -> []
+          (f' :<| (f :<| fs)) ->
             [ Event . DoFocusedFileEvent . PutFile $ f
-            , Model $ model & fileSelectionModel . selection .~ (fs |> f)
+            , Model $ model & fileSelectionModel . selection .~ ((f <| fs) |> f')
             ]
       CycleNextSetOp -> [Model $ model & fileSelectionModel . setOp %~ next]
       CyclePrevFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []
-          (fs :|> f) ->
+          (Seq.Empty :|> _) -> []
+          ((f' :<| fs) :|> f) ->
             [ Event . DoFocusedFileEvent . PutFile $ f
-            , Model $ model & fileSelectionModel . selection .~ (f <| fs)
+            , Model $ model & fileSelectionModel . selection .~ (f <| (f' <| fs))
             ]
       CyclePrevSetOp -> [Model $ model & fileSelectionModel . setOp %~ prev]
       CycleTagOrderCriteria ->
@@ -244,6 +246,10 @@ fileSelectionEventHandler
                 )
             , Event (DoFileSelectionEvent . MakeFileSelectionInfoMap $ newSeq)
             ]
+              ++ ( case newSeq of
+                    Seq.Empty -> []
+                    (f :<| _) -> [Event . DoFocusedFileEvent . PutFile $ f]
+                 )
       PutTagOccurrenceHashMap_ m ->
         [ Model $
             model
