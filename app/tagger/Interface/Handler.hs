@@ -238,7 +238,19 @@ fileSelectionEventHandler
                 Union -> HS.union
                 Intersect -> HS.intersection
                 Difference -> HS.difference
-            newSeq = Seq.fromList . HS.toList . combFun currentSet $ fs
+            newSeq =
+              uncurry (Seq.><)
+                . (\(x, y) -> (y, x))
+                . Seq.breakl
+                  ( ( concreteTaggedFile $
+                        model ^. focusedFileModel . focusedFile
+                    )
+                      ==
+                  )
+                . Seq.fromList
+                . HS.toList
+                . combFun currentSet
+                $ fs
          in [ Model $ model & fileSelectionModel . selection .~ newSeq
             , Event
                 ( DoFileSelectionEvent
