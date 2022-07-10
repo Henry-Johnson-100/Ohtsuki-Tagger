@@ -424,15 +424,17 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
  where
   detailPaneTagsWidget =
     let metaMembers =
-          filter (\x -> HM.metaMember x hm && not (HM.infraMember x hm))
+          L.sortOn (descriptor . concreteTagDescriptor)
+            . filter (\x -> HM.metaMember x hm && not (HM.infraMember x hm))
             . HM.keys
             $ hm
         topNullMembers =
-          filter
-            ( \x ->
-                not (HM.metaMember x hm)
-                  && not (HM.infraMember x hm)
-            )
+          L.sortOn (descriptor . concreteTagDescriptor)
+            . filter
+              ( \x ->
+                  not (HM.metaMember x hm)
+                    && not (HM.infraMember x hm)
+              )
             . HM.keys
             $ hm
      in withStyleBasic
@@ -520,7 +522,10 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
         (flip metaLeaf hm <$> metaMembers)
      where
       metaLeaf l@(ConcreteTag tk (Descriptor _ dp) _) hmap =
-        let subtags = HS.toList $ HM.find l hmap
+        let subtags =
+              L.sortOn (descriptor . concreteTagDescriptor)
+                . HS.toList
+                $ HM.find l hmap
          in if null subtags
               then
                 subTagDropTarget tk . box_ [alignLeft, alignTop]
