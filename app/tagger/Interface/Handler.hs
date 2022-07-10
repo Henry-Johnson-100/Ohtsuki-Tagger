@@ -503,7 +503,7 @@ focusedFileEventHandler
                     . fileSelectionInfoMap
                     . fileInfoAt (fromIntegral fk)
                     . fileInfoRenameText
-           in Task (IOEvent <$> renameFile conn fk newRenameText)
+           in Task (IOEvent <$> mvFile conn fk newRenameText)
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
       ResetTagHistIndex ->
