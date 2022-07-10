@@ -2,18 +2,16 @@ module Interface (
   runTagger,
 ) where
 
-import Control.Lens
-import Data.Config
-import Data.Event
-import Data.Model
-import Interface.Handler
-import Interface.Theme
-import Interface.Widget
-import Monomer
+import Data.Event (TaggerEvent (TaggerInit))
+import Data.Model.Core (TaggerModel)
+import Interface.Handler (taggerEventHandler)
+import Interface.Theme (themeConfig)
+import Interface.Widget (taggerApplicationUI)
+import Monomer (appInitEvent, startApp)
 
 runTagger :: TaggerModel -> IO ()
 runTagger m = do
-  themeConf <- themeConfig $ m ^. conf . styleConf
+  themeConf <- themeConfig
   startApp
     m
     taggerEventHandler

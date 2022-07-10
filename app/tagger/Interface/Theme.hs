@@ -6,26 +6,12 @@ module Interface.Theme (
   module Interface.Theme,
 ) where
 
-import Control.Lens ((^.))
-import Data.Config.Internal (StyleConfig)
-import Data.Config.Lens (
-  HasBold (bold),
-  HasFont (font),
-  HasMaximize (maximize),
-  HasRegular (regular),
-  HasScalingFactor (scalingFactor),
-  HasSizeX (sizeX),
-  HasSizeY (sizeY),
-  HasThin (thin),
-  HasWindow (window),
- )
 import Data.Event (TaggerEvent (CloseConnection))
-import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Monomer (
   AppConfig,
   Color,
-  MainWindowState (MainWindowMaximized, MainWindowNormal),
+  MainWindowState (MainWindowMaximized),
   Theme,
   appDisposeEvent,
   appFontDef,
@@ -64,8 +50,8 @@ import Monomer.Core.Themes.BaseTheme (
 import qualified Paths_tagger as PT
 import System.Directory (makeAbsolute)
 
-themeConfig :: StyleConfig -> IO [AppConfig TaggerEvent]
-themeConfig cfg = do
+themeConfig :: IO [AppConfig TaggerEvent]
+themeConfig = do
   defaultThinFont <- T.pack <$> (makeAbsolute =<< PT.getDataFileName "iosevka_thin.ttf")
   defaultRegularFont <-
     T.pack
@@ -74,19 +60,12 @@ themeConfig cfg = do
   dataIcon <- T.pack <$> (makeAbsolute =<< PT.getDataFileName "Yui_signature_SS.bmp")
   return
     [ appWindowTitle "Tagger"
-    , appWindowState $
-        if cfg ^. window . maximize
-          then MainWindowMaximized
-          else
-            MainWindowNormal
-              ( fromIntegral $ cfg ^. window . sizeX
-              , fromIntegral $ cfg ^. window . sizeY
-              )
-    , appScaleFactor $ cfg ^. window . scalingFactor
+    , appWindowState MainWindowMaximized
+    , appScaleFactor 1.65
     , appTheme yuiTheme
-    , appFontDef "Regular" . fromMaybe defaultRegularFont $ cfg ^. font . regular
-    , appFontDef "Thin" . fromMaybe defaultThinFont $ cfg ^. font . thin
-    , appFontDef "Bold" . fromMaybe defaultBoldFont $ cfg ^. font . bold
+    , appFontDef "Regular" defaultRegularFont
+    , appFontDef "Thin" defaultThinFont
+    , appFontDef "Bold" defaultBoldFont
     , appWindowIcon dataIcon
     , appDisposeEvent CloseConnection
     ]
