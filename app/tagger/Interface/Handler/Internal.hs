@@ -1,9 +1,11 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Interface.Handler.Internal (
   Interface.Handler.Internal.renameFile,
   addFiles,
+  shuffleSequence,
 ) where
 
 import qualified Control.Exception as Exception
@@ -17,6 +19,9 @@ import Control.Monad.Trans.Except (
  )
 import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
 import qualified Data.Either as E
+import Data.Hashable (Hashable, hashWithSalt)
+import Data.Sequence (Seq)
+import qualified Data.Sequence as Seq
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger (
@@ -39,6 +44,17 @@ import System.Directory as Directory (
  )
 import System.FilePath (makeRelative, (</>))
 import System.IO (hPrint, hPutStrLn, stderr)
+import System.Random
+
+{- |
+ Sorts a given sequence with a random seed.
+-}
+shuffleSequence :: Hashable a => Seq a -> IO (Seq a)
+shuffleSequence s = do
+  !shuffleSeed <- initStdGen :: IO StdGen
+  let genFileHash = hashWithSalt (fst . random $ shuffleSeed)
+      !sortedSeq = Seq.unstableSortOn genFileHash s
+  return sortedSeq
 
 {- |
  Renames a file in the database and file system at the same time.

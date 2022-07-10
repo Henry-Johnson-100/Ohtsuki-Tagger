@@ -124,7 +124,7 @@ fileSelectionFileList m =
     ]
  where
   fileSelectionHeader :: TaggerWidget
-  fileSelectionHeader = hstack_ [] [toggleViewSelectionButton]
+  fileSelectionHeader = hstack_ [] [toggleViewSelectionButton, shuffleSelectionButton]
   fileSelectionLeaf :: File -> TaggerWidget
   fileSelectionLeaf f@(File _ fp) =
     draggable f $
@@ -173,7 +173,10 @@ tagListWidget m =
           case ordCrit of
             Alphabetic -> "ABC"
             Numeric -> "123"
-     in styledButton_ [resizeFactor (-1)] btnText (DoFileSelectionEvent CycleTagOrderCriteria)
+     in styledButton_
+          [resizeFactor (-1)]
+          btnText
+          (DoFileSelectionEvent CycleTagOrderCriteria)
   tagListOrderDirCycleButton =
     let (OrderBy _ ordDir) = m ^. fileSelectionModel . tagOrdering
      in styledButton_
@@ -276,6 +279,13 @@ toggleFileEditMode =
     [resizeFactor (-1)]
     "Edit"
     (DoFileSelectionEvent (TogglePaneVisibility editFileMode))
+
+shuffleSelectionButton :: TaggerWidget
+shuffleSelectionButton =
+  styledButton_
+    [resizeFactor (-1)]
+    "Shuffle"
+    (DoFileSelectionEvent ShuffleSelection)
 
 {-
  _____ ___   ____ _   _ ____  _____ ____

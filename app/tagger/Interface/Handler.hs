@@ -245,29 +245,33 @@ fileSelectionEventHandler
                 Intersect -> HS.intersection
                 Difference -> HS.difference
             newSeq =
-              uncurry (Seq.><)
-                . (\(x, y) -> (y, x))
-                . Seq.breakl
-                  ( ( concreteTaggedFile $
-                        model ^. focusedFileModel . focusedFile
-                    )
-                      ==
-                  )
-                . Seq.fromList
+              Seq.fromList
                 . HS.toList
                 . combFun currentSet
                 $ fs
-         in [ Model $ model & fileSelectionModel . selection .~ newSeq
-            , Event
-                ( DoFileSelectionEvent
-                    (RefreshTagOccurrencesWith (fmap fileId newSeq))
+         in [Event . DoFileSelectionEvent . PutFilesNoCombine $ newSeq]
+      PutFilesNoCombine
+        ( uncurry (Seq.><)
+            . (\(x, y) -> (y, x))
+            . Seq.breakl
+              ( ( concreteTaggedFile $
+                    model ^. focusedFileModel . focusedFile
                 )
-            , Event (DoFileSelectionEvent . MakeFileSelectionInfoMap $ newSeq)
-            ]
-              ++ ( case newSeq of
-                    Seq.Empty -> []
-                    (f :<| _) -> [Event . DoFocusedFileEvent . PutFile $ f]
-                 )
+                  ==
+              ) ->
+            fseq
+          ) ->
+          [ Model $ model & fileSelectionModel . selection .~ fseq
+          , Event
+              ( DoFileSelectionEvent
+                  (RefreshTagOccurrencesWith (fmap fileId fseq))
+              )
+          , Event (DoFileSelectionEvent . MakeFileSelectionInfoMap $ fseq)
+          ]
+            ++ ( case fseq of
+                  Seq.Empty -> []
+                  (f :<| _) -> [Event . DoFocusedFileEvent . PutFile $ f]
+               )
       PutTagOccurrenceHashMap_ m ->
         [ Model $
             model
@@ -318,6 +322,12 @@ fileSelectionEventHandler
         [ Task
             ( DoFileSelectionEvent . PutTagOccurrenceHashMap_
                 <$> getTagOccurrencesByFileKey fks conn
+            )
+        ]
+      ShuffleSelection ->
+        [ Task
+            ( DoFileSelectionEvent . PutFilesNoCombine
+                <$> shuffleSequence (model ^. fileSelectionModel . selection)
             )
         ]
       TogglePaneVisibility t ->

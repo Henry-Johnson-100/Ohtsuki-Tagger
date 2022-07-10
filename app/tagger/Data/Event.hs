@@ -51,6 +51,7 @@ data FileSelectionEvent
   | PrevAddFileHist
   | PrevQueryHist
   | PutFiles (HashSet File)
+  | PutFilesNoCombine (Seq File)
   | PutTagOccurrenceHashMap_ (OccurrenceHashMap Descriptor)
   | Query
   | RefreshFileSelection
@@ -60,6 +61,7 @@ data FileSelectionEvent
     RefreshTagOccurrencesWith (Seq (RecordKey File))
   | ResetAddFileHistIndex
   | ResetQueryHistIndex
+  | ShuffleSelection
   | ToggleSelectionView
   | TogglePaneVisibility Text
   deriving (Show, Eq)
