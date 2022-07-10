@@ -28,6 +28,7 @@ data TaggerEvent
   | FocusQueryTextField
   | TaggerInit
   | RefreshUI
+  | ToggleMainVisibility Text
   | ToggleTagMode
   | CloseConnection
   | IOEvent ()

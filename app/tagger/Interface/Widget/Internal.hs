@@ -9,6 +9,7 @@
 
 module Interface.Widget.Internal (
   TaggerWidget,
+  hidePossibleUIVis,
   fileSelectionWidget,
   fileSelectionOperationWidget,
   queryTextFieldKey,
@@ -40,6 +41,9 @@ import Monomer
 import Monomer.Graphics.Lens
 
 type TaggerWidget = WidgetNode TaggerModel TaggerEvent
+
+hidePossibleUIVis :: Text
+hidePossibleUIVis = "hide-possible-elements"
 
 {-
  _____ ___ _     _____
@@ -336,8 +340,12 @@ focusedFileWidget m =
                 _ -> imagePreviewRender
             )
             (filePath . concreteTaggedFile $ (m ^. focusedFileModel . focusedFile))
-      , box_
-          [alignBottom, alignLeft, ignoreEmptyArea]
+      , withNodeVisible
+          ( not $
+              (m ^. visibilityModel) `hasVis` VisibilityLabel hidePossibleUIVis
+          )
+          . box_
+            [alignBottom, alignLeft, ignoreEmptyArea]
           $ vstack
             [ hstack [zstackNextImage, zstackTaggingWidget]
             , hstack [zstackPrevImage, zstackQueryWidget]

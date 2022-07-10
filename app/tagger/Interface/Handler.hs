@@ -118,6 +118,8 @@ taggerEventHandler
         [ Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
+      ToggleMainVisibility t ->
+        [Model $ model & visibilityModel %~ (flip togglePaneVis . VisibilityLabel $ t)]
       ToggleTagMode -> [Model $ model & isTagMode %~ not]
       CloseConnection -> [Task (IOEvent <$> close conn)]
       IOEvent _ -> []

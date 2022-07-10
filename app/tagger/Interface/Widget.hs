@@ -35,6 +35,7 @@ taggerApplicationUI _ m =
     , ("Ctrl-g", DoFileSelectionEvent CycleNextSetOp)
     , ("Ctrl-Shift-g", DoFileSelectionEvent CyclePrevSetOp)
     , ("Ctrl-u", DoFileSelectionEvent ClearSelection)
+    , ("Ctrl-h", ToggleMainVisibility hidePossibleUIVis)
     ]
     []
     $ vsplit_
