@@ -313,7 +313,11 @@ focusedFileWidget m =
     . withStyleBasic [minHeight 300]
     $ hsplit_
       [splitIgnoreChildResize True, splitHandleSize 10]
-      (withStyleBasic [borderR 1 black] focusedFileMainPane, detailPane m)
+      ( withStyleBasic [borderR 1 black] focusedFileMainPane
+      , withNodeVisible
+          (not $ (m ^. visibilityModel) `hasVis` VisibilityLabel hidePossibleUIVis)
+          $ detailPane m
+      )
  where
   focusedFileMainPane =
     zstack_
@@ -643,8 +647,13 @@ manageDescriptorPaneVis = "manage"
 
 descriptorTreeWidget :: TaggerModel -> TaggerWidget
 descriptorTreeWidget m =
-  withNodeKey "descriptorTree" $
-    keystroke_
+  withNodeVisible
+    ( not $
+        (m ^. visibilityModel)
+          `hasVis` VisibilityLabel hidePossibleUIVis
+    )
+    . withNodeKey "descriptorTree"
+    $ keystroke_
       [("Ctrl-m", DoDescriptorTreeEvent (ToggleDescriptorTreeVisibility "manage"))]
       [ignoreChildrenEvts]
       $ vstack_
@@ -942,9 +951,14 @@ __        _____ ____   ____ _____ _____
 -}
 
 taggerInfoWidget :: TaggerModel -> TaggerWidget
-taggerInfoWidget ((^. taggerInfoModel) -> tim) =
-  box_ [alignMiddle] $
-    vstack $
+taggerInfoWidget m@((^. taggerInfoModel) -> tim) =
+  withNodeVisible
+    ( not $
+        (m ^. visibilityModel)
+          `hasVis` VisibilityLabel hidePossibleUIVis
+    )
+    . box_ [alignMiddle]
+    $ vstack $
       withStyleBasic [paddingT 2.5, paddingB 2.5]
         <$> ( [ flip label_ [resizeFactor (-1)] $ tim ^. message
               , flip label_ [resizeFactor (-1)] $ tim ^. versionMessage
