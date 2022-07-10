@@ -1,20 +1,8 @@
 # Revision history for Tagger
 
-# Unreleased
-
-* Enhancing the file selection to either only File's or FileKey's
-  * This will help improve the memory footprint of tagger and hopefully
-  make some node logic easier to maintain.
-* Host scripts like a database initialization script in the program.
-  * Can get rid of the path to the script file field in the config. This is a breaking change.
-* Set backups to save automatically to {database_path}.backup to remove this field from the configuration as well.
-  * Should be an optional field in the config in case a database is initialized in memory.
-  * Would also like to be able to freely load from the backup as well so that a memory database can be created and saved or rolled back from the backup.
-    * Create a boolean toggle inMemory and just remove the database backup field from the config.
-
 ------
 
-#### 0.3.4.2 -- ????-??-??
+# 1.0.0.0 -- ????-??-??
 
 ------
 
