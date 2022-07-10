@@ -165,7 +165,7 @@ fileSelectionEventHandler
           _ :<| Seq.Empty -> []
           (f' :<| (f :<| fs)) ->
             [ Event . DoFocusedFileEvent . PutFile $ f
-            , Model $ model & fileSelectionModel . selection .~ ((f <| fs) |> f')
+            , Model $ model & fileSelectionModel . selection .~ (f <| (fs |> f'))
             ]
       CycleNextSetOp -> [Model $ model & fileSelectionModel . setOp %~ next]
       CyclePrevFile ->
