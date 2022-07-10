@@ -85,7 +85,6 @@ taggerEventHandler
             ]
       TaggerInit ->
         [ Event (DoDescriptorTreeEvent DescriptorTreeInit)
-        , Event FocusQueryTextField
         , Task
             ( DoTaggerInfoEvent . PutWorkingDirectory
                 <$> (T.pack <$> getCurrentDirectory)
@@ -109,6 +108,11 @@ taggerEventHandler
               .~ "Thank you for using tagger!"
               & taggerInfoModel . versionMessage
               .~ "Released on ????/??/??"
+        , Event
+            ( DoFocusedFileEvent
+                (ToggleFocusedFilePaneVisibility zstackQueryWidgetVis)
+            )
+        , Event FocusQueryTextField
         ]
       RefreshUI ->
         [ Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)

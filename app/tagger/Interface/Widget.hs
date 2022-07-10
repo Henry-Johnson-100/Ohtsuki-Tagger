@@ -19,7 +19,19 @@ taggerApplicationUI _ m =
     , ("Ctrl-i", DoFileSelectionEvent CycleNextFile)
     , ("Ctrl-k", DoFileSelectionEvent CyclePrevFile)
     , ("Ctrl-t", FocusTagTextField)
+    ,
+      ( "Ctrl-Shift-t"
+      , DoFocusedFileEvent
+          ( ToggleFocusedFilePaneVisibility
+              zstackTaggingWidgetVis
+          )
+      )
     , ("Ctrl-f", FocusQueryTextField)
+    ,
+      ( "Ctrl-Shift-f"
+      , DoFocusedFileEvent
+          (ToggleFocusedFilePaneVisibility zstackQueryWidgetVis)
+      )
     , ("Ctrl-g", DoFileSelectionEvent CycleNextSetOp)
     , ("Ctrl-Shift-g", DoFileSelectionEvent CyclePrevSetOp)
     , ("Ctrl-u", DoFileSelectionEvent ClearSelection)
