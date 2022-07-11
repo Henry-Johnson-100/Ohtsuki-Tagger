@@ -133,7 +133,7 @@ fileSelectionFileList m =
           )
           . draggable f
           . withStyleBasic [textLeft]
-          $ label_ fp []
+          $ label_ fp [resizeFactor (-1)]
       , withNodeVisible isEditMode editModeWidget
       ]
    where
@@ -142,9 +142,7 @@ fileSelectionFileList m =
         []
         [ removeFromSelectionButton
         , renameFileTextField
-        , spacer_ [resizeFactor (-1)]
         , removeFileFromDatabaseButton
-        , spacer_ [resizeFactor (-1)]
         , deleteFileFromFileSystemButton
         ]
      where
@@ -246,7 +244,7 @@ tagListWidget m =
             Alphabetic -> "ABC"
             Numeric -> "123"
      in styledButton_
-          [resizeFactorW (-1)]
+          [resizeFactor (-1)]
           btnText
           (DoFileSelectionEvent CycleTagOrderCriteria)
   tagListOrderDirCycleButton =
@@ -276,7 +274,7 @@ fileSelectionManagePane m =
         fileSelectionManagePaneIsVisible
         $ hstack_ [] [refreshFileSelectionButton, toggleFileEditMode]
     , styledButton_
-        [resizeFactorW (-1)]
+        [resizeFactor (-1)]
         "Manage"
         (DoFileSelectionEvent (TogglePaneVisibility manageFileSelectionPane))
     ]
@@ -288,7 +286,7 @@ fileSelectionManagePane m =
 clearSelectionButton :: TaggerWidget
 clearSelectionButton =
   styledButton_
-    [resizeFactorW (-1)]
+    [resizeFactor (-1)]
     "Clear"
     (DoFileSelectionEvent ClearSelection)
 
@@ -330,7 +328,7 @@ setOpDrowpdown =
 
 selectionSizeLabel :: TaggerModel -> TaggerWidget
 selectionSizeLabel m =
-  flip label_ [resizeFactorW (-1)] $
+  flip label_ [resizeFactor (-1)] $
     "In Selection: ("
       <> ( T.pack . show
             . Seq.length
@@ -379,6 +377,9 @@ __        _____ ____   ____ _____ _____
    \_/\_/  |___|____/ \____|_____| |_|
 
 -}
+
+mainPaneFloatingOpacity :: Double
+mainPaneFloatingOpacity = 0.5
 
 tagTextNodeKey :: Text
 tagTextNodeKey = "tag-text-field"
@@ -439,10 +440,10 @@ focusedFileWidget m =
       ]
    where
     zstackNextImage =
-      withStyleBasic [bgColor $ yuiLightPeach & a .~ 0.33] $
+      withStyleBasic [bgColor $ yuiLightPeach & a .~ mainPaneFloatingOpacity] $
         styledButton_ [resizeFactor (-1)] "↑" (DoFileSelectionEvent CycleNextFile)
     zstackPrevImage =
-      withStyleBasic [bgColor $ yuiLightPeach & a .~ 0.33] $
+      withStyleBasic [bgColor $ yuiLightPeach & a .~ mainPaneFloatingOpacity] $
         styledButton_ [resizeFactor (-1)] "↓" (DoFileSelectionEvent CyclePrevFile)
     zstackQueryWidget :: TaggerWidget
     zstackQueryWidget =
@@ -450,8 +451,13 @@ focusedFileWidget m =
         . withStyleBasic [maxWidth 450]
         $ hstack_
           []
-          [ vstack . (: []) . withStyleBasic [bgColor $ yuiLightPeach & a .~ 0.33] $
-              styledButton_
+          [ vstack . (: [])
+              . withStyleBasic
+                [ bgColor $
+                    yuiLightPeach
+                      & a .~ mainPaneFloatingOpacity
+                ]
+              $ styledButton_
                 [resizeFactor (-1)]
                 "Query"
                 ( DoFocusedFileEvent
@@ -468,8 +474,13 @@ focusedFileWidget m =
       box_ [alignLeft, ignoreEmptyArea]
         . withStyleBasic [maxWidth 400]
         $ hstack
-          [ vstack . (: []) . withStyleBasic [bgColor $ yuiLightPeach & a .~ 0.33] $
-              styledButton_
+          [ vstack . (: [])
+              . withStyleBasic
+                [ bgColor $
+                    yuiLightPeach
+                      & a .~ mainPaneFloatingOpacity
+                ]
+              $ styledButton_
                 [resizeFactor (-1)]
                 "Tag"
                 ( DoFocusedFileEvent
@@ -521,7 +532,7 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
                 , vscroll_ [wheelRate 50] $
                     vstack
                       [ metaLeaves metaMembers
-                      , spacer
+                      , spacer_ [resizeFactor (-1)]
                       , nullMemberLeaves topNullMembers
                       ]
                 , separatorLine
@@ -543,7 +554,8 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
             ( focusedFileDefaultRecordKey
                 /= (fileId . concreteTaggedFile $ m ^. focusedFileModel . focusedFile)
             )
-            $ styledButton
+            $ styledButton_
+              [resizeFactor (-1)]
               "Rename"
               ( DoFocusedFileEvent
                   (ToggleFocusedFilePaneVisibility fileRenameModeVis)
@@ -671,7 +683,7 @@ tagTextField =
       (DoFocusedFileEvent . AppendTagText . descriptor)
       [dropTargetStyle [border 1 yuiBlue]]
     . withNodeKey tagTextNodeKey
-    . withStyleBasic [bgColor (yuiLightPeach & a .~ 0.33)]
+    . withStyleBasic [bgColor (yuiLightPeach & a .~ mainPaneFloatingOpacity)]
     $ textField_
       (focusedFileModel . tagText)
       [ onChange
@@ -702,7 +714,7 @@ queryTextField =
       (DoFileSelectionEvent . AppendQueryText . descriptor)
       [dropTargetStyle [border 1 yuiBlue]]
     . withNodeKey queryTextFieldKey
-    . withStyleBasic [bgColor (yuiLightPeach & a .~ 0.33)]
+    . withStyleBasic [bgColor (yuiLightPeach & a .~ mainPaneFloatingOpacity)]
     $ textField_
       (fileSelectionModel . queryText)
       [ onChange
@@ -953,7 +965,7 @@ descriptorTreeLeaf
         , box_ [alignLeft]
             . withStyleHover [bgColor yuiRed, textColor white]
             . withStyleBasic [textColor yuiRed]
-            $ button "Delete" (DoDescriptorTreeEvent (DeleteDescriptor d))
+            $ button_ "Delete" (DoDescriptorTreeEvent (DeleteDescriptor d)) [resizeFactor (-1)]
         ]
 
 descriptorTreeToggleVisButton :: TaggerWidget
