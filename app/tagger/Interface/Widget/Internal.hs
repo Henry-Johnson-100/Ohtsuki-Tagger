@@ -6,6 +6,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Redundant flip" #-}
+{-# HLINT ignore "Use ||" #-}
 
 module Interface.Widget.Internal (
   TaggerWidget,
