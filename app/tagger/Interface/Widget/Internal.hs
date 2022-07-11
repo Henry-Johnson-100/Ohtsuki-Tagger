@@ -144,8 +144,46 @@ fileSelectionFileList m =
         , renameFileTextField
         , spacer_ [resizeFactor (-1)]
         , removeFileFromDatabaseButton
+        , spacer_ [resizeFactor (-1)]
+        , deleteFileFromFileSystemButton
         ]
      where
+      deleteFileFromFileSystemButton :: TaggerWidget
+      deleteFileFromFileSystemButton =
+        zstack
+          [ withNodeVisible confirmDeleteVis
+              . tooltip_
+                "Deletes the file from the database and file system."
+                [tooltipDelay 500]
+              . withStyleHover [textColor white, bgColor yuiRed, border 1 black]
+              . withStyleBasic [textColor yuiRed, bgColor yuiLightPeach, border 1 black]
+              $ styledButton_
+                [resizeFactor (-1)]
+                "Confirm"
+                (DoFileSelectionEvent . DeleteFileFromFileSystem $ fk)
+          , withNodeVisible
+              (not confirmDeleteVis)
+              . tooltip_
+                "Deletes the file from the database and file system."
+                [tooltipDelay 500]
+              . withStyleHover [textColor white, bgColor yuiRed, border 1 black]
+              . withStyleBasic [textColor yuiRed, bgColor yuiLightPeach, border 1 black]
+              $ toggleButton_
+                "Delete"
+                ( fileSelectionModel
+                    . fileSelectionInfoMap
+                    . fileInfoAt (fromIntegral fk)
+                    . deleteFileIsVis
+                )
+                [resizeFactor (-1)]
+          ]
+       where
+        confirmDeleteVis =
+          m
+            ^. fileSelectionModel
+              . fileSelectionInfoMap
+              . fileInfoAt (fromIntegral fk)
+              . deleteFileIsVis
       removeFileFromDatabaseButton :: TaggerWidget
       removeFileFromDatabaseButton =
         withStyleBasic [bgColor yuiLightPeach]
