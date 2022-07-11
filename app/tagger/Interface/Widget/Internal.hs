@@ -140,7 +140,8 @@ fileSelectionFileList m =
         $ ( fmap fileSelectionLeaf renderedChunks
               Seq.>< Seq.fromList
                 [ box_ [alignBottom, alignCenter] $
-                    hstack
+                    hstack_
+                      []
                       [ styledButton_
                           [resizeFactor (-1)]
                           "<-"
@@ -183,8 +184,7 @@ fileSelectionFileList m =
       , refreshFileSelectionButton
       , numericField_ (fileSelectionModel . chunkSize) [minValue 0]
       , toggleFileEditMode
-      , spacer_ [resizeFactor (-1)]
-      , addFilesWidget
+      , withStyleBasic [paddingL 15] addFilesWidget
       , shellCommandWidget m
       ]
   fileSelectionLeaf :: File -> TaggerWidget
