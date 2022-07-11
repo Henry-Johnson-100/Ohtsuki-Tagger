@@ -111,7 +111,16 @@ fileSelectionFileList m =
     []
     [ fileSelectionHeader
     , separatorLine
-    , vscroll_ [wheelRate 50]
+    , box_
+        [ alignTop
+        , alignCenter
+        , mergeRequired
+            ( \_ m1 m2 ->
+                let neq l = m1 ^. fileSelectionModel . l /= m2 ^. fileSelectionModel . l
+                 in or [neq selection, neq fileSelectionInfoMap]
+            )
+        ]
+        . vscroll_ [wheelRate 50]
         . vstack_ []
         $ fmap fileSelectionLeaf (m ^. fileSelectionModel . selection)
     ]
@@ -222,8 +231,17 @@ tagListWidget m =
     []
     [ tagListHeader
     , separatorLine
-    , vscroll_ [wheelRate 50] $
-        vstack_ [] (tagListLeaf <$> sortedOccurrenceMapList)
+    , vscroll_ [wheelRate 50]
+        . box_
+          [ alignTop
+          , alignCenter
+          , mergeRequired
+              ( \_ m1 m2 ->
+                  let neq l = m1 ^. fileSelectionModel . l /= m2 ^. fileSelectionModel . l
+                   in or [neq tagOccurrences, neq tagOrdering]
+              )
+          ]
+        $ vstack_ [] (tagListLeaf <$> sortedOccurrenceMapList)
     ]
  where
   tagListHeader =
