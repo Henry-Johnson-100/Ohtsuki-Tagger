@@ -7,6 +7,8 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
+{-# HLINT ignore "Use section" #-}
+
 {- |
 Module      : Database.Tagger.Query.Basic
 Description : Contains basic queries.
@@ -107,11 +109,10 @@ module Database.Tagger.Query (
 
   -- ** 'Descriptor` Operations
   insertDescriptors,
-  -- #TODO modify this function to not delete #_# descriptors
-  -- #TODO create a function that can delete #_# descriptors
   deleteDescriptors,
-  -- #TODO See the two above.
+  deleteDescriptors',
   updateDescriptors,
+  updateDescriptors',
 
   -- ** 'Relation` Operations
   insertDescriptorRelation,
@@ -130,7 +131,7 @@ module Database.Tagger.Query (
 import Control.Monad (guard, join)
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT, throwE)
-import Control.Monad.Trans.Maybe (MaybeT)
+import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
 import qualified Data.HierarchyMap as HAM
@@ -159,7 +160,7 @@ import Database.Tagger.Query.Type (TaggerQuery)
 import Database.Tagger.Type (
   ConcreteTag (ConcreteTag),
   ConcreteTaggedFile (ConcreteTaggedFile),
-  Descriptor (Descriptor),
+  Descriptor (Descriptor, descriptor, descriptorId),
   File,
   RecordKey,
   Tag (Tag, tagSubtagOfId),
@@ -797,12 +798,36 @@ insertDescriptors ps tc = do
 
 {- |
  Delete a list of 'Descriptor`s from the database.
+ Does not delete any immutable 'Descriptor`s, I.E. 'Descriptor`s infixed by '#'
+ Use 'deleteDescriptors'' if this is desired.
 
  Also runs a maintenance execution on the db, inserting all 'Descriptor`s that are not
- infra to anything as infra to #UNRELATED#.
+ infra to anything as infra to \#UNRELATED\#.
 -}
 deleteDescriptors :: [RecordKey Descriptor] -> TaggedConnection -> IO ()
-deleteDescriptors ps tc = do
+deleteDescriptors dks tc = do
+  corrDks <-
+    catMaybes
+      <$> mapM (runMaybeT . flip queryForSingleDescriptorByDescriptorId tc) dks
+  let mutDs =
+        filter
+          ( \(descriptor -> dp) ->
+              not
+                ( "#" `T.isPrefixOf` dp
+                    && "#" `T.isSuffixOf` dp
+                )
+          )
+          corrDks
+  deleteDescriptors' (descriptorId <$> mutDs) tc
+
+{- |
+ Delete a list of 'Descriptor`s from the database.
+
+ Also runs a maintenance execution on the db, inserting all 'Descriptor`s that are not
+ infra to anything as infra to \#UNRELATED\#.
+-}
+deleteDescriptors' :: [RecordKey Descriptor] -> TaggedConnection -> IO ()
+deleteDescriptors' ps tc = do
   executeMany tc q (Only <$> ps)
   execute_ tc unrelateUnrelatedTaggerQuery
  where
@@ -825,9 +850,39 @@ unrelateUnrelatedTaggerQuery =
 
 {- |
  Given a tuple of 'Text` and a 'Descriptor`'s primary key, relabel that 'Descriptor`.
+
+ Does not update immutable 'Descriptor`s, I.E. infixed by '#'.
+ Use 'updateDescriptors'' if this is desired.
 -}
 updateDescriptors :: [(T.Text, RecordKey Descriptor)] -> TaggedConnection -> IO ()
-updateDescriptors updates tc =
+updateDescriptors updates tc = do
+  corrDkTuples <-
+    catMaybes
+      <$> mapM
+        (runMaybeT . secondM (flip queryForSingleDescriptorByDescriptorId tc))
+        updates
+  let mutDTuples =
+        second descriptorId
+          <$> filter
+            ( \(descriptor . snd -> dp) ->
+                not
+                  ( "#" `T.isPrefixOf` dp
+                      && "#" `T.isSuffixOf` dp
+                  )
+            )
+            corrDkTuples
+  updateDescriptors' mutDTuples tc
+ where
+  second f (x, y) = (x, f y)
+  secondM fm (x, y) = do
+    y' <- fm y
+    return (x, y')
+
+{- |
+ Given a tuple of 'Text` and a 'Descriptor`'s primary key, relabel that 'Descriptor`.
+-}
+updateDescriptors' :: [(T.Text, RecordKey Descriptor)] -> TaggedConnection -> IO ()
+updateDescriptors' updates tc =
   executeMany tc q updates
  where
   q =
@@ -1329,7 +1384,7 @@ moveSubTags tids tc =
     |]
 
 {- |
- Search for the #UNRELATED# 'Descriptor`, throw an exception if it is not found.
+ Search for the \#UNRELATED\# 'Descriptor`, throw an exception if it is not found.
 -}
 getUnrelatedDescriptor :: TaggedConnection -> ExceptT T.Text IO Descriptor
 getUnrelatedDescriptor tc = do
