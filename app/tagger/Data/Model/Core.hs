@@ -11,6 +11,7 @@ module Data.Model.Core (
   createFileSelectionModel,
   FileInfo (..),
   createFileInfo,
+  constructFileInfo,
   FocusedFileModel (..),
   focusedFileDefaultDataFile,
   focusedFileDefaultRecordKey,
@@ -98,11 +99,15 @@ createFileSelectionModel =
 
 data FileInfo = FileInfo
   { _fileinfoFileInfoRenameText :: Text
+  , _fileinfoDeleteFileIsVis :: Bool
   }
   deriving (Show, Eq)
 
 createFileInfo :: FileInfo
-createFileInfo = FileInfo ""
+createFileInfo = FileInfo "" False
+
+constructFileInfo :: Text -> FileInfo
+constructFileInfo t = FileInfo t False
 
 data FocusedFileModel = FocusedFileModel
   { _focusedfilemodelFocusedFile :: ConcreteTaggedFile

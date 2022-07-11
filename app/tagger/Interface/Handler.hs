@@ -192,8 +192,12 @@ fileSelectionEventHandler
             model & fileSelectionModel . tagOrdering
               %~ cycleOrderDir
         ]
+      DeleteFileFromFileSystem fk ->
+        [ Task (IOEvent <$> rmFile conn fk)
+        , Event . DoFileSelectionEvent . RemoveFileFromSelection $ fk
+        ]
       MakeFileSelectionInfoMap fseq ->
-        [ let fiTuple (File fk fp) = (fromIntegral fk, FileInfo fp)
+        [ let fiTuple (File fk fp) = (fromIntegral fk, constructFileInfo fp)
               m = F.toList $ fiTuple <$> fseq
            in Model $
                 model
@@ -311,7 +315,7 @@ fileSelectionEventHandler
                     maybeIx
                   & fileSelectionModel . fileSelectionInfoMap
                     . fileInfoAt (fromIntegral fk)
-                    .~ FileInfo fp
+                    .~ constructFileInfo fp
             , Event $ DoFileSelectionEvent RefreshTagOccurrences
             ]
       RefreshFileSelection ->
@@ -330,6 +334,10 @@ fileSelectionEventHandler
                   (map fileId . F.toList $ model ^. fileSelectionModel . selection)
                   conn
             )
+        ]
+      RemoveFileFromDatabase fk ->
+        [ Task (IOEvent <$> deleteFiles [fk] conn)
+        , Event . DoFileSelectionEvent . RemoveFileFromSelection $ fk
         ]
       RemoveFileFromSelection fk ->
         let curSeq = model ^. fileSelectionModel . selection

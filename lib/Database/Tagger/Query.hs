@@ -753,12 +753,12 @@ insertFiles ps tc =
  Given a list of exact absolute paths, delete their corresponding records from
  the database.
 -}
-deleteFiles :: [FilePath] -> TaggedConnection -> IO ()
+deleteFiles :: [RecordKey File] -> TaggedConnection -> IO ()
 deleteFiles ps tc = executeMany tc q (Only <$> ps)
  where
   q =
     [r|
-    DELETE FROM File WHERE filePath = ?
+    DELETE FROM File WHERE id = ?
     |]
 
 {- |

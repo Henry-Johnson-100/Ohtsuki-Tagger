@@ -49,8 +49,8 @@ import System.IO (hPrint, hPutStrLn, stderr)
 rmFile :: TaggedConnection -> RecordKey File -> IO ()
 rmFile tc fk = do
   result <- runExceptT $ do
-    (File _ (T.unpack -> fp)) <- guardFileInDatabase tc fk
-    lift $ deleteFiles [fp] tc
+    (File dbFk (T.unpack -> fp)) <- guardFileInDatabase tc fk
+    lift $ deleteFiles [dbFk] tc
     rmResult <-
       lift . Exception.try $ removeFile fp ::
         ExceptT String IO (Either Exception.IOException ())

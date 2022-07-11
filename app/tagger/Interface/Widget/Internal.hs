@@ -137,8 +137,24 @@ fileSelectionFileList m =
       , withNodeVisible isEditMode editModeWidget
       ]
    where
-    editModeWidget = hstack_ [] [removeFromSelectionButton, renameFileTextField, label "edit mode :P"]
+    editModeWidget =
+      hstack_
+        []
+        [ removeFromSelectionButton
+        , renameFileTextField
+        , spacer_ [resizeFactor (-1)]
+        , removeFileFromDatabaseButton
+        ]
      where
+      removeFileFromDatabaseButton :: TaggerWidget
+      removeFileFromDatabaseButton =
+        withStyleBasic [bgColor yuiLightPeach]
+          . tooltip_ "Removes the file from the database only." [tooltipDelay 1500]
+          . withStyleHover [bgColor yuiRed]
+          $ styledButton_
+            [resizeFactor (-1)]
+            "Remove"
+            (DoFileSelectionEvent . RemoveFileFromDatabase $ fk)
       renameFileTextField :: TaggerWidget
       renameFileTextField =
         keystroke_
@@ -153,7 +169,7 @@ fileSelectionFileList m =
             []
       removeFromSelectionButton =
         styledButton_
-          [resizeFactorW (-1)]
+          [resizeFactor (-1)]
           "-"
           (DoFileSelectionEvent (RemoveFileFromSelection fk))
     isEditMode =

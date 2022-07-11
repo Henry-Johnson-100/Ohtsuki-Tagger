@@ -45,6 +45,7 @@ data FileSelectionEvent
   | CyclePrevSetOp
   | CycleTagOrderCriteria
   | CycleTagOrderDirection
+  | DeleteFileFromFileSystem (RecordKey File)
   | MakeFileSelectionInfoMap (Seq File)
   | NextAddFileHist
   | NextQueryHist
@@ -61,6 +62,7 @@ data FileSelectionEvent
   | -- | Given a Traversable of File keys, fetch an OccurrenceHashMap. Saves having to
     -- call toList on the selection Seq in RefreshTagOccurrences.
     RefreshTagOccurrencesWith (Seq (RecordKey File))
+  | RemoveFileFromDatabase (RecordKey File)
   | RemoveFileFromSelection (RecordKey File)
   | RenameFile (RecordKey File)
   | ResetAddFileHistIndex
