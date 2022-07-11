@@ -125,18 +125,37 @@ fileSelectionFileList m =
   fileSelectionHeader :: TaggerWidget
   fileSelectionHeader = hstack_ [] [toggleViewSelectionButton, shuffleSelectionButton]
   fileSelectionLeaf :: File -> TaggerWidget
-  fileSelectionLeaf f@(File _ fp) =
-    draggable f $
-      zstack_
-        []
-        [ withNodeVisible
-            ( not isEditMode
-            )
-            . withStyleBasic [textLeft]
-            $ label_ fp []
-        , withNodeVisible isEditMode $ label "edit mode :P"
-        ]
+  fileSelectionLeaf f@(File fk fp) =
+    zstack_
+      []
+      [ withNodeVisible
+          ( not isEditMode
+          )
+          . draggable f
+          . withStyleBasic [textLeft]
+          $ label_ fp []
+      , withNodeVisible isEditMode editModeWidget
+      ]
    where
+    editModeWidget = hstack_ [] [removeFromSelectionButton, renameFileTextField, label "edit mode :P"]
+     where
+      renameFileTextField :: TaggerWidget
+      renameFileTextField =
+        keystroke_
+          [("Enter", DoFileSelectionEvent . RenameFile $ fk)]
+          [ignoreChildrenEvts]
+          $ textField_
+            ( fileSelectionModel
+                . fileSelectionInfoMap
+                . fileInfoAt (fromIntegral fk)
+                . fileInfoRenameText
+            )
+            []
+      removeFromSelectionButton =
+        styledButton_
+          [resizeFactorW (-1)]
+          "-"
+          (DoFileSelectionEvent (RemoveFileFromSelection fk))
     isEditMode =
       (m ^. fileSelectionModel . fileSelectionVis)
         `hasVis` VisibilityLabel editFileMode
