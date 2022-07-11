@@ -331,6 +331,18 @@ fileSelectionEventHandler
                   conn
             )
         ]
+      RemoveFileFromSelection fk ->
+        let curSeq = model ^. fileSelectionModel . selection
+            maybeIx = Seq.findIndexR ((==) fk . fileId) curSeq
+         in maybe
+              []
+              ( \sindex ->
+                  [ Event . DoFileSelectionEvent . PutFilesNoCombine
+                      . flip Seq.deleteAt curSeq
+                      $ sindex
+                  ]
+              )
+              maybeIx
       RenameFile fk ->
         [ let newRenameText =
                 model
