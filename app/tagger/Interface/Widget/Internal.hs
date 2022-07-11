@@ -173,7 +173,7 @@ tagListWidget m =
             Alphabetic -> "ABC"
             Numeric -> "123"
      in styledButton_
-          [resizeFactor (-1)]
+          [resizeFactorW (-1)]
           btnText
           (DoFileSelectionEvent CycleTagOrderCriteria)
   tagListOrderDirCycleButton =
@@ -203,7 +203,7 @@ fileSelectionManagePane m =
         fileSelectionManagePaneIsVisible
         $ hstack_ [] [refreshFileSelectionButton, toggleFileEditMode]
     , styledButton_
-        [resizeFactor (-1)]
+        [resizeFactorW (-1)]
         "Manage"
         (DoFileSelectionEvent (TogglePaneVisibility manageFileSelectionPane))
     ]
@@ -215,7 +215,7 @@ fileSelectionManagePane m =
 clearSelectionButton :: TaggerWidget
 clearSelectionButton =
   styledButton_
-    [resizeFactor (-1)]
+    [resizeFactorW (-1)]
     "Clear"
     (DoFileSelectionEvent ClearSelection)
 
@@ -257,7 +257,7 @@ setOpDrowpdown =
 
 selectionSizeLabel :: TaggerModel -> TaggerWidget
 selectionSizeLabel m =
-  flip label_ [resizeFactor (-1)] $
+  flip label_ [resizeFactorW (-1)] $
     "In Selection: ("
       <> ( T.pack . show
             . Seq.length
