@@ -466,12 +466,11 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
     filePathWidget =
       hstack_
         []
-        [ withNodeVisible True
-          -- ( focusedFileDefaultRecordKey
-          --     /= (fileId . concreteTaggedFile $ m ^. focusedFileModel . focusedFile)
-          -- )
-          $
-            styledButton
+        [ withNodeVisible
+            ( focusedFileDefaultRecordKey
+                /= (fileId . concreteTaggedFile $ m ^. focusedFileModel . focusedFile)
+            )
+            $ styledButton
               "Rename"
               ( DoFocusedFileEvent
                   (ToggleFocusedFilePaneVisibility fileRenameModeVis)
