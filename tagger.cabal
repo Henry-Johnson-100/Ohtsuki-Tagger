@@ -44,6 +44,7 @@ common tagger-common
                       ,hashable == 1.4.0.2
                       ,containers == 0.6.2.1
                       ,unordered-containers == 0.2.18.0
+                      ,process
 
 executable tagger
   import:              haskell-common

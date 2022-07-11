@@ -126,6 +126,7 @@ fileSelectionFileList m =
       , toggleFileEditMode
       , spacer_ [resizeFactor (-1)]
       , addFilesWidget
+      , shellCommandWidget m
       ]
   fileSelectionLeaf :: File -> TaggerWidget
   fileSelectionLeaf f@(File fk fp) =
@@ -279,6 +280,22 @@ toggleViewSelectionButton =
     [resizeFactor (-1)]
     "View"
     (DoFileSelectionEvent ToggleSelectionView)
+
+shellCommandWidget :: TaggerModel -> TaggerWidget
+shellCommandWidget ((^. isMassOpMode) -> isMassOpModeIsTrue) =
+  hstack
+    [ toggleButton_ "MassOp" isMassOpMode [resizeFactor (-1)]
+    , keystroke_
+        [
+          ( "Enter"
+          , if isMassOpModeIsTrue
+              then DoFileSelectionEvent RunSelectionShellCommand
+              else DoFocusedFileEvent RunFocusedFileShellCommand
+          )
+        ]
+        [ignoreChildrenEvts]
+        $ textField_ shellText []
+    ]
 
 addFilesWidget :: TaggerWidget
 addFilesWidget =

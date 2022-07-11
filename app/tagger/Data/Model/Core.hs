@@ -45,6 +45,7 @@ data TaggerModel = TaggerModel
   , _taggermodelConnection :: TaggedConnection
   , _taggermodelIsTagMode :: Bool
   , _taggerMassTagText :: Text
+  , _taggerIsMassOpMode :: Bool
   , _taggerShellText :: Text
   }
   deriving (Show, Eq)
@@ -65,6 +66,7 @@ createTaggerModel tc d unRelatedD defaultFilePath =
     , _taggermodelConnection = tc
     , _taggermodelIsTagMode = True
     , _taggerMassTagText = ""
+    , _taggerIsMassOpMode = False
     , _taggerShellText = ""
     }
 

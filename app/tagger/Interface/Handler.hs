@@ -382,6 +382,19 @@ fileSelectionEventHandler
             model
               & fileSelectionModel . queryHistory . historyIndex .~ 0
         ]
+      RunSelectionShellCommand ->
+        [ Task
+            ( IOEvent
+                <$> runShellCmd
+                  (T.strip $ model ^. shellText)
+                  ( F.toList
+                      ( T.unpack . filePath <$> model
+                          ^. fileSelectionModel
+                            . selection
+                      )
+                  )
+            )
+        ]
       RefreshTagOccurrencesWith fks ->
         [ Task
             ( DoFileSelectionEvent . PutTagOccurrenceHashMap_
@@ -564,6 +577,18 @@ focusedFileEventHandler
         [ Model $
             model
               & focusedFileModel . tagHistory . historyIndex .~ 0
+        ]
+      RunFocusedFileShellCommand ->
+        [ Task
+            ( IOEvent
+                <$> runShellCmd
+                  (T.strip $ model ^. shellText)
+                  [ T.unpack . filePath . concreteTaggedFile $
+                      model
+                        ^. focusedFileModel
+                          . focusedFile
+                  ]
+            )
         ]
       -- Should:
       -- submit a tag in the db
