@@ -68,9 +68,6 @@ __        _____ ____   ____ _____ _____
 queryTextFieldKey :: Text
 queryTextFieldKey = "queryTextField"
 
-manageFileSelectionPane :: Text
-manageFileSelectionPane = "manage-file-selection"
-
 editFileMode :: Text
 editFileMode = "edit-file"
 
@@ -78,16 +75,12 @@ fileSelectionWidget :: TaggerModel -> TaggerWidget
 fileSelectionWidget m =
   vstack_
     []
-    [ withStyleBasic [textCenter, paddingT 5, paddingB 5] $
-        selectionSizeLabel m
-    , withStyleBasic [paddingB 5] separatorLine
-    , fileSelectionWidgetHeader
+    [ fileSelectionWidgetHeader
     , zstack_
         []
         [ withNodeVisible (not selectionIsVisible) $ tagListWidget m
         , withNodeVisible selectionIsVisible $ fileSelectionFileList m
         ]
-    , fileSelectionManagePane m
     ]
  where
   selectionIsVisible =
@@ -95,7 +88,8 @@ fileSelectionWidget m =
   fileSelectionWidgetHeader =
     hstack_
       []
-      [ clearSelectionButton
+      [ selectionSizeLabel m
+      , clearSelectionButton
       , setOpDrowpdown
       ]
 
@@ -123,7 +117,16 @@ fileSelectionFileList m =
     ]
  where
   fileSelectionHeader :: TaggerWidget
-  fileSelectionHeader = hstack_ [] [toggleViewSelectionButton, shuffleSelectionButton]
+  fileSelectionHeader =
+    hstack_
+      []
+      [ toggleViewSelectionButton
+      , shuffleSelectionButton
+      , refreshFileSelectionButton
+      , toggleFileEditMode
+      , spacer_ [resizeFactor (-1)]
+      , addFilesWidget
+      ]
   fileSelectionLeaf :: File -> TaggerWidget
   fileSelectionLeaf f@(File fk fp) =
     zstack_
@@ -262,26 +265,6 @@ tagListWidget m =
           separatorLine
       , label . T.pack . show $ n
       ]
-
-fileSelectionManagePane :: TaggerModel -> TaggerWidget
-fileSelectionManagePane m =
-  vstack_
-    []
-    [ withNodeVisible
-        fileSelectionManagePaneIsVisible
-        addFilesWidget
-    , withNodeVisible
-        fileSelectionManagePaneIsVisible
-        $ hstack_ [] [refreshFileSelectionButton, toggleFileEditMode]
-    , styledButton_
-        [resizeFactor (-1)]
-        "Manage"
-        (DoFileSelectionEvent (TogglePaneVisibility manageFileSelectionPane))
-    ]
- where
-  fileSelectionManagePaneIsVisible =
-    (m ^. fileSelectionModel . fileSelectionVis)
-      `hasVis` VisibilityLabel manageFileSelectionPane
 
 clearSelectionButton :: TaggerWidget
 clearSelectionButton =
@@ -507,44 +490,46 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
     ]
  where
   detailPaneTagsWidget =
-    let metaMembers =
-          L.sortOn (descriptor . concreteTagDescriptor)
-            . filter (\x -> HM.metaMember x hm && not (HM.infraMember x hm))
-            . HM.keys
-            $ hm
-        topNullMembers =
-          L.sortOn (descriptor . concreteTagDescriptor)
-            . filter
-              ( \x ->
-                  not (HM.metaMember x hm)
-                    && not (HM.infraMember x hm)
-              )
-            . HM.keys
-            $ hm
-     in withStyleBasic
-          [paddingR 20]
-          $ vgrid_
+    withStyleBasic
+      [paddingR 20]
+      $ vstack_
+        []
+        [ vstack_
             []
-            [ vstack_
-                []
-                [ filePathWidget
-                , separatorLine
-                , vscroll_ [wheelRate 50] $
-                    vstack
-                      [ metaLeaves metaMembers
-                      , spacer_ [resizeFactor (-1)]
-                      , nullMemberLeaves topNullMembers
-                      ]
-                , separatorLine
-                , deleteTagZone
-                , separatorLine
-                ]
-            , withStyleBasic [paddingT 20] $
+            [ filePathWidget
+            , separatorLine
+            , vscroll_ [wheelRate 50] $
                 vstack
-                  [ separatorLine
-                  , fileSelectionWidget m
+                  [ metaLeaves
+                      ( L.sortOn (descriptor . concreteTagDescriptor)
+                          . filter
+                            ( \x ->
+                                HM.metaMember x hm
+                                  && not (HM.infraMember x hm)
+                            )
+                          . HM.keys
+                          $ hm
+                      )
+                  , spacer_ [resizeFactor (-1)]
+                  , nullMemberLeaves
+                      ( L.sortOn (descriptor . concreteTagDescriptor)
+                          . filter
+                            ( \x ->
+                                not (HM.metaMember x hm)
+                                  && not (HM.infraMember x hm)
+                            )
+                          . HM.keys
+                          $ hm
+                      )
+                  , deleteTagZone
                   ]
             ]
+        , withStyleBasic [paddingT 20] $
+            vstack
+              [ separatorLine
+              , withStyleBasic [maxHeight 400] $ fileSelectionWidget m
+              ]
+        ]
    where
     filePathWidget :: TaggerWidget
     filePathWidget =
@@ -598,7 +583,7 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
       isFileRenameMode =
         (m ^. focusedFileModel . focusedFileVis)
           `hasVis` VisibilityLabel fileRenameModeVis
-    nullMemberLeaves topNullMembers =
+    nullMemberLeaves members =
       withStyleBasic [borderB 1 black]
         . vstack_ []
         $ ( \ct@(ConcreteTag tk (Descriptor _ dp) _) ->
@@ -607,11 +592,11 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
                 . draggable ct
                 $ label dp
           )
-          <$> topNullMembers
+          <$> members
     metaLeaves :: [ConcreteTag] -> TaggerWidget
-    metaLeaves metaMembers =
+    metaLeaves members =
       vstack_ [] . L.intersperse spacer $
-        (flip metaLeaf hm <$> metaMembers)
+        (flip metaLeaf hm <$> members)
      where
       metaLeaf l@(ConcreteTag tk (Descriptor _ dp) _) hmap =
         let subtags =
