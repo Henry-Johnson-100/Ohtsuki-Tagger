@@ -55,10 +55,13 @@ data FileSelectionEvent
   | PutTagOccurrenceHashMap_ (OccurrenceHashMap Descriptor)
   | Query
   | RefreshFileSelection
+  | RefreshSpecificFile (RecordKey File)
+  | RefreshSpecificFile_ File
   | RefreshTagOccurrences
   | -- | Given a Traversable of File keys, fetch an OccurrenceHashMap. Saves having to
     -- call toList on the selection Seq in RefreshTagOccurrences.
     RefreshTagOccurrencesWith (Seq (RecordKey File))
+  | RenameFile (RecordKey File)
   | ResetAddFileHistIndex
   | ResetQueryHistIndex
   | ShuffleSelection
@@ -76,7 +79,6 @@ data FocusedFileEvent
   | PutConcreteFile_ ConcreteTaggedFile
   | PutFile File
   | RefreshFocusedFileAndSelection
-  | RenameFile
   | ResetTagHistIndex
   | TagFile (RecordKey Descriptor) (Maybe (RecordKey Tag))
   | ToggleFocusedFilePaneVisibility Text

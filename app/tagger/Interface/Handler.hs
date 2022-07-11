@@ -290,6 +290,30 @@ fileSelectionEventHandler
         , Event (ClearTextField (TaggerLens (fileSelectionModel . queryText)))
         , Event (DoFileSelectionEvent ResetQueryHistIndex)
         ]
+      RefreshSpecificFile fk ->
+        [ Task
+            ( do
+                f <- runMaybeT $ queryForSingleFileByFileId fk conn
+                maybe
+                  (return . IOEvent $ ())
+                  (return . DoFileSelectionEvent . RefreshSpecificFile_)
+                  f
+            )
+        ]
+      RefreshSpecificFile_ f@(File fk fp) ->
+        let curSeq = model ^. fileSelectionModel . selection
+            maybeIx = Seq.findIndexR ((==) fk . fileId) curSeq
+         in [ Model $
+                model & fileSelectionModel . selection
+                  %~ maybe
+                    (f <|)
+                    (Seq.adjust (const f))
+                    maybeIx
+                  & fileSelectionModel . fileSelectionInfoMap
+                    . fileInfoAt (fromIntegral fk)
+                    .~ FileInfo fp
+            , Event $ DoFileSelectionEvent RefreshTagOccurrences
+            ]
       RefreshFileSelection ->
         [ Event (DoFileSelectionEvent RefreshTagOccurrences)
         , Event
@@ -306,6 +330,27 @@ fileSelectionEventHandler
                   (map fileId . F.toList $ model ^. fileSelectionModel . selection)
                   conn
             )
+        ]
+      RenameFile fk ->
+        [ let newRenameText =
+                model
+                  ^. fileSelectionModel
+                    . fileSelectionInfoMap
+                    . fileInfoAt (fromIntegral fk)
+                    . fileInfoRenameText
+           in Task
+                ( do
+                    -- refetch the fk from the db,
+                    -- to put the calculation in the MaybeT monad
+                    result <- runMaybeT $ do
+                      lift $ mvFile conn fk newRenameText
+                      queryForSingleFileByFileId fk conn
+                    maybe
+                      (return $ IOEvent ())
+                      (return . DoFileSelectionEvent . RefreshSpecificFile_)
+                      result
+                )
+        , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
       ResetAddFileHistIndex ->
         [ Model $
@@ -494,17 +539,6 @@ focusedFileEventHandler
             . concreteTaggedFile
             $ model ^. focusedFileModel . focusedFile
         , Event . DoFileSelectionEvent $ RefreshFileSelection
-        ]
-      RenameFile ->
-        [ let fk = fileId . concreteTaggedFile $ model ^. focusedFileModel . focusedFile
-              newRenameText =
-                model
-                  ^. fileSelectionModel
-                    . fileSelectionInfoMap
-                    . fileInfoAt (fromIntegral fk)
-                    . fileInfoRenameText
-           in Task (IOEvent <$> mvFile conn fk newRenameText)
-        , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
       ResetTagHistIndex ->
         [ Model $

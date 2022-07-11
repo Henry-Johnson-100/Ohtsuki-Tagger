@@ -466,7 +466,7 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
     filePathWidget =
       hstack_
         []
-        [ withNodeVisible False
+        [ withNodeVisible True
           -- ( focusedFileDefaultRecordKey
           --     /= (fileId . concreteTaggedFile $ m ^. focusedFileModel . focusedFile)
           -- )
@@ -485,7 +485,15 @@ detailPane m@((^. focusedFileModel . focusedFile) -> (ConcreteTaggedFile _ hm)) 
                   (filePath . concreteTaggedFile $m ^. focusedFileModel . focusedFile)
             , withNodeVisible isFileRenameMode
                 . keystroke_
-                  [("Enter", DoFocusedFileEvent RenameFile)]
+                  [
+                    ( "Enter"
+                    , DoFileSelectionEvent
+                        . RenameFile
+                        $ ( fileId . concreteTaggedFile $
+                              m ^. focusedFileModel . focusedFile
+                          )
+                    )
+                  ]
                   []
                 $ textField_
                   ( fileSelectionModel
