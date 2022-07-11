@@ -1,5 +1,7 @@
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
+{-# OPTIONS_GHC -Wno-type-defaults #-}
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# HLINT ignore "Eta reduce" #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -9,6 +11,8 @@ module Data.Model.Core (
   createTaggerModel,
   FileSelectionModel (..),
   createFileSelectionModel,
+  getSelectionChunk,
+  selectionChunkLength,
   FileInfo (..),
   createFileInfo,
   constructFileInfo,
@@ -27,11 +31,13 @@ module Data.Model.Core (
 import Data.HierarchyMap (empty)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
+import Data.Maybe
 import Data.Model.Shared
 import Data.OccurrenceHashMap (OccurrenceHashMap)
 import qualified Data.OccurrenceHashMap as OHM
 import Data.Sequence (Seq)
 import qualified Data.Sequence as S
+import qualified Data.Sequence as Seq
 import Data.Tagger
 import Data.Text (Text)
 import Database.Tagger.Type
@@ -72,6 +78,9 @@ createTaggerModel tc d unRelatedD defaultFilePath =
 
 data FileSelectionModel = FileSelectionModel
   { _fileselectionSelection :: Seq File
+  , _fileselectionCurrentChunk :: Int
+  , _fileselectionChunkSize :: Int
+  , _fileselectionChunkSequence :: Seq Int
   , _fileselectionTagOccurrences :: OccurrenceHashMap Descriptor
   , _fileselectionTagOrdering :: OrderBy
   , _fileselectionFileSelectionInfoMap :: IntMap FileInfo
@@ -88,6 +97,9 @@ createFileSelectionModel :: FileSelectionModel
 createFileSelectionModel =
   FileSelectionModel
     { _fileselectionSelection = S.empty
+    , _fileselectionCurrentChunk = 0
+    , _fileselectionChunkSize = 50
+    , _fileselectionChunkSequence = S.singleton 0
     , _fileselectionTagOccurrences = OHM.empty
     , _fileselectionTagOrdering = OrderBy Numeric Desc
     , _fileselectionFileSelectionInfoMap = IntMap.empty
@@ -110,6 +122,32 @@ createFileInfo = FileInfo "" False
 
 constructFileInfo :: Text -> FileInfo
 constructFileInfo t = FileInfo t False
+
+selectionChunkLength :: TaggerModel -> Int
+selectionChunkLength m = 1 + ((Seq.length . _fileselectionSelection . _taggermodelFileSelectionModel $ m) `div` (_fileselectionChunkSize . _taggermodelFileSelectionModel $ m))
+
+getSelectionChunk :: TaggerModel -> Seq File
+getSelectionChunk m =
+  getSelectionChunk'
+    (_fileselectionCurrentChunk . _taggermodelFileSelectionModel $ m)
+    (_fileselectionChunkSize . _taggermodelFileSelectionModel $ m)
+    (_fileselectionSelection . _taggermodelFileSelectionModel $ m)
+
+{- |
+ Get the indexed chunk of 50 or fewer items from the given seq.
+-}
+getSelectionChunk' :: Int -> Int -> Seq a -> Seq a
+getSelectionChunk' n cs s
+  | Seq.null s = s
+  | otherwise =
+    let chunks = Seq.chunksOf cs s
+        size = Seq.length chunks
+     in ( if
+              | n >= size -> fromJust . Seq.lookup (size - 1)
+              | n < 0 -> fromJust . Seq.lookup 0
+              | otherwise -> fromJust . Seq.lookup n
+        )
+          chunks
 
 data FocusedFileModel = FocusedFileModel
   { _focusedfilemodelFocusedFile :: ConcreteTaggedFile

@@ -10,6 +10,7 @@
 
 module Interface.Widget.Internal (
   TaggerWidget,
+  fileSelectionScrollWidgetNodeKey,
   hidePossibleUIVis,
   fileSelectionWidget,
   fileSelectionOperationWidget,
@@ -66,6 +67,9 @@ __        _____ ____   ____ _____ _____
 
 -}
 
+fileSelectionScrollWidgetNodeKey :: Text
+fileSelectionScrollWidgetNodeKey = "file-selection-scroll-widget"
+
 queryTextFieldKey :: Text
 queryTextFieldKey = "queryTextField"
 
@@ -118,14 +122,58 @@ fileSelectionFileList m =
         , mergeRequired
             ( \_ m1 m2 ->
                 let neq l = m1 ^. fileSelectionModel . l /= m2 ^. fileSelectionModel . l
-                 in or [neq selection, neq fileSelectionInfoMap]
+                 in or
+                      [ neq selection
+                      , neq fileSelectionInfoMap
+                      , neq currentChunk
+                      , neq chunkSequence
+                      , neq chunkSize
+                      , neq fileSelectionVis
+                      ]
             )
         ]
-        . vscroll_ [wheelRate 50]
+        . withNodeKey fileSelectionScrollWidgetNodeKey
+        . vscroll_
+          [ wheelRate 50
+          ]
         . vstack_ []
-        $ fmap fileSelectionLeaf (m ^. fileSelectionModel . selection)
+        $ ( fmap fileSelectionLeaf renderedChunks
+              Seq.>< Seq.fromList
+                [ box_ [alignBottom, alignCenter] $
+                    hstack
+                      [ styledButton_
+                          [resizeFactor (-1)]
+                          "<-"
+                          ( DoFileSelectionEvent
+                              . DoFileSelectionWidgetEvent
+                              $ CyclePrevChunk
+                          )
+                      , label_
+                          ( ( T.pack . show . succ $
+                                m ^. fileSelectionModel . currentChunk
+                            )
+                              <> "/"
+                              <> ( T.pack
+                                    . show
+                                    . Seq.length
+                                    $ m ^. fileSelectionModel . chunkSequence
+                                 )
+                          )
+                          [resizeFactor (-1)]
+                      , styledButton_
+                          [resizeFactor (-1)]
+                          "->"
+                          ( DoFileSelectionEvent
+                              . DoFileSelectionWidgetEvent
+                              $ CycleNextChunk
+                          )
+                      ]
+                ]
+          )
     ]
  where
+  renderedChunks =
+    getSelectionChunk m
   fileSelectionHeader :: TaggerWidget
   fileSelectionHeader =
     hstack_
@@ -133,6 +181,7 @@ fileSelectionFileList m =
       [ toggleViewSelectionButton
       , shuffleSelectionButton
       , refreshFileSelectionButton
+      , numericField_ (fileSelectionModel . chunkSize) [minValue 0]
       , toggleFileEditMode
       , spacer_ [resizeFactor (-1)]
       , addFilesWidget

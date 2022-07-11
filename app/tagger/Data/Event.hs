@@ -6,6 +6,7 @@
 module Data.Event (
   TaggerEvent (..),
   FileSelectionEvent (..),
+  FileSelectionWidgetEvent (..),
   DescriptorTreeEvent (..),
   FocusedFileEvent (..),
   TaggerInfoEvent (..),
@@ -46,11 +47,13 @@ data FileSelectionEvent
   | CycleTagOrderCriteria
   | CycleTagOrderDirection
   | DeleteFileFromFileSystem (RecordKey File)
+  | DoFileSelectionWidgetEvent FileSelectionWidgetEvent
   | MakeFileSelectionInfoMap (Seq File)
   | NextAddFileHist
   | NextQueryHist
   | PrevAddFileHist
   | PrevQueryHist
+  | PutChunkSequence
   | PutFiles (HashSet File)
   | PutFilesNoCombine (Seq File)
   | PutTagOccurrenceHashMap_ (OccurrenceHashMap Descriptor)
@@ -71,6 +74,13 @@ data FileSelectionEvent
   | ShuffleSelection
   | ToggleSelectionView
   | TogglePaneVisibility Text
+  deriving (Show, Eq)
+
+data FileSelectionWidgetEvent
+  = CycleNextChunk
+  | CyclePrevChunk
+  | ResetFileSelectionWidgetChunk
+  | ResetFileSelectionWidgetScroll
   deriving (Show, Eq)
 
 data FocusedFileEvent

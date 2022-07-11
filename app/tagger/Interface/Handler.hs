@@ -5,6 +5,8 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
+{-# HLINT ignore "Use list comprehension" #-}
+
 module Interface.Handler (
   taggerEventHandler,
 ) where
@@ -32,7 +34,7 @@ import qualified Data.Text as T
 import Data.Version (showVersion)
 import Database.Tagger
 import Interface.Handler.Internal
-import Interface.Widget.Internal (queryTextFieldKey, tagTextNodeKey, zstackQueryWidgetVis, zstackTaggingWidgetVis)
+import Interface.Widget.Internal (fileSelectionScrollWidgetNodeKey, queryTextFieldKey, tagTextNodeKey, zstackQueryWidgetVis, zstackTaggingWidgetVis)
 import Monomer
 import Paths_tagger
 import System.Directory (getCurrentDirectory)
@@ -131,8 +133,8 @@ fileSelectionEventHandler ::
   FileSelectionEvent ->
   [AppEventResponse TaggerModel TaggerEvent]
 fileSelectionEventHandler
-  _
-  _
+  wenv
+  node
   model@(_taggermodelConnection -> conn)
   event =
     case event of
@@ -196,6 +198,7 @@ fileSelectionEventHandler
         [ Task (IOEvent <$> rmFile conn fk)
         , Event . DoFileSelectionEvent . RemoveFileFromSelection $ fk
         ]
+      DoFileSelectionWidgetEvent e -> fileSelectionWidgetEventHandler wenv node model e
       MakeFileSelectionInfoMap fseq ->
         [ let fiTuple (File fk fp) = (fromIntegral fk, constructFileInfo fp)
               m = F.toList $ fiTuple <$> fseq
@@ -237,6 +240,14 @@ fileSelectionEventHandler
                 .~ (fromMaybe "" . getHist $ (model ^. fileSelectionModel . queryHistory))
               & fileSelectionModel . queryHistory %~ prevHist
         ]
+      PutChunkSequence ->
+        [ Model $
+            model & fileSelectionModel . chunkSequence
+              .~ Seq.fromList
+                [ 0
+                .. selectionChunkLength model
+                ]
+        ]
       PutFiles fs ->
         let currentSet =
               HS.fromList
@@ -270,6 +281,11 @@ fileSelectionEventHandler
                   (RefreshTagOccurrencesWith (fmap fileId fseq))
               )
           , Event (DoFileSelectionEvent . MakeFileSelectionInfoMap $ fseq)
+          , Event
+              . DoFileSelectionEvent
+              . DoFileSelectionWidgetEvent
+              $ ResetFileSelectionWidgetScroll
+          , Event . DoFileSelectionEvent $ PutChunkSequence
           ]
             ++ ( case fseq of
                   Seq.Empty -> []
@@ -326,6 +342,7 @@ fileSelectionEventHandler
                     model ^. fileSelectionModel . selection
                 )
             )
+        , Event . DoFileSelectionEvent $ PutChunkSequence
         ]
       RefreshTagOccurrences ->
         [ Task
@@ -419,6 +436,48 @@ fileSelectionEventHandler
                 . fileSelectionVis
               %~ toggleAltVis
         ]
+
+fileSelectionWidgetEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  FileSelectionWidgetEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+fileSelectionWidgetEventHandler
+  _
+  _
+  model
+  event = case event of
+    CycleNextChunk ->
+      let cSeq = model ^. fileSelectionModel . chunkSequence
+       in case cSeq of
+            (f' :<| (f :<| fs)) ->
+              [ Model $
+                  model & fileSelectionModel . currentChunk .~ f
+                    & fileSelectionModel . chunkSequence .~ (f <| (fs |> f'))
+              ]
+            _ -> []
+    CyclePrevChunk ->
+      let cSeq = model ^. fileSelectionModel . chunkSequence
+       in case cSeq of
+            (f' :<| (fs :|> f)) ->
+              [ Model $
+                  model & fileSelectionModel . currentChunk .~ f
+                    & fileSelectionModel . chunkSequence .~ (f <| (f' <| fs))
+              ]
+            _ -> []
+    ResetFileSelectionWidgetChunk ->
+      [ Model $
+          model
+            & fileSelectionModel . currentChunk .~ 0
+      , Event . DoFileSelectionEvent . DoFileSelectionWidgetEvent $
+          ResetFileSelectionWidgetScroll
+      ]
+    ResetFileSelectionWidgetScroll ->
+      [ Message
+          (WidgetKey fileSelectionScrollWidgetNodeKey)
+          ScrollReset
+      ]
 
 focusedFileEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
