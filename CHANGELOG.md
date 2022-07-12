@@ -2,7 +2,9 @@
 
 ------
 
-# 1.0.0.0 -- ????-??-??
+# 1.0.0.0 -- 2022-07-11
+
+* I rewrote everything from scratch. Most functionality is the same.
 
 ------
 
