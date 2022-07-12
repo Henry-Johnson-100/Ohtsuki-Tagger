@@ -26,6 +26,7 @@ common haskell-common
   ghc-options:         -Wall
 
   build-depends:       base ^>= 4.13.0.0
+                      ,Cabal
 
 common tagger-common
   other-extensions:    OverloadedStrings
@@ -51,7 +52,8 @@ executable tagger
 
   main-is:             Main.hs
 
-  other-modules:       Data.Event
+  other-modules:       Config
+                      ,Data.Event
                       ,Data.Model
                       ,Data.Model.Core
                       ,Data.Model.Lens
@@ -76,7 +78,8 @@ executable tagger
                       ,directory == 1.3.6.0
                       ,filepath == 1.4.2.1
                       ,random
-                      ,process                      
+                      ,process
+                      ,tomland
 
   hs-source-dirs:      app/tagger
 

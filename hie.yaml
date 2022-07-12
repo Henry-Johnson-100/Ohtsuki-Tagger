@@ -3,6 +3,9 @@ cradle:
     - path: "app/tagger/Main.hs"
       component: "tagger:exe:tagger"
 
+    - path: "app/tagger/Config.hs"
+      component: "tagger:exe:tagger"
+
     - path: "app/tagger/Data/Event.hs"
       component: "tagger:exe:tagger"
 

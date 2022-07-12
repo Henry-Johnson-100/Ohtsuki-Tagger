@@ -6,7 +6,11 @@ module Interface.Theme (
   module Interface.Theme,
 ) where
 
+import Config
+import Control.Monad
+import Control.Monad.Trans.Maybe
 import Data.Event (TaggerEvent (CloseConnection))
+import Data.Maybe
 import qualified Data.Text as T
 import Monomer (
   AppConfig,
@@ -58,10 +62,11 @@ themeConfig = do
       <$> (makeAbsolute =<< PT.getDataFileName "iosevka_regular.ttf")
   defaultBoldFont <- T.pack <$> (makeAbsolute =<< PT.getDataFileName "iosevka_bold.ttf")
   dataIcon <- T.pack <$> (makeAbsolute =<< PT.getDataFileName "Yui_signature_SS.bmp")
+  maybeDefaultScaleFactor <- join <$> runMaybeT (taggerConfigScaleFactor <$> getOptConf)
   return
     [ appWindowTitle "Tagger"
     , appWindowState MainWindowMaximized
-    , appScaleFactor 1.65
+    , appScaleFactor $ fromMaybe 1.0 maybeDefaultScaleFactor
     , appTheme yuiTheme
     , appFontDef "Regular" defaultRegularFont
     , appFontDef "Thin" defaultThinFont
