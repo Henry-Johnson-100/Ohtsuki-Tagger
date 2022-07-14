@@ -2,9 +2,25 @@
 
 ------
 
+# Unreleased
+
+------
+
+# Planned
+* Updating the image detail info pane to use less vertical space by using
+LISP-style bracketing to show subtags.
+* Making the descriptor management pane more obvious and less intrusive.
+
+------
+
+### 1.0.1.0 -- ????-??-??
+
+------
+
 # 1.0.0.0 -- 2022-07-11
 
 * I rewrote everything from scratch. Most functionality is the same.
+Go to the wiki in the fossil repo to get up to speed on v1.0.0.0.
 
 ------
 
