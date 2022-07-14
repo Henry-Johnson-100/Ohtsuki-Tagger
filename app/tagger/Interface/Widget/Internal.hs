@@ -1142,7 +1142,6 @@ taggerInfoWidget m@((^. taggerInfoModel) -> tim) =
                       <$> [ ("In Directory", workingDirectory)
                           , ("Version", version)
                           , ("Last Accessed", lastAccessed)
-                          , ("Last Saved", lastSaved)
                           ]
                    )
             )

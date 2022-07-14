@@ -3,6 +3,8 @@
 ------
 
 # Unreleased
+* Removed the "Last Saved" field in the info widget, because there is currenlty no
+save functionality.
 
 ------
 
