@@ -9,8 +9,6 @@ save functionality.
 ------
 
 # Planned
-* Updating the image detail info pane to use less vertical space by using
-LISP-style bracketing to show subtags.
 * Making the descriptor management pane more obvious and less intrusive.
 
 ------
