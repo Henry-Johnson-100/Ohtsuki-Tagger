@@ -23,7 +23,7 @@ module Interface.Widget.Internal (
   taggerInfoWidget,
 ) where
 
-import Control.Lens
+import Control.Lens hiding (both)
 import Data.Event
 import qualified Data.HashSet as HS
 import qualified Data.HierarchyMap as HM
@@ -40,6 +40,7 @@ import Database.Tagger.Type
 import Interface.Theme
 import Monomer
 import Monomer.Graphics.Lens
+import Monomer.Lens (fixed)
 
 type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
@@ -818,9 +819,6 @@ __        _____ ____   ____ _____ _____
 editDescriptorVis :: Text
 editDescriptorVis = "edit-descriptor"
 
-manageDescriptorPaneVis :: Text
-manageDescriptorPaneVis = "manage"
-
 descriptorTreeWidget :: TaggerModel -> TaggerWidget
 descriptorTreeWidget m =
   withNodeVisible
@@ -829,14 +827,7 @@ descriptorTreeWidget m =
           `hasVis` VisibilityLabel hidePossibleUIVis
     )
     . withNodeKey "descriptorTree"
-    $ keystroke_
-      [("Ctrl-m", DoDescriptorTreeEvent (ToggleDescriptorTreeVisibility "manage"))]
-      [ignoreChildrenEvts]
-      $ vstack_
-        []
-        [ mainPane
-        , altPane
-        ]
+    $ mainPane
  where
   mainPane =
     vstack_
@@ -859,25 +850,6 @@ descriptorTreeWidget m =
         [ descriptorTreeRefreshBothButton
         , descriptorTreeRequestParentButton
         , descriptorTreeFixedRequestButton "#META#"
-        ]
-  altPane =
-    withStyleBasic [border 1 black] $
-      vstack_
-        []
-        [ descriptorTreeToggleVisButton
-        , withNodeVisible
-            ( (m ^. descriptorTreeModel . descriptorTreeVis)
-                `hasVis` VisibilityLabel manageDescriptorPaneVis
-            )
-            $vstack
-            [ insertDescriptorWidget
-            , styledButton_
-                [resizeFactor (-1)]
-                "Edit"
-                ( DoDescriptorTreeEvent
-                    (ToggleDescriptorTreeVisibility editDescriptorVis)
-                )
-            ]
         ]
 
 descriptorTreeFocusedNodeWidget :: TaggerModel -> TaggerWidget
@@ -951,6 +923,7 @@ descriptorTreeUnrelatedWidget m =
       [ flip label_ [resizeFactor (-1)] "Unrelated"
       , separatorLine
       , unrelatedTreeLeafWidget
+      , descriptorManagementPane
       ]
 
   unrelatedTreeLeafWidget :: TaggerWidget
@@ -973,17 +946,6 @@ descriptorTreeUnrelatedWidget m =
     dropTarget_
       (DoDescriptorTreeEvent . CreateRelation (m ^. descriptorTreeModel . unrelatedNode))
       [dropTargetStyle [border 3 yuiBlue]]
-
-insertDescriptorWidget :: TaggerWidget
-insertDescriptorWidget =
-  keystroke_ [("Enter", DoDescriptorTreeEvent InsertDescriptor)] [] . hstack_ [] $
-    [insertButton, textField_ (descriptorTreeModel . newDescriptorText) []]
- where
-  insertButton =
-    styledButton_
-      [resizeFactor (-1)]
-      "Insert"
-      (DoDescriptorTreeEvent InsertDescriptor)
 
 descriptorTreeLeaf :: TaggerModel -> Descriptor -> TaggerWidget
 descriptorTreeLeaf
@@ -1035,15 +997,43 @@ descriptorTreeLeaf
         , box_ [alignLeft]
             . withStyleHover [bgColor yuiRed, textColor white]
             . withStyleBasic [textColor yuiRed]
-            $ button_ "Delete" (DoDescriptorTreeEvent (DeleteDescriptor d)) [resizeFactor (-1)]
+            $ button_
+              "Delete"
+              ( DoDescriptorTreeEvent
+                  (DeleteDescriptor d)
+              )
+              [resizeFactor (-1)]
         ]
 
-descriptorTreeToggleVisButton :: TaggerWidget
-descriptorTreeToggleVisButton =
-  styledButton_
-    [resizeFactor (-1)]
-    "Manage Descriptors"
-    (DoDescriptorTreeEvent (ToggleDescriptorTreeVisibility "manage"))
+descriptorManagementPane :: TaggerWidget
+descriptorManagementPane =
+  insertDescriptorWidget
+ where
+  insertDescriptorWidget :: TaggerWidget
+  insertDescriptorWidget =
+    keystroke_ [("Enter", DoDescriptorTreeEvent InsertDescriptor)] [] . hstack_ [] $
+      [ editDescriptorLeafButton
+      , insertButton
+      , box_
+          [ alignBottom
+          , alignMiddle
+          , sizeReqUpdater
+              (\(xs, xy) -> both (& fixed .~ 0) (xs, xy))
+          ]
+          $ textField_ (descriptorTreeModel . newDescriptorText) []
+      ]
+   where
+    editDescriptorLeafButton =
+      styledButton_
+        [resizeFactor (-1)]
+        "Edit"
+        (DoDescriptorTreeEvent . ToggleDescriptorTreeVisibility $ editDescriptorVis)
+    insertButton =
+      styledButton_
+        [resizeFactor (-1)]
+        "New"
+        (DoDescriptorTreeEvent InsertDescriptor)
+    both f (x, y) = (f x, f y)
 
 descriptorTreeFixedRequestButton :: Text -> TaggerWidget
 descriptorTreeFixedRequestButton t =
