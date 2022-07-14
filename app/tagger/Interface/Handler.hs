@@ -108,7 +108,7 @@ taggerEventHandler
               & taggerInfoModel . message
               .~ "Thank you for using tagger!"
               & taggerInfoModel . versionMessage
-              .~ "Released on 2022/07/11"
+              .~ mempty
         , Event
             ( DoFocusedFileEvent
                 (ToggleFocusedFilePaneVisibility zstackQueryWidgetVis)

@@ -2,9 +2,31 @@
 
 ------
 
+# Unreleased
+
+------
+
+# Planned
+
+------
+
+### 1.0.1.0 -- 2022-07-14
+* Removed the "Last Saved" field in the info widget, because there is currenlty no
+save functionality.
+* Making the descriptor management pane more obvious and less intrusive by 
+moving it to the bottom of the Unrelated descriptor tree widget and not hiding it 
+behind a button.
+* Improved spacing slightly in the tag list widget.
+* Reduced visual weirdness of the buttons resizing when the file list is in view.
+* Moved the addFileWidget and the edit button to the bottom of the file list in the scrollable
+zone.
+
+------
+
 # 1.0.0.0 -- 2022-07-11
 
 * I rewrote everything from scratch. Most functionality is the same.
+Go to the wiki in the fossil repo to get up to speed on v1.0.0.0.
 
 ------
 

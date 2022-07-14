@@ -23,7 +23,7 @@ module Interface.Widget.Internal (
   taggerInfoWidget,
 ) where
 
-import Control.Lens
+import Control.Lens hiding (both)
 import Data.Event
 import qualified Data.HashSet as HS
 import qualified Data.HierarchyMap as HM
@@ -40,6 +40,8 @@ import Database.Tagger.Type
 import Interface.Theme
 import Monomer
 import Monomer.Graphics.Lens
+import Monomer.Lens (fixed)
+import Util (both)
 
 type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
@@ -116,63 +118,70 @@ fileSelectionFileList m =
     []
     [ fileSelectionHeader
     , separatorLine
-    , box_
-        [ alignTop
-        , alignCenter
-        , mergeRequired
-            ( \_ m1 m2 ->
-                let neq l = m1 ^. fileSelectionModel . l /= m2 ^. fileSelectionModel . l
-                 in or
-                      [ neq selection
-                      , neq fileSelectionInfoMap
-                      , neq currentChunk
-                      , neq chunkSequence
-                      , neq chunkSize
-                      , neq fileSelectionVis
-                      ]
-            )
-        ]
-        . withNodeKey fileSelectionScrollWidgetNodeKey
-        . vscroll_
-          [ wheelRate 50
-          ]
-        . vstack_ []
-        $ ( fmap fileSelectionLeaf renderedChunks
-              Seq.>< Seq.fromList
-                [ box_ [alignBottom, alignCenter] $
-                    hstack_
-                      []
-                      [ styledButton_
-                          [resizeFactor (-1)]
-                          "<-"
-                          ( DoFileSelectionEvent
-                              . DoFileSelectionWidgetEvent
-                              $ CyclePrevChunk
-                          )
-                      , label_
-                          ( ( T.pack . show . succ $
-                                m ^. fileSelectionModel . currentChunk
-                            )
-                              <> "/"
-                              <> ( T.pack
-                                    . show
-                                    . Seq.length
-                                    $ m ^. fileSelectionModel . chunkSequence
-                                 )
-                          )
-                          [resizeFactor (-1)]
-                      , styledButton_
-                          [resizeFactor (-1)]
-                          "->"
-                          ( DoFileSelectionEvent
-                              . DoFileSelectionWidgetEvent
-                              $ CycleNextChunk
-                          )
-                      ]
-                ]
-          )
+    , fileListBody
     ]
  where
+  fileListBody =
+    box_
+      [ alignTop
+      , alignCenter
+      , fileListMergeRequirement
+      ]
+      . withNodeKey fileSelectionScrollWidgetNodeKey
+      . vscroll_
+        [ wheelRate 50
+        ]
+      . vstack_ []
+      . flip (|>) (hstack [toggleFileEditMode, addFilesWidget])
+      $ ( fmap fileSelectionLeaf renderedChunks
+            Seq.>< Seq.fromList fileListPaginationWidgets
+        )
+   where
+    fileListPaginationWidgets =
+      [ box_ [alignBottom, alignCenter] $
+          hstack_
+            []
+            [ styledButton_
+                [resizeFactor (-1)]
+                "<-"
+                ( DoFileSelectionEvent
+                    . DoFileSelectionWidgetEvent
+                    $ CyclePrevChunk
+                )
+            , label_
+                ( ( T.pack . show . succ $
+                      m ^. fileSelectionModel . currentChunk
+                  )
+                    <> "/"
+                    <> ( T.pack
+                          . show
+                          . Seq.length
+                          $ m ^. fileSelectionModel . chunkSequence
+                       )
+                )
+                [resizeFactor (-1)]
+            , styledButton_
+                [resizeFactor (-1)]
+                "->"
+                ( DoFileSelectionEvent
+                    . DoFileSelectionWidgetEvent
+                    $ CycleNextChunk
+                )
+            ]
+      ]
+    fileListMergeRequirement =
+      mergeRequired
+        ( \_ m1 m2 ->
+            let neq l = m1 ^. fileSelectionModel . l /= m2 ^. fileSelectionModel . l
+             in or
+                  [ neq selection
+                  , neq fileSelectionInfoMap
+                  , neq currentChunk
+                  , neq chunkSequence
+                  , neq chunkSize
+                  , neq fileSelectionVis
+                  ]
+        )
   renderedChunks =
     getSelectionChunk m
   fileSelectionHeader :: TaggerWidget
@@ -182,10 +191,9 @@ fileSelectionFileList m =
       [ toggleViewSelectionButton
       , shuffleSelectionButton
       , refreshFileSelectionButton
-      , numericField_ (fileSelectionModel . chunkSize) [minValue 0]
-      , toggleFileEditMode
-      , withStyleBasic [paddingL 15] addFilesWidget
-      , shellCommandWidget m
+      , fileSelectionChunkSizeNumField
+      , -- , toggleFileEditMode
+        shellCommandWidget m
       ]
   fileSelectionLeaf :: File -> TaggerWidget
   fileSelectionLeaf f@(File fk fp) =
@@ -327,12 +335,12 @@ tagListWidget m =
           (DoFileSelectionEvent CycleTagOrderDirection)
   tagListLeaf (d, n) =
     hgrid_
-      []
-      [ draggable d . label . descriptor $ d
-      , withStyleBasic
-          [paddingL 1.5, paddingR 1.5]
-          separatorLine
-      , label . T.pack . show $ n
+      [childSpacing_ 0]
+      [ draggable d . withStyleBasic [textRight, paddingR 1.5]
+          . flip label_ []
+          . descriptor
+          $ d
+      , withStyleBasic [paddingL 1.5, borderL 1 black] . label . T.pack . show $ n
       ]
 
 clearSelectionButton :: TaggerWidget
@@ -351,19 +359,26 @@ toggleViewSelectionButton =
 
 shellCommandWidget :: TaggerModel -> TaggerWidget
 shellCommandWidget ((^. isMassOpMode) -> isMassOpModeIsTrue) =
-  hstack
-    [ toggleButton_ "MassOp" isMassOpMode [resizeFactor (-1)]
-    , keystroke_
-        [
-          ( "Enter"
-          , if isMassOpModeIsTrue
-              then DoFileSelectionEvent RunSelectionShellCommand
-              else DoFocusedFileEvent RunFocusedFileShellCommand
-          )
-        ]
-        [ignoreChildrenEvts]
-        $ textField_ shellText []
-    ]
+  box_ [sizeReqUpdater (both (& fixed .~ 0))] $
+    hstack
+      [ toggleButton_ "MassOp" isMassOpMode []
+      , keystroke_
+          [
+            ( "Enter"
+            , if isMassOpModeIsTrue
+                then DoFileSelectionEvent RunSelectionShellCommand
+                else DoFocusedFileEvent RunFocusedFileShellCommand
+            )
+          ]
+          [ignoreChildrenEvts]
+          . withStyleBasic [minWidth 80]
+          $ textField_ shellText []
+      ]
+
+fileSelectionChunkSizeNumField :: TaggerWidget
+fileSelectionChunkSizeNumField =
+  withStyleBasic [maxWidth 80] $
+    numericField_ (fileSelectionModel . chunkSize) [minValue 0]
 
 addFilesWidget :: TaggerWidget
 addFilesWidget =
@@ -818,9 +833,6 @@ __        _____ ____   ____ _____ _____
 editDescriptorVis :: Text
 editDescriptorVis = "edit-descriptor"
 
-manageDescriptorPaneVis :: Text
-manageDescriptorPaneVis = "manage"
-
 descriptorTreeWidget :: TaggerModel -> TaggerWidget
 descriptorTreeWidget m =
   withNodeVisible
@@ -829,14 +841,7 @@ descriptorTreeWidget m =
           `hasVis` VisibilityLabel hidePossibleUIVis
     )
     . withNodeKey "descriptorTree"
-    $ keystroke_
-      [("Ctrl-m", DoDescriptorTreeEvent (ToggleDescriptorTreeVisibility "manage"))]
-      [ignoreChildrenEvts]
-      $ vstack_
-        []
-        [ mainPane
-        , altPane
-        ]
+    $ mainPane
  where
   mainPane =
     vstack_
@@ -859,25 +864,6 @@ descriptorTreeWidget m =
         [ descriptorTreeRefreshBothButton
         , descriptorTreeRequestParentButton
         , descriptorTreeFixedRequestButton "#META#"
-        ]
-  altPane =
-    withStyleBasic [border 1 black] $
-      vstack_
-        []
-        [ descriptorTreeToggleVisButton
-        , withNodeVisible
-            ( (m ^. descriptorTreeModel . descriptorTreeVis)
-                `hasVis` VisibilityLabel manageDescriptorPaneVis
-            )
-            $vstack
-            [ insertDescriptorWidget
-            , styledButton_
-                [resizeFactor (-1)]
-                "Edit"
-                ( DoDescriptorTreeEvent
-                    (ToggleDescriptorTreeVisibility editDescriptorVis)
-                )
-            ]
         ]
 
 descriptorTreeFocusedNodeWidget :: TaggerModel -> TaggerWidget
@@ -951,6 +937,7 @@ descriptorTreeUnrelatedWidget m =
       [ flip label_ [resizeFactor (-1)] "Unrelated"
       , separatorLine
       , unrelatedTreeLeafWidget
+      , descriptorManagementPane
       ]
 
   unrelatedTreeLeafWidget :: TaggerWidget
@@ -973,17 +960,6 @@ descriptorTreeUnrelatedWidget m =
     dropTarget_
       (DoDescriptorTreeEvent . CreateRelation (m ^. descriptorTreeModel . unrelatedNode))
       [dropTargetStyle [border 3 yuiBlue]]
-
-insertDescriptorWidget :: TaggerWidget
-insertDescriptorWidget =
-  keystroke_ [("Enter", DoDescriptorTreeEvent InsertDescriptor)] [] . hstack_ [] $
-    [insertButton, textField_ (descriptorTreeModel . newDescriptorText) []]
- where
-  insertButton =
-    styledButton_
-      [resizeFactor (-1)]
-      "Insert"
-      (DoDescriptorTreeEvent InsertDescriptor)
 
 descriptorTreeLeaf :: TaggerModel -> Descriptor -> TaggerWidget
 descriptorTreeLeaf
@@ -1035,15 +1011,42 @@ descriptorTreeLeaf
         , box_ [alignLeft]
             . withStyleHover [bgColor yuiRed, textColor white]
             . withStyleBasic [textColor yuiRed]
-            $ button_ "Delete" (DoDescriptorTreeEvent (DeleteDescriptor d)) [resizeFactor (-1)]
+            $ button_
+              "Delete"
+              ( DoDescriptorTreeEvent
+                  (DeleteDescriptor d)
+              )
+              [resizeFactor (-1)]
         ]
 
-descriptorTreeToggleVisButton :: TaggerWidget
-descriptorTreeToggleVisButton =
-  styledButton_
-    [resizeFactor (-1)]
-    "Manage Descriptors"
-    (DoDescriptorTreeEvent (ToggleDescriptorTreeVisibility "manage"))
+descriptorManagementPane :: TaggerWidget
+descriptorManagementPane =
+  insertDescriptorWidget
+ where
+  insertDescriptorWidget :: TaggerWidget
+  insertDescriptorWidget =
+    keystroke_ [("Enter", DoDescriptorTreeEvent InsertDescriptor)] [] . hstack_ [] $
+      [ editDescriptorLeafButton
+      , insertButton
+      , box_
+          [ alignBottom
+          , alignMiddle
+          , sizeReqUpdater
+              (\(xs, xy) -> both (& fixed .~ 0) (xs, xy))
+          ]
+          $ textField_ (descriptorTreeModel . newDescriptorText) []
+      ]
+   where
+    editDescriptorLeafButton =
+      styledButton_
+        [resizeFactor (-1)]
+        "Edit"
+        (DoDescriptorTreeEvent . ToggleDescriptorTreeVisibility $ editDescriptorVis)
+    insertButton =
+      styledButton_
+        [resizeFactor (-1)]
+        "New"
+        (DoDescriptorTreeEvent InsertDescriptor)
 
 descriptorTreeFixedRequestButton :: Text -> TaggerWidget
 descriptorTreeFixedRequestButton t =
@@ -1142,7 +1145,6 @@ taggerInfoWidget m@((^. taggerInfoModel) -> tim) =
                       <$> [ ("In Directory", workingDirectory)
                           , ("Version", version)
                           , ("Last Accessed", lastAccessed)
-                          , ("Last Saved", lastSaved)
                           ]
                    )
             )
