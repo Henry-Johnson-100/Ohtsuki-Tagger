@@ -1,58 +1,55 @@
 cradle:
   cabal:
-    - path: "./app/Main.hs"
+    - path: "app/tagger/Main.hs"
       component: "tagger:exe:tagger"
 
-    - path: "./app/Node/Application.hs"
+    - path: "app/tagger/Config.hs"
       component: "tagger:exe:tagger"
 
-    - path: "./app/Node/Color.hs"
+    - path: "app/tagger/Data/Event.hs"
       component: "tagger:exe:tagger"
 
-    - path: "./app/Node/Micro.hs"
+    - path: "app/tagger/Data/Model.hs"
       component: "tagger:exe:tagger"
 
-    - path: "./app/Event/Task.hs"
+    - path: "app/tagger/Data/Model/Core.hs"
       component: "tagger:exe:tagger"
 
-    - path: "./app/Event/Handler.hs"
+    - path: "app/tagger/Data/Model/Lens.hs"
       component: "tagger:exe:tagger"
 
-    - path: "./app/Event/Parser.hs"
+    - path: "app/tagger/Data/Model/Shared.hs"
       component: "tagger:exe:tagger"
 
-    - path: "./app/Event/CLI.hs"
+    - path: "app/tagger/Data/Model/Shared/Core.hs"
       component: "tagger:exe:tagger"
 
-    - path: "./app/Event/CLI/Type.hs"
+    - path: "app/tagger/Data/Model/Shared/Lens.hs"
       component: "tagger:exe:tagger"
 
-    - path: "./app/Type/Model.hs"
+    - path: "app/tagger/Interface.hs"
       component: "tagger:exe:tagger"
 
-    - path: "./app/Type/Model/Prim.hs"
+    - path: "app/tagger/Interface/Handler.hs"
       component: "tagger:exe:tagger"
 
-    - path: "./app/Type/Config.hs"
+    - path: "app/tagger/Interface/Handler/Internal.hs"
       component: "tagger:exe:tagger"
 
-    - path: "./app/Type/BufferList.hs"
+    - path: "app/tagger/Interface/Theme.hs"
       component: "tagger:exe:tagger"
 
-    - path: "./app/Database/Tagger/Type.hs"
+    - path: "app/tagger/Interface/Widget.hs"
       component: "tagger:exe:tagger"
 
-    - path: "./app/Database/Tagger/Access.hs"
+    - path: "app/tagger/Interface/Widget/Internal.hs"
       component: "tagger:exe:tagger"
 
-    - path: "./app/Database/Tagger/Access/RowMap.hs"
+    - path: "app/tagger/Util.hs"
       component: "tagger:exe:tagger"
 
-    - path: "./app/IO.hs"
-      component: "tagger:exe:tagger"
+    - path: "lib"
+      component: "tagger:lib:tagger-lib"
 
-    - path: "./app/Util/Core.hs"
-      component: "tagger:exe:tagger"
-
-    - path: "./app/Paths_tagger.hs"
-      component: "tagger:exe:tagger"
+    - path: "./"
+      component: "tagger:test:tagger-test"
