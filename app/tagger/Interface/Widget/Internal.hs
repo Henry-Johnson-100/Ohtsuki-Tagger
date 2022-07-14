@@ -328,12 +328,12 @@ tagListWidget m =
           (DoFileSelectionEvent CycleTagOrderDirection)
   tagListLeaf (d, n) =
     hgrid_
-      []
-      [ draggable d . label . descriptor $ d
-      , withStyleBasic
-          [paddingL 1.5, paddingR 1.5]
-          separatorLine
-      , label . T.pack . show $ n
+      [childSpacing_ 0]
+      [ draggable d . withStyleBasic [textRight, paddingR 1.5]
+          . flip label_ []
+          . descriptor
+          $ d
+      , withStyleBasic [paddingL 1.5, borderL 1.5 black] . label . T.pack . show $ n
       ]
 
 clearSelectionButton :: TaggerWidget
