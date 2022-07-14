@@ -41,6 +41,7 @@ import Interface.Theme
 import Monomer
 import Monomer.Graphics.Lens
 import Monomer.Lens (fixed)
+import Util (both)
 
 type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
@@ -117,63 +118,70 @@ fileSelectionFileList m =
     []
     [ fileSelectionHeader
     , separatorLine
-    , box_
-        [ alignTop
-        , alignCenter
-        , mergeRequired
-            ( \_ m1 m2 ->
-                let neq l = m1 ^. fileSelectionModel . l /= m2 ^. fileSelectionModel . l
-                 in or
-                      [ neq selection
-                      , neq fileSelectionInfoMap
-                      , neq currentChunk
-                      , neq chunkSequence
-                      , neq chunkSize
-                      , neq fileSelectionVis
-                      ]
-            )
-        ]
-        . withNodeKey fileSelectionScrollWidgetNodeKey
-        . vscroll_
-          [ wheelRate 50
-          ]
-        . vstack_ []
-        $ ( fmap fileSelectionLeaf renderedChunks
-              Seq.>< Seq.fromList
-                [ box_ [alignBottom, alignCenter] $
-                    hstack_
-                      []
-                      [ styledButton_
-                          [resizeFactor (-1)]
-                          "<-"
-                          ( DoFileSelectionEvent
-                              . DoFileSelectionWidgetEvent
-                              $ CyclePrevChunk
-                          )
-                      , label_
-                          ( ( T.pack . show . succ $
-                                m ^. fileSelectionModel . currentChunk
-                            )
-                              <> "/"
-                              <> ( T.pack
-                                    . show
-                                    . Seq.length
-                                    $ m ^. fileSelectionModel . chunkSequence
-                                 )
-                          )
-                          [resizeFactor (-1)]
-                      , styledButton_
-                          [resizeFactor (-1)]
-                          "->"
-                          ( DoFileSelectionEvent
-                              . DoFileSelectionWidgetEvent
-                              $ CycleNextChunk
-                          )
-                      ]
-                ]
-          )
+    , fileListBody
     ]
  where
+  fileListBody =
+    box_
+      [ alignTop
+      , alignCenter
+      , fileListMergeRequirement
+      ]
+      . withNodeKey fileSelectionScrollWidgetNodeKey
+      . vscroll_
+        [ wheelRate 50
+        ]
+      . vstack_ []
+      . flip (|>) (hstack [toggleFileEditMode, addFilesWidget])
+      $ ( fmap fileSelectionLeaf renderedChunks
+            Seq.>< Seq.fromList fileListPaginationWidgets
+        )
+   where
+    fileListPaginationWidgets =
+      [ box_ [alignBottom, alignCenter] $
+          hstack_
+            []
+            [ styledButton_
+                [resizeFactor (-1)]
+                "<-"
+                ( DoFileSelectionEvent
+                    . DoFileSelectionWidgetEvent
+                    $ CyclePrevChunk
+                )
+            , label_
+                ( ( T.pack . show . succ $
+                      m ^. fileSelectionModel . currentChunk
+                  )
+                    <> "/"
+                    <> ( T.pack
+                          . show
+                          . Seq.length
+                          $ m ^. fileSelectionModel . chunkSequence
+                       )
+                )
+                [resizeFactor (-1)]
+            , styledButton_
+                [resizeFactor (-1)]
+                "->"
+                ( DoFileSelectionEvent
+                    . DoFileSelectionWidgetEvent
+                    $ CycleNextChunk
+                )
+            ]
+      ]
+    fileListMergeRequirement =
+      mergeRequired
+        ( \_ m1 m2 ->
+            let neq l = m1 ^. fileSelectionModel . l /= m2 ^. fileSelectionModel . l
+             in or
+                  [ neq selection
+                  , neq fileSelectionInfoMap
+                  , neq currentChunk
+                  , neq chunkSequence
+                  , neq chunkSize
+                  , neq fileSelectionVis
+                  ]
+        )
   renderedChunks =
     getSelectionChunk m
   fileSelectionHeader :: TaggerWidget
@@ -183,10 +191,9 @@ fileSelectionFileList m =
       [ toggleViewSelectionButton
       , shuffleSelectionButton
       , refreshFileSelectionButton
-      , numericField_ (fileSelectionModel . chunkSize) [minValue 0]
-      , toggleFileEditMode
-      , withStyleBasic [paddingL 15] addFilesWidget
-      , shellCommandWidget m
+      , fileSelectionChunkSizeNumField
+      , -- , toggleFileEditMode
+        shellCommandWidget m
       ]
   fileSelectionLeaf :: File -> TaggerWidget
   fileSelectionLeaf f@(File fk fp) =
@@ -352,19 +359,26 @@ toggleViewSelectionButton =
 
 shellCommandWidget :: TaggerModel -> TaggerWidget
 shellCommandWidget ((^. isMassOpMode) -> isMassOpModeIsTrue) =
-  hstack
-    [ toggleButton_ "MassOp" isMassOpMode [resizeFactor (-1)]
-    , keystroke_
-        [
-          ( "Enter"
-          , if isMassOpModeIsTrue
-              then DoFileSelectionEvent RunSelectionShellCommand
-              else DoFocusedFileEvent RunFocusedFileShellCommand
-          )
-        ]
-        [ignoreChildrenEvts]
-        $ textField_ shellText []
-    ]
+  box_ [sizeReqUpdater (both (& fixed .~ 0))] $
+    hstack
+      [ toggleButton_ "MassOp" isMassOpMode []
+      , keystroke_
+          [
+            ( "Enter"
+            , if isMassOpModeIsTrue
+                then DoFileSelectionEvent RunSelectionShellCommand
+                else DoFocusedFileEvent RunFocusedFileShellCommand
+            )
+          ]
+          [ignoreChildrenEvts]
+          . withStyleBasic [minWidth 80]
+          $ textField_ shellText []
+      ]
+
+fileSelectionChunkSizeNumField :: TaggerWidget
+fileSelectionChunkSizeNumField =
+  withStyleBasic [maxWidth 80] $
+    numericField_ (fileSelectionModel . chunkSize) [minValue 0]
 
 addFilesWidget :: TaggerWidget
 addFilesWidget =
@@ -1033,7 +1047,6 @@ descriptorManagementPane =
         [resizeFactor (-1)]
         "New"
         (DoDescriptorTreeEvent InsertDescriptor)
-    both f (x, y) = (f x, f y)
 
 descriptorTreeFixedRequestButton :: Text -> TaggerWidget
 descriptorTreeFixedRequestButton t =

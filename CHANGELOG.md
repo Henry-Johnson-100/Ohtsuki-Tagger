@@ -9,6 +9,9 @@ save functionality.
 moving it to the bottom of the Unrelated descriptor tree widget and not hiding it 
 behind a button.
 * Improved spacing slightly in the tag list widget.
+* Reduced visual weirdness of the buttons resizing when the file list is in view.
+* Moved the addFileWidget and the edit button to the bottom of the file list in the scrollable
+zone.
 
 ------
 
