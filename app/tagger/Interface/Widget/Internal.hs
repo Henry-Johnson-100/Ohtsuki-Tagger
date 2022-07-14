@@ -333,7 +333,7 @@ tagListWidget m =
           . flip label_ []
           . descriptor
           $ d
-      , withStyleBasic [paddingL 1.5, borderL 1.5 black] . label . T.pack . show $ n
+      , withStyleBasic [paddingL 1.5, borderL 1 black] . label . T.pack . show $ n
       ]
 
 clearSelectionButton :: TaggerWidget

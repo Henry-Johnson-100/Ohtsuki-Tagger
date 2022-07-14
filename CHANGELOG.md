@@ -8,6 +8,7 @@ save functionality.
 * Making the descriptor management pane more obvious and less intrusive by 
 moving it to the bottom of the Unrelated descriptor tree widget and not hiding it 
 behind a button.
+* Improved spacing slightly in the tag list widget.
 
 ------
 
