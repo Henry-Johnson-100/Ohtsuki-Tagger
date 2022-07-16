@@ -2,13 +2,24 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Interface.Handler.WidgetQueryRequest (
-  module Interface.Handler.WidgetQueryRequest,
+  WidgetQueryRequest,
+  WidgetSentenceBranch,
+  squashWidgetQueryRequest,
+  moveQueryWidgetNodeTo,
+  deleteWidgetQueryNode,
+  appendWidgetQueryNode,
+  createWidgetSentenceBranch,
+  queryWidgetQueryRequestNodes,
 ) where
 
 import Data.Foldable (toList)
+import Data.HashSet (HashSet)
 import Data.Maybe (fromMaybe)
 import Data.Sequence (Seq, deleteAt, elemIndexL, insertAt, lookup, (|>))
 import Data.Tagger (SetOp)
+import Data.Text (Text)
+import Database.Tagger.Type (File, TaggedConnection)
+import Text.TaggerQL
 import Text.TaggerQL.AST (
   Request (Request),
   SentenceTree (SentenceBranch),
@@ -58,3 +69,19 @@ appendWidgetQueryNode (WidgetSentenceBranch st) (WidgetQueryRequest sts) =
 
 createWidgetSentenceBranch :: SetOp -> Request a -> WidgetSentenceBranch a
 createWidgetSentenceBranch so (Request ss) = WidgetSentenceBranch $ SentenceBranch so ss
+
+queryWidgetQueryRequestNodes ::
+  TaggedConnection ->
+  WidgetQueryRequest Text ->
+  IO (Seq (HashSet File))
+queryWidgetQueryRequestNodes tc (WidgetQueryRequest sts) =
+  traverse
+    (queryWidgetSentenceBranch tc . WidgetSentenceBranch)
+    sts
+
+queryWidgetSentenceBranch ::
+  TaggedConnection ->
+  WidgetSentenceBranch Text ->
+  IO (HashSet File)
+queryWidgetSentenceBranch tc (WidgetSentenceBranch st) =
+  combinableSentenceResultSet <$> queryRequest tc (Request [st])
