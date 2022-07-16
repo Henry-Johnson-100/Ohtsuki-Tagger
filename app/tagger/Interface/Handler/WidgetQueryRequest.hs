@@ -4,6 +4,7 @@
 module Interface.Handler.WidgetQueryRequest (
   WidgetQueryRequest,
   WidgetSentenceBranch,
+  emptyWidgetQueryRequest,
   squashWidgetQueryRequest,
   moveQueryWidgetNodeTo,
   deleteWidgetQueryNode,
@@ -15,7 +16,7 @@ module Interface.Handler.WidgetQueryRequest (
 import Data.Foldable (toList)
 import Data.HashSet (HashSet)
 import Data.Maybe (fromMaybe)
-import Data.Sequence (Seq, deleteAt, elemIndexL, insertAt, lookup, (|>))
+import Data.Sequence (Seq, deleteAt, elemIndexL, empty, insertAt, lookup, (|>))
 import Data.Tagger (SetOp)
 import Data.Text (Text)
 import Database.Tagger.Type (File, TaggedConnection)
@@ -30,7 +31,9 @@ import Prelude hiding (lookup)
  A newtype to be used in lieu of the 'Request` type. This type will be converted
  to a 'Request` just before a query is executed. This type is used for easier editing.
 -}
-newtype WidgetQueryRequest a = WidgetQueryRequest {widgetRequest :: Seq (SentenceTree a)}
+newtype WidgetQueryRequest a = WidgetQueryRequest
+  { queryWidgetRequest :: Seq (SentenceTree a)
+  }
   deriving (Show, Eq, Functor)
 
 {- |
@@ -40,6 +43,9 @@ newtype WidgetQueryRequest a = WidgetQueryRequest {widgetRequest :: Seq (Sentenc
 -}
 newtype WidgetSentenceBranch a = WidgetSentenceBranch (SentenceTree a)
   deriving (Show, Eq, Functor)
+
+emptyWidgetQueryRequest :: WidgetQueryRequest a
+emptyWidgetQueryRequest = WidgetQueryRequest empty
 
 squashWidgetQueryRequest :: WidgetQueryRequest a -> Request a
 squashWidgetQueryRequest (WidgetQueryRequest sts) = Request . toList $ sts

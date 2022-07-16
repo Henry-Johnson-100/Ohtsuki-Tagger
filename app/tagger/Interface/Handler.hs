@@ -34,6 +34,7 @@ import qualified Data.Text as T
 import Data.Version (showVersion)
 import Database.Tagger
 import Interface.Handler.Internal
+import Interface.Handler.WidgetQueryRequest
 import Interface.Widget.Internal (fileSelectionScrollWidgetNodeKey, queryTextFieldKey, tagTextNodeKey, zstackQueryWidgetVis, zstackTaggingWidgetVis)
 import Monomer
 import Paths_tagger
@@ -42,6 +43,7 @@ import System.FilePath
 import System.IO
 import Tagger.Info (taggerVersion)
 import Text.TaggerQL
+import Text.TaggerQL.Parser.Internal
 import Util
 
 taggerEventHandler ::
@@ -145,6 +147,25 @@ fileSelectionEventHandler
               %~ putHist (T.strip $ model ^. fileSelectionModel . addFileText)
         , Event (ClearTextField (TaggerLens (fileSelectionModel . addFileText)))
         ]
+      AppendWidgetQueryNode ->
+        parseWidgetSentenceBranch
+          (T.strip $ model ^. fileSelectionModel . queryText)
+          (model ^. fileSelectionModel . setOp)
+       where
+        parseWidgetSentenceBranch ::
+          Text ->
+          SetOp ->
+          [AppEventResponse TaggerModel TaggerEvent]
+        parseWidgetSentenceBranch t so =
+          either
+            (\err -> [Task (IOEvent <$> hPrint stderr err)])
+            ( \req ->
+                [ Model $
+                    model & fileSelectionModel . fileSelectionQueryWidgetRequest
+                      %~ appendWidgetQueryNode (createWidgetSentenceBranch so req)
+                ]
+            )
+            (parse requestParser "parseWidgetSentenceBranch" t)
       AppendQueryText t ->
         [ Model $
             model

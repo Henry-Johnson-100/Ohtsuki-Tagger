@@ -41,6 +41,7 @@ import qualified Data.Sequence as Seq
 import Data.Tagger
 import Data.Text (Text)
 import Database.Tagger.Type
+import Interface.Handler.WidgetQueryRequest
 
 data TaggerModel = TaggerModel
   { _taggermodelDescriptorTreeModel :: DescriptorTreeModel
@@ -87,6 +88,7 @@ data FileSelectionModel = FileSelectionModel
   , _fileselectionSetOp :: SetOp
   , _fileselectionQueryText :: Text
   , _fileselectionQueryHistory :: TextHistory
+  , _fileselectionFileSelectionQueryWidgetRequest :: WidgetQueryRequest Text
   , _fileselectionFileSelectionVis :: Visibility
   , _fileselectionAddFileText :: Text
   , _fileselectionAddFileHistory :: TextHistory
@@ -106,6 +108,7 @@ createFileSelectionModel =
     , _fileselectionSetOp = Union
     , _fileselectionQueryText = ""
     , _fileselectionQueryHistory = createHistory 10
+    , _fileselectionFileSelectionQueryWidgetRequest = emptyWidgetQueryRequest
     , _fileselectionFileSelectionVis = VisibilityMain
     , _fileselectionAddFileText = ""
     , _fileselectionAddFileHistory = createHistory 30
