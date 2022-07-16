@@ -175,7 +175,7 @@ querySentenceSet ::
   TaggedConnection ->
   SentenceSet Text ->
   IO CombinableSentenceResult
-querySentenceSet tc (CombinableSentence so s) =
+querySentenceSet tc (SentenceSet so s) =
   CombinableSentenceResult so . termResult <$> querySentence tc s
 
 {- |

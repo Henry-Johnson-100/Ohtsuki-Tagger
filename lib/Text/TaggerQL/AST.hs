@@ -52,7 +52,7 @@ data SentenceTree a
  in a left-associative combination.
 -}
 data SentenceSet a
-  = CombinableSentence SetOp (Sentence a)
+  = SentenceSet SetOp (Sentence a)
   deriving (Show, Eq, Functor)
 
 {- |

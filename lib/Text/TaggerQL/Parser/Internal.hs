@@ -124,7 +124,7 @@ combinableSentenceParser = do
   so <- explicitOpParser <|> pure Union
   spaces
   s <- sentenceParser
-  return $ CombinableSentence so s
+  return $ SentenceSet so s
 
 {- |
  Parses 1 or more 'TermTree`s that are separated by spaces.

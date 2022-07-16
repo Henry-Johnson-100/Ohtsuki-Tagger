@@ -12,34 +12,132 @@ main = defaultMain (testGroup "Test" [parserEdgeCases])
 
 parserEdgeCases :: TestTree
 parserEdgeCases =
-  testGroup
-    "Parser Edge Cases"
-    [ testCase
-        "Parse a nested subquery with trailing whitespace"
-        ( assertEqual
-            ""
-            ( Right
-                ( Request
-                    [ SentenceNode
-                        ( CombinableSentence
-                            Union
-                            ( Sentence
-                                [ Simple
-                                    ( SimpleTerm
-                                        (Term MetaDescriptorCriteria "otsuki%")
-                                    )
-                                ]
-                            )
-                        )
-                    , SentenceBranch
-                        Difference
+    testGroup
+        "Parser Edge Cases"
+        [ testCase
+            "Parse a nested subquery with trailing whitespace"
+            ( assertEqual
+                ""
+                ( Right
+                    ( Request
                         [ SentenceNode
-                            ( CombinableSentence
+                            ( SentenceSet
                                 Union
                                 ( Sentence
                                     [ Simple
                                         ( SimpleTerm
-                                            (Term MetaDescriptorCriteria "bruh")
+                                            (Term MetaDescriptorCriteria "otsuki%")
+                                        )
+                                    ]
+                                )
+                            )
+                        , SentenceBranch
+                            Difference
+                            [ SentenceNode
+                                ( SentenceSet
+                                    Union
+                                    ( Sentence
+                                        [ Simple
+                                            ( SimpleTerm
+                                                (Term MetaDescriptorCriteria "bruh")
+                                            )
+                                        ]
+                                    )
+                                )
+                            , SentenceBranch
+                                Union
+                                [ SentenceNode
+                                    ( SentenceSet
+                                        Union
+                                        ( Sentence
+                                            [ Simple
+                                                ( SimpleTerm
+                                                    (Term MetaDescriptorCriteria "squad")
+                                                )
+                                            ]
+                                        )
+                                    )
+                                ]
+                            ]
+                        ]
+                    )
+                )
+                (parse requestParser "test" "otsuki% d|(bruh u| (squad) )")
+            )
+        , testCase
+            "Parse a nested subquery without trailing whitespace."
+            ( assertEqual
+                ""
+                ( Right
+                    ( Request
+                        [ SentenceNode
+                            ( SentenceSet
+                                Union
+                                ( Sentence
+                                    [ Simple
+                                        ( SimpleTerm
+                                            (Term MetaDescriptorCriteria "otsuki%")
+                                        )
+                                    ]
+                                )
+                            )
+                        , SentenceBranch
+                            Difference
+                            [ SentenceNode
+                                ( SentenceSet
+                                    Union
+                                    ( Sentence
+                                        [ Simple
+                                            ( SimpleTerm
+                                                (Term MetaDescriptorCriteria "bruh")
+                                            )
+                                        ]
+                                    )
+                                )
+                            , SentenceBranch
+                                Union
+                                [ SentenceNode
+                                    ( SentenceSet
+                                        Union
+                                        ( Sentence
+                                            [ Simple
+                                                ( SimpleTerm
+                                                    (Term MetaDescriptorCriteria "squad")
+                                                )
+                                            ]
+                                        )
+                                    )
+                                ]
+                            ]
+                        ]
+                    )
+                )
+                (parse requestParser "test" "otsuki% d|(bruh u| (squad))")
+            )
+        , testCase
+            "Use a parenthetical query in the middle of a query"
+            ( assertEqual
+                ""
+                ( Right
+                    ( Request
+                        [ SentenceNode
+                            ( SentenceSet
+                                Union
+                                ( Sentence
+                                    [ Simple
+                                        ( SimpleTerm
+                                            (Term MetaDescriptorCriteria "kazuho")
+                                        )
+                                    ]
+                                )
+                            )
+                        , SentenceNode
+                            ( SentenceSet
+                                Union
+                                ( Sentence
+                                    [ Simple
+                                        ( SimpleTerm
+                                            (Term MetaDescriptorCriteria "kaede")
                                         )
                                     ]
                                 )
@@ -47,144 +145,46 @@ parserEdgeCases =
                         , SentenceBranch
                             Union
                             [ SentenceNode
-                                ( CombinableSentence
+                                ( SentenceSet
                                     Union
                                     ( Sentence
                                         [ Simple
                                             ( SimpleTerm
-                                                (Term MetaDescriptorCriteria "squad")
+                                                (Term MetaDescriptorCriteria "%kirari")
+                                            )
+                                        , Simple
+                                            ( SimpleTerm
+                                                (Term MetaDescriptorCriteria "hold")
+                                            )
+                                        , Simple
+                                            ( SimpleTerm
+                                                (Term MetaDescriptorCriteria "f%anzu")
                                             )
                                         ]
                                     )
                                 )
                             ]
-                        ]
-                    ]
-                )
-            )
-            (parse requestParser "test" "otsuki% d|(bruh u| (squad) )")
-        )
-    , testCase
-        "Parse a nested subquery without trailing whitespace."
-        ( assertEqual
-            ""
-            ( Right
-                ( Request
-                    [ SentenceNode
-                        ( CombinableSentence
-                            Union
-                            ( Sentence
-                                [ Simple
-                                    ( SimpleTerm
-                                        (Term MetaDescriptorCriteria "otsuki%")
-                                    )
-                                ]
-                            )
-                        )
-                    , SentenceBranch
-                        Difference
-                        [ SentenceNode
-                            ( CombinableSentence
+                        , SentenceNode
+                            ( SentenceSet
                                 Union
                                 ( Sentence
-                                    [ Simple
-                                        ( SimpleTerm
-                                            (Term MetaDescriptorCriteria "bruh")
-                                        )
-                                    ]
-                                )
-                            )
-                        , SentenceBranch
-                            Union
-                            [ SentenceNode
-                                ( CombinableSentence
-                                    Union
-                                    ( Sentence
-                                        [ Simple
-                                            ( SimpleTerm
-                                                (Term MetaDescriptorCriteria "squad")
-                                            )
-                                        ]
-                                    )
-                                )
-                            ]
-                        ]
-                    ]
-                )
-            )
-            (parse requestParser "test" "otsuki% d|(bruh u| (squad))")
-        )
-    , testCase
-        "Use a parenthetical query in the middle of a query"
-        ( assertEqual
-            ""
-            ( Right
-                ( Request
-                    [ SentenceNode
-                        ( CombinableSentence
-                            Union
-                            ( Sentence
-                                [ Simple
-                                    ( SimpleTerm
-                                        (Term MetaDescriptorCriteria "kazuho")
-                                    )
-                                ]
-                            )
-                        )
-                    , SentenceNode
-                        ( CombinableSentence
-                            Union
-                            ( Sentence
-                                [ Simple
-                                    ( SimpleTerm
-                                        (Term MetaDescriptorCriteria "kaede")
-                                    )
-                                ]
-                            )
-                        )
-                    , SentenceBranch
-                        Union
-                        [ SentenceNode
-                            ( CombinableSentence
-                                Union
-                                ( Sentence
-                                    [ Simple
-                                        ( SimpleTerm
-                                            (Term MetaDescriptorCriteria "%kirari")
-                                        )
-                                    , Simple
-                                        ( SimpleTerm
-                                            (Term MetaDescriptorCriteria "hold")
-                                        )
-                                    , Simple
-                                        ( SimpleTerm
-                                            (Term MetaDescriptorCriteria "f%anzu")
+                                    [ Complex
+                                        ( Term MetaDescriptorCriteria "k%akane"
+                                            :<- ( Bottom
+                                                    (Term MetaDescriptorCriteria "smile")
+                                                    :| []
+                                                )
                                         )
                                     ]
                                 )
                             )
                         ]
-                    , SentenceNode
-                        ( CombinableSentence
-                            Union
-                            ( Sentence
-                                [ Complex
-                                    ( Term MetaDescriptorCriteria "k%akane"
-                                        :<- ( Bottom
-                                                (Term MetaDescriptorCriteria "smile")
-                                                :| []
-                                            )
-                                    )
-                                ]
-                            )
-                        )
-                    ]
+                    )
+                )
+                ( parse
+                    requestParser
+                    "test"
+                    "kazuho u| kaede u| (%kirari hold f%anzu) u| k%akane {smile}"
                 )
             )
-            ( parse
-                requestParser
-                "test"
-                "kazuho u| kaede u| (%kirari hold f%anzu) u| k%akane {smile}"
-            )
-        )
-    ]
+        ]
