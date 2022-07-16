@@ -88,7 +88,7 @@ data FileSelectionModel = FileSelectionModel
   , _fileselectionSetOp :: SetOp
   , _fileselectionQueryText :: Text
   , _fileselectionQueryHistory :: TextHistory
-  , _fileselectionFileSelectionQueryWidgetRequest :: WidgetQueryRequest Text
+  , _fileselectionFileSelectionQueryWidgetRequest :: WidgetQueryRequest
   , _fileselectionFileSelectionVis :: Visibility
   , _fileselectionAddFileText :: Text
   , _fileselectionAddFileHistory :: TextHistory

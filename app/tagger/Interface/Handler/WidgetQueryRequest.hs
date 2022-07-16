@@ -1,61 +1,65 @@
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Interface.Handler.WidgetQueryRequest (
-  WidgetQueryRequest,
-  WidgetSentenceBranch,
+  WidgetQueryRequest (widgetQueryRequest),
+  WidgetSentenceBranch (
+    widgetSentenceBranchText,
+    widgetSentenceBranch,
+    widgetSentenceBranchCount
+  ),
   emptyWidgetQueryRequest,
   squashWidgetQueryRequest,
   moveQueryWidgetNodeTo,
   deleteWidgetQueryNode,
   appendWidgetQueryNode,
   createWidgetSentenceBranch,
-  queryWidgetQueryRequestNodes,
 ) where
 
+import Control.Monad ((<=<))
+import Control.Monad.Trans.Class (MonadTrans (lift))
+import Control.Monad.Trans.Maybe (MaybeT)
 import Data.Foldable (toList)
-import Data.HashSet (HashSet)
+import qualified Data.HashSet as HS
 import Data.Maybe (fromMaybe)
 import Data.Sequence (Seq, deleteAt, elemIndexL, empty, insertAt, lookup, (|>))
 import Data.Tagger (SetOp)
 import Data.Text (Text)
-import Database.Tagger.Type (File, TaggedConnection)
-import Text.TaggerQL
+import Database.Tagger.Type (TaggedConnection)
+import System.IO (hPrint, stderr)
+import Tagger.Util (hoistMaybe)
+import Text.TaggerQL (combinableSentenceResultSet, queryRequest)
 import Text.TaggerQL.AST (
   Request (Request),
   SentenceTree (SentenceBranch),
  )
+import Text.TaggerQL.Parser.Internal (parse, requestParser)
 import Prelude hiding (lookup)
 
-{- |
- A newtype to be used in lieu of the 'Request` type. This type will be converted
- to a 'Request` just before a query is executed. This type is used for easier editing.
--}
-newtype WidgetQueryRequest a = WidgetQueryRequest
-  { queryWidgetRequest :: Seq (SentenceTree a)
+newtype WidgetQueryRequest = WidgetQueryRequest
+  { widgetQueryRequest :: Seq WidgetSentenceBranch
   }
-  deriving (Show, Eq, Functor)
+  deriving (Show, Eq)
 
-{- |
- newtype to illustrate the fact that any 'Request` made by the widget in the tagger UI
- can actually be squashed to a 'SentenceBranch` constructed SentenceTree provided
- since the model also provides a 'SetOp`.
--}
-newtype WidgetSentenceBranch a = WidgetSentenceBranch (SentenceTree a)
-  deriving (Show, Eq, Functor)
+data WidgetSentenceBranch = WidgetSentenceBranch
+  { widgetSentenceBranchText :: Text
+  , widgetSentenceBranch :: SentenceTree Text
+  , widgetSentenceBranchCount :: Int
+  }
+  deriving (Show, Eq)
 
-emptyWidgetQueryRequest :: WidgetQueryRequest a
+emptyWidgetQueryRequest :: WidgetQueryRequest
 emptyWidgetQueryRequest = WidgetQueryRequest empty
 
-squashWidgetQueryRequest :: WidgetQueryRequest a -> Request a
-squashWidgetQueryRequest (WidgetQueryRequest sts) = Request . toList $ sts
+squashWidgetQueryRequest :: WidgetQueryRequest -> Request Text
+squashWidgetQueryRequest (WidgetQueryRequest sts) =
+  Request . toList $
+    (widgetSentenceBranch <$> sts)
 
 moveQueryWidgetNodeTo ::
-  Eq a =>
   Int ->
   Int ->
-  WidgetQueryRequest a ->
-  WidgetQueryRequest a
+  WidgetQueryRequest ->
+  WidgetQueryRequest
 moveQueryWidgetNodeTo from to wr@(WidgetQueryRequest sts) = fromMaybe wr $ do
   nodeToMove <- lookup from sts
   nodeInGivenDestination <- lookup to sts
@@ -63,31 +67,31 @@ moveQueryWidgetNodeTo from to wr@(WidgetQueryRequest sts) = fromMaybe wr $ do
   destinationNodeIx <- elemIndexL nodeInGivenDestination removedToNode
   return . WidgetQueryRequest $ insertAt destinationNodeIx nodeToMove removedToNode
 
-deleteWidgetQueryNode :: Int -> WidgetQueryRequest a -> WidgetQueryRequest a
+deleteWidgetQueryNode :: Int -> WidgetQueryRequest -> WidgetQueryRequest
 deleteWidgetQueryNode n (WidgetQueryRequest sts) = WidgetQueryRequest $ deleteAt n sts
 
 appendWidgetQueryNode ::
-  WidgetSentenceBranch a ->
-  WidgetQueryRequest a ->
-  WidgetQueryRequest a
-appendWidgetQueryNode (WidgetSentenceBranch st) (WidgetQueryRequest sts) =
-  WidgetQueryRequest $ sts |> st
+  WidgetSentenceBranch ->
+  WidgetQueryRequest ->
+  WidgetQueryRequest
+appendWidgetQueryNode wsb (WidgetQueryRequest sts) =
+  WidgetQueryRequest $ sts |> wsb
 
-createWidgetSentenceBranch :: SetOp -> Request a -> WidgetSentenceBranch a
-createWidgetSentenceBranch so (Request ss) = WidgetSentenceBranch $ SentenceBranch so ss
-
-queryWidgetQueryRequestNodes ::
+createWidgetSentenceBranch ::
   TaggedConnection ->
-  WidgetQueryRequest Text ->
-  IO (Seq (HashSet File))
-queryWidgetQueryRequestNodes tc (WidgetQueryRequest sts) =
-  traverse
-    (queryWidgetSentenceBranch tc . WidgetSentenceBranch)
-    sts
-
-queryWidgetSentenceBranch ::
-  TaggedConnection ->
-  WidgetSentenceBranch Text ->
-  IO (HashSet File)
-queryWidgetSentenceBranch tc (WidgetSentenceBranch st) =
-  combinableSentenceResultSet <$> queryRequest tc (Request [st])
+  SetOp ->
+  Text ->
+  MaybeT IO WidgetSentenceBranch
+createWidgetSentenceBranch tc so q = do
+  let parseResult = parse requestParser "" q
+  req@(Request sts) <-
+    either
+      (const (hoistMaybe Nothing) <=< lift . hPrint stderr)
+      return
+      parseResult
+  affectedFileCount <-
+    lift $
+      HS.size
+        . combinableSentenceResultSet
+        <$> queryRequest tc req
+  return $ WidgetSentenceBranch q (SentenceBranch so sts) affectedFileCount
