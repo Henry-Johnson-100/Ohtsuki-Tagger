@@ -63,6 +63,7 @@ executable tagger
                       ,Interface
                       ,Interface.Handler
                       ,Interface.Handler.Internal
+                      ,Interface.Handler.WidgetQueryRequest
                       ,Interface.Theme
                       ,Interface.Widget
                       ,Interface.Widget.Internal
@@ -70,6 +71,7 @@ executable tagger
 
   other-extensions:   RankNTypes
                      ,MultiWayIf
+                     ,NoImplicitPrelude
 
   -- ghc-options:
 

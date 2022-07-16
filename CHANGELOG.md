@@ -7,6 +7,8 @@
 ------
 
 # Planned
+* Visual query history/builder/editor 
+  * https://holedigging.club/cgi-bin/tagger/tktview?name=4433af1d6b
 
 ------
 

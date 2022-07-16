@@ -17,9 +17,7 @@ import qualified Data.Text as T
 import Database.Tagger (
   insertFiles,
  )
-import Database.Tagger.Type (
-  TaggedConnection,
- )
+import Database.Tagger.Type (TaggedConnection)
 import System.Directory as Directory (
   doesDirectoryExist,
   doesFileExist,
