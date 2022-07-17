@@ -1,6 +1,5 @@
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 
 module Interface.Handler.WidgetQueryRequest (
   WidgetQueryRequest (widgetQueryRequest),
@@ -23,7 +22,7 @@ import Control.Monad.Trans.Except (ExceptT, except, withExceptT)
 import Data.Foldable (toList)
 import qualified Data.HashSet as HS
 import Data.Maybe (fromMaybe)
-import Data.Sequence (Seq, deleteAt, elemIndexL, empty, insertAt, lookup, (|>))
+import Data.Sequence (Seq, deleteAt, elemIndexL, empty, insertAt, (|>))
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import Database.Tagger.Type (TaggedConnection)
@@ -34,7 +33,6 @@ import Text.TaggerQL.AST (
   SentenceTree (..),
  )
 import Text.TaggerQL.Parser.Internal (parse, requestParser)
-import Prelude hiding (lookup)
 
 newtype WidgetQueryRequest = WidgetQueryRequest
   { widgetQueryRequest :: Seq WidgetSentenceBranch
@@ -63,16 +61,15 @@ squashWidgetQueryRequest (WidgetQueryRequest sts) =
     (widgetSentenceBranch <$> sts)
 
 moveQueryWidgetNodeTo ::
-  Int ->
-  Int ->
+  WidgetSentenceBranch ->
+  WidgetSentenceBranch ->
   WidgetQueryRequest ->
   WidgetQueryRequest
 moveQueryWidgetNodeTo from to wr@(WidgetQueryRequest sts) = fromMaybe wr $ do
-  nodeToMove <- lookup from sts
-  nodeInGivenDestination <- lookup to sts
-  let removedToNode = deleteAt from sts
-  destinationNodeIx <- elemIndexL nodeInGivenDestination removedToNode
-  return . WidgetQueryRequest $ insertAt destinationNodeIx nodeToMove removedToNode
+  deleteIx <- elemIndexL from sts
+  let removedFromNode = deleteAt deleteIx sts
+  toIx <- elemIndexL to removedFromNode
+  return . WidgetQueryRequest $ insertAt toIx from removedFromNode
 
 deleteWidgetQueryNode :: Int -> WidgetQueryRequest -> WidgetQueryRequest
 deleteWidgetQueryNode n (WidgetQueryRequest sts) = WidgetQueryRequest $ deleteAt n sts
