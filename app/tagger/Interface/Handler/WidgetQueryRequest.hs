@@ -30,6 +30,7 @@ import Database.Tagger.Type (TaggedConnection)
 import Text.TaggerQL (combinableSentenceResultSet, queryRequest)
 import Text.TaggerQL.AST (
   Request (Request),
+  SentenceSet (..),
   SentenceTree (..),
  )
 import Text.TaggerQL.Parser.Internal (parse, requestParser)
@@ -51,7 +52,7 @@ widgetSentenceBranchSetOp :: WidgetSentenceBranch -> SetOp
 widgetSentenceBranchSetOp (widgetSentenceBranch -> st) =
   case st of
     SentenceBranch so _ -> so
-    SentenceNode _ -> Union
+    SentenceNode (SentenceSet so _) -> so
 
 emptyWidgetQueryRequest :: WidgetQueryRequest
 emptyWidgetQueryRequest = WidgetQueryRequest empty
