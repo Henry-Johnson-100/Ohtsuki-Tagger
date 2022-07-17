@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -37,7 +38,7 @@ import Text.TaggerQL.Parser.Internal (parse, requestParser)
 newtype WidgetQueryRequest = WidgetQueryRequest
   { widgetQueryRequest :: Seq WidgetSentenceBranch
   }
-  deriving (Show, Eq)
+  deriving (Show, Eq, Semigroup, Monoid)
 
 data WidgetSentenceBranch = WidgetSentenceBranch
   { widgetSentenceBranchText :: Text

@@ -160,9 +160,10 @@ fileSelectionEventHandler
                     <> t
                 )
         ]
-      ClearSelection ->
+      ClearQuerySequence ->
         [ Model $
-            model & fileSelectionModel . selection .~ Seq.empty
+            model & fileSelectionModel . selection .~ mempty
+              & fileSelectionModel . fileSelectionQueryWidgetRequest .~ mempty
               & fileSelectionModel . tagOccurrences .~ OHM.empty
               & fileSelectionModel . fileSelectionInfoMap .~ IntMap.empty
               & fileSelectionModel . fileSelectionVis .~ VisibilityMain

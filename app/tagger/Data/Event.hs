@@ -40,7 +40,7 @@ data TaggerEvent
 data FileSelectionEvent
   = AddFiles
   | AppendQueryText Text
-  | ClearSelection
+  | ClearQuerySequence
   | CreateNewWidgetQueryNode
   | CycleNextFile
   | CycleNextSetOp

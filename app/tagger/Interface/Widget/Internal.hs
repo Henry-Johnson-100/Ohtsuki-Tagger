@@ -349,7 +349,7 @@ clearSelectionButton =
   styledButton_
     [resizeFactor (-1)]
     "Clear"
-    (DoFileSelectionEvent ClearSelection)
+    (DoFileSelectionEvent ClearQuerySequence)
 
 toggleViewSelectionButton :: TaggerWidget
 toggleViewSelectionButton =

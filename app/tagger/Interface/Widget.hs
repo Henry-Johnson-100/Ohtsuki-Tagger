@@ -34,7 +34,7 @@ taggerApplicationUI _ m =
       )
     , ("Ctrl-g", DoFileSelectionEvent CycleNextSetOp)
     , ("Ctrl-Shift-g", DoFileSelectionEvent CyclePrevSetOp)
-    , ("Ctrl-u", DoFileSelectionEvent ClearSelection)
+    , ("Ctrl-u", DoFileSelectionEvent ClearQuerySequence)
     , ("Ctrl-h", ToggleMainVisibility hidePossibleUIVis)
     ]
     []
