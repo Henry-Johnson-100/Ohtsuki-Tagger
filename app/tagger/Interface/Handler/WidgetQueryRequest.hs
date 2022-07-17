@@ -1,3 +1,5 @@
+{-# LANGUAGE StrictData #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Interface.Handler.WidgetQueryRequest (
@@ -7,6 +9,7 @@ module Interface.Handler.WidgetQueryRequest (
     widgetSentenceBranch,
     widgetSentenceBranchCount
   ),
+  widgetSentenceBranchSetOp,
   emptyWidgetQueryRequest,
   squashWidgetQueryRequest,
   moveQueryWidgetNodeTo,
@@ -15,22 +18,19 @@ module Interface.Handler.WidgetQueryRequest (
   createWidgetSentenceBranch,
 ) where
 
-import Control.Monad ((<=<))
 import Control.Monad.Trans.Class (MonadTrans (lift))
-import Control.Monad.Trans.Maybe (MaybeT)
+import Control.Monad.Trans.Except (ExceptT, except, withExceptT)
 import Data.Foldable (toList)
 import qualified Data.HashSet as HS
 import Data.Maybe (fromMaybe)
 import Data.Sequence (Seq, deleteAt, elemIndexL, empty, insertAt, lookup, (|>))
-import Data.Tagger (SetOp)
+import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import Database.Tagger.Type (TaggedConnection)
-import System.IO (hPrint, stderr)
-import Tagger.Util (hoistMaybe)
 import Text.TaggerQL (combinableSentenceResultSet, queryRequest)
 import Text.TaggerQL.AST (
   Request (Request),
-  SentenceTree (SentenceBranch),
+  SentenceTree (..),
  )
 import Text.TaggerQL.Parser.Internal (parse, requestParser)
 import Prelude hiding (lookup)
@@ -46,6 +46,12 @@ data WidgetSentenceBranch = WidgetSentenceBranch
   , widgetSentenceBranchCount :: Int
   }
   deriving (Show, Eq)
+
+widgetSentenceBranchSetOp :: WidgetSentenceBranch -> SetOp
+widgetSentenceBranchSetOp (widgetSentenceBranch -> st) =
+  case st of
+    SentenceBranch so _ -> so
+    SentenceNode _ -> Union
 
 emptyWidgetQueryRequest :: WidgetQueryRequest
 emptyWidgetQueryRequest = WidgetQueryRequest empty
@@ -81,14 +87,12 @@ createWidgetSentenceBranch ::
   TaggedConnection ->
   SetOp ->
   Text ->
-  MaybeT IO WidgetSentenceBranch
+  ExceptT String IO WidgetSentenceBranch
 createWidgetSentenceBranch tc so q = do
-  let parseResult = parse requestParser "" q
   req@(Request sts) <-
-    either
-      (const (hoistMaybe Nothing) <=< lift . hPrint stderr)
-      return
-      parseResult
+    withExceptT show
+      . except
+      $ parse requestParser "createWidgetSentenceBranch" q
   affectedFileCount <-
     lift $
       HS.size
