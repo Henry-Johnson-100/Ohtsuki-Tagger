@@ -19,6 +19,7 @@ import Data.OccurrenceHashMap (OccurrenceHashMap)
 import Data.Sequence (Seq)
 import Data.Text (Text)
 import Database.Tagger.Type
+import Interface.Handler.WidgetQueryRequest
 
 data TaggerEvent
   = DoFocusedFileEvent FocusedFileEvent
@@ -38,9 +39,9 @@ data TaggerEvent
 
 data FileSelectionEvent
   = AddFiles
-  | AppendWidgetQueryNode
   | AppendQueryText Text
   | ClearSelection
+  | CreateNewWidgetQueryNode
   | CycleNextFile
   | CycleNextSetOp
   | CyclePrevFile
@@ -58,6 +59,7 @@ data FileSelectionEvent
   | PutFiles (HashSet File)
   | PutFilesNoCombine (Seq File)
   | PutTagOccurrenceHashMap_ (OccurrenceHashMap Descriptor)
+  | PutWidgetQueryNode WidgetSentenceBranch
   | Query
   | RefreshFileSelection
   | RefreshSpecificFile (RecordKey File)

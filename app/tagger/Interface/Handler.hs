@@ -146,7 +146,6 @@ fileSelectionEventHandler
               %~ putHist (T.strip $ model ^. fileSelectionModel . addFileText)
         , Event (ClearTextField (TaggerLens (fileSelectionModel . addFileText)))
         ]
-      AppendWidgetQueryNode -> []
       AppendQueryText t ->
         [ Model $
             model
@@ -167,6 +166,26 @@ fileSelectionEventHandler
               & fileSelectionModel . tagOccurrences .~ OHM.empty
               & fileSelectionModel . fileSelectionInfoMap .~ IntMap.empty
               & fileSelectionModel . fileSelectionVis .~ VisibilityMain
+        ]
+      CreateNewWidgetQueryNode ->
+        [ Task
+            ( do
+                result <-
+                  runExceptT $
+                    createWidgetSentenceBranch
+                      conn
+                      (model ^. fileSelectionModel . setOp)
+                      (model ^. fileSelectionModel . queryText)
+                either
+                  (fmap IOEvent . hPutStrLn stderr)
+                  (return . DoFileSelectionEvent . PutWidgetQueryNode)
+                  result
+            )
+        , Model $
+            model & fileSelectionModel . queryHistory
+              %~ putHist (T.strip $ model ^. fileSelectionModel . queryText)
+              & fileSelectionModel . queryText .~ mempty
+        , Event (DoFileSelectionEvent ResetQueryHistIndex)
         ]
       CycleNextFile ->
         case model ^. fileSelectionModel . selection of
@@ -297,6 +316,11 @@ fileSelectionEventHandler
         [ Model $
             model
               & fileSelectionModel . tagOccurrences .~ m
+        ]
+      PutWidgetQueryNode wsb ->
+        [ Model $
+            model & fileSelectionModel . fileSelectionQueryWidgetRequest
+              %~ appendWidgetQueryNode wsb
         ]
       Query ->
         [ Task
