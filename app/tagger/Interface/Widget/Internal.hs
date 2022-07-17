@@ -37,6 +37,7 @@ import Data.Tagger
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger.Type
+import Interface.Handler.WidgetQueryRequest
 import Interface.Theme
 import Monomer
 import Monomer.Graphics.Lens
@@ -532,23 +533,41 @@ focusedFileWidget m =
     zstackQueryWidget =
       box_ [alignLeft, ignoreEmptyArea]
         . withStyleBasic [maxWidth 450]
-        $ hstack_
+        $ vstack_
           []
-          [ vstack . (: [])
-              . withStyleBasic
-                [ bgColor $
-                    yuiLightPeach
-                      & a .~ mainPaneFloatingOpacity
-                ]
-              $ styledButton_
-                [resizeFactor (-1)]
-                "Query"
-                ( DoFocusedFileEvent
-                    (ToggleFocusedFilePaneVisibility zstackQueryWidgetVis)
-                )
-          , withNodeVisible isVisible queryTextField
+          [ widgetQueryRequestWidget
+          , hstack_
+              []
+              [ vstack . (: [])
+                  . withStyleBasic
+                    [ bgColor $
+                        yuiLightPeach
+                          & a .~ mainPaneFloatingOpacity
+                    ]
+                  $ styledButton_
+                    [resizeFactor (-1)]
+                    "Query"
+                    ( DoFocusedFileEvent
+                        (ToggleFocusedFilePaneVisibility zstackQueryWidgetVis)
+                    )
+              , withNodeVisible isVisible queryTextField
+              ]
           ]
      where
+      widgetQueryRequestWidget =
+        vstack_
+          []
+          ( widgetQueryNode
+              <$> widgetQueryRequest
+                (m ^. fileSelectionModel . fileSelectionQueryWidgetRequest)
+          )
+       where
+        widgetQueryNode wsb =
+          label_
+            ( widgetSentenceBranchText wsb <> " : "
+                <> (T.pack . show . widgetSentenceBranchCount $ wsb)
+            )
+            [resizeFactor (-1)]
       isVisible =
         (m ^. focusedFileModel . focusedFileVis)
           `hasVis` VisibilityLabel zstackQueryWidgetVis
@@ -784,7 +803,7 @@ tagTextField =
 queryTextField :: TaggerWidget
 queryTextField =
   keystroke_
-    [ ("Enter", DoFileSelectionEvent Query)
+    [ ("Enter", DoFileSelectionEvent CreateNewWidgetQueryNode)
     , ("Up", DoFileSelectionEvent NextQueryHist)
     , ("Down", DoFileSelectionEvent PrevQueryHist)
     ]
