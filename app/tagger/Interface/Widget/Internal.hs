@@ -562,15 +562,16 @@ focusedFileWidget m =
                 (m ^. fileSelectionModel . fileSelectionQueryWidgetRequest)
           )
        where
-        widgetQueryNode wsb =
+        widgetQueryNode (WidgetSentenceBranchComp t c so) =
           label_
-            ( (T.pack . show . widgetSentenceBranchSetOp $ wsb)
+            ( (T.take 1 . T.pack . show $ so)
                 <> "| "
-                <> widgetSentenceBranchText wsb
+                <> t
                 <> " : "
-                <> (T.pack . show . widgetSentenceBranchCount $ wsb)
+                <> (T.pack . show $ c)
             )
             [resizeFactor (-1)]
+        widgetQueryNode _ = label "_ match in widgetQueryNode"
       isVisible =
         (m ^. focusedFileModel . focusedFileVis)
           `hasVis` VisibilityLabel zstackQueryWidgetVis

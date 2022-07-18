@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -9,6 +10,7 @@ module Interface.Handler.WidgetQueryRequest (
     widgetSentenceBranch,
     widgetSentenceBranchCount
   ),
+  pattern WidgetSentenceBranchComp,
   widgetSentenceBranchSetOp,
   emptyWidgetQueryRequest,
   squashWidgetQueryRequest,
@@ -47,8 +49,15 @@ data WidgetSentenceBranch = WidgetSentenceBranch
   }
   deriving (Show, Eq)
 
+pattern WidgetSentenceBranchComp :: Text -> Int -> SetOp -> WidgetSentenceBranch
+pattern WidgetSentenceBranchComp t c so <-
+  WidgetSentenceBranch t (sentenceTreeSetOp -> so) c
+
 widgetSentenceBranchSetOp :: WidgetSentenceBranch -> SetOp
-widgetSentenceBranchSetOp (widgetSentenceBranch -> st) =
+widgetSentenceBranchSetOp (widgetSentenceBranch -> st) = sentenceTreeSetOp st
+
+sentenceTreeSetOp :: SentenceTree a -> SetOp
+sentenceTreeSetOp st =
   case st of
     SentenceBranch so _ -> so
     SentenceNode (SentenceSet so _) -> so
