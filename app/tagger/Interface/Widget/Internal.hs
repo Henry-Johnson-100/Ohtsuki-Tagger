@@ -564,7 +564,10 @@ focusedFileWidget m =
        where
         widgetQueryNode wsb =
           label_
-            ( widgetSentenceBranchText wsb <> " : "
+            ( (T.pack . show . widgetSentenceBranchSetOp $ wsb)
+                <> "| "
+                <> widgetSentenceBranchText wsb
+                <> " : "
                 <> (T.pack . show . widgetSentenceBranchCount $ wsb)
             )
             [resizeFactor (-1)]
@@ -804,6 +807,7 @@ queryTextField :: TaggerWidget
 queryTextField =
   keystroke_
     [ ("Enter", DoFileSelectionEvent CreateNewWidgetQueryNode)
+    , ("Shift-Enter", DoFileSelectionEvent RunQuerySequence)
     , ("Up", DoFileSelectionEvent NextQueryHist)
     , ("Down", DoFileSelectionEvent PrevQueryHist)
     ]

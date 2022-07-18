@@ -439,6 +439,20 @@ fileSelectionEventHandler
                   )
             )
         ]
+      RunQuerySequence ->
+        [ Task
+            ( DoFileSelectionEvent . PutFilesNoCombine
+                <$> ( Seq.fromList . F.toList . combinableSentenceResultSet
+                        <$> queryRequest
+                          conn
+                          ( squashWidgetQueryRequest $
+                              model
+                                ^. fileSelectionModel
+                                  . fileSelectionQueryWidgetRequest
+                          )
+                    )
+            )
+        ]
       RefreshTagOccurrencesWith fks ->
         [ Task
             ( DoFileSelectionEvent . PutTagOccurrenceHashMap_

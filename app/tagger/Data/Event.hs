@@ -74,6 +74,7 @@ data FileSelectionEvent
   | ResetAddFileHistIndex
   | ResetQueryHistIndex
   | RunSelectionShellCommand
+  | RunQuerySequence
   | ShuffleSelection
   | ToggleSelectionView
   | TogglePaneVisibility Text
