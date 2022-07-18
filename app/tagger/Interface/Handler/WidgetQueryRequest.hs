@@ -136,9 +136,16 @@ createWidgetSentenceBranch tc so q = do
     withExceptT show
       . except
       $ parse requestParser "createWidgetSentenceBranch" q
+  let explicitSetOp =
+        case sts of
+          [] -> so
+          x : _ ->
+            case x of
+              SentenceBranch explSO _ -> explSO
+              _ -> so
   affectedFileCount <-
     lift $
       HS.size
         . combinableSentenceResultSet
         <$> queryRequest tc req
-  return $ WidgetSentenceBranch q (SentenceBranch so sts) affectedFileCount
+  return $ WidgetSentenceBranch q (SentenceBranch explicitSetOp sts) affectedFileCount
