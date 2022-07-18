@@ -2,6 +2,9 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use lambda-case" #-}
 
 module Interface.Handler.WidgetQueryRequest (
   WidgetQueryRequest (widgetQueryRequest),
@@ -11,7 +14,10 @@ module Interface.Handler.WidgetQueryRequest (
     widgetSentenceBranchCount
   ),
   pattern WidgetSentenceBranchComp,
-  widgetSentenceBranchSetOp,
+  widgetSentenceBranchTextLens,
+  widgetSentenceBranchLens,
+  widgetSentenceBranchCountLens,
+  widgetSentenceBranchSetOpLens,
   emptyWidgetQueryRequest,
   squashWidgetQueryRequest,
   moveQueryWidgetNodeTo,
@@ -20,6 +26,7 @@ module Interface.Handler.WidgetQueryRequest (
   createWidgetSentenceBranch,
 ) where
 
+import Control.Lens (Lens', lens, (&), (.~), (^.))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT, except, withExceptT)
 import Data.Foldable (toList)
@@ -49,18 +56,46 @@ data WidgetSentenceBranch = WidgetSentenceBranch
   }
   deriving (Show, Eq)
 
+widgetSentenceBranchTextLens :: Lens' WidgetSentenceBranch Text
+widgetSentenceBranchTextLens =
+  lens
+    (\(WidgetSentenceBranch t _ _) -> t)
+    (\wsb t -> wsb{widgetSentenceBranchText = t})
+
+widgetSentenceBranchLens :: Lens' WidgetSentenceBranch (SentenceTree Text)
+widgetSentenceBranchLens =
+  lens
+    (\(WidgetSentenceBranch _ st _) -> st)
+    (\wsb st -> wsb{widgetSentenceBranch = st})
+
+widgetSentenceBranchCountLens :: Lens' WidgetSentenceBranch Int
+widgetSentenceBranchCountLens =
+  lens
+    (\(WidgetSentenceBranch _ _ c) -> c)
+    (\wsb c -> wsb{widgetSentenceBranchCount = c})
+
 pattern WidgetSentenceBranchComp :: Text -> Int -> SetOp -> WidgetSentenceBranch
 pattern WidgetSentenceBranchComp t c so <-
-  WidgetSentenceBranch t (sentenceTreeSetOp -> so) c
+  WidgetSentenceBranch t ((^. sentenceTreeSetOpLens) -> so) c
 
-widgetSentenceBranchSetOp :: WidgetSentenceBranch -> SetOp
-widgetSentenceBranchSetOp (widgetSentenceBranch -> st) = sentenceTreeSetOp st
+widgetSentenceBranchSetOpLens :: Lens' WidgetSentenceBranch SetOp
+widgetSentenceBranchSetOpLens =
+  lens
+    (flip (^.) sentenceTreeSetOpLens . widgetSentenceBranch)
+    (\wsb so -> wsb & widgetSentenceBranchLens . sentenceTreeSetOpLens .~ so)
 
-sentenceTreeSetOp :: SentenceTree a -> SetOp
-sentenceTreeSetOp st =
-  case st of
-    SentenceBranch so _ -> so
-    SentenceNode (SentenceSet so _) -> so
+sentenceTreeSetOpLens :: Lens' (SentenceTree a) SetOp
+sentenceTreeSetOpLens =
+  lens
+    ( \st -> case st of
+        SentenceBranch so _ -> so
+        SentenceNode (SentenceSet so _) -> so
+    )
+    ( \st so ->
+        case st of
+          SentenceBranch _ xs -> SentenceBranch so xs
+          SentenceNode (SentenceSet _ xs) -> SentenceNode (SentenceSet so xs)
+    )
 
 emptyWidgetQueryRequest :: WidgetQueryRequest
 emptyWidgetQueryRequest = WidgetQueryRequest empty
