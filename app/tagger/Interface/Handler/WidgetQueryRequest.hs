@@ -138,11 +138,8 @@ createWidgetSentenceBranch tc so q = do
       $ parse requestParser "createWidgetSentenceBranch" q
   let explicitSetOp =
         case sts of
-          [] -> so
-          x : _ ->
-            case x of
-              SentenceBranch explSO _ -> explSO
-              _ -> so
+          [] -> Union
+          x : _ -> x ^. sentenceTreeSetOpLens
   affectedFileCount <-
     lift $
       HS.size
