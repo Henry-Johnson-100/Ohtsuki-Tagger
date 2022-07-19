@@ -46,6 +46,7 @@ data FileSelectionEvent
   | CycleTagOrderCriteria
   | CycleTagOrderDirection
   | DeleteFileFromFileSystem (RecordKey File)
+  | DeleteQueryNode WidgetSentenceBranch
   | DoFileSelectionWidgetEvent FileSelectionWidgetEvent
   | MakeFileSelectionInfoMap (Seq File)
   | MoveQueryNodeBefore WidgetSentenceBranch WidgetSentenceBranch

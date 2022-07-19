@@ -18,6 +18,7 @@ module Interface.Handler.WidgetQueryRequest (
   widgetSentenceBranchLens,
   widgetSentenceBranchCountLens,
   widgetSentenceBranchSetOpLens,
+  widgetSentenceBranchIdLens,
   emptyWidgetQueryRequest,
   squashWidgetQueryRequest,
   moveQueryWidgetNodeTo,
@@ -53,30 +54,37 @@ data WidgetSentenceBranch = WidgetSentenceBranch
   { widgetSentenceBranchText :: Text
   , widgetSentenceBranch :: SentenceTree Text
   , widgetSentenceBranchCount :: Int
+  , widgetSentenceBranchId :: Int
   }
   deriving (Show, Eq)
 
 widgetSentenceBranchTextLens :: Lens' WidgetSentenceBranch Text
 widgetSentenceBranchTextLens =
   lens
-    (\(WidgetSentenceBranch t _ _) -> t)
+    (\(WidgetSentenceBranch t _ _ _) -> t)
     (\wsb t -> wsb{widgetSentenceBranchText = t})
 
 widgetSentenceBranchLens :: Lens' WidgetSentenceBranch (SentenceTree Text)
 widgetSentenceBranchLens =
   lens
-    (\(WidgetSentenceBranch _ st _) -> st)
+    (\(WidgetSentenceBranch _ st _ _) -> st)
     (\wsb st -> wsb{widgetSentenceBranch = st})
 
 widgetSentenceBranchCountLens :: Lens' WidgetSentenceBranch Int
 widgetSentenceBranchCountLens =
   lens
-    (\(WidgetSentenceBranch _ _ c) -> c)
+    (\(WidgetSentenceBranch _ _ c _) -> c)
     (\wsb c -> wsb{widgetSentenceBranchCount = c})
+
+widgetSentenceBranchIdLens :: Lens' WidgetSentenceBranch Int
+widgetSentenceBranchIdLens =
+  lens
+    (\(WidgetSentenceBranch _ _ _ k) -> k)
+    (\wsb k -> wsb{widgetSentenceBranchId = k})
 
 pattern WidgetSentenceBranchComp :: Text -> Int -> SetOp -> WidgetSentenceBranch
 pattern WidgetSentenceBranchComp t c so <-
-  WidgetSentenceBranch t ((^. sentenceTreeSetOpLens) -> so) c
+  WidgetSentenceBranch t ((^. sentenceTreeSetOpLens) -> so) c _
 
 widgetSentenceBranchSetOpLens :: Lens' WidgetSentenceBranch SetOp
 widgetSentenceBranchSetOpLens =
@@ -116,8 +124,12 @@ moveQueryWidgetNodeTo from to wr@(WidgetQueryRequest sts) = fromMaybe wr $ do
   toIx <- elemIndexL to removedFromNode
   return . WidgetQueryRequest $ insertAt toIx from removedFromNode
 
-deleteWidgetQueryNode :: Int -> WidgetQueryRequest -> WidgetQueryRequest
-deleteWidgetQueryNode n (WidgetQueryRequest sts) = WidgetQueryRequest $ deleteAt n sts
+deleteWidgetQueryNode :: WidgetSentenceBranch -> WidgetQueryRequest -> WidgetQueryRequest
+deleteWidgetQueryNode wsb wr@(WidgetQueryRequest sts) =
+  maybe
+    wr
+    (WidgetQueryRequest . flip deleteAt sts)
+    (elemIndexL wsb sts)
 
 appendWidgetQueryNode ::
   WidgetSentenceBranch ->
@@ -144,4 +156,4 @@ createWidgetSentenceBranch tc q = do
       HS.size
         . combinableSentenceResultSet
         <$> queryRequest tc req
-  return $ WidgetSentenceBranch q (SentenceBranch explicitSetOp sts) affectedFileCount
+  return $ WidgetSentenceBranch q (SentenceBranch explicitSetOp sts) affectedFileCount 0

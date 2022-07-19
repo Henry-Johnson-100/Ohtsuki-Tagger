@@ -542,7 +542,7 @@ focusedFileWidget m =
         widgetQueryNode wsb@(WidgetSentenceBranchComp t c so) =
           dropTarget_
             (DoFileSelectionEvent . flip MoveQueryNodeBefore wsb)
-            [dropTargetStyle [borderT 1 green]]
+            [dropTargetStyle [borderT 1 yuiOrange]]
             . draggable wsb
             $ label_
               ( (T.take 1 . T.pack . show $ so)

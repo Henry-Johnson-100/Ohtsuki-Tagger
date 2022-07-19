@@ -269,6 +269,11 @@ fileSelectionEventHandler
         [ Task (IOEvent <$> rmFile conn fk)
         , Event . DoFileSelectionEvent . RemoveFileFromSelection $ fk
         ]
+      DeleteQueryNode wsb ->
+        [ Model $
+            model & fileSelectionModel . fileSelectionQueryWidgetRequest
+              %~ deleteWidgetQueryNode wsb
+        ]
       DoFileSelectionWidgetEvent e -> fileSelectionWidgetEventHandler wenv node model e
       MakeFileSelectionInfoMap fseq ->
         [ let fiTuple (File fk fp) = (fromIntegral fk, constructFileInfo fp)
@@ -359,7 +364,14 @@ fileSelectionEventHandler
       PutWidgetQueryNode wsb ->
         [ Model $
             model & fileSelectionModel . fileSelectionQueryWidgetRequest
-              %~ appendWidgetQueryNode wsb
+              %~ appendWidgetQueryNode
+                ( wsb & widgetSentenceBranchIdLens
+                    .~ ( Seq.length . widgetQueryRequest $
+                          model
+                            ^. fileSelectionModel
+                              . fileSelectionQueryWidgetRequest
+                       )
+                )
         ]
       RefreshSpecificFile fk ->
         [ Task
