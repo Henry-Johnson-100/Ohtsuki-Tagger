@@ -498,6 +498,7 @@ focusedFileWidget m =
             [ hstack [zstackNextImage, zstackTaggingWidget]
             , hstack [zstackPrevImage, zstackQueryWidget]
             ]
+      , queryWidget m
       ]
    where
     zstackNextImage =
@@ -585,6 +586,9 @@ focusedFileWidget m =
       isVisible =
         (m ^. focusedFileModel . focusedFileVis)
           `hasVis` VisibilityLabel zstackTaggingWidgetVis
+
+queryWidget :: TaggerModel -> TaggerWidget
+queryWidget _ = label "query"
 
 imagePreviewRender :: Text -> TaggerWidget
 imagePreviewRender fp = image_ fp [fitEither, alignCenter]
