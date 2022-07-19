@@ -12,7 +12,6 @@ module Data.Event (
   TaggerInfoEvent (..),
 ) where
 
-import Data.HashSet
 import Data.IntMap.Strict (IntMap)
 import Data.Model
 import Data.OccurrenceHashMap (OccurrenceHashMap)
@@ -43,9 +42,7 @@ data FileSelectionEvent
   | ClearQuerySequence
   | CreateNewWidgetQueryNode
   | CycleNextFile
-  | CycleNextSetOp
   | CyclePrevFile
-  | CyclePrevSetOp
   | CycleTagOrderCriteria
   | CycleTagOrderDirection
   | DeleteFileFromFileSystem (RecordKey File)
@@ -56,11 +53,9 @@ data FileSelectionEvent
   | PrevAddFileHist
   | PrevQueryHist
   | PutChunkSequence
-  | PutFiles (HashSet File)
   | PutFilesNoCombine (Seq File)
   | PutTagOccurrenceHashMap_ (OccurrenceHashMap Descriptor)
   | PutWidgetQueryNode WidgetSentenceBranch
-  | Query
   | RefreshFileSelection
   | RefreshSpecificFile (RecordKey File)
   | RefreshSpecificFile_ File

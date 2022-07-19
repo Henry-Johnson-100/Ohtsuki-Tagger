@@ -32,8 +32,6 @@ taggerApplicationUI _ m =
       , DoFocusedFileEvent
           (ToggleFocusedFilePaneVisibility zstackQueryWidgetVis)
       )
-    , ("Ctrl-g", DoFileSelectionEvent CycleNextSetOp)
-    , ("Ctrl-Shift-g", DoFileSelectionEvent CyclePrevSetOp)
     , ("Ctrl-u", DoFileSelectionEvent ClearQuerySequence)
     , ("Ctrl-h", ToggleMainVisibility hidePossibleUIVis)
     ]

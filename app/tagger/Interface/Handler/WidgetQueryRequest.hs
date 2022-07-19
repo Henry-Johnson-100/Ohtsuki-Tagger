@@ -128,10 +128,9 @@ appendWidgetQueryNode wsb (WidgetQueryRequest sts) =
 
 createWidgetSentenceBranch ::
   TaggedConnection ->
-  SetOp ->
   Text ->
   ExceptT String IO WidgetSentenceBranch
-createWidgetSentenceBranch tc so q = do
+createWidgetSentenceBranch tc q = do
   req@(Request sts) <-
     withExceptT show
       . except

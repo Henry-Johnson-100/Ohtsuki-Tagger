@@ -38,7 +38,6 @@ import qualified Data.OccurrenceHashMap as OHM
 import Data.Sequence (Seq)
 import qualified Data.Sequence as S
 import qualified Data.Sequence as Seq
-import Data.Tagger
 import Data.Text (Text)
 import Database.Tagger.Type
 import Interface.Handler.WidgetQueryRequest
@@ -85,7 +84,6 @@ data FileSelectionModel = FileSelectionModel
   , _fileselectionTagOccurrences :: OccurrenceHashMap Descriptor
   , _fileselectionTagOrdering :: OrderBy
   , _fileselectionFileSelectionInfoMap :: IntMap FileInfo
-  , _fileselectionSetOp :: SetOp
   , _fileselectionQueryText :: Text
   , _fileselectionQueryHistory :: TextHistory
   , _fileselectionFileSelectionQueryWidgetRequest :: WidgetQueryRequest
@@ -105,7 +103,6 @@ createFileSelectionModel =
     , _fileselectionTagOccurrences = OHM.empty
     , _fileselectionTagOrdering = OrderBy Numeric Desc
     , _fileselectionFileSelectionInfoMap = IntMap.empty
-    , _fileselectionSetOp = Union
     , _fileselectionQueryText = ""
     , _fileselectionQueryHistory = createHistory 10
     , _fileselectionFileSelectionQueryWidgetRequest = emptyWidgetQueryRequest

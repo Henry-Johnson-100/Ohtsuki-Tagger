@@ -13,7 +13,6 @@ module Interface.Widget.Internal (
   fileSelectionScrollWidgetNodeKey,
   hidePossibleUIVis,
   fileSelectionWidget,
-  fileSelectionOperationWidget,
   queryTextFieldKey,
   tagTextNodeKey,
   zstackTaggingWidgetVis,
@@ -33,7 +32,6 @@ import Data.Model.Shared
 import qualified Data.OccurrenceHashMap as OHM
 import qualified Data.Ord as O
 import qualified Data.Sequence as Seq
-import Data.Tagger
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger.Type
@@ -98,20 +96,7 @@ fileSelectionWidget m =
       []
       [ selectionSizeLabel m
       , clearSelectionButton
-      , setOpDrowpdown
       ]
-
-fileSelectionOperationWidget :: TaggerModel -> TaggerWidget
-fileSelectionOperationWidget _ =
-  withStyleBasic
-    [borderL 1 black, borderR 1 black]
-    queryWidget
- where
-  queryWidget =
-    box_ [alignTop, alignCenter] $
-      hstack_ [] [runQueryButton, queryTextField]
-   where
-    runQueryButton = styledButton "Search" (DoFileSelectionEvent Query)
 
 fileSelectionFileList :: TaggerModel -> TaggerWidget
 fileSelectionFileList m =
@@ -401,14 +386,6 @@ addFilesWidget =
               )
           ]
       ]
-
-setOpDrowpdown :: TaggerWidget
-setOpDrowpdown =
-  dropdown
-    (fileSelectionModel . setOp)
-    [Union, Intersect, Difference]
-    (flip label_ [resizeFactor (-1)] . T.pack . show)
-    (flip label_ [resizeFactor (-1)] . T.pack . show)
 
 selectionSizeLabel :: TaggerModel -> TaggerWidget
 selectionSizeLabel m =
@@ -1092,12 +1069,6 @@ descriptorTreeRefreshBothButton =
     [resizeFactor (-1)]
     "Refresh"
     (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
-
-styledButton :: Text -> TaggerEvent -> TaggerWidget
-styledButton t e =
-  withStyleHover [bgColor yuiYellow, border 1 yuiOrange]
-    . withStyleBasic [bgColor yuiLightPeach, border 1 yuiPeach]
-    $ button t e
 
 styledButton_ ::
   [ButtonCfg TaggerModel TaggerEvent] ->

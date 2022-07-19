@@ -11,14 +11,24 @@ module Interface.Handler (
   taggerEventHandler,
 ) where
 
-import Control.Lens
-import Control.Monad
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Except
-import Control.Monad.Trans.Maybe
-import Data.Event
+import Control.Lens ((%~), (&), (.~), (^.))
+import Control.Monad (guard, unless, void)
+import Control.Monad.Trans.Class (MonadTrans (lift))
+import Control.Monad.Trans.Except (
+  ExceptT,
+  runExceptT,
+  withExceptT,
+ )
+import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
+import Data.Event (
+  DescriptorTreeEvent (..),
+  FileSelectionEvent (..),
+  FileSelectionWidgetEvent (..),
+  FocusedFileEvent (..),
+  TaggerEvent (..),
+  TaggerInfoEvent (..),
+ )
 import qualified Data.Foldable as F
-import qualified Data.HashSet as HS
 import Data.HierarchyMap (empty)
 import qualified Data.HierarchyMap as HAM
 import qualified Data.IntMap.Strict as IntMap
@@ -26,24 +36,66 @@ import Data.Maybe
 import Data.Model
 import Data.Model.Shared
 import qualified Data.OccurrenceHashMap as OHM
-import Data.Sequence (Seq ((:<|), (:|>)))
+import Data.Sequence (Seq ((:<|), (:|>)), (<|), (|>))
 import qualified Data.Sequence as Seq
-import Data.Tagger
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Version (showVersion)
-import Database.Tagger
-import Interface.Handler.Internal
+import Database.Tagger (
+  ConcreteTag (ConcreteTag, concreteTagId),
+  ConcreteTaggedFile (
+    ConcreteTaggedFile,
+    concreteTaggedFile,
+    concreteTaggedFileDescriptors
+  ),
+  Descriptor (..),
+  File (File, fileId, filePath),
+  RecordKey (RecordKey),
+  TaggedConnection,
+  close,
+  deleteDescriptors,
+  deleteFiles,
+  deleteTags,
+  getInfraChildren,
+  getLastAccessed,
+  getLastSaved,
+  getMetaParent,
+  getTagOccurrencesByFileKey,
+  hasInfraRelations,
+  insertDescriptorRelation,
+  insertDescriptors,
+  insertTags,
+  moveSubTags,
+  mvFile,
+  queryForConcreteTaggedFileWithFileId,
+  queryForDescriptorByPattern,
+  queryForSingleFileByFileId,
+  rmFile,
+  unSubTags,
+  updateDescriptors,
+ )
+import Interface.Handler.Internal (
+  addFiles,
+  runShellCmd,
+  shuffleSequence,
+ )
 import Interface.Handler.WidgetQueryRequest
 import Interface.Widget.Internal (fileSelectionScrollWidgetNodeKey, queryTextFieldKey, tagTextNodeKey, zstackQueryWidgetVis, zstackTaggingWidgetVis)
-import Monomer
-import Paths_tagger
+import Monomer (
+  AppEventResponse,
+  EventResponse (Event, Message, Model, SetFocusOnKey, Task),
+  ScrollMessage (ScrollReset),
+  WidgetEnv,
+  WidgetKey (WidgetKey),
+  WidgetNode,
+ )
+import Paths_tagger (getDataFileName)
 import System.Directory (getCurrentDirectory)
-import System.FilePath
-import System.IO
+import System.FilePath (takeExtension)
+import System.IO (hPutStrLn, stderr)
 import Tagger.Info (taggerVersion)
 import Text.TaggerQL
-import Util
+import Util (head')
 
 taggerEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -175,7 +227,6 @@ fileSelectionEventHandler
                   runExceptT $
                     createWidgetSentenceBranch
                       conn
-                      (model ^. fileSelectionModel . setOp)
                       (model ^. fileSelectionModel . queryText)
                 either
                   (fmap IOEvent . hPutStrLn stderr)
@@ -196,7 +247,6 @@ fileSelectionEventHandler
             [ Event . DoFocusedFileEvent . PutFile $ f
             , Model $ model & fileSelectionModel . selection .~ (f <| (fs |> f'))
             ]
-      CycleNextSetOp -> [Model $ model & fileSelectionModel . setOp %~ next]
       CyclePrevFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []
@@ -205,7 +255,6 @@ fileSelectionEventHandler
             [ Event . DoFocusedFileEvent . PutFile $ f
             , Model $ model & fileSelectionModel . selection .~ (f <| (f' <| fs))
             ]
-      CyclePrevSetOp -> [Model $ model & fileSelectionModel . setOp %~ prev]
       CycleTagOrderCriteria ->
         [ Model $
             model & fileSelectionModel . tagOrdering
@@ -270,22 +319,6 @@ fileSelectionEventHandler
                 .. selectionChunkLength model
                 ]
         ]
-      PutFiles fs ->
-        let currentSet =
-              HS.fromList
-                . F.toList
-                $ model ^. fileSelectionModel . selection
-            combFun =
-              case model ^. fileSelectionModel . setOp of
-                Union -> HS.union
-                Intersect -> HS.intersection
-                Difference -> HS.difference
-            newSeq =
-              Seq.fromList
-                . HS.toList
-                . combFun currentSet
-                $ fs
-         in [Event . DoFileSelectionEvent . PutFilesNoCombine $ newSeq]
       PutFilesNoCombine
         ( uncurry (Seq.><)
             . (\(x, y) -> (y, x))
@@ -322,20 +355,6 @@ fileSelectionEventHandler
         [ Model $
             model & fileSelectionModel . fileSelectionQueryWidgetRequest
               %~ appendWidgetQueryNode wsb
-        ]
-      Query ->
-        [ Task
-            ( DoFileSelectionEvent
-                . PutFiles
-                <$> taggerQL
-                  (TaggerQLQuery . T.strip $ model ^. fileSelectionModel . queryText)
-                  conn
-            )
-        , Model $
-            model & fileSelectionModel . queryHistory
-              %~ putHist (T.strip $ model ^. fileSelectionModel . queryText)
-        , Event (ClearTextField (TaggerLens (fileSelectionModel . queryText)))
-        , Event (DoFileSelectionEvent ResetQueryHistIndex)
         ]
       RefreshSpecificFile fk ->
         [ Task
