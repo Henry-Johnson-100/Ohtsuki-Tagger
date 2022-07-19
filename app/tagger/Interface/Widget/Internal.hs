@@ -496,7 +496,7 @@ focusedFileWidget m =
             [alignBottom, alignLeft, ignoreEmptyArea]
           $ vstack
             [ hstack [zstackNextImage, zstackTaggingWidget]
-            , hstack [zstackPrevImage, zstackQueryWidget]
+            , hstack [zstackPrevImage]
             ]
       , queryWidget m
       ]
@@ -507,60 +507,6 @@ focusedFileWidget m =
     zstackPrevImage =
       withStyleBasic [bgColor $ yuiLightPeach & a .~ mainPaneFloatingOpacity] $
         styledButton_ [resizeFactor (-1)] "↓" (DoFileSelectionEvent CyclePrevFile)
-    zstackQueryWidget :: TaggerWidget
-    zstackQueryWidget =
-      box_ [alignLeft, ignoreEmptyArea]
-        . withStyleBasic [maxWidth 450]
-        $ vstack_
-          []
-          [ widgetQueryRequestWidget
-          , hstack_
-              []
-              [ vstack . (: [])
-                  . withStyleBasic
-                    [ bgColor $
-                        yuiLightPeach
-                          & a .~ mainPaneFloatingOpacity
-                    ]
-                  $ styledButton_
-                    [resizeFactor (-1)]
-                    "Query"
-                    ( DoFocusedFileEvent
-                        (ToggleFocusedFilePaneVisibility zstackQueryWidgetVis)
-                    )
-              , withNodeVisible isVisible queryTextField
-              ]
-          ]
-     where
-      widgetQueryRequestWidget =
-        vstack_
-          []
-          ( widgetQueryNode
-              <$> widgetQueryRequest
-                (m ^. fileSelectionModel . fileSelectionQueryWidgetRequest)
-          )
-       where
-        widgetQueryNode wsb@(WidgetSentenceBranchComp t c _) =
-          hstack
-            [ styledButton_
-                [resizeFactor (-1)]
-                "-"
-                (DoFileSelectionEvent . DeleteQueryNode $ wsb)
-            , dropTarget_
-                (DoFileSelectionEvent . flip MoveQueryNodeBefore wsb)
-                [dropTargetStyle [borderT 1 yuiOrange]]
-                . draggable wsb
-                $ label_
-                  ( t
-                      <> " : "
-                      <> (T.pack . show $ c)
-                  )
-                  [resizeFactor (-1)]
-            ]
-        widgetQueryNode _ = label "_ match in widgetQueryNode"
-      isVisible =
-        (m ^. focusedFileModel . focusedFileVis)
-          `hasVis` VisibilityLabel zstackQueryWidgetVis
     zstackTaggingWidget :: TaggerWidget
     zstackTaggingWidget =
       box_ [alignLeft, ignoreEmptyArea]
@@ -588,7 +534,60 @@ focusedFileWidget m =
           `hasVis` VisibilityLabel zstackTaggingWidgetVis
 
 queryWidget :: TaggerModel -> TaggerWidget
-queryWidget _ = label "query"
+queryWidget m =
+  box_ [alignLeft, ignoreEmptyArea]
+    . withStyleBasic [maxWidth 450]
+    $ vstack_
+      []
+      [ widgetQueryRequestWidget
+      , hstack_
+          []
+          [ vstack . (: [])
+              . withStyleBasic
+                [ bgColor $
+                    yuiLightPeach
+                      & a .~ mainPaneFloatingOpacity
+                ]
+              $ styledButton_
+                [resizeFactor (-1)]
+                "Query"
+                ( DoFocusedFileEvent
+                    (ToggleFocusedFilePaneVisibility zstackQueryWidgetVis)
+                )
+          , withNodeVisible
+              ( (m ^. focusedFileModel . focusedFileVis)
+                  `hasVis` VisibilityLabel zstackQueryWidgetVis
+              )
+              queryTextField
+          ]
+      ]
+ where
+  widgetQueryRequestWidget =
+    vstack_
+      []
+      ( widgetQueryNode
+          <$> widgetQueryRequest
+            (m ^. fileSelectionModel . fileSelectionQueryWidgetRequest)
+      )
+   where
+    widgetQueryNode wsb@(WidgetSentenceBranchComp t c _) =
+      hstack
+        [ styledButton_
+            [resizeFactor (-1)]
+            "-"
+            (DoFileSelectionEvent . DeleteQueryNode $ wsb)
+        , dropTarget_
+            (DoFileSelectionEvent . flip MoveQueryNodeBefore wsb)
+            [dropTargetStyle [borderT 1 yuiOrange]]
+            . draggable wsb
+            $ label_
+              ( t
+                  <> " : "
+                  <> (T.pack . show $ c)
+              )
+              [resizeFactor (-1)]
+        ]
+    widgetQueryNode _ = label "_ match in widgetQueryNode"
 
 imagePreviewRender :: Text -> TaggerWidget
 imagePreviewRender fp = image_ fp [fitEither, alignCenter]
