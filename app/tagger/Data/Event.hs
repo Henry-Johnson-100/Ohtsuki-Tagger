@@ -48,6 +48,7 @@ data FileSelectionEvent
   | DeleteFileFromFileSystem (RecordKey File)
   | DoFileSelectionWidgetEvent FileSelectionWidgetEvent
   | MakeFileSelectionInfoMap (Seq File)
+  | MoveQueryNodeBefore WidgetSentenceBranch WidgetSentenceBranch
   | NextAddFileHist
   | NextQueryHist
   | PrevAddFileHist

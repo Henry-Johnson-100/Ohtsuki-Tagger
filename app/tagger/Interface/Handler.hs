@@ -279,6 +279,11 @@ fileSelectionEventHandler
                     . fileSelectionInfoMap
                   .~ IntMap.fromList m
         ]
+      MoveQueryNodeBefore from to ->
+        [ Model $
+            model & fileSelectionModel . fileSelectionQueryWidgetRequest
+              %~ moveQueryWidgetNodeTo from to
+        ]
       NextAddFileHist ->
         [ Model $
             model

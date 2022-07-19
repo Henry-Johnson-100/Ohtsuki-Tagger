@@ -539,15 +539,19 @@ focusedFileWidget m =
                 (m ^. fileSelectionModel . fileSelectionQueryWidgetRequest)
           )
        where
-        widgetQueryNode (WidgetSentenceBranchComp t c so) =
-          label_
-            ( (T.take 1 . T.pack . show $ so)
-                <> "| "
-                <> t
-                <> " : "
-                <> (T.pack . show $ c)
-            )
-            [resizeFactor (-1)]
+        widgetQueryNode wsb@(WidgetSentenceBranchComp t c so) =
+          dropTarget_
+            (DoFileSelectionEvent . flip MoveQueryNodeBefore wsb)
+            [dropTargetStyle [borderT 1 green]]
+            . draggable wsb
+            $ label_
+              ( (T.take 1 . T.pack . show $ so)
+                  <> "| "
+                  <> t
+                  <> " : "
+                  <> (T.pack . show $ c)
+              )
+              [resizeFactor (-1)]
         widgetQueryNode _ = label "_ match in widgetQueryNode"
       isVisible =
         (m ^. focusedFileModel . focusedFileVis)
