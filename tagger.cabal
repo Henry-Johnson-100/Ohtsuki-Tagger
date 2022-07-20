@@ -67,6 +67,9 @@ executable tagger
                       ,Interface.Theme
                       ,Interface.Widget
                       ,Interface.Widget.Internal
+                      ,Type.WidgetBuilder
+                      ,Type.WidgetBuilder.NodeBuilder
+                      ,Type.WidgetBuilder.StackBuilder
                       ,Util
 
   other-extensions:   RankNTypes

@@ -40,6 +40,7 @@ import Interface.Theme
 import Monomer
 import Monomer.Graphics.Lens
 import Monomer.Lens (fixed)
+import Type.WidgetBuilder
 import Util (both)
 
 type TaggerWidget = WidgetNode TaggerModel TaggerEvent
