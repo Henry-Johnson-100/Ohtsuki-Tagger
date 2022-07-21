@@ -99,6 +99,7 @@ import Text.TaggerQL.Parser.Internal (
   requestParser,
   sentenceParser,
  )
+import Text.TaggerQL.QueryGen (generateAndRunQuery)
 
 data CombinableSentenceResult
   = CombinableSentenceResult SetOp (HashSet File)
@@ -196,10 +197,7 @@ queryTermTree ::
   TaggedConnection ->
   TermTree Text ->
   MaybeT IO TermResult
-queryTermTree tc tt =
-  case tt of
-    Simple st -> lift $ querySimpleTerm tc st
-    Complex ct -> queryComplexTerm tc ct
+queryTermTree tc tt = TermResult <$> lift (generateAndRunQuery tt tc)
 
 {- |
  A depth-first query with 'ComplexTerm`s.

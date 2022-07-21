@@ -79,7 +79,7 @@ generateTermQuery (Term qc t) =
 
 terminateQuery :: TaggerQuery -> TaggerQuery
 terminateQuery q =
-  "WITH n as (" `qcat` q `qcat` ")"
+  "WITH n AS (" `qcat` q `qcat` ")"
     `qcat` [r|SELECT DISTINCT f.*
 FROM File f
 JOIN n
@@ -101,6 +101,7 @@ buildQuery (TaggerQLGenQuery p qcq (Just iq) qc) =
   let (innerQuery, innerParams) = buildQuery iq
    in (,maybe innerParams (: innerParams) p)
         ( "WITH n AS (" `qcat` innerQuery `qcat` ")"
+            <> ", "
             `qcat` qcq
             `qcat` [r|SELECT t.* 
 FROM Tag t 
