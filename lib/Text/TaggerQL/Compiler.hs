@@ -1,5 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {- |
 Module      : Text.TaggerQL.Compiler
@@ -14,9 +16,11 @@ treated as distinct queries and can be combined and aggregated appopriately in m
 -}
 module Text.TaggerQL.Compiler () where
 
+import Data.String (IsString)
 import Data.Tagger
 import Data.Text (Text)
 import Database.Tagger.Query.Type
+import Text.RawString.QQ (r)
 import Text.TaggerQL.AST
 
 data TaggerQLCompilerTarget = TaggerQLCompilerTarget
@@ -25,4 +29,24 @@ data TaggerQLCompilerTarget = TaggerQLCompilerTarget
   }
   deriving (Show, Eq)
 
--- compileTermTree :: TermTree Text -> TaggerQuery
+newtype UnterminatedNTypeQuery = UnterminatedNTypeQuery TaggerQLCompilerTarget
+  deriving (Show, Eq)
+
+newtype FileJoinTerminatedQuery = FileJoinTerminatedQuery TaggerQLCompilerTarget
+  deriving (Show, Eq)
+
+compileTermTree :: TermTree Text -> FileJoinTerminatedQuery
+compileTermTree = undefined
+
+fileJoinTermination :: UnterminatedNTypeQuery -> FileJoinTerminatedQuery
+fileJoinTermination (UnterminatedNTypeQuery (TaggerQLCompilerTarget q ps)) =
+  FileJoinTerminatedQuery . flip TaggerQLCompilerTarget ps $
+    "WITH n AS ("
+      `qcat` q
+      `qcat` ")"
+      `qcat` [r|
+f.id
+,f.filePath
+FROM n
+JOIN File f
+  ON n.fileId = f.id|]
