@@ -6,6 +6,7 @@
 {-# LANGUAGE StrictData #-}
 {-# HLINT ignore "Redundant case" #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# HLINT ignore "Redundant bracket" #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -16,6 +17,8 @@ module Text.TaggerQL.QueryGen (
 ) where
 
 import Data.HashSet (HashSet)
+import qualified Data.HashSet as HS
+import qualified Data.List as L
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import Data.Maybe (maybeToList)
 import Data.Tagger
@@ -35,10 +38,15 @@ data TaggerQLGenQuery = TaggerQLGenQuery
   deriving (Show, Eq)
 
 generateAndRunQuery :: TermTree Text -> TaggedConnection -> IO (HashSet File)
-generateAndRunQuery tt tc = undefined
+generateAndRunQuery tt tc = do
+  let series = generateQuerySeries tt
+  results <- mapM (`runGenQuery` tc) series
+  let intersections xs = case xs of [] -> HS.empty; _ -> L.foldl1' HS.intersection xs
+  return . intersections $ results
 
 runGenQuery :: TaggerQLGenQuery -> TaggedConnection -> IO (HashSet File)
-runGenQuery q tc = undefined
+runGenQuery (buildQuery -> (terminateQuery -> genQ, params)) tc =
+  HS.fromList <$> query tc genQ params
 
 generateQuerySeries :: TermTree Text -> [TaggerQLGenQuery]
 generateQuerySeries tt =
@@ -68,6 +76,14 @@ generateTermQuery (Term qc t) =
     (generateQCCTEBody qc)
     Nothing
     qc
+
+terminateQuery :: TaggerQuery -> TaggerQuery
+terminateQuery q =
+  "WITH n as (" `qcat` q `qcat` ")"
+    `qcat` [r|SELECT DISTINCT f.*
+FROM File f
+JOIN n
+  ON f.id = n.fileId|]
 
 {- |
  Finally construct a query and return a tuple with its parameters.
