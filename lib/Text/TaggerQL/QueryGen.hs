@@ -41,8 +41,8 @@ generateAndRunQuery :: TermTree Text -> TaggedConnection -> IO (HashSet File)
 generateAndRunQuery tt tc = do
   let series = generateQuerySeries tt
   results <- mapM (`runGenQuery` tc) series
-  let intersections xs = case xs of [] -> HS.empty; _ -> L.foldl1' HS.intersection xs
-  return . intersections $ results
+  let combines xs = case xs of [] -> HS.empty; _ -> L.foldl1' HS.union xs
+  return . combines $ results
 
 runGenQuery :: TaggerQLGenQuery -> TaggedConnection -> IO (HashSet File)
 runGenQuery (buildQuery -> (terminateQuery -> genQ, params)) tc =
