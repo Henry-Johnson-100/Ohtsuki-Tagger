@@ -6,3 +6,6 @@ License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL.Engine.QueryEngine () where
+
+import Text.TaggerQL.Engine.QueryEngine.Query
+import Text.TaggerQL.Engine.QueryEngine.Type

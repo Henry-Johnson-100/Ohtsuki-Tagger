@@ -5,6 +5,7 @@
 
 module Text.TaggerQL.Engine.QueryEngine.Query (
   queryTerms,
+  queryTerm,
 ) where
 
 import Control.Monad.Trans.Class (MonadTrans (lift))
@@ -23,6 +24,7 @@ import Database.Tagger.Connection (
   NamedParam (..),
   Only (Only),
   ToField,
+  query,
   queryNamed,
  )
 import Database.Tagger.Query.Type (TaggerQuery)
@@ -65,6 +67,72 @@ dispatchQuery x y =
       FilePatternCriteria -> pSubP
       _ -> uSubAnything
     _ -> uSubAnything
+
+{- |
+ Run a query on a single term and produce an environment with corresponding 'Tag`s
+
+ Naturally, querying with 'UntaggedCriteria` will always produce and empty set.
+-}
+queryTerm :: Term Text -> QueryReaderT TagKeySet IO TagKeySet
+queryTerm (Term qc p) = dispatchSimpleQuery qc p
+ where
+  dispatchSimpleQuery qc' p' =
+    case qc' of
+      DescriptorCriteria ->
+        runSimpleDispatchQuery
+          p'
+          [r|
+SELECT DISTINCT t.id          
+FROM Tag t
+JOIN Descriptor d
+ON t.descriptorId = d.id
+WHERE d.descriptor LIKE ? ESCAPE '\'
+ORDER BY t.id ASC|]
+      MetaDescriptorCriteria ->
+        runSimpleDispatchQuery
+          p'
+          [r|
+SELECT DISTINCT t.id          
+FROM Tag t
+JOIN (
+  WITH RECURSIVE r(id) AS (
+    SELECT id
+    FROM Descriptor
+    WHERE descriptor LIKE ? ESCAPE '\'
+    UNION
+    SELECT infraDescriptorId
+    FROM MetaDescriptor md
+    JOIN r
+      ON md.metaDescriptorId - r.id
+  )
+  SELECT id FROM r
+) AS d
+  ON t.descriptorId = d.id
+ORDER BY t.id ASC|]
+      FilePatternCriteria ->
+        runSimpleDispatchQuery
+          p'
+          [r|
+SELECT DISTINCT t.id
+FROM Tag t
+JOIN File f
+  ON t.fileId = f.id
+WHERE f.filePath LIKE ? ESCAPE '\'
+ORDER BY t.id ASC
+          |]
+      _ -> return IS.empty
+   where
+    runSimpleDispatchQuery p'' q'' =
+      asks queryEnvConn
+        >>= ( \c ->
+                fromDistinctAscResultList
+                  <$> lift
+                    ( query
+                        c
+                        q''
+                        [p'']
+                    )
+            )
 
 {-
  ____
