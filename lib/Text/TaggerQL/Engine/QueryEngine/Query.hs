@@ -106,7 +106,7 @@ JOIN (
     SELECT infraDescriptorId
     FROM MetaDescriptor md
     JOIN r
-      ON md.metaDescriptorId - r.id
+      ON md.metaDescriptorId = r.id
   )
   SELECT id FROM r
 ) AS d
@@ -144,7 +144,7 @@ getFileKeySetFromTagKeySet ks tc = do
  where
   q =
     [r|
-SELECT DISTINT f.id
+SELECT DISTINCT f.id
 FROM File f
 JOIN Tag t
   ON f.id = t.fileId

@@ -38,9 +38,11 @@ import Control.Monad.Trans.Reader (
   asks,
   local,
  )
+import qualified Data.Foldable as F
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
+import qualified Data.IntSet as IntSet
 import qualified Data.List as L
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import Data.Maybe (fromJust)
@@ -70,6 +72,7 @@ import Database.Tagger.Query (
   queryForFileByMetaDescriptorSubTagDescriptor,
   queryForFileByMetaDescriptorSubTagMetaDescriptor,
   queryForFileByPattern,
+  queryForSingleFileByFileId,
   queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf,
   queryForTagBySubTagTriple,
   queryForUntaggedFiles,
@@ -94,6 +97,8 @@ import Text.TaggerQL.AST (
   TermTree (..),
   complexTermNode,
  )
+import Text.TaggerQL.Engine.QueryEngine
+import Text.TaggerQL.Engine.QueryEngine.Type
 import Text.TaggerQL.Parser.Internal (
   parse,
   requestParser,
@@ -187,7 +192,7 @@ querySentence ::
   IO TermResult
 querySentence tc (Sentence tts) =
   intersectTermResults
-    <$> catMaybeTM (queryTermTree tc) tts
+    <$> mapM (queryTermTree tc) tts
 
 {- |
  Return 'Nothing` if the given 'TermTree` is Complex and Bottom.
@@ -195,66 +200,77 @@ querySentence tc (Sentence tts) =
 queryTermTree ::
   TaggedConnection ->
   TermTree Text ->
-  MaybeT IO TermResult
+  IO TermResult
 queryTermTree tc tt =
   case tt of
-    Simple st -> lift $ querySimpleTerm tc st
-    Complex ct -> queryComplexTerm tc ct
+    Simple st -> querySimpleTerm tc st
+    Complex ct -> do
+      resultFileSet <-
+        IntSet.toList
+          <$> runReaderT
+            (queryComplexTerm True ct)
+            (QueryEnv tc IntSet.empty)
+      TermResult . HS.fromList
+        <$> catMaybeTM
+          (flip queryForSingleFileByFileId tc . fromIntegral)
+          resultFileSet
 
-{- |
- A depth-first query with 'ComplexTerm`s.
- Each 'Term` in a given 'ComplexTerm` will first find its relation
- query with its immediate sub-term then intersect that result with the results
- of its sub-term's sub-terms. It will do this until it reaches a term-bottom relation
- where it will perform one final query then move on to query relations of the term
- and any sub-terms adjacent to the first.
+-- Complex ct -> runReaderT queryComplexTerm tc ct
 
- This is a recursive, depth-first tree traversal where the results of the top relation
- are intersected with the intersected results of every query below it.
--}
-queryComplexTerm ::
-  TaggedConnection ->
-  ComplexTerm Text ->
-  MaybeT IO TermResult
--- This match should never be called, but if it is, it is filtered by querySentence.
-queryComplexTerm _ (Bottom _) = hoistMaybe Nothing
--- The bottom of a depth-relation query, will perform a single query on the current
--- term and bottom subterm then move to any adjacent subterms
---
--- This match contains the terminal case in t :<- (Bottom bst :| [])
-queryComplexTerm tc (t :<- ((Bottom bst) :| sts)) =
-  if null sts
-    then queryComplexTermRelation tc (TermTag t) (TermSubTag bst)
-    else do
-      thisResult <- queryComplexTermRelation tc (TermTag t) (TermSubTag bst)
-      nextResults <-
-        lift $
-          intersectTermResults
-            <$> catMaybeTM (\ct' -> queryComplexTerm tc (t :<- [ct'])) sts
-      let combinedResults = intersectTermResult thisResult nextResults
-      return combinedResults
--- A relation query that has not reached the bottom yet.
--- Will intersect the result of the current term and next subterm with the results
--- of the subterm and subterm's subterms before moving on to adjacent subterms.
-queryComplexTerm tc (t :<- (st :| sts)) =
-  if null sts
-    then do
-      thisResult <-
-        queryComplexTermRelation tc (TermTag t) (TermSubTag . complexTermNode $ st)
-      nestedResult <- queryComplexTerm tc st
-      let combinedResults = intersectTermResult thisResult nestedResult
-      return combinedResults
-    else do
-      thisResult <-
-        queryComplexTermRelation tc (TermTag t) (TermSubTag . complexTermNode $ st)
-      nestedResult <- queryComplexTerm tc st
-      nextResults <-
-        lift $
-          intersectTermResults
-            <$> catMaybeTM (\ct' -> queryComplexTerm tc (t :<- [ct'])) sts
-      let combinedResults =
-            intersectTermResults [thisResult, nestedResult, nextResults]
-      return combinedResults
+-- {- |
+--  A depth-first query with 'ComplexTerm`s.
+--  Each 'Term` in a given 'ComplexTerm` will first find its relation
+--  query with its immediate sub-term then intersect that result with the results
+--  of its sub-term's sub-terms. It will do this until it reaches a term-bottom relation
+--  where it will perform one final query then move on to query relations of the term
+--  and any sub-terms adjacent to the first.
+
+--  This is a recursive, depth-first tree traversal where the results of the top relation
+--  are intersected with the intersected results of every query below it.
+-- -}
+-- queryComplexTerm ::
+--   TaggedConnection ->
+--   ComplexTerm Text ->
+--   MaybeT IO TermResult
+-- -- This match should never be called, but if it is, it is filtered by querySentence.
+-- queryComplexTerm _ (Bottom _) = hoistMaybe Nothing
+-- -- The bottom of a depth-relation query, will perform a single query on the current
+-- -- term and bottom subterm then move to any adjacent subterms
+-- --
+-- -- This match contains the terminal case in t :<- (Bottom bst :| [])
+-- queryComplexTerm tc (t :<- ((Bottom bst) :| sts)) =
+--   if null sts
+--     then queryComplexTermRelation tc (TermTag t) (TermSubTag bst)
+--     else do
+--       thisResult <- queryComplexTermRelation tc (TermTag t) (TermSubTag bst)
+--       nextResults <-
+--         lift $
+--           intersectTermResults
+--             <$> catMaybeTM (\ct' -> queryComplexTerm tc (t :<- [ct'])) sts
+--       let combinedResults = intersectTermResult thisResult nextResults
+--       return combinedResults
+-- -- A relation query that has not reached the bottom yet.
+-- -- Will intersect the result of the current term and next subterm with the results
+-- -- of the subterm and subterm's subterms before moving on to adjacent subterms.
+-- queryComplexTerm tc (t :<- (st :| sts)) =
+--   if null sts
+--     then do
+--       thisResult <-
+--         queryComplexTermRelation tc (TermTag t) (TermSubTag . complexTermNode $ st)
+--       nestedResult <- queryComplexTerm tc st
+--       let combinedResults = intersectTermResult thisResult nestedResult
+--       return combinedResults
+--     else do
+--       thisResult <-
+--         queryComplexTermRelation tc (TermTag t) (TermSubTag . complexTermNode $ st)
+--       nestedResult <- queryComplexTerm tc st
+--       nextResults <-
+--         lift $
+--           intersectTermResults
+--             <$> catMaybeTM (\ct' -> queryComplexTerm tc (t :<- [ct'])) sts
+--       let combinedResults =
+--             intersectTermResults [thisResult, nestedResult, nextResults]
+--       return combinedResults
 
 -- Could be handled easier programmatically, but with hand-written queries for
 -- each case, it probably has better performance.
