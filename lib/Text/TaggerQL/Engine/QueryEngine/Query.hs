@@ -30,20 +30,56 @@ import Text.TaggerQL.Engine.QueryEngine.Type
 |____/
 -}
 
+withDSuper ::
+  (ToField v1, ToField a) =>
+  TaggerQuery ->
+  v1 ->
+  a ->
+  QueryReaderT TagKeySet IO TagKeySet
+withDSuper q = (subTagQuery (constructQuery superDSubQuery q) .) . superSubParams
+
+dSubP :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+dSubP = withDSuper subPSubQuery
+
+dSubR :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+dSubR = withDSuper subRSubQuery
+
+dSubD :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+dSubD = withDSuper subDSubQuery
+
 {- |
  Always returns an empty set. Also, should not even possible to occur in the first place.
 -}
 dSubU :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
 dSubU _ _ = return IS.empty
 
-dSubP :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
-dSubP = (subTagQuery (constructQuery superDSubQuery subPSubQuery) .) . superSubParams
+{-
+ ____
+|  _ \
+| |_) |
+|  _ <
+|_| \_\
+-}
 
-dSubR :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
-dSubR = (subTagQuery (constructQuery superDSubQuery subRSubQuery) .) . superSubParams
+withRSuper ::
+  (ToField v1, ToField a) =>
+  TaggerQuery ->
+  v1 ->
+  a ->
+  QueryReaderT TagKeySet IO TagKeySet
+withRSuper q = (subTagQuery (constructQuery superRSubQuery q) .) . superSubParams
 
-dSubD :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
-dSubD = (subTagQuery (constructQuery superDSubQuery subDSubQuery) .) . superSubParams
+rSubP :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+rSubP = withRSuper subPSubQuery
+
+rSubR :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+rSubR = withRSuper subRSubQuery
+
+rSubD :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+rSubD = withRSuper subDSubQuery
+
+rSubU :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+rSubU _ _ = return IS.empty
 
 constructQuery :: TaggerQuery -> TaggerQuery -> TaggerQuery
 constructQuery super sub =
@@ -59,6 +95,27 @@ JOIN (|]
     <> [r|) AS t1 USING (id)
 ORDER BY t.id ASC
 |]
+
+superRSubQuery :: TaggerQuery
+superRSubQuery =
+  [r|
+SELECT t.id
+FROM Tag t
+JOIN (
+  WITH RECURSIVE qr (id) AS (
+    SELECT id
+    FROM Descriptor
+    WHERE descriptor LIKE :super ESCAPE '\'
+    UNION
+    SELECT infraDescriptorId
+    FROM MetaDescriptor md
+    JOIN qr
+      ON md.metaDescriptorId = qr.id
+  )
+  SELECT id FROM qr
+) AS d
+  ON t.descriptorId = d.id
+  |]
 
 superDSubQuery :: TaggerQuery
 superDSubQuery =
