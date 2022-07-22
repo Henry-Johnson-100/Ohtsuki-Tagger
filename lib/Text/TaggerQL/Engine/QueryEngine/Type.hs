@@ -1,7 +1,5 @@
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE StrictData #-}
 {-# OPTIONS_HADDOCK hide #-}
 
@@ -19,9 +17,7 @@ import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Reader
 import Data.Functor.Identity (Identity)
 import Data.IntSet (IntSet)
-import Data.String (IsString)
-import Database.Tagger (TaggedConnection)
-import Database.Tagger.Query.Type (TaggerQuery)
+import Database.Tagger.Type (TaggedConnection)
 
 data QueryEnv a = QueryEnv
   { queryEnvConn :: TaggedConnection
@@ -34,4 +30,3 @@ type QueryReaderT a m b = ReaderT (QueryEnv a) m b
 type QueryReader a b = QueryReaderT a Identity b
 
 type TagKeySet = IntSet
-

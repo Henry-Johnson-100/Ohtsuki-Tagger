@@ -4,23 +4,67 @@
 {-# OPTIONS_HADDOCK hide #-}
 
 module Text.TaggerQL.Engine.QueryEngine.Query (
-  dSubR,
-  dSubD,
-  dSubP,
-  dSubU,
+  queryTerms,
 ) where
 
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Reader
+import Control.Monad.Trans.Class (MonadTrans (lift))
+import Control.Monad.Trans.Reader (asks)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
+import Data.Tagger (
+  QueryCriteria (
+    DescriptorCriteria,
+    FilePatternCriteria,
+    MetaDescriptorCriteria
+  ),
+ )
 import Data.Text (Text)
-import Database.Tagger.Connection
-import Database.Tagger.Query.Type
-import Database.Tagger.Type
+import Database.Tagger.Connection (
+  NamedParam (..),
+  Only (Only),
+  ToField,
+  queryNamed,
+ )
+import Database.Tagger.Query.Type (TaggerQuery)
+import Database.Tagger.Type (RecordKey, Tag)
 import Text.RawString.QQ (r)
-import Text.TaggerQL.AST
-import Text.TaggerQL.Engine.QueryEngine.Type
+import Text.TaggerQL.AST (Term (Term))
+import Text.TaggerQL.Engine.QueryEngine.Type (
+  QueryEnv (queryEnvConn),
+  QueryReaderT,
+  TagKeySet,
+ )
+
+{- |
+ Given two terms, run a subtag style search using their given 'QueryCriteria` and
+ patterns.
+-}
+queryTerms :: Term Text -> Term Text -> QueryReaderT TagKeySet IO TagKeySet
+queryTerms (Term qcx px) (Term qcy py) =
+  dispatchQuery qcx qcy px py
+
+dispatchQuery ::
+  QueryCriteria ->
+  QueryCriteria ->
+  (Text -> Text -> QueryReaderT TagKeySet IO TagKeySet)
+dispatchQuery x y =
+  case x of
+    DescriptorCriteria -> case y of
+      DescriptorCriteria -> dSubD
+      MetaDescriptorCriteria -> dSubR
+      FilePatternCriteria -> dSubP
+      _ -> uSubAnything
+    MetaDescriptorCriteria -> case y of
+      DescriptorCriteria -> rSubD
+      MetaDescriptorCriteria -> rSubR
+      FilePatternCriteria -> rSubP
+      _ -> uSubAnything
+    FilePatternCriteria -> case y of
+      DescriptorCriteria -> pSubD
+      MetaDescriptorCriteria -> pSubR
+      FilePatternCriteria -> pSubP
+      _ -> uSubAnything
+    _ -> uSubAnything
 
 {-
  ____
@@ -54,12 +98,6 @@ dSubR = withDSuper subRSubQuery
 
 dSubD :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
 dSubD = withDSuper subDSubQuery
-
-{- |
- Always returns an empty set. Also, should not even possible to occur in the first place.
--}
-dSubU :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
-dSubU _ _ = return IS.empty
 
 {-
  ____
@@ -106,9 +144,6 @@ rSubR = withRSuper subRSubQuery
 rSubD :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
 rSubD = withRSuper subDSubQuery
 
-rSubU :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
-rSubU _ _ = return IS.empty
-
 {-
  ____
 |  _ \
@@ -141,9 +176,6 @@ pSubR = withPSuper subRSubQuery
 
 pSubD :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
 pSubD = withPSuper subDSubQuery
-
-pSubU :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
-pSubU p _ = return IS.empty
 
 {-
  _   _
