@@ -1,22 +1,11 @@
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE StrictData #-}
-{-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_HADDOCK hide #-}
 
-{- |
-Module      : Text.TaggerQL.Engine.Query
-Description : This module houses the internal workings of the TaggerQL's query engine.
+module Text.TaggerQL.Engine.QueryEngine.Query () where
 
-License     : GPL-3
-Maintainer  : monawasensei@gmail.com
--}
-module Text.TaggerQL.Engine.Query () where
-
-import Control.Applicative
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
-import Data.Functor.Identity (Identity)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
 import Data.Text (Text)
@@ -25,18 +14,7 @@ import Database.Tagger.Query.Type
 import Database.Tagger.Type
 import Text.RawString.QQ (r)
 import Text.TaggerQL.AST
-
-data QueryEnv a = QueryEnv
-  { queryEnvConn :: TaggedConnection
-  , queryEnv :: a
-  }
-  deriving (Show, Eq, Functor)
-
-type QueryReaderT a m b = ReaderT (QueryEnv a) m b
-
-type QueryReader a b = QueryReaderT a Identity b
-
-type TagKeySet = IntSet
+import Text.TaggerQL.Engine.QueryEngine.Type
 
 queryDSubR :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
 queryDSubR = (subTagQuery q .) . superSubParams
