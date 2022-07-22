@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 module Text.TaggerQL.Engine.QueryEngine.Query (
@@ -126,16 +127,16 @@ templateSubQuery ::
   NamedParamQuery (Super, Sub) (c1, c2)
 templateSubQuery superQ subQ =
   NamedParamQuery $
-    namedParamQuery tSelect
+    partialNamedParamQuery tSelect
       `qcat` ("(" <> namedParamQuery superQ <> ") AS t")
       `qcat` "JOIN"
       `qcat` ("(" <> namedParamQuery subQ <> ") AS t1 USING (id)")
-      `qcat` namedParamQuery tOrder
+      `qcat` partialNamedParamQuery tOrder
  where
-  tSelect :: NamedParamQuery NoParam NoCriteria
+  tSelect :: PartialNamedParamQuery NoParam NoCriteria
   tSelect =
     [r|SELECT DISTINCT t.id|]
-  tOrder :: NamedParamQuery NoParam NoCriteria
+  tOrder :: PartialNamedParamQuery NoParam NoCriteria
   tOrder = [r|ORDER BY t.id ASC|]
 
 constructSuper :: GenericCriteria c => c -> NamedParamQuery Super c
@@ -143,3 +144,42 @@ constructSuper = undefined
 
 constructSub :: GenericCriteria c => c -> NamedParamQuery Sub c
 constructSub = undefined
+
+completeSuperQuery ::
+  GenericCriteria c =>
+  ( PartialNamedParamQuery (Either Super Sub) c
+  , Maybe (PartialNamedParamQuery (Either Super Sub) c)
+  ) ->
+  NamedParamQuery Super c
+completeSuperQuery
+  ( partialNamedParamQuery -> x
+    , fmap partialNamedParamQuery -> y
+    ) =
+    let body = [r|SELECT t.id FROM Tag t |] <> x <> " :super "
+     in NamedParamQuery $ maybe body (qcat body) y
+
+completeSubQuery ::
+  GenericCriteria c =>
+  ( PartialNamedParamQuery (Either Super Sub) c
+  , Maybe (PartialNamedParamQuery (Either Super Sub) c)
+  ) ->
+  NamedParamQuery Sub c
+completeSubQuery (partialNamedParamQuery -> x, fmap partialNamedParamQuery -> y) =
+  let body = [r|SELECT t.subTagOfId "id" FROM Tag t |] <> x <> " :sub "
+   in NamedParamQuery $ maybe body (qcat body) y
+
+type Present a = Maybe a
+type Absent a = Maybe a
+
+dQuery ::
+  ( PartialNamedParamQuery (Either Super Sub) D
+  , Present (PartialNamedParamQuery (Either Super Sub) D)
+  )
+dQuery =
+  ( [r|
+JOIN Descriptor d 
+  ON t.descriptorId = d.id 
+WHERE d.descriptor LIKE|]
+  , Just [r|ESCAPE '\'|]
+  )
+

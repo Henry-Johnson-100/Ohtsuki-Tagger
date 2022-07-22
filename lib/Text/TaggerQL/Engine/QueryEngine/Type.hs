@@ -21,6 +21,7 @@ module Text.TaggerQL.Engine.QueryEngine.Type (
   NoParam,
   NoCriteria,
   NamedParamQuery (..),
+  PartialNamedParamQuery (..),
   module Control.Monad.Trans.Reader,
   lift,
 ) where
@@ -56,5 +57,10 @@ data NoParam
 class GenericCriteria c
 
 newtype NamedParamQuery pos qc = NamedParamQuery {namedParamQuery :: TaggerQuery}
+  deriving (Show, Eq)
+  deriving newtype (IsString)
+
+newtype PartialNamedParamQuery pos qc = PartialNamedParamQuery
+  {partialNamedParamQuery :: TaggerQuery}
   deriving (Show, Eq)
   deriving newtype (IsString)
