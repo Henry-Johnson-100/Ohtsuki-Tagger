@@ -16,12 +16,19 @@ treated as distinct queries and can be combined and aggregated appopriately in m
 -}
 module Text.TaggerQL.Compiler () where
 
+import Data.HashMap.Strict (HashMap)
 import Data.String (IsString)
 import Data.Tagger
 import Data.Text (Text)
 import Database.Tagger.Query.Type
 import Text.RawString.QQ (r)
 import Text.TaggerQL.AST
+
+data ParamMap = ParamMap
+  { paramMapIter :: Int
+  , paramMap :: HashMap Text Int
+  }
+  deriving (Show, Eq)
 
 data TaggerQLCompilerTarget = TaggerQLCompilerTarget
   { taggerQLCompilerQuery :: TaggerQuery
@@ -38,15 +45,15 @@ newtype FileJoinTerminatedQuery = FileJoinTerminatedQuery TaggerQLCompilerTarget
 compileTermTree :: TermTree Text -> FileJoinTerminatedQuery
 compileTermTree = undefined
 
-fileJoinTermination :: UnterminatedNTypeQuery -> FileJoinTerminatedQuery
-fileJoinTermination (UnterminatedNTypeQuery (TaggerQLCompilerTarget q ps)) =
-  FileJoinTerminatedQuery . flip TaggerQLCompilerTarget ps $
-    "WITH n AS ("
-      `qcat` q
-      `qcat` ")"
-      `qcat` [r|
-f.id
-,f.filePath
-FROM n
-JOIN File f
-  ON n.fileId = f.id|]
+-- fileJoinTermination :: UnterminatedNTypeQuery -> FileJoinTerminatedQuery
+-- fileJoinTermination (UnterminatedNTypeQuery (TaggerQLCompilerTarget q ps)) =
+--   FileJoinTerminatedQuery . flip TaggerQLCompilerTarget ps $
+--     "WITH file_terminal AS ("
+--       `qcat` q
+--       `qcat` ")"
+--       `qcat` [r|
+-- f.id
+-- ,f.filePath
+-- FROM n
+-- JOIN File f
+--   ON file_terminal.fileId = f.id|]
