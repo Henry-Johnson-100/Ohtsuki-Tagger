@@ -85,10 +85,11 @@ withDSuper q = (subTagQuery (constructQuery superDSubQuery q) .) . superSubParam
   superDSubQuery :: TaggerQuery
   superDSubQuery =
     [r|
-    SELECT t.id
-    FROM Tag t
-    JOIN Descriptor d
-    WHERE d.descriptor LIKE :super ESCAPE '\'|]
+SELECT t.id
+FROM Tag t
+JOIN Descriptor d
+  ON t.descriptorId = d.id
+WHERE d.descriptor LIKE :super ESCAPE '\'|]
 
 dSubP :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
 dSubP = withDSuper subPSubQuery
@@ -118,22 +119,22 @@ withRSuper q = (subTagQuery (constructQuery superRSubQuery q) .) . superSubParam
   superRSubQuery :: TaggerQuery
   superRSubQuery =
     [r|
-    SELECT t.id
-    FROM Tag t
-    JOIN (
-      WITH RECURSIVE qr (id) AS (
-        SELECT id
-        FROM Descriptor
-        WHERE descriptor LIKE :super ESCAPE '\'
-        UNION
-        SELECT infraDescriptorId
-        FROM MetaDescriptor md
-        JOIN qr
-          ON md.metaDescriptorId = qr.id
-      )
-      SELECT id FROM qr
-    ) AS d
-      ON t.descriptorId = d.id|]
+SELECT t.id
+FROM Tag t
+JOIN (
+  WITH RECURSIVE qr (id) AS (
+    SELECT id
+    FROM Descriptor
+    WHERE descriptor LIKE :super ESCAPE '\'
+    UNION
+    SELECT infraDescriptorId
+    FROM MetaDescriptor md
+    JOIN qr
+      ON md.metaDescriptorId = qr.id
+  )
+  SELECT id FROM qr
+) AS d
+  ON t.descriptorId = d.id|]
 
 rSubP :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
 rSubP = withRSuper subPSubQuery
@@ -209,6 +210,7 @@ subDSubQuery =
 SELECT t.subTagOfId "id"
 FROM Tag t
 JOIN Descriptor d
+  ON t.descriptorId = d.id
 WHERE d.descriptor LIKE :sub ESCAPE '\'
 |]
 
