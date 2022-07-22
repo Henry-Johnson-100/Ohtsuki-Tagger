@@ -22,6 +22,14 @@ import Text.RawString.QQ (r)
 import Text.TaggerQL.AST
 import Text.TaggerQL.Engine.QueryEngine.Type
 
+{-
+ ____
+|  _ \
+| | | |
+| |_| |
+|____/
+-}
+
 {- |
  Always returns an empty set. Also, should not even possible to occur in the first place.
 -}
@@ -29,81 +37,76 @@ dSubU :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
 dSubU _ _ = return IS.empty
 
 dSubP :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
-dSubP = (subTagQuery q .) . superSubParams
- where
-  q =
-    [r|
-SELECT DISTINCT t.id    
-FROM (
-  SELECT t.id
-  FROM Tag t
-  JOIN Descriptor d
-    ON t.descriptorId = d.id
-  WHERE d.descriptor LIKE :super ESCAPE '\'  
-) as t
-JOIN (
-  SELECT t.subTagOfId "id"
-  FROM Tag t
-  JOIN File f
-    ON t.fileId = f.id
-  WHERE f.filePath LIKE :sub ESCAPE '\'
-) as t1 USING (id)
-ORDER BY t.id ASC
-|]
+dSubP = (subTagQuery (constructQuery superDSubQuery subPSubQuery) .) . superSubParams
 
 dSubR :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
-dSubR = (subTagQuery q .) . superSubParams
- where
-  q =
-    [r|
-SELECT DISTINCT t.id
+dSubR = (subTagQuery (constructQuery superDSubQuery subRSubQuery) .) . superSubParams
+
+dSubD :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+dSubD = (subTagQuery (constructQuery superDSubQuery subDSubQuery) .) . superSubParams
+
+constructQuery :: TaggerQuery -> TaggerQuery -> TaggerQuery
+constructQuery super sub =
+  [r|
+SELECT DISTINCT t.id    
 FROM (
-  SELECT t.id
-  FROM Tag t
-  JOIN Descriptor d
-    ON t.descriptorId = d.id
-  WHERE d.descriptor LIKE :super ESCAPE '\'
+|]
+    <> super
+    <> [r|
 ) AS t
-JOIN (
-  SELECT t.subTagOfId "id"
-  FROM Tag t
-  JOIN (
-    WITH RECURSIVE qr (id) AS (
-      SELECT id
-      FROM Descriptor
-      WHERE descriptor LIKE :sub ESCAPE '\'
-      UNION
-      SELECT infraDescriptorId
-      FROM MetaDescriptor md
-      JOIN qr
-        ON md.metaDescriptorId = qr.id
-    )
-    SELECT id FROM qr
-  ) AS d
-    ON t.descriptorId = d.id
-) AS t1 USING (id)
+JOIN (|]
+    <> sub
+    <> [r|) AS t1 USING (id)
 ORDER BY t.id ASC
 |]
 
-dSubD :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
-dSubD = (subTagQuery q .) . superSubParams
- where
-  q =
-    [r|
-SELECT DISTINCT t.id    
-FROM (
-  SELECT t.id
-  FROM Tag t
-  JOIN Descriptor d
-  WHERE d.descriptor LIKE :super ESCAPE '\'
-) AS t
+superDSubQuery :: TaggerQuery
+superDSubQuery =
+  [r|
+SELECT t.id
+FROM Tag t
+JOIN Descriptor d
+WHERE d.descriptor LIKE :super ESCAPE '\'  
+|]
+
+subDSubQuery :: TaggerQuery
+subDSubQuery =
+  [r|
+SELECT t.subTagOfId "id"
+FROM Tag t
+JOIN Descriptor d
+WHERE d.descriptor LIKE :sub ESCAPE '\'
+|]
+
+subRSubQuery :: TaggerQuery
+subRSubQuery =
+  [r|
+SELECT t.subTagOfId "id"
+FROM Tag t
 JOIN (
-  SELECT t.subTagOfId "id"
-  FROM Tag t
-  JOIN Descriptor d
-  WHERE d.descriptor LIKE :sub ESCAPE '\'
-) AS t1 USING (id)
-ORDER BY t.id ASC
+  WITH RECURSIVE qr (id) AS (
+    SELECT id
+    FROM Descriptor
+    WHERE descriptor LIKE :sub ESCAPE '\'
+    UNION
+    SELECT infraDescriptorId
+    FROM MetaDescriptor md
+    JOIN qr
+      ON md.metaDescriptorId = qr.id
+  )
+  SELECT id FROM qr
+) AS d
+  ON t.descriptorId = d.id
+|]
+
+subPSubQuery :: TaggerQuery
+subPSubQuery =
+  [r|
+SELECT t.subTagOfId "id"
+FROM Tag t
+JOIN File f
+  ON t.fileId = f.id
+WHERE f.filePath LIKE :sub ESCAPE '\'
 |]
 
 subTagQuery ::
@@ -119,4 +122,3 @@ fromDistinctAscResultList = IS.fromDistinctAscList . map (\(Only k) -> fromInteg
 
 superSubParams :: (ToField v1, ToField v2) => v1 -> v2 -> [NamedParam]
 superSubParams super sub = [":super" := super, ":sub" := sub]
-
