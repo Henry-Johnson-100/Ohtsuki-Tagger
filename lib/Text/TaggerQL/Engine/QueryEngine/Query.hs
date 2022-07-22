@@ -6,6 +6,7 @@
 module Text.TaggerQL.Engine.QueryEngine.Query (
   queryTerms,
   queryTerm,
+  getFileKeySetFromTagKeySet,
 ) where
 
 import Control.Monad.Trans.Class (MonadTrans (lift))
@@ -28,13 +29,15 @@ import Database.Tagger.Connection (
   queryNamed,
  )
 import Database.Tagger.Query.Type (TaggerQuery)
-import Database.Tagger.Type (RecordKey, Tag)
+import Database.Tagger.Type (File, RecordKey, RowId, Tag)
 import Text.RawString.QQ (r)
 import Text.TaggerQL.AST (Term (Term))
 import Text.TaggerQL.Engine.QueryEngine.Type (
+  FileKeySet,
   QueryEnv (queryEnvConn),
   QueryReaderT,
   TagKeySet,
+  TaggedConnection,
  )
 
 {- |
@@ -71,7 +74,7 @@ dispatchQuery x y =
 {- |
  Run a query on a single term and produce an environment with corresponding 'Tag`s
 
- Naturally, querying with 'UntaggedCriteria` will always produce and empty set.
+ Naturally, querying with 'UntaggedCriteria` will always produce an empty set.
 -}
 queryTerm :: Term Text -> QueryReaderT TagKeySet IO TagKeySet
 queryTerm (Term qc p) = dispatchSimpleQuery qc p
@@ -125,7 +128,7 @@ ORDER BY t.id ASC
     runSimpleDispatchQuery p'' q'' =
       asks queryEnvConn
         >>= ( \c ->
-                fromDistinctAscResultList
+                (fromDistinctAscResultList :: [Only (RecordKey Tag)] -> IntSet)
                   <$> lift
                     ( query
                         c
@@ -133,6 +136,20 @@ ORDER BY t.id ASC
                         [p'']
                     )
             )
+
+getFileKeySetFromTagKeySet :: RecordKey Tag -> TaggedConnection -> IO FileKeySet
+getFileKeySetFromTagKeySet k tc = do
+  results <- query tc q [k] :: IO [Only (RecordKey File)]
+  return . fromDistinctAscResultList $ results
+ where
+  q =
+    [r|
+SELECT DISTINT f.id
+FROM File f
+JOIN Tag t
+  ON f.id = t.fileId
+WHERE t.id = ?
+ORDER BY f.id ASC|]
 
 {-
  ____
@@ -319,9 +336,12 @@ subTagQuery ::
   QueryReaderT TagKeySet IO TagKeySet
 subTagQuery q params =
   asks queryEnvConn
-    >>= (\c -> fromDistinctAscResultList <$> lift (queryNamed c q params))
+    >>= ( \c ->
+            (fromDistinctAscResultList :: [Only (RecordKey Tag)] -> IntSet)
+              <$> lift (queryNamed c q params)
+        )
 
-fromDistinctAscResultList :: [Only (RecordKey Tag)] -> IntSet
+fromDistinctAscResultList :: RowId k => [Only (RecordKey k)] -> IntSet
 fromDistinctAscResultList = IS.fromDistinctAscList . map (\(Only k) -> fromIntegral k)
 
 superSubParams :: (ToField v1, ToField v2) => v1 -> v2 -> [NamedParam]

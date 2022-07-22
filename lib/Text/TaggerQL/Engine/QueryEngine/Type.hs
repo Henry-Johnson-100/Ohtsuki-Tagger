@@ -8,6 +8,7 @@ module Text.TaggerQL.Engine.QueryEngine.Type (
   QueryReaderT,
   QueryReader,
   TagKeySet,
+  FileKeySet,
   TaggedConnection,
   module Control.Monad.Trans.Reader,
   lift,
@@ -30,3 +31,5 @@ type QueryReaderT a m b = ReaderT (QueryEnv a) m b
 type QueryReader a b = QueryReaderT a Identity b
 
 type TagKeySet = IntSet
+
+type FileKeySet = IntSet
