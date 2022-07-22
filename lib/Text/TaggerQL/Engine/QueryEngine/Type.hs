@@ -11,17 +11,6 @@ module Text.TaggerQL.Engine.QueryEngine.Type (
   QueryReader,
   TagKeySet,
   TaggedConnection,
-  Super,
-  Sub,
-  D,
-  R,
-  P,
-  U,
-  GenericCriteria,
-  NoParam,
-  NoCriteria,
-  NamedParamQuery (..),
-  PartialNamedParamQuery (..),
   module Control.Monad.Trans.Reader,
   lift,
 ) where
@@ -46,21 +35,3 @@ type QueryReader a b = QueryReaderT a Identity b
 
 type TagKeySet = IntSet
 
-data Super
-data Sub
-data D deriving (GenericCriteria)
-data R deriving (GenericCriteria)
-data P deriving (GenericCriteria)
-data U deriving (GenericCriteria)
-data NoCriteria deriving (GenericCriteria)
-data NoParam
-class GenericCriteria c
-
-newtype NamedParamQuery pos qc = NamedParamQuery {namedParamQuery :: TaggerQuery}
-  deriving (Show, Eq)
-  deriving newtype (IsString)
-
-newtype PartialNamedParamQuery pos qc = PartialNamedParamQuery
-  {partialNamedParamQuery :: TaggerQuery}
-  deriving (Show, Eq)
-  deriving newtype (IsString)
