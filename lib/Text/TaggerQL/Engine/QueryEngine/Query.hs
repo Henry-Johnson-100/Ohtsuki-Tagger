@@ -37,6 +37,14 @@ withDSuper ::
   a ->
   QueryReaderT TagKeySet IO TagKeySet
 withDSuper q = (subTagQuery (constructQuery superDSubQuery q) .) . superSubParams
+ where
+  superDSubQuery :: TaggerQuery
+  superDSubQuery =
+    [r|
+    SELECT t.id
+    FROM Tag t
+    JOIN Descriptor d
+    WHERE d.descriptor LIKE :super ESCAPE '\'|]
 
 dSubP :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
 dSubP = withDSuper subPSubQuery
@@ -68,6 +76,26 @@ withRSuper ::
   a ->
   QueryReaderT TagKeySet IO TagKeySet
 withRSuper q = (subTagQuery (constructQuery superRSubQuery q) .) . superSubParams
+ where
+  superRSubQuery :: TaggerQuery
+  superRSubQuery =
+    [r|
+    SELECT t.id
+    FROM Tag t
+    JOIN (
+      WITH RECURSIVE qr (id) AS (
+        SELECT id
+        FROM Descriptor
+        WHERE descriptor LIKE :super ESCAPE '\'
+        UNION
+        SELECT infraDescriptorId
+        FROM MetaDescriptor md
+        JOIN qr
+          ON md.metaDescriptorId = qr.id
+      )
+      SELECT id FROM qr
+    ) AS d
+      ON t.descriptorId = d.id|]
 
 rSubP :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
 rSubP = withRSuper subPSubQuery
@@ -80,6 +108,53 @@ rSubD = withRSuper subDSubQuery
 
 rSubU :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
 rSubU _ _ = return IS.empty
+
+{-
+ ____
+|  _ \
+| |_) |
+|  __/
+|_|
+-}
+
+withPSuper ::
+  (ToField v1, ToField a) =>
+  TaggerQuery ->
+  v1 ->
+  a ->
+  QueryReaderT TagKeySet IO TagKeySet
+withPSuper q = (subTagQuery (constructQuery superPSubQuery q) .) . superSubParams
+ where
+  superPSubQuery =
+    [r|
+SELECT t.id    
+FROM Tag t
+JOIN File f
+  ON t.fileId = f.id
+WHERE f.filePath LIKE :super ESCAPE '\'|]
+
+pSubP :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+pSubP = withPSuper subPSubQuery
+
+pSubR :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+pSubR = withPSuper subRSubQuery
+
+pSubD :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+pSubD = withPSuper subDSubQuery
+
+pSubU :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+pSubU p _ = return IS.empty
+
+{-
+ _   _
+| | | |
+| | | |
+| |_| |
+ \___/
+-}
+
+uSubAnything :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+uSubAnything _ _ = return IS.empty
 
 constructQuery :: TaggerQuery -> TaggerQuery -> TaggerQuery
 constructQuery super sub =
@@ -94,36 +169,6 @@ JOIN (|]
     <> sub
     <> [r|) AS t1 USING (id)
 ORDER BY t.id ASC
-|]
-
-superRSubQuery :: TaggerQuery
-superRSubQuery =
-  [r|
-SELECT t.id
-FROM Tag t
-JOIN (
-  WITH RECURSIVE qr (id) AS (
-    SELECT id
-    FROM Descriptor
-    WHERE descriptor LIKE :super ESCAPE '\'
-    UNION
-    SELECT infraDescriptorId
-    FROM MetaDescriptor md
-    JOIN qr
-      ON md.metaDescriptorId = qr.id
-  )
-  SELECT id FROM qr
-) AS d
-  ON t.descriptorId = d.id
-  |]
-
-superDSubQuery :: TaggerQuery
-superDSubQuery =
-  [r|
-SELECT t.id
-FROM Tag t
-JOIN Descriptor d
-WHERE d.descriptor LIKE :super ESCAPE '\'  
 |]
 
 subDSubQuery :: TaggerQuery
