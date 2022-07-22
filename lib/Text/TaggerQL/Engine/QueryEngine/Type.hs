@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 module Text.TaggerQL.Engine.QueryEngine.Type (
@@ -10,6 +11,7 @@ module Text.TaggerQL.Engine.QueryEngine.Type (
   TagKeySet,
   FileKeySet,
   TaggedConnection,
+  withQueryEnv,
   module Control.Monad.Trans.Reader,
   lift,
 ) where
@@ -25,6 +27,9 @@ data QueryEnv a = QueryEnv
   , queryEnv :: a
   }
   deriving (Show, Eq, Functor)
+
+withQueryEnv :: (t -> a) -> QueryEnv t -> QueryEnv a
+withQueryEnv f qe@(queryEnv -> e) = qe{queryEnv = f e}
 
 type QueryReaderT a m b = ReaderT (QueryEnv a) m b
 

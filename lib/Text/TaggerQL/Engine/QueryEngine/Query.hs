@@ -137,10 +137,10 @@ ORDER BY t.id ASC
                     )
             )
 
-getFileKeySetFromTagKeySet :: RecordKey Tag -> TaggedConnection -> IO FileKeySet
-getFileKeySetFromTagKeySet k tc = do
-  results <- query tc q [k] :: IO [Only (RecordKey File)]
-  return . fromDistinctAscResultList $ results
+getFileKeySetFromTagKeySet :: TagKeySet -> TaggedConnection -> IO FileKeySet
+getFileKeySetFromTagKeySet ks tc = do
+  IS.unions . map (fromDistinctAscResultList :: [Only (RecordKey File)] -> IntSet)
+    <$> (mapM (query tc q . (: [])) . IS.toList $ ks)
  where
   q =
     [r|
