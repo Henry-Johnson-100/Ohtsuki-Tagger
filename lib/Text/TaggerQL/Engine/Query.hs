@@ -13,6 +13,7 @@ Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL.Engine.Query () where
 
+import Control.Applicative
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
 import Data.Functor.Identity (Identity)
@@ -37,30 +38,71 @@ type QueryReader a b = QueryReaderT a Identity b
 
 type TagKeySet = IntSet
 
-fromDistinctAscResultList :: [Only (RecordKey Tag)] -> IntSet
-fromDistinctAscResultList = IS.fromDistinctAscList . map (\(Only k) -> fromIntegral k)
-
-queryDSubD ::
-  Text ->
-  Text ->
-  QueryReaderT TagKeySet IO TagKeySet
-queryDSubD super sub = do
-  c <- asks queryEnvConn
-  results <-
-    lift $ queryNamed c q [":super" := super, ":sub" := sub] ::
-      QueryReaderT TagKeySet IO [Only (RecordKey Tag)]
-  return . fromDistinctAscResultList $ results
+queryDSubR :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+queryDSubR = (subTagQuery q .) . superSubParams
  where
   q =
     [r|
 SELECT DISTINCT t.id
-FROM Tag t
-JOIN Tag t1
-  ON t.id = t1.subTagOfId
-JOIN Descriptor d
-  ON t.descriptorId = d.id
-JOIN Descriptor d1
-  ON t1.descriptorId = d1.id
-WHERE d.descriptor LIKE :super ESCAPE '\'
-  AND d1.descriptor LIKE :sub ESCAPE '\'
-ORDER BY t.id ASC|]
+FROM (
+  SELECT t.id
+  FROM Tag t
+  JOIN Descriptor d
+    ON t.descriptorId = d.id
+  WHERE d.descriptor LIKE :super ESCAPE '\'
+) AS t
+JOIN (
+  SELECT t.subTagOfId "id"
+  FROM Tag t
+  JOIN (
+    WITH RECURSIVE qr (id) AS (
+      SELECT id
+      FROM Descriptor
+      WHERE descriptor LIKE :sub ESCAPE '\'
+      UNION
+      SELECT infraDescriptorId
+      FROM MetaDescriptor md
+      JOIN qr
+        ON md.metaDescriptorId = qr.id
+    )
+    SELECT id FROM qr
+  ) AS d
+    ON t.descriptorId = d.id
+) AS t1 USING (id)
+ORDER BY t.id ASC
+|]
+
+queryDSubD :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+queryDSubD = (subTagQuery q .) . superSubParams
+ where
+  q =
+    [r|
+SELECT DISTINCT t.id    
+FROM (
+  SELECT t.id
+  FROM Tag t
+  JOIN Descriptor d
+  WHERE d.descriptor LIKE :super ESCAPE '\'
+) AS t
+JOIN (
+  SELECT t.subTagOfId "id"
+  FROM Tag t
+  JOIN Descriptor d
+  WHERE d.descriptor LIKE :sub ESCAPE '\'
+) AS t1 USING (id)
+ORDER BY t.id ASC
+|]
+
+subTagQuery ::
+  TaggerQuery ->
+  [NamedParam] ->
+  QueryReaderT TagKeySet IO TagKeySet
+subTagQuery q params =
+  asks queryEnvConn
+    >>= (\c -> fromDistinctAscResultList <$> lift (queryNamed c q params))
+
+fromDistinctAscResultList :: [Only (RecordKey Tag)] -> IntSet
+fromDistinctAscResultList = IS.fromDistinctAscList . map (\(Only k) -> fromIntegral k)
+
+superSubParams :: (ToField v1, ToField v2) => v1 -> v2 -> [NamedParam]
+superSubParams super sub = [":super" := super, ":sub" := sub]
