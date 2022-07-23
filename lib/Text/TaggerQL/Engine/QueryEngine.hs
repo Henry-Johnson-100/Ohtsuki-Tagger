@@ -26,24 +26,8 @@ import Data.List.NonEmpty (NonEmpty ((:|)))
 import Data.Text (Text)
 import Database.Tagger.Type
 import Text.TaggerQL.AST
-import Text.TaggerQL.Engine.QueryEngine.Query (getFileKeySetFromTagKeySet, joinTagSet)
-
-data Env = Env
-  { envTagSet :: HashSet Tag
-  , envConn :: TaggedConnection
-  }
-  deriving (Show, Eq)
-
-type QueryReader a = ReaderT Env IO a
-
-getFileSetFromTagSet :: HashSet Tag -> QueryReader (HashSet File)
-getFileSetFromTagSet _ = _
-
-queryTerm :: Term Text -> QueryReader (HashSet Tag)
-queryTerm _ = _
-
-queryTerms :: Term Text -> Term Text -> QueryReader (HashSet Tag)
-queryTerms _ _ = _
+import Text.TaggerQL.Engine.QueryEngine.Query
+import Text.TaggerQL.Engine.QueryEngine.Type
 
 queryComplexTermTopLevel :: ComplexTerm Text -> QueryReader (HashSet File)
 queryComplexTermTopLevel (Bottom _) = return mempty

@@ -10,8 +10,8 @@
 module Text.TaggerQL.Engine.QueryEngine.Query (
   queryTerms,
   queryTerm,
-  getFileKeySetFromTagKeySet,
   joinTagSet,
+  getFileSetFromTagSet,
 ) where
 
 import Control.Monad.Trans.Class (MonadTrans (lift))
@@ -35,14 +35,14 @@ import Text.TaggerQL.Engine.QueryEngine.Type
  Given two terms, run a subtag style search using their given 'QueryCriteria` and
  patterns.
 -}
-queryTerms :: Term Text -> Term Text -> QueryReaderT TagKeySet IO TagKeySet
+queryTerms :: Term Text -> Term Text -> QueryReader (HashSet Tag)
 queryTerms (Term qcx px) (Term qcy py) =
   dispatchQuery qcx qcy px py
 
 dispatchQuery ::
   QueryCriteria ->
   QueryCriteria ->
-  (Text -> Text -> QueryReaderT TagKeySet IO TagKeySet)
+  (Text -> Text -> QueryReader (HashSet Tag))
 dispatchQuery x y =
   case x of
     DescriptorCriteria -> case y of
@@ -67,26 +67,33 @@ dispatchQuery x y =
 
  Naturally, querying with 'UntaggedCriteria` will always produce an empty set.
 -}
-queryTerm :: Term Text -> QueryReaderT TagKeySet IO TagKeySet
+queryTerm :: Term Text -> QueryReader (HashSet Tag)
 queryTerm (Term qc p) = dispatchSimpleQuery qc p
  where
+  dispatchSimpleQuery :: QueryCriteria -> Text -> QueryReader (HashSet Tag)
   dispatchSimpleQuery qc' p' =
     case qc' of
       DescriptorCriteria ->
         runSimpleDispatchQuery
           p'
           [r|
-SELECT DISTINCT t.id          
+SELECT
+  t.id
+  ,t.fileId
+  ,t.descriptorId
+  ,t.subTagOfId        
 FROM Tag t
-JOIN Descriptor d
-ON t.descriptorId = d.id
-WHERE d.descriptor LIKE ? ESCAPE '\'
-ORDER BY t.id ASC|]
+JOIN Descriptor d ON t.descriptorId = d.id
+WHERE d.descriptor LIKE ? ESCAPE '\'|]
       MetaDescriptorCriteria ->
         runSimpleDispatchQuery
           p'
           [r|
-SELECT DISTINCT t.id          
+SELECT
+  t.id
+  ,t.fileId
+  ,t.descriptorId
+  ,t.subTagOfId
 FROM Tag t
 JOIN (
   WITH RECURSIVE r(id) AS (
@@ -96,51 +103,48 @@ JOIN (
     UNION
     SELECT infraDescriptorId
     FROM MetaDescriptor md
-    JOIN r
-      ON md.metaDescriptorId = r.id
+    JOIN r ON md.metaDescriptorId = r.id
   )
   SELECT id FROM r
-) AS d
-  ON t.descriptorId = d.id
-ORDER BY t.id ASC|]
+) AS d ON t.descriptorId = d.id|]
       FilePatternCriteria ->
         runSimpleDispatchQuery
           p'
           [r|
-SELECT DISTINCT t.id
+SELECT
+  t.id
+  ,t.fileId
+  ,t.descriptorId
+  ,t.subTagOfId
 FROM Tag t
-JOIN File f
-  ON t.fileId = f.id
-WHERE f.filePath LIKE ? ESCAPE '\'
-ORDER BY t.id ASC
-          |]
-      _ -> return IS.empty
+JOIN File f ON t.fileId = f.id
+WHERE f.filePath LIKE ? ESCAPE '\'|]
+      _ -> return mempty
    where
-    runSimpleDispatchQuery p'' q'' =
-      asks queryEnvConn
-        >>= ( \c ->
-                (fromDistinctAscResultList :: [Only (RecordKey Tag)] -> IntSet)
-                  <$> lift
-                    ( query
-                        c
-                        q''
-                        [p'']
-                    )
-            )
+    runSimpleDispatchQuery :: Text -> TaggerQuery -> QueryReader (HashSet Tag)
+    runSimpleDispatchQuery p'' q'' = do
+      conn <- asks envConn
+      results <- lift $ query conn q'' [p''] :: QueryReader [Tag]
+      return . HS.fromList $ results
 
-getFileKeySetFromTagKeySet :: TagKeySet -> TaggedConnection -> IO FileKeySet
-getFileKeySetFromTagKeySet ks tc = do
-  IS.unions . map (fromDistinctAscResultList :: [Only (RecordKey File)] -> IntSet)
-    <$> (mapM (query tc q . (: [])) . IS.toList $ ks)
+getFileSetFromTagSet :: HashSet Tag -> QueryReader (HashSet File)
+getFileSetFromTagSet (map tagId . HS.toList -> ts) = do
+  conn <- asks envConn
+  results <-
+    lift $
+      mapM (query conn q . (: [])) ts ::
+      QueryReader [[File]]
+  return . HS.unions . map HS.fromList $ results
  where
   q =
     [r|
-SELECT DISTINCT f.id
+SELECT
+  f.id
+  ,f.filePath
 FROM File f
-JOIN Tag t
-  ON f.id = t.fileId
+JOIN Tag t ON f.id = t.fileId
 WHERE t.id = ?
-ORDER BY f.id ASC|]
+    |]
 
 {- |
  Given two HashSets of 'Tag`s, intersect them, such that only 'Tag`s in the second set
@@ -178,25 +182,28 @@ withDSuper ::
   TaggerQuery ->
   v1 ->
   a ->
-  QueryReaderT TagKeySet IO TagKeySet
+  QueryReader (HashSet Tag)
 withDSuper q = (subTagQuery (constructQuery superDSubQuery q) .) . superSubParams
  where
   superDSubQuery :: TaggerQuery
   superDSubQuery =
     [r|
-SELECT t.id
+SELECT
+  t.id
+  ,t.fileId
+  ,t.descriptorId
+  ,t.subTagOfId
 FROM Tag t
-JOIN Descriptor d
-  ON t.descriptorId = d.id
+JOIN Descriptor d ON t.descriptorId = d.id
 WHERE d.descriptor LIKE :super ESCAPE '\'|]
 
-dSubP :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+dSubP :: Text -> Text -> QueryReader (HashSet Tag)
 dSubP = withDSuper subPSubQuery
 
-dSubR :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+dSubR :: Text -> Text -> QueryReader (HashSet Tag)
 dSubR = withDSuper subRSubQuery
 
-dSubD :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+dSubD :: Text -> Text -> QueryReader (HashSet Tag)
 dSubD = withDSuper subDSubQuery
 
 {-
@@ -212,13 +219,17 @@ withRSuper ::
   TaggerQuery ->
   v1 ->
   a ->
-  QueryReaderT TagKeySet IO TagKeySet
+  QueryReader (HashSet Tag)
 withRSuper q = (subTagQuery (constructQuery superRSubQuery q) .) . superSubParams
  where
   superRSubQuery :: TaggerQuery
   superRSubQuery =
     [r|
-SELECT t.id
+SELECT
+  t.id
+  ,t.fileId
+  ,t.descriptorId
+  ,t.subTagOfId
 FROM Tag t
 JOIN (
   WITH RECURSIVE qr (id) AS (
@@ -228,20 +239,18 @@ JOIN (
     UNION
     SELECT infraDescriptorId
     FROM MetaDescriptor md
-    JOIN qr
-      ON md.metaDescriptorId = qr.id
+    JOIN qr ON md.metaDescriptorId = qr.id
   )
   SELECT id FROM qr
-) AS d
-  ON t.descriptorId = d.id|]
+) AS d ON t.descriptorId = d.id|]
 
-rSubP :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+rSubP :: Text -> Text -> QueryReader (HashSet Tag)
 rSubP = withRSuper subPSubQuery
 
-rSubR :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+rSubR :: Text -> Text -> QueryReader (HashSet Tag)
 rSubR = withRSuper subRSubQuery
 
-rSubD :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+rSubD :: Text -> Text -> QueryReader (HashSet Tag)
 rSubD = withRSuper subDSubQuery
 
 {-
@@ -257,24 +266,27 @@ withPSuper ::
   TaggerQuery ->
   v1 ->
   a ->
-  QueryReaderT TagKeySet IO TagKeySet
+  QueryReader (HashSet Tag)
 withPSuper q = (subTagQuery (constructQuery superPSubQuery q) .) . superSubParams
  where
   superPSubQuery =
     [r|
-SELECT t.id    
+SELECT
+  t.id
+  ,t.fileId
+  ,t.descriptorId
+  ,t.subTagOfId
 FROM Tag t
-JOIN File f
-  ON t.fileId = f.id
+JOIN File f ON t.fileId = f.id
 WHERE f.filePath LIKE :super ESCAPE '\'|]
 
-pSubP :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+pSubP :: Text -> Text -> QueryReader (HashSet Tag)
 pSubP = withPSuper subPSubQuery
 
-pSubR :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+pSubR :: Text -> Text -> QueryReader (HashSet Tag)
 pSubR = withPSuper subRSubQuery
 
-pSubD :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
+pSubD :: Text -> Text -> QueryReader (HashSet Tag)
 pSubD = withPSuper subDSubQuery
 
 {-
@@ -285,13 +297,17 @@ pSubD = withPSuper subDSubQuery
  \___/
 -}
 
-uSubAnything :: Text -> Text -> QueryReaderT TagKeySet IO TagKeySet
-uSubAnything _ _ = return IS.empty
+uSubAnything :: Text -> Text -> QueryReader (HashSet Tag)
+uSubAnything _ _ = return mempty
 
 constructQuery :: TaggerQuery -> TaggerQuery -> TaggerQuery
 constructQuery super sub =
   [r|
-SELECT DISTINCT t.id    
+SELECT
+  t1.id
+  ,t1.fileId
+  ,t1.descriptorId
+  ,t1.subTagOfId
 FROM (
 |]
     <> super
@@ -299,24 +315,30 @@ FROM (
 ) AS t
 JOIN (|]
     <> sub
-    <> [r|) AS t1 USING (id)
-ORDER BY t.id ASC
+    <> [r|) AS t1 ON t.id = t1.subTagOfId
 |]
 
 subDSubQuery :: TaggerQuery
 subDSubQuery =
   [r|
-SELECT t.subTagOfId "id"
+SELECT
+  t.id
+  ,t.fileId
+  ,t.descriptorId
+  ,t.subTagOfId
 FROM Tag t
-JOIN Descriptor d
-  ON t.descriptorId = d.id
+JOIN Descriptor d ON t.descriptorId = d.id
 WHERE d.descriptor LIKE :sub ESCAPE '\'
 |]
 
 subRSubQuery :: TaggerQuery
 subRSubQuery =
   [r|
-SELECT t.subTagOfId "id"
+SELECT
+  t.id
+  ,t.fileId
+  ,t.descriptorId
+  ,t.subTagOfId
 FROM Tag t
 JOIN (
   WITH RECURSIVE qr (id) AS (
@@ -326,37 +348,35 @@ JOIN (
     UNION
     SELECT infraDescriptorId
     FROM MetaDescriptor md
-    JOIN qr
-      ON md.metaDescriptorId = qr.id
+    JOIN qr ON md.metaDescriptorId = qr.id
   )
   SELECT id FROM qr
-) AS d
-  ON t.descriptorId = d.id
+) AS d ON t.descriptorId = d.id
 |]
 
 subPSubQuery :: TaggerQuery
 subPSubQuery =
   [r|
-SELECT t.subTagOfId "id"
+SELECT
+  t.id
+  ,t.fileId
+  ,t.descriptorId
+  ,t.subTagOfId
 FROM Tag t
-JOIN File f
-  ON t.fileId = f.id
+JOIN File f ON t.fileId = f.id
 WHERE f.filePath LIKE :sub ESCAPE '\'
 |]
 
 subTagQuery ::
   TaggerQuery ->
   [NamedParam] ->
-  QueryReaderT TagKeySet IO TagKeySet
-subTagQuery q params =
-  asks queryEnvConn
-    >>= ( \c ->
-            (fromDistinctAscResultList :: [Only (RecordKey Tag)] -> IntSet)
-              <$> lift (queryNamed c q params)
-        )
-
-fromDistinctAscResultList :: RowId k => [Only (RecordKey k)] -> IntSet
-fromDistinctAscResultList = IS.fromDistinctAscList . map (\(Only k) -> fromIntegral k)
+  QueryReader (HashSet Tag)
+subTagQuery q params = do
+  conn <- asks envConn
+  results <-
+    lift $ queryNamed conn q params ::
+      ReaderT QueryEnv IO [Tag]
+  return . HS.fromList $ results
 
 superSubParams :: (ToField v1, ToField v2) => v1 -> v2 -> [NamedParam]
 superSubParams super sub = [":super" := super, ":sub" := sub]
