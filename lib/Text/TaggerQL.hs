@@ -30,19 +30,9 @@ module Text.TaggerQL (
 ) where
 
 import Control.Monad (void, (<=<))
-import Control.Monad.Trans.Class (MonadTrans (lift))
-import Control.Monad.Trans.Maybe (MaybeT)
-import Control.Monad.Trans.Reader (
-  ReaderT (runReaderT),
-  ask,
-  asks,
-  local,
- )
-import qualified Data.Foldable as F
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
-import qualified Data.IntSet as IntSet
 import qualified Data.List as L
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import Data.Maybe (fromJust)
@@ -63,16 +53,7 @@ import Database.Tagger.Query (
   flatQueryForFileOnMetaRelationPattern,
   insertTags,
   queryForDescriptorByPattern,
-  queryForFileByDescriptorSubTagDescriptor,
-  queryForFileByDescriptorSubTagMetaDescriptor,
-  queryForFileByFilePatternAndDescriptor,
-  queryForFileByFilePatternAndFilePattern,
-  queryForFileByFilePatternAndMetaDescriptor,
-  queryForFileByFilePatternAndUntagged,
-  queryForFileByMetaDescriptorSubTagDescriptor,
-  queryForFileByMetaDescriptorSubTagMetaDescriptor,
   queryForFileByPattern,
-  queryForSingleFileByFileId,
   queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf,
   queryForTagBySubTagTriple,
   queryForUntaggedFiles,
@@ -82,10 +63,8 @@ import Database.Tagger.Type (
   File,
   RecordKey,
   Tag (tagId),
-  TaggedConnection,
  )
 import System.IO (hPrint, stderr)
-import Tagger.Util (catMaybeTM, hoistMaybe)
 import Text.TaggerQL.AST (
   ComplexTerm (..),
   Request (Request),
@@ -203,135 +182,10 @@ queryTermTree ::
   IO TermResult
 queryTermTree tc tt =
   case tt of
-    Simple st -> undefined
-
--- Complex ct -> runReaderT queryComplexTerm tc ct
-
--- {- |
---  A depth-first query with 'ComplexTerm`s.
---  Each 'Term` in a given 'ComplexTerm` will first find its relation
---  query with its immediate sub-term then intersect that result with the results
---  of its sub-term's sub-terms. It will do this until it reaches a term-bottom relation
---  where it will perform one final query then move on to query relations of the term
---  and any sub-terms adjacent to the first.
-
---  This is a recursive, depth-first tree traversal where the results of the top relation
---  are intersected with the intersected results of every query below it.
--- -}
--- queryComplexTerm ::
---   TaggedConnection ->
---   ComplexTerm Text ->
---   MaybeT IO TermResult
--- -- This match should never be called, but if it is, it is filtered by querySentence.
--- queryComplexTerm _ (Bottom _) = hoistMaybe Nothing
--- -- The bottom of a depth-relation query, will perform a single query on the current
--- -- term and bottom subterm then move to any adjacent subterms
--- --
--- -- This match contains the terminal case in t :<- (Bottom bst :| [])
--- queryComplexTerm tc (t :<- ((Bottom bst) :| sts)) =
---   if null sts
---     then queryComplexTermRelation tc (TermTag t) (TermSubTag bst)
---     else do
---       thisResult <- queryComplexTermRelation tc (TermTag t) (TermSubTag bst)
---       nextResults <-
---         lift $
---           intersectTermResults
---             <$> catMaybeTM (\ct' -> queryComplexTerm tc (t :<- [ct'])) sts
---       let combinedResults = intersectTermResult thisResult nextResults
---       return combinedResults
--- -- A relation query that has not reached the bottom yet.
--- -- Will intersect the result of the current term and next subterm with the results
--- -- of the subterm and subterm's subterms before moving on to adjacent subterms.
--- queryComplexTerm tc (t :<- (st :| sts)) =
---   if null sts
---     then do
---       thisResult <-
---         queryComplexTermRelation tc (TermTag t) (TermSubTag . complexTermNode $ st)
---       nestedResult <- queryComplexTerm tc st
---       let combinedResults = intersectTermResult thisResult nestedResult
---       return combinedResults
---     else do
---       thisResult <-
---         queryComplexTermRelation tc (TermTag t) (TermSubTag . complexTermNode $ st)
---       nestedResult <- queryComplexTerm tc st
---       nextResults <-
---         lift $
---           intersectTermResults
---             <$> catMaybeTM (\ct' -> queryComplexTerm tc (t :<- [ct'])) sts
---       let combinedResults =
---             intersectTermResults [thisResult, nestedResult, nextResults]
---       return combinedResults
-
--- Could be handled easier programmatically, but with hand-written queries for
--- each case, it probably has better performance.
-queryComplexTermRelation ::
-  TaggedConnection ->
-  TermTag ->
-  TermSubTag ->
-  MaybeT IO TermResult
-queryComplexTermRelation
-  tc
-  (TermTag (Term tqc basisPattern))
-  (TermSubTag (Term sqc subQueryPattern)) =
-    case (tqc, sqc) of
-      (DescriptorCriteria, DescriptorCriteria) ->
-        lift $
-          TermResult . HS.fromList
-            <$> queryForFileByDescriptorSubTagDescriptor basisPattern subQueryPattern tc
-      (DescriptorCriteria, MetaDescriptorCriteria) ->
-        lift $
-          TermResult . HS.fromList
-            <$> queryForFileByDescriptorSubTagMetaDescriptor
-              basisPattern
-              subQueryPattern
-              tc
-      -- flipped case of (FilePatternCriteria, DescriptorCriteria)
-      (DescriptorCriteria, FilePatternCriteria) ->
-        lift $
-          TermResult . HS.fromList
-            <$> queryForFileByFilePatternAndDescriptor subQueryPattern basisPattern tc
-      (MetaDescriptorCriteria, DescriptorCriteria) ->
-        lift $
-          TermResult . HS.fromList
-            <$> queryForFileByMetaDescriptorSubTagDescriptor
-              basisPattern
-              subQueryPattern
-              tc
-      (MetaDescriptorCriteria, MetaDescriptorCriteria) ->
-        lift $
-          TermResult . HS.fromList
-            <$> queryForFileByMetaDescriptorSubTagMetaDescriptor
-              basisPattern
-              subQueryPattern
-              tc
-      -- flipped case of (FilePatternCriteria, MetaDescriptorCriteria)
-      (MetaDescriptorCriteria, FilePatternCriteria) ->
-        lift $
-          TermResult . HS.fromList
-            <$> queryForFileByFilePatternAndMetaDescriptor subQueryPattern basisPattern tc
-      (FilePatternCriteria, DescriptorCriteria) ->
-        lift $
-          TermResult . HS.fromList
-            <$> queryForFileByFilePatternAndDescriptor basisPattern subQueryPattern tc
-      (FilePatternCriteria, MetaDescriptorCriteria) ->
-        lift $
-          TermResult . HS.fromList
-            <$> queryForFileByFilePatternAndMetaDescriptor basisPattern subQueryPattern tc
-      (FilePatternCriteria, FilePatternCriteria) ->
-        lift $
-          TermResult . HS.fromList
-            <$> queryForFileByFilePatternAndFilePattern basisPattern subQueryPattern tc
-      (FilePatternCriteria, UntaggedCriteria) ->
-        lift $
-          TermResult . HS.fromList
-            <$> queryForFileByFilePatternAndUntagged basisPattern tc
-      -- flipped case of (FilePatternCriteria, UntaggedCriteria)
-      (UntaggedCriteria, FilePatternCriteria) ->
-        lift $
-          TermResult . HS.fromList
-            <$> queryForFileByFilePatternAndUntagged subQueryPattern tc
-      (UntaggedCriteria, _) -> hoistMaybe Nothing
-      (_, UntaggedCriteria) -> hoistMaybe Nothing
+    Simple st -> querySimpleTerm tc st
+    Complex ct ->
+      TermResult
+        <$> runReaderT (queryComplexTermTopLevel ct) (QueryEnv mempty tc)
 
 querySimpleTerm ::
   TaggedConnection ->

@@ -14,13 +14,10 @@ module Text.TaggerQL.Engine.QueryEngine (
   queryComplexTermTopLevel,
 ) where
 
-import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
-import qualified Data.Foldable as F
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
-import qualified Data.IntSet as IS
 import qualified Data.List as L
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import Data.Text (Text)

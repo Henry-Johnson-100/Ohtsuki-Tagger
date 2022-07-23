@@ -14,14 +14,8 @@ module Text.TaggerQL.Engine.QueryEngine.Query (
   getFileSetFromTagSet,
 ) where
 
-import Control.Monad.Trans.Class (MonadTrans (lift))
-import Control.Monad.Trans.Reader (asks)
-import Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HM
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
-import Data.IntSet (IntSet)
-import qualified Data.IntSet as IS
 import Data.Tagger
 import Data.Text (Text)
 import Database.Tagger.Connection
