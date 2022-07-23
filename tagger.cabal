@@ -1,7 +1,7 @@
 cabal-version:       2.4
 
 name:                tagger
-version:             1.0.1.0
+version:             1.0.1.1
 synopsis:            A file/image tagger that connects to or initializes sqlite databases.
 -- description:
 -- bug-reports:
@@ -126,6 +126,8 @@ library tagger-lib
                       ,Data.OccurrenceHashMap.Internal
                       ,Data.OccurrenceMap.Internal
                       ,Tagger.Util
+                      ,Text.TaggerQL.Engine.QueryEngine
+                      ,Text.TaggerQL.Engine.QueryEngine.Query
 
   other-extensions:    DeriveGeneric
                       ,DeriveAnyClass
