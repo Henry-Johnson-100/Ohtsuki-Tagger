@@ -7,38 +7,23 @@ module Text.TaggerQL.Engine.QueryEngine.Query (
   queryTerms,
   queryTerm,
   getFileKeySetFromTagKeySet,
+  joinTagSet,
 ) where
 
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Reader (asks)
+import Data.HashSet (HashSet)
+import qualified Data.HashSet as HS
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
-import Data.Tagger (
-  QueryCriteria (
-    DescriptorCriteria,
-    FilePatternCriteria,
-    MetaDescriptorCriteria
-  ),
- )
+import Data.Tagger
 import Data.Text (Text)
-import Database.Tagger.Connection (
-  NamedParam (..),
-  Only (Only),
-  ToField,
-  query,
-  queryNamed,
- )
-import Database.Tagger.Query.Type (TaggerQuery)
-import Database.Tagger.Type (File, RecordKey, RowId, Tag)
+import Database.Tagger.Connection
+import Database.Tagger.Query.Type
+import Database.Tagger.Type
 import Text.RawString.QQ (r)
-import Text.TaggerQL.AST (Term (Term))
-import Text.TaggerQL.Engine.QueryEngine.Type (
-  FileKeySet,
-  QueryEnv (queryEnvConn),
-  QueryReaderT,
-  TagKeySet,
-  TaggedConnection,
- )
+import Text.TaggerQL.AST
+import Text.TaggerQL.Engine.QueryEngine.Type
 
 {- |
  Given two terms, run a subtag style search using their given 'QueryCriteria` and
@@ -150,6 +135,31 @@ JOIN Tag t
   ON f.id = t.fileId
 WHERE t.id = ?
 ORDER BY f.id ASC|]
+
+{- |
+ Given two HashSets of 'Tag`s, intersect them, such that only 'Tag`s in the second set
+ that are subtags of 'Tag`s in the first remain.
+
+ like:
+
+ @
+  SELECT DISTINCT t2.*
+
+  FROM (...) as t1
+
+  JOIN (...) as t2
+
+    ON t1.id = t2.subTagOfId
+ @
+-}
+joinTagSet :: HashSet Tag -> HashSet Tag -> HashSet Tag
+joinTagSet superSet = HS.filter (subTagInSuperTagSet superSet)
+ where
+  subTagInSuperTagSet :: HashSet Tag -> Tag -> Bool
+  subTagInSuperTagSet ss (tagSubtagOfId -> st) =
+    case st of
+      Nothing -> False
+      Just subTagKey -> HS.member subTagKey (HS.map tagId ss)
 
 {-
  ____
