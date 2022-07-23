@@ -1,10 +1,11 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Use lambda-case" #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Interface.Handler.WidgetQueryRequest (
   WidgetQueryRequest (widgetQueryRequest),
@@ -32,17 +33,15 @@ import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT, except, withExceptT)
 import Data.Foldable (toList)
 import qualified Data.HashSet as HS
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromMaybe)
 import Data.Sequence (Seq, deleteAt, elemIndexL, empty, insertAt, (|>))
-import Data.Tagger (SetOp (..))
+import Data.Tagger (QueryCriteria (DescriptorCriteria, FilePatternCriteria, MetaDescriptorCriteria, UntaggedCriteria), SetOp (..))
 import Data.Text (Text)
+import qualified Data.Text as T
 import Database.Tagger.Type (TaggedConnection)
 import Text.TaggerQL (combinableSentenceResultSet, queryRequest)
-import Text.TaggerQL.AST (
-  Request (Request),
-  SentenceSet (..),
-  SentenceTree (..),
- )
+import Text.TaggerQL.AST
 import Text.TaggerQL.Parser.Internal (parse, requestParser)
 
 newtype WidgetQueryRequest = WidgetQueryRequest
@@ -157,3 +156,47 @@ createWidgetSentenceBranch tc q = do
         . combinableSentenceResultSet
         <$> queryRequest tc req
   return $ WidgetSentenceBranch q (SentenceBranch explicitSetOp sts) affectedFileCount 0
+
+formatSentenceTree :: SentenceTree Text -> Text
+formatSentenceTree (SentenceNode ss) = formatSentenceSet ss
+formatSentenceTree (SentenceBranch so sss) =
+  formatSetOp so
+    <> "( "
+    <> T.unwords (formatSentenceTree <$> sss)
+    <> " )"
+
+formatSentenceSet :: SentenceSet Text -> Text
+formatSentenceSet (SentenceSet so s) =
+  formatSetOp so
+    <> formatSentence s
+
+formatSentence :: Sentence Text -> Text
+formatSentence (Sentence tts) = T.unwords $ formatTermTree <$> tts
+
+formatTermTree :: TermTree Text -> Text
+formatTermTree (Simple st) = formatSimpleTerm st
+formatTermTree (Complex ct) = formatComplexTerm ct
+
+formatComplexTerm :: ComplexTerm Text -> Text
+formatComplexTerm (t :<- ct) =
+  formatTerm t <> "{ "
+    <> (T.unwords . NE.toList . NE.map formatComplexTerm $ ct)
+    <> " }"
+formatComplexTerm (Bottom t) = formatTerm t
+
+formatSimpleTerm :: SimpleTerm Text -> Text
+formatSimpleTerm (SimpleTerm t) = formatTerm t
+
+formatTerm :: Term Text -> Text
+formatTerm (Term qc t) = formatQueryCriteria qc <> t
+
+formatQueryCriteria :: QueryCriteria -> Text
+formatQueryCriteria DescriptorCriteria = "D."
+formatQueryCriteria MetaDescriptorCriteria = "R."
+formatQueryCriteria FilePatternCriteria = "P."
+formatQueryCriteria UntaggedCriteria = "U."
+
+formatSetOp :: SetOp -> Text
+formatSetOp Union = "U|"
+formatSetOp Intersect = "I|"
+formatSetOp Difference = "D|"
