@@ -1,7 +1,11 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_HADDOCK hide #-}
+
+{-# HLINT ignore "Eta reduce" #-}
 
 module Text.TaggerQL.Engine.QueryEngine.Query (
   queryTerms,
@@ -12,6 +16,8 @@ module Text.TaggerQL.Engine.QueryEngine.Query (
 
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Reader (asks)
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HM
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.IntSet (IntSet)
@@ -153,13 +159,11 @@ ORDER BY f.id ASC|]
  @
 -}
 joinTagSet :: HashSet Tag -> HashSet Tag -> HashSet Tag
-joinTagSet superSet = HS.filter (subTagInSuperTagSet superSet)
- where
-  subTagInSuperTagSet :: HashSet Tag -> Tag -> Bool
-  subTagInSuperTagSet ss (tagSubtagOfId -> st) =
-    case st of
-      Nothing -> False
-      Just subTagKey -> HS.member subTagKey (HS.map tagId ss)
+joinTagSet superSet subSet =
+  let !superIdSet = HS.map tagId superSet
+   in HS.filter
+        (\(tagSubtagOfId -> mstid) -> maybe False (`HS.member` superIdSet) mstid)
+        subSet
 
 {-
  ____
