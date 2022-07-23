@@ -203,17 +203,7 @@ queryTermTree ::
   IO TermResult
 queryTermTree tc tt =
   case tt of
-    Simple st -> querySimpleTerm tc st
-    Complex ct -> do
-      resultFileSet <-
-        IntSet.toList
-          <$> runReaderT
-            (queryComplexTerm True ct)
-            (QueryEnv tc IntSet.empty)
-      TermResult . HS.fromList
-        <$> catMaybeTM
-          (flip queryForSingleFileByFileId tc . fromIntegral)
-          resultFileSet
+    Simple st -> undefined
 
 -- Complex ct -> runReaderT queryComplexTerm tc ct
 
