@@ -10,6 +10,12 @@
 
 ------
 
+#### 1.0.1.1 -- 2022-07-23
+* Reworked the complex term query engine to be more accurate.
+Refer to Tech-note f02a13240b for some more information.
+
+------
+
 ### 1.0.1.0 -- 2022-07-14
 * Removed the "Last Saved" field in the info widget, because there is currenlty no
 save functionality.
