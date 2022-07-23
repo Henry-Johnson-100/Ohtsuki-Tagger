@@ -125,7 +125,6 @@ library tagger-lib
                       ,Data.OccurrenceMap.Internal
                       ,Tagger.Util
                       ,Text.TaggerQL.Engine.QueryEngine
-                      ,Text.TaggerQL.Engine.QueryEngine.Type
                       ,Text.TaggerQL.Engine.QueryEngine.Query
 
   other-extensions:    DeriveGeneric

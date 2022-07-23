@@ -20,24 +20,56 @@ module Text.TaggerQL.Engine.QueryEngine (
   combinableSentenceResultSet,
 ) where
 
-import Control.Monad
-import Control.Monad.Trans.Reader
+import Control.Monad ((<=<))
+import Control.Monad.Trans.Reader (
+  ReaderT (runReaderT),
+  asks,
+  local,
+ )
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
 import qualified Data.List as L
 import Data.List.NonEmpty (NonEmpty ((:|)))
-import Data.String
-import Data.Tagger
+import Data.String (IsString (..))
+import Data.Tagger (
+  QueryCriteria (
+    DescriptorCriteria,
+    FilePatternCriteria,
+    MetaDescriptorCriteria,
+    UntaggedCriteria
+  ),
+  SetOp (..),
+ )
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger.Query
-import Database.Tagger.Type
-import System.IO
-import Text.TaggerQL.AST
-import Text.TaggerQL.Engine.QueryEngine.Query
-import Text.TaggerQL.Engine.QueryEngine.Type
-import Text.TaggerQL.Parser.Internal
+import Database.Tagger.Query (
+  flatQueryForFileByTagDescriptorPattern,
+  flatQueryForFileOnMetaRelationPattern,
+  queryForFileByPattern,
+  queryForUntaggedFiles,
+ )
+import Database.Tagger.Type (File, TaggedConnection)
+import System.IO (hPrint, stderr)
+import Text.TaggerQL.AST (
+  ComplexTerm (..),
+  Request (Request),
+  Sentence (Sentence),
+  SentenceSet (..),
+  SentenceTree (..),
+  SimpleTerm (..),
+  Term (Term),
+  TermTree (..),
+ )
+import Text.TaggerQL.Engine.QueryEngine.Query (
+  QueryEnv (QueryEnv, envTagSet),
+  QueryReader,
+  getFileSetFromTagSet,
+  joinTagSet,
+  queryTerm,
+  queryTerms,
+ )
+import Text.TaggerQL.Parser.Internal (parse, requestParser)
 
 data CombinableSentenceResult
   = CombinableSentenceResult SetOp (HashSet File)

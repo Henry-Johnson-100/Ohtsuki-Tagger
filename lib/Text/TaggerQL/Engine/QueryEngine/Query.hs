@@ -8,22 +8,48 @@
 {-# HLINT ignore "Eta reduce" #-}
 
 module Text.TaggerQL.Engine.QueryEngine.Query (
+  QueryEnv (..),
+  QueryReader,
   queryTerms,
   queryTerm,
   joinTagSet,
   getFileSetFromTagSet,
 ) where
 
+import Control.Monad.Trans.Class (MonadTrans (lift))
+import Control.Monad.Trans.Reader (ReaderT, asks)
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
-import Data.Tagger
+import Data.Tagger (
+  QueryCriteria (
+    DescriptorCriteria,
+    FilePatternCriteria,
+    MetaDescriptorCriteria
+  ),
+ )
 import Data.Text (Text)
-import Database.Tagger.Connection
-import Database.Tagger.Query.Type
-import Database.Tagger.Type
+import Database.Tagger.Connection (
+  NamedParam (..),
+  ToField,
+  query,
+  queryNamed,
+ )
+import Database.Tagger.Query.Type (TaggerQuery)
+import Database.Tagger.Type (
+  File,
+  Tag (tagId, tagSubtagOfId),
+  TaggedConnection,
+ )
 import Text.RawString.QQ (r)
-import Text.TaggerQL.AST
-import Text.TaggerQL.Engine.QueryEngine.Type
+import Text.TaggerQL.AST (Term (Term))
+
+data QueryEnv = QueryEnv
+  { envTagSet :: HashSet Tag
+  , envConn :: TaggedConnection
+  }
+  deriving (Show, Eq)
+
+type QueryReader a = ReaderT QueryEnv IO a
 
 {- |
  Given two terms, run a subtag style search using their given 'QueryCriteria` and
