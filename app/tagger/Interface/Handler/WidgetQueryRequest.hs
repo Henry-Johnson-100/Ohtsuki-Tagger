@@ -9,23 +9,23 @@
 
 module Interface.Handler.WidgetQueryRequest (
   WidgetQueryRequest (widgetQueryRequest),
-  WidgetSentenceBranch (
-    widgetSentenceBranchText,
-    widgetSentenceBranch,
-    widgetSentenceBranchCount
+  WidgetQueryNode (
+    widgetQueryNodeText,
+    widgetQueryNode,
+    widgetQueryNodeCount
   ),
-  pattern WidgetSentenceBranchComp,
-  widgetSentenceBranchTextLens,
-  widgetSentenceBranchLens,
-  widgetSentenceBranchCountLens,
-  widgetSentenceBranchSetOpLens,
-  widgetSentenceBranchIdLens,
+  pattern WidgetQueryNodeComp,
+  widgetQueryNodeTextLens,
+  widgetQueryNodeLens,
+  widgetQueryNodeCountLens,
+  widgetQueryNodeSetOpLens,
+  widgetQueryNodeIdLens,
   emptyWidgetQueryRequest,
   squashWidgetQueryRequest,
   moveQueryWidgetNodeTo,
   deleteWidgetQueryNode,
   appendWidgetQueryNode,
-  createWidgetSentenceBranch,
+  createWidgetQueryNode,
 ) where
 
 import Control.Lens (Lens', lens, (&), (.~), (^.))
@@ -45,51 +45,51 @@ import Text.TaggerQL.AST
 import Text.TaggerQL.Parser.Internal (parse, requestParser)
 
 newtype WidgetQueryRequest = WidgetQueryRequest
-  { widgetQueryRequest :: Seq WidgetSentenceBranch
+  { widgetQueryRequest :: Seq WidgetQueryNode
   }
   deriving (Show, Eq, Semigroup, Monoid)
 
-data WidgetSentenceBranch = WidgetSentenceBranch
-  { widgetSentenceBranchText :: Text
-  , widgetSentenceBranch :: SentenceTree Text
-  , widgetSentenceBranchCount :: Int
-  , widgetSentenceBranchId :: Int
+data WidgetQueryNode = WidgetQueryNode
+  { widgetQueryNodeText :: Text
+  , widgetQueryNode :: SentenceTree Text
+  , widgetQueryNodeCount :: Int
+  , widgetQueryNodeId :: Int
   }
   deriving (Show, Eq)
 
-widgetSentenceBranchTextLens :: Lens' WidgetSentenceBranch Text
-widgetSentenceBranchTextLens =
+widgetQueryNodeTextLens :: Lens' WidgetQueryNode Text
+widgetQueryNodeTextLens =
   lens
-    (\(WidgetSentenceBranch t _ _ _) -> t)
-    (\wsb t -> wsb{widgetSentenceBranchText = t})
+    (\(WidgetQueryNode t _ _ _) -> t)
+    (\wsb t -> wsb{widgetQueryNodeText = t})
 
-widgetSentenceBranchLens :: Lens' WidgetSentenceBranch (SentenceTree Text)
-widgetSentenceBranchLens =
+widgetQueryNodeLens :: Lens' WidgetQueryNode (SentenceTree Text)
+widgetQueryNodeLens =
   lens
-    (\(WidgetSentenceBranch _ st _ _) -> st)
-    (\wsb st -> wsb{widgetSentenceBranch = st})
+    (\(WidgetQueryNode _ st _ _) -> st)
+    (\wsb st -> wsb{widgetQueryNode = st})
 
-widgetSentenceBranchCountLens :: Lens' WidgetSentenceBranch Int
-widgetSentenceBranchCountLens =
+widgetQueryNodeCountLens :: Lens' WidgetQueryNode Int
+widgetQueryNodeCountLens =
   lens
-    (\(WidgetSentenceBranch _ _ c _) -> c)
-    (\wsb c -> wsb{widgetSentenceBranchCount = c})
+    (\(WidgetQueryNode _ _ c _) -> c)
+    (\wsb c -> wsb{widgetQueryNodeCount = c})
 
-widgetSentenceBranchIdLens :: Lens' WidgetSentenceBranch Int
-widgetSentenceBranchIdLens =
+widgetQueryNodeIdLens :: Lens' WidgetQueryNode Int
+widgetQueryNodeIdLens =
   lens
-    (\(WidgetSentenceBranch _ _ _ k) -> k)
-    (\wsb k -> wsb{widgetSentenceBranchId = k})
+    (\(WidgetQueryNode _ _ _ k) -> k)
+    (\wsb k -> wsb{widgetQueryNodeId = k})
 
-pattern WidgetSentenceBranchComp :: Text -> Int -> SetOp -> WidgetSentenceBranch
-pattern WidgetSentenceBranchComp t c so <-
-  WidgetSentenceBranch t ((^. sentenceTreeSetOpLens) -> so) c _
+pattern WidgetQueryNodeComp :: Text -> Int -> SetOp -> WidgetQueryNode
+pattern WidgetQueryNodeComp t c so <-
+  WidgetQueryNode t ((^. sentenceTreeSetOpLens) -> so) c _
 
-widgetSentenceBranchSetOpLens :: Lens' WidgetSentenceBranch SetOp
-widgetSentenceBranchSetOpLens =
+widgetQueryNodeSetOpLens :: Lens' WidgetQueryNode SetOp
+widgetQueryNodeSetOpLens =
   lens
-    (flip (^.) sentenceTreeSetOpLens . widgetSentenceBranch)
-    (\wsb so -> wsb & widgetSentenceBranchLens . sentenceTreeSetOpLens .~ so)
+    (flip (^.) sentenceTreeSetOpLens . widgetQueryNode)
+    (\wsb so -> wsb & widgetQueryNodeLens . sentenceTreeSetOpLens .~ so)
 
 sentenceTreeSetOpLens :: Lens' (SentenceTree a) SetOp
 sentenceTreeSetOpLens =
@@ -110,11 +110,11 @@ emptyWidgetQueryRequest = WidgetQueryRequest empty
 squashWidgetQueryRequest :: WidgetQueryRequest -> Request Text
 squashWidgetQueryRequest (WidgetQueryRequest sts) =
   Request . toList $
-    (widgetSentenceBranch <$> sts)
+    (widgetQueryNode <$> sts)
 
 moveQueryWidgetNodeTo ::
-  WidgetSentenceBranch ->
-  WidgetSentenceBranch ->
+  WidgetQueryNode ->
+  WidgetQueryNode ->
   WidgetQueryRequest ->
   WidgetQueryRequest
 moveQueryWidgetNodeTo from to wr@(WidgetQueryRequest sts) = fromMaybe wr $ do
@@ -123,7 +123,7 @@ moveQueryWidgetNodeTo from to wr@(WidgetQueryRequest sts) = fromMaybe wr $ do
   toIx <- elemIndexL to removedFromNode
   return . WidgetQueryRequest $ insertAt toIx from removedFromNode
 
-deleteWidgetQueryNode :: WidgetSentenceBranch -> WidgetQueryRequest -> WidgetQueryRequest
+deleteWidgetQueryNode :: WidgetQueryNode -> WidgetQueryRequest -> WidgetQueryRequest
 deleteWidgetQueryNode wsb wr@(WidgetQueryRequest sts) =
   maybe
     wr
@@ -131,21 +131,21 @@ deleteWidgetQueryNode wsb wr@(WidgetQueryRequest sts) =
     (elemIndexL wsb sts)
 
 appendWidgetQueryNode ::
-  WidgetSentenceBranch ->
+  WidgetQueryNode ->
   WidgetQueryRequest ->
   WidgetQueryRequest
 appendWidgetQueryNode wsb (WidgetQueryRequest sts) =
   WidgetQueryRequest $ sts |> wsb
 
-createWidgetSentenceBranch ::
+createWidgetQueryNode ::
   TaggedConnection ->
   Text ->
-  ExceptT String IO WidgetSentenceBranch
-createWidgetSentenceBranch tc q = do
+  ExceptT String IO WidgetQueryNode
+createWidgetQueryNode tc q = do
   req@(Request sts) <-
     withExceptT show
       . except
-      $ parse requestParser "createWidgetSentenceBranch" q
+      $ parse requestParser "createWidgetQueryNode" q
   let explicitSetOp =
         case sts of
           [] -> Intersect
@@ -155,7 +155,7 @@ createWidgetSentenceBranch tc q = do
       HS.size
         . combinableSentenceResultSet
         <$> queryRequest tc req
-  return $ WidgetSentenceBranch q (SentenceBranch explicitSetOp sts) affectedFileCount 0
+  return $ WidgetQueryNode q (SentenceBranch explicitSetOp sts) affectedFileCount 0
 
 formatSentenceTree :: SentenceTree Text -> Text
 formatSentenceTree (SentenceNode ss) = formatSentenceSet ss

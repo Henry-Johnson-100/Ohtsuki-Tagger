@@ -565,12 +565,12 @@ queryWidget m =
   widgetQueryRequestWidget =
     vstack_
       []
-      ( widgetQueryNode
+      ( widgetQueryNodeWidget
           <$> widgetQueryRequest
             (m ^. fileSelectionModel . fileSelectionQueryWidgetRequest)
       )
    where
-    widgetQueryNode wsb@(WidgetSentenceBranchComp t c _) =
+    widgetQueryNodeWidget wsb@(WidgetQueryNodeComp t c _) =
       hstack
         [ styledButton_
             [resizeFactor (-1)]
@@ -587,7 +587,7 @@ queryWidget m =
               )
               [resizeFactor (-1)]
         ]
-    widgetQueryNode _ = label "_ match in widgetQueryNode"
+    widgetQueryNodeWidget _ = label "_ match in widgetQueryNode"
 
 imagePreviewRender :: Text -> TaggerWidget
 imagePreviewRender fp = image_ fp [fitEither, alignCenter]

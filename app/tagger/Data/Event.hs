@@ -46,10 +46,10 @@ data FileSelectionEvent
   | CycleTagOrderCriteria
   | CycleTagOrderDirection
   | DeleteFileFromFileSystem (RecordKey File)
-  | DeleteQueryNode WidgetSentenceBranch
+  | DeleteQueryNode WidgetQueryNode
   | DoFileSelectionWidgetEvent FileSelectionWidgetEvent
   | MakeFileSelectionInfoMap (Seq File)
-  | MoveQueryNodeBefore WidgetSentenceBranch WidgetSentenceBranch
+  | MoveQueryNodeBefore WidgetQueryNode WidgetQueryNode
   | NextAddFileHist
   | NextQueryHist
   | PrevAddFileHist
@@ -57,7 +57,7 @@ data FileSelectionEvent
   | PutChunkSequence
   | PutFilesNoCombine (Seq File)
   | PutTagOccurrenceHashMap_ (OccurrenceHashMap Descriptor)
-  | PutWidgetQueryNode WidgetSentenceBranch
+  | PutWidgetQueryNode WidgetQueryNode
   | RefreshFileSelection
   | RefreshSpecificFile (RecordKey File)
   | RefreshSpecificFile_ File

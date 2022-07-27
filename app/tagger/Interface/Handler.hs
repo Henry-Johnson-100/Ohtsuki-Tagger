@@ -225,7 +225,7 @@ fileSelectionEventHandler
             ( do
                 result <-
                   runExceptT $
-                    createWidgetSentenceBranch
+                    createWidgetQueryNode
                       conn
                       (model ^. fileSelectionModel . queryText)
                 either
@@ -365,7 +365,7 @@ fileSelectionEventHandler
         [ Model $
             model & fileSelectionModel . fileSelectionQueryWidgetRequest
               %~ appendWidgetQueryNode
-                ( wsb & widgetSentenceBranchIdLens
+                ( wsb & widgetQueryNodeIdLens
                     .~ ( Seq.length . widgetQueryRequest $
                           model
                             ^. fileSelectionModel
