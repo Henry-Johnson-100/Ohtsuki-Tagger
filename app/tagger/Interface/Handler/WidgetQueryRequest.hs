@@ -148,7 +148,7 @@ createWidgetSentenceBranch tc q = do
       $ parse requestParser "createWidgetSentenceBranch" q
   let explicitSetOp =
         case sts of
-          [] -> Union
+          [] -> Intersect
           x : _ -> x ^. sentenceTreeSetOpLens
   affectedFileCount <-
     lift $
