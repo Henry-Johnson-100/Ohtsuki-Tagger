@@ -7,8 +7,21 @@
 ------
 
 # Planned
-* Visual query history/builder/editor 
+
+### 1.0.2.0
+In order of priority
+* Visual query history/builder/editor.
   * https://holedigging.club/cgi-bin/tagger/tktview?name=4433af1d6b
+* Adjusting the layout of all widgets so that image is central and other widgets
+are floating panels that can be selectively hidden, this will remove the bottom and right
+panels that are resizeable, make them a fixed size, and make them floating above the image.
+  * Having a separate tagging and query mode to reduce confusion and mistakes that may
+  occur from using one textfield or the other.
+* Changing the function of adding files from adding certain files or recursive directories
+to just scanning and adding all files recursively from the directory that the database is
+placed in.
+* Minor adjustment to library architecture, moving the tagging engine to its own module,
+just like the new query engine in v1.0.1.1.
 
 ------
 
