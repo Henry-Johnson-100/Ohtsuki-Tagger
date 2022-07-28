@@ -35,7 +35,7 @@ import Data.Foldable (toList)
 import qualified Data.HashSet as HS
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromMaybe)
-import Data.Sequence (Seq, deleteAt, elemIndexL, empty, insertAt, (|>))
+import Data.Sequence (Seq, deleteAt, elemIndexL, empty, fromList, insertAt, (|>))
 import Data.Tagger (QueryCriteria (DescriptorCriteria, FilePatternCriteria, MetaDescriptorCriteria, UntaggedCriteria), SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -49,9 +49,30 @@ newtype WidgetQueryRequest = WidgetQueryRequest
   }
   deriving (Show, Eq, Semigroup, Monoid)
 
+data WidgetSentenceTree
+  = WidgetSentenceNode (SentenceSet Text)
+  | WidgetSentenceBranch SetOp (Seq WidgetSentenceTree)
+  deriving (Show, Eq)
+
+toWidgetSentenceTree :: SentenceTree Text -> WidgetSentenceTree
+toWidgetSentenceTree st =
+  case st of
+    SentenceNode ss -> WidgetSentenceNode ss
+    SentenceBranch so st' ->
+      WidgetSentenceBranch so . fromList $
+        (toWidgetSentenceTree <$> st')
+
+fromWidgetSentenceTree :: WidgetSentenceTree -> SentenceTree Text
+fromWidgetSentenceTree st =
+  case st of
+    WidgetSentenceNode ss -> SentenceNode ss
+    WidgetSentenceBranch so wst ->
+      SentenceBranch so . toList $
+        (fromWidgetSentenceTree <$> wst)
+
 data WidgetQueryNode = WidgetQueryNode
   { widgetQueryNodeText :: Text
-  , widgetQueryNode :: SentenceTree Text
+  , widgetQueryNode :: WidgetSentenceTree
   , widgetQueryNodeCount :: Int
   , widgetQueryNodeId :: Int
   }
@@ -63,7 +84,7 @@ widgetQueryNodeTextLens =
     (\(WidgetQueryNode t _ _ _) -> t)
     (\wsb t -> wsb{widgetQueryNodeText = t})
 
-widgetQueryNodeLens :: Lens' WidgetQueryNode (SentenceTree Text)
+widgetQueryNodeLens :: Lens' WidgetQueryNode WidgetSentenceTree
 widgetQueryNodeLens =
   lens
     (\(WidgetQueryNode _ st _ _) -> st)
@@ -83,25 +104,38 @@ widgetQueryNodeIdLens =
 
 pattern WidgetQueryNodeComp :: Text -> Int -> SetOp -> WidgetQueryNode
 pattern WidgetQueryNodeComp t c so <-
-  WidgetQueryNode t ((^. sentenceTreeSetOpLens) -> so) c _
+  WidgetQueryNode t ((^. widgetSentenceTreeSetOpLens) -> so) c _
 
 widgetQueryNodeSetOpLens :: Lens' WidgetQueryNode SetOp
 widgetQueryNodeSetOpLens =
   lens
-    (flip (^.) sentenceTreeSetOpLens . widgetQueryNode)
-    (\wsb so -> wsb & widgetQueryNodeLens . sentenceTreeSetOpLens .~ so)
+    (flip (^.) widgetSentenceTreeSetOpLens . widgetQueryNode)
+    (\wsb so -> wsb & widgetQueryNodeLens . widgetSentenceTreeSetOpLens .~ so)
+
+widgetSentenceTreeSetOpLens :: Lens' WidgetSentenceTree SetOp
+widgetSentenceTreeSetOpLens =
+  lens
+    ( \st -> case st of
+        WidgetSentenceNode (SentenceSet so _) -> so
+        WidgetSentenceBranch so _ -> so
+    )
+    ( \st so ->
+        case st of
+          WidgetSentenceNode (SentenceSet _ ss) -> WidgetSentenceNode (SentenceSet so ss)
+          WidgetSentenceBranch _ wst -> WidgetSentenceBranch so wst
+    )
 
 sentenceTreeSetOpLens :: Lens' (SentenceTree a) SetOp
 sentenceTreeSetOpLens =
   lens
     ( \st -> case st of
-        SentenceBranch so _ -> so
         SentenceNode (SentenceSet so _) -> so
+        SentenceBranch so _ -> so
     )
     ( \st so ->
         case st of
-          SentenceBranch _ xs -> SentenceBranch so xs
-          SentenceNode (SentenceSet _ xs) -> SentenceNode (SentenceSet so xs)
+          SentenceNode (SentenceSet _ ss) -> SentenceNode (SentenceSet so ss)
+          SentenceBranch _ st' -> SentenceBranch so st'
     )
 
 emptyWidgetQueryRequest :: WidgetQueryRequest
@@ -110,7 +144,7 @@ emptyWidgetQueryRequest = WidgetQueryRequest empty
 squashWidgetQueryRequest :: WidgetQueryRequest -> Request Text
 squashWidgetQueryRequest (WidgetQueryRequest sts) =
   Request . toList $
-    (widgetQueryNode <$> sts)
+    (fromWidgetSentenceTree . widgetQueryNode <$> sts)
 
 moveQueryWidgetNodeTo ::
   WidgetQueryNode ->
@@ -155,7 +189,15 @@ createWidgetQueryNode tc q = do
       HS.size
         . combinableSentenceResultSet
         <$> queryRequest tc req
-  return $ WidgetQueryNode q (SentenceBranch explicitSetOp sts) affectedFileCount 0
+  return $
+    WidgetQueryNode
+      q
+      ( WidgetSentenceBranch
+          explicitSetOp
+          (fromList (toWidgetSentenceTree <$> sts))
+      )
+      affectedFileCount
+      0
 
 formatSentenceTree :: SentenceTree Text -> Text
 formatSentenceTree (SentenceNode ss) = formatSentenceSet ss
