@@ -1,8 +1,10 @@
+{-# LANGUAGE BangPatterns #-}
+{-# HLINT ignore "Use <&>" #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_HADDOCK hide #-}
-
-{-# HLINT ignore "Use <&>" #-}
 
 {- |
 Module      : Text.TaggerQL.Engine.Query
@@ -49,7 +51,7 @@ import Database.Tagger.Query (
   queryForFileByPattern,
   queryForUntaggedFiles,
  )
-import Database.Tagger.Type (File, TaggedConnection)
+import Database.Tagger.Type (File, Tag (..), TaggedConnection)
 import System.IO (hPrint, stderr)
 import Text.TaggerQL.AST (
   ComplexTerm (..),
@@ -65,10 +67,10 @@ import Text.TaggerQL.Engine.QueryEngine.Query (
   QueryEnv (QueryEnv, envTagSet),
   QueryReader,
   getFileSetFromTagSet,
-  joinTagSet,
   queryTerm,
   queryTerms,
  )
+import Text.TaggerQL.Engine.QueryEngine.Type
 import Text.TaggerQL.Parser.Internal (parse, requestParser)
 
 data CombinableSentenceResult
@@ -172,7 +174,9 @@ queryComplexTermTopLevel ct@(t :<- _) = do
     terminalTagSet <- queryTerms currentTerm bottomTerminal
     terminalFileSet <-
       asks envTagSet
-        >>= getFileSetFromTagSet . flip joinTagSet terminalTagSet
+        >>= getFileSetFromTagSet . HS.map subTag
+          . flip joinTagSet (HS.map SubTag terminalTagSet)
+          . HS.map SuperTag
     case parallelSubTerms of
       [] -> return terminalFileSet
       _ -> do
@@ -188,9 +192,13 @@ queryComplexTermTopLevel ct@(t :<- _) = do
               )
       ) = do
       tagSet <- queryTerms currentTerm firstSubTerm
-      newTagSet <- asks envTagSet >>= return . flip joinTagSet tagSet
+      newTagSet <-
+        asks envTagSet
+          >>= return
+            . flip joinTagSet (HS.map SubTag tagSet)
+            . HS.map SuperTag
       depthFirstFileSet <-
-        local (\e -> e{envTagSet = newTagSet}) $
+        local (\e -> e{envTagSet = HS.map subTag newTagSet}) $
           queryComplexTerm nestedComplexTerm
       case parallelSubTerms of
         [] -> return depthFirstFileSet
@@ -215,6 +223,30 @@ querySimpleTerm tc (SimpleTerm (Term qc p)) =
       TermResult . HS.fromList <$> queryForFileByPattern p tc
     UntaggedCriteria ->
       TermResult . HS.fromList <$> queryForUntaggedFiles tc
+
+{- |
+ Given two HashSets of 'Tag`s, intersect them, such that only 'Tag`s in the second set
+ that are subtags of 'Tag`s in the first remain.
+
+ like:
+
+ @
+  SELECT DISTINCT t2.*
+
+  FROM (...) as t1
+
+  JOIN (...) as t2
+
+    ON t1.id = t2.subTagOfId
+ @
+-}
+joinTagSet :: HashSet SuperTag -> HashSet SubTag -> HashSet SubTag
+joinTagSet (HS.map superTag -> superSet) (HS.map subTag -> subSet) =
+  let !superIdSet = HS.map tagId superSet
+   in HS.map SubTag $
+        HS.filter
+          (\(tagSubtagOfId -> mstid) -> maybe False (`HS.member` superIdSet) mstid)
+          subSet
 
 {- |
  Should perform an associative strict intersection of the given 'TermResult`s.

@@ -126,6 +126,7 @@ library tagger-lib
                       ,Tagger.Util
                       ,Text.TaggerQL.Engine.QueryEngine
                       ,Text.TaggerQL.Engine.QueryEngine.Query
+                      ,Text.TaggerQL.Engine.QueryEngine.Type
 
   other-extensions:    DeriveGeneric
                       ,DeriveAnyClass

@@ -12,7 +12,6 @@ module Text.TaggerQL.Engine.QueryEngine.Query (
   QueryReader,
   queryTerms,
   queryTerm,
-  joinTagSet,
   getFileSetFromTagSet,
 ) where
 
@@ -35,11 +34,7 @@ import Database.Tagger.Connection (
   queryNamed,
  )
 import Database.Tagger.Query.Type (TaggerQuery)
-import Database.Tagger.Type (
-  File,
-  Tag (tagId, tagSubtagOfId),
-  TaggedConnection,
- )
+import Database.Tagger.Type (File, Tag (tagId), TaggedConnection)
 import Text.RawString.QQ (r)
 import Text.TaggerQL.AST (Term (Term))
 
@@ -165,29 +160,6 @@ FROM File f
 JOIN Tag t ON f.id = t.fileId
 WHERE t.id = ?
     |]
-
-{- |
- Given two HashSets of 'Tag`s, intersect them, such that only 'Tag`s in the second set
- that are subtags of 'Tag`s in the first remain.
-
- like:
-
- @
-  SELECT DISTINCT t2.*
-
-  FROM (...) as t1
-
-  JOIN (...) as t2
-
-    ON t1.id = t2.subTagOfId
- @
--}
-joinTagSet :: HashSet Tag -> HashSet Tag -> HashSet Tag
-joinTagSet superSet subSet =
-  let !superIdSet = HS.map tagId superSet
-   in HS.filter
-        (\(tagSubtagOfId -> mstid) -> maybe False (`HS.member` superIdSet) mstid)
-        subSet
 
 {-
  ____
