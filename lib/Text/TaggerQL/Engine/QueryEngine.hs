@@ -53,23 +53,8 @@ import Database.Tagger.Query (
  )
 import Database.Tagger.Type (File, Tag (..), TaggedConnection)
 import System.IO (hPrint, stderr)
-import Text.TaggerQL.AST (
-  ComplexTerm (..),
-  Request (Request),
-  Sentence (Sentence),
-  SentenceSet (..),
-  SentenceTree (..),
-  SimpleTerm (..),
-  Term (Term),
-  TermTree (..),
- )
-import Text.TaggerQL.Engine.QueryEngine.Query (
-  QueryEnv (QueryEnv, envTagSet),
-  QueryReader,
-  getFileSetFromTagSet,
-  queryTerm,
-  queryTerms,
- )
+import Text.TaggerQL.AST
+import Text.TaggerQL.Engine.QueryEngine.Query
 import Text.TaggerQL.Engine.QueryEngine.Type
 import Text.TaggerQL.Parser.Internal (parse, requestParser)
 
@@ -158,56 +143,59 @@ queryTermTree ::
 queryTermTree tc tt =
   case tt of
     Simple st -> querySimpleTerm tc st
-    Complex ct ->
-      TermResult
-        <$> runReaderT (queryComplexTermTopLevel ct) (QueryEnv mempty tc)
+    Complex ct -> undefined
 
-queryComplexTermTopLevel :: ComplexTerm Text -> QueryReader (HashSet File)
-queryComplexTermTopLevel (Bottom _) = return mempty
-queryComplexTermTopLevel ct@(t :<- _) = do
-  topLevelTagSet <- queryTerm t
-  local (\e -> e{envTagSet = topLevelTagSet}) $ queryComplexTerm ct
- where
-  queryComplexTerm :: ComplexTerm Text -> QueryReader (HashSet File)
-  queryComplexTerm (Bottom _) = return mempty
-  queryComplexTerm (currentTerm :<- ((Bottom bottomTerminal) :| parallelSubTerms)) = do
-    terminalTagSet <- queryTerms currentTerm bottomTerminal
-    terminalFileSet <-
-      asks envTagSet
-        >>= getFileSetFromTagSet . HS.map subTag
-          . flip joinTagSet (HS.map SubTag terminalTagSet)
-          . HS.map SuperTag
-    case parallelSubTerms of
-      [] -> return terminalFileSet
-      _ -> do
-        parallelFileSets <-
-          mapM
-            (\pt -> queryComplexTerm (currentTerm :<- (pt :| [])))
-            parallelSubTerms
-        return . intersections $ terminalFileSet : parallelFileSets
-  queryComplexTerm
-    ( currentTerm
-        :<- ( nestedComplexTerm@(firstSubTerm :<- _)
-                :| parallelSubTerms
-              )
-      ) = do
-      tagSet <- queryTerms currentTerm firstSubTerm
-      newTagSet <-
-        asks envTagSet
-          >>= return
-            . flip joinTagSet (HS.map SubTag tagSet)
-            . HS.map SuperTag
-      depthFirstFileSet <-
-        local (\e -> e{envTagSet = HS.map subTag newTagSet}) $
-          queryComplexTerm nestedComplexTerm
-      case parallelSubTerms of
-        [] -> return depthFirstFileSet
-        _ -> do
-          parallelFileSets <-
-            mapM
-              (\pt -> queryComplexTerm (currentTerm :<- (pt :| [])))
-              parallelSubTerms
-          return . intersections $ depthFirstFileSet : parallelFileSets
+-- TermResult
+--   <$> runReaderT (queryComplexTermTopLevel ct) (QueryEnv mempty tc)
+
+queryComplexTermTopLevel = undefined
+
+-- queryComplexTermTopLevel :: ComplexTerm Text -> QueryReader (HashSet File)
+-- queryComplexTermTopLevel (Bottom _) = return mempty
+-- queryComplexTermTopLevel ct@(t :<- _) = do
+--   topLevelTagSet <- queryTerm t
+--   local (\e -> e{envTagSet = topLevelTagSet}) $ queryComplexTerm ct
+--  where
+--   queryComplexTerm :: ComplexTerm Text -> QueryReader (HashSet File)
+--   queryComplexTerm (Bottom _) = return mempty
+--   queryComplexTerm (currentTerm :<- ((Bottom bottomTerminal) :| parallelSubTerms)) = do
+--     terminalTagSet <- queryTerms currentTerm bottomTerminal
+--     terminalFileSet <-
+--       asks envTagSet
+--         >>= getFileSetFromTagSet . HS.map subTag
+--           . flip joinTagSet (HS.map SubTag terminalTagSet)
+--           . HS.map SuperTag
+--     case parallelSubTerms of
+--       [] -> return terminalFileSet
+--       _ -> do
+--         parallelFileSets <-
+--           mapM
+--             (\pt -> queryComplexTerm (currentTerm :<- (pt :| [])))
+--             parallelSubTerms
+--         return . intersections $ terminalFileSet : parallelFileSets
+--   queryComplexTerm
+--     ( currentTerm
+--         :<- ( nestedComplexTerm@(firstSubTerm :<- _)
+--                 :| parallelSubTerms
+--               )
+--       ) = do
+--       tagSet <- queryTerms currentTerm firstSubTerm
+--       newTagSet <-
+--         asks envTagSet
+--           >>= return
+--             . flip joinTagSet (HS.map SubTag tagSet)
+--             . HS.map SuperTag
+--       depthFirstFileSet <-
+--         local (\e -> e{envTagSet = HS.map subTag newTagSet}) $
+--           queryComplexTerm nestedComplexTerm
+--       case parallelSubTerms of
+--         [] -> return depthFirstFileSet
+--         _ -> do
+--           parallelFileSets <-
+--             mapM
+--               (\pt -> queryComplexTerm (currentTerm :<- (pt :| [])))
+--               parallelSubTerms
+--           return . intersections $ depthFirstFileSet : parallelFileSets
 
 querySimpleTerm ::
   TaggedConnection ->
