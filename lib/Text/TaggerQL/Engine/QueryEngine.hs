@@ -28,11 +28,13 @@ import Control.Monad.Trans.Reader (
   asks,
   local,
  )
+import qualified Data.Foldable as F
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
 import qualified Data.List as L
 import Data.List.NonEmpty (NonEmpty ((:|)))
+import Data.Maybe
 import Data.String (IsString (..))
 import Data.Tagger (
   QueryCriteria (
@@ -78,7 +80,8 @@ newtype TaggerQLQuery = TaggerQLQuery Text deriving (Show, Eq)
 instance IsString TaggerQLQuery where
   fromString = TaggerQLQuery . T.pack
 
-newtype TermResult = TermResult {termResult :: HashSet File} deriving (Show, Eq)
+newtype TermResult = TermResult {termResult :: HashSet File}
+  deriving (Show, Eq, Semigroup, Monoid)
 
 {- |
  Run a 'TaggerQLQuery` on a connection.
@@ -143,12 +146,9 @@ queryTermTree ::
 queryTermTree tc tt =
   case tt of
     Simple st -> querySimpleTerm tc st
-    Complex ct -> undefined
+    Complex ct@(complexTermNode -> headTerm) -> _
 
--- TermResult
---   <$> runReaderT (queryComplexTermTopLevel ct) (QueryEnv mempty tc)
 
-queryComplexTermTopLevel = undefined
 
 -- queryComplexTermTopLevel :: ComplexTerm Text -> QueryReader (HashSet File)
 -- queryComplexTermTopLevel (Bottom _) = return mempty
@@ -212,29 +212,37 @@ querySimpleTerm tc (SimpleTerm (Term qc p)) =
     UntaggedCriteria ->
       TermResult . HS.fromList <$> queryForUntaggedFiles tc
 
-{- |
- Given two HashSets of 'Tag`s, intersect them, such that only 'Tag`s in the second set
- that are subtags of 'Tag`s in the first remain.
+-- {- |
+--  Given two HashSets of 'Tag`s, intersect them, such that only 'Tag`s in the second set
+--  that are subtags of 'Tag`s in the first remain.
 
- like:
+--  like:
 
- @
-  SELECT DISTINCT t2.*
+--  @
+--   SELECT DISTINCT t2.*
 
-  FROM (...) as t1
+--   FROM (...) as t1
 
-  JOIN (...) as t2
+--   JOIN (...) as t2
 
-    ON t1.id = t2.subTagOfId
- @
--}
-joinTagSet :: HashSet SuperTag -> HashSet SubTag -> HashSet SubTag
-joinTagSet (HS.map superTag -> superSet) (HS.map subTag -> subSet) =
-  let !superIdSet = HS.map tagId superSet
-   in HS.map SubTag $
-        HS.filter
-          (\(tagSubtagOfId -> mstid) -> maybe False (`HS.member` superIdSet) mstid)
-          subSet
+--     ON t1.id = t2.subTagOfId
+--  @
+-- -}
+-- joinTagSet :: HashSet SuperTag -> HashSet SubTag -> HashSet SubTag
+-- joinTagSet (HS.map superTag -> superSet) (HS.map subTag -> subSet) =
+--   let !superIdSet = HS.map tagId superSet
+--    in HS.map SubTag $
+--         HS.filter
+--           (\(tagSubtagOfId -> mstid) -> maybe False (`HS.member` superIdSet) mstid)
+--           subSet
+
+joinOnSuperTag :: HashSet SuperTag -> HashSet SubTag -> HashSet SuperTag
+joinOnSuperTag (HS.map superTag -> superTagSet) (HS.map subTag -> subTagSet) =
+  let !subTagOfIdSet =
+        HS.map (fromJust . tagSubtagOfId) . HS.filter (isJust . tagSubtagOfId) $
+          subTagSet
+   in HS.map SuperTag $
+        HS.filter (flip HS.member subTagOfIdSet . tagId) superTagSet
 
 {- |
  Should perform an associative strict intersection of the given 'TermResult`s.

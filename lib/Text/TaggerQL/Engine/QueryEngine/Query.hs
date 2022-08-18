@@ -134,8 +134,8 @@ WHERE f.filePath LIKE ? ESCAPE '\'|]
       results <- lift $ query conn q'' [p''] :: ReaderT QueryEnv IO [Tag]
       return . HS.fromList $ results
 
-getFileSetFromTagSet :: HashSet Tag -> ReaderT QueryEnv IO (HashSet File)
-getFileSetFromTagSet (map tagId . HS.toList -> ts) = do
+getFileSetFromTagSet :: IsTag t => HashSet t -> ReaderT QueryEnv IO (HashSet File)
+getFileSetFromTagSet (map (tagId . toTag) . HS.toList -> ts) = do
   conn <- asks queryEnvConn
   results <-
     lift $
