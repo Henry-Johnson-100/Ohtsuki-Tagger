@@ -1,18 +1,20 @@
 {-# LANGUAGE BangPatterns #-}
+{-# HLINT ignore "Eta reduce" #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_HADDOCK hide #-}
 
-{-# HLINT ignore "Eta reduce" #-}
-
 module Text.TaggerQL.Engine.QueryEngine.Query (
   QueryEnv (..),
+  Super (..),
+  Sub (..),
   QueryReader,
   queryTerms,
   queryTerm,
-  joinTagSet,
   getFileSetFromTagSet,
 ) where
 
@@ -20,6 +22,7 @@ import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Reader (ReaderT, asks)
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
+import Data.Hashable (Hashable)
 import Data.Tagger (
   QueryCriteria (
     DescriptorCriteria,
@@ -35,16 +38,17 @@ import Database.Tagger.Connection (
   queryNamed,
  )
 import Database.Tagger.Query.Type (TaggerQuery)
-import Database.Tagger.Type (
-  File,
-  Tag (tagId, tagSubtagOfId),
-  TaggedConnection,
- )
+import Database.Tagger.Type (File, Tag (tagId), TaggedConnection)
 import Text.RawString.QQ (r)
 import Text.TaggerQL.AST (Term (Term))
 
+newtype Super a = Super {runSuper :: a} deriving (Show, Eq, Functor, Hashable, Semigroup, Monoid)
+
+newtype Sub a = Sub {runSub :: a} deriving (Show, Eq, Functor, Hashable, Semigroup, Monoid)
+
 data QueryEnv = QueryEnv
-  { envTagSet :: HashSet Tag
+  { envTagSet :: Super (HashSet Tag)
+  , envSuperTerm :: Term Text
   , envConn :: TaggedConnection
   }
   deriving (Show, Eq)
@@ -55,14 +59,14 @@ type QueryReader a = ReaderT QueryEnv IO a
  Given two terms, run a subtag style search using their given 'QueryCriteria` and
  patterns.
 -}
-queryTerms :: Term Text -> Term Text -> QueryReader (HashSet Tag)
+queryTerms :: Term Text -> Term Text -> QueryReader (Sub (HashSet Tag))
 queryTerms (Term qcx px) (Term qcy py) =
   dispatchQuery qcx qcy px py
 
 dispatchQuery ::
   QueryCriteria ->
   QueryCriteria ->
-  (Text -> Text -> QueryReader (HashSet Tag))
+  (Text -> Text -> QueryReader (Sub (HashSet Tag)))
 dispatchQuery x y =
   case x of
     DescriptorCriteria -> case y of
@@ -166,29 +170,6 @@ JOIN Tag t ON f.id = t.fileId
 WHERE t.id = ?
     |]
 
-{- |
- Given two HashSets of 'Tag`s, intersect them, such that only 'Tag`s in the second set
- that are subtags of 'Tag`s in the first remain.
-
- like:
-
- @
-  SELECT DISTINCT t2.*
-
-  FROM (...) as t1
-
-  JOIN (...) as t2
-
-    ON t1.id = t2.subTagOfId
- @
--}
-joinTagSet :: HashSet Tag -> HashSet Tag -> HashSet Tag
-joinTagSet superSet subSet =
-  let !superIdSet = HS.map tagId superSet
-   in HS.filter
-        (\(tagSubtagOfId -> mstid) -> maybe False (`HS.member` superIdSet) mstid)
-        subSet
-
 {-
  ____
 |  _ \
@@ -202,7 +183,7 @@ withDSuper ::
   TaggerQuery ->
   v1 ->
   a ->
-  QueryReader (HashSet Tag)
+  QueryReader (Sub (HashSet Tag))
 withDSuper q = (subTagQuery (constructQuery superDSubQuery q) .) . superSubParams
  where
   superDSubQuery :: TaggerQuery
@@ -217,13 +198,13 @@ FROM Tag t
 JOIN Descriptor d ON t.descriptorId = d.id
 WHERE d.descriptor LIKE :super ESCAPE '\'|]
 
-dSubP :: Text -> Text -> QueryReader (HashSet Tag)
+dSubP :: Text -> Text -> QueryReader (Sub (HashSet Tag))
 dSubP = withDSuper subPSubQuery
 
-dSubR :: Text -> Text -> QueryReader (HashSet Tag)
+dSubR :: Text -> Text -> QueryReader (Sub (HashSet Tag))
 dSubR = withDSuper subRSubQuery
 
-dSubD :: Text -> Text -> QueryReader (HashSet Tag)
+dSubD :: Text -> Text -> QueryReader (Sub (HashSet Tag))
 dSubD = withDSuper subDSubQuery
 
 {-
@@ -239,7 +220,7 @@ withRSuper ::
   TaggerQuery ->
   v1 ->
   a ->
-  QueryReader (HashSet Tag)
+  QueryReader (Sub (HashSet Tag))
 withRSuper q = (subTagQuery (constructQuery superRSubQuery q) .) . superSubParams
  where
   superRSubQuery :: TaggerQuery
@@ -264,13 +245,13 @@ JOIN (
   SELECT id FROM qr
 ) AS d ON t.descriptorId = d.id|]
 
-rSubP :: Text -> Text -> QueryReader (HashSet Tag)
+rSubP :: Text -> Text -> QueryReader (Sub (HashSet Tag))
 rSubP = withRSuper subPSubQuery
 
-rSubR :: Text -> Text -> QueryReader (HashSet Tag)
+rSubR :: Text -> Text -> QueryReader (Sub (HashSet Tag))
 rSubR = withRSuper subRSubQuery
 
-rSubD :: Text -> Text -> QueryReader (HashSet Tag)
+rSubD :: Text -> Text -> QueryReader (Sub (HashSet Tag))
 rSubD = withRSuper subDSubQuery
 
 {-
@@ -286,7 +267,7 @@ withPSuper ::
   TaggerQuery ->
   v1 ->
   a ->
-  QueryReader (HashSet Tag)
+  QueryReader (Sub (HashSet Tag))
 withPSuper q = (subTagQuery (constructQuery superPSubQuery q) .) . superSubParams
  where
   superPSubQuery =
@@ -300,13 +281,13 @@ FROM Tag t
 JOIN File f ON t.fileId = f.id
 WHERE f.filePath LIKE :super ESCAPE '\'|]
 
-pSubP :: Text -> Text -> QueryReader (HashSet Tag)
+pSubP :: Text -> Text -> QueryReader (Sub (HashSet Tag))
 pSubP = withPSuper subPSubQuery
 
-pSubR :: Text -> Text -> QueryReader (HashSet Tag)
+pSubR :: Text -> Text -> QueryReader (Sub (HashSet Tag))
 pSubR = withPSuper subRSubQuery
 
-pSubD :: Text -> Text -> QueryReader (HashSet Tag)
+pSubD :: Text -> Text -> QueryReader (Sub (HashSet Tag))
 pSubD = withPSuper subDSubQuery
 
 {-
@@ -317,7 +298,7 @@ pSubD = withPSuper subDSubQuery
  \___/
 -}
 
-uSubAnything :: Text -> Text -> QueryReader (HashSet Tag)
+uSubAnything :: Text -> Text -> QueryReader (Sub (HashSet Tag))
 uSubAnything _ _ = return mempty
 
 constructQuery :: TaggerQuery -> TaggerQuery -> TaggerQuery
@@ -390,13 +371,13 @@ WHERE f.filePath LIKE :sub ESCAPE '\'
 subTagQuery ::
   TaggerQuery ->
   [NamedParam] ->
-  QueryReader (HashSet Tag)
+  QueryReader (Sub (HashSet Tag))
 subTagQuery q params = do
   conn <- asks envConn
   results <-
     lift $ queryNamed conn q params ::
       ReaderT QueryEnv IO [Tag]
-  return . HS.fromList $ results
+  return . Sub . HS.fromList $ results
 
 superSubParams :: (ToField v1, ToField v2) => v1 -> v2 -> [NamedParam]
 superSubParams super sub = [":super" := super, ":sub" := sub]

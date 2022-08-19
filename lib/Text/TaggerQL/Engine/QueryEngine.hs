@@ -1,8 +1,11 @@
+{-# HLINT ignore "Use <&>" #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_HADDOCK hide #-}
-
-{-# HLINT ignore "Use <&>" #-}
 
 {- |
 Module      : Text.TaggerQL.Engine.Query
@@ -31,6 +34,7 @@ import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
 import qualified Data.List as L
 import Data.List.NonEmpty (NonEmpty ((:|)))
+import qualified Data.List.NonEmpty as NE
 import Data.String (IsString (..))
 import Data.Tagger (
   QueryCriteria (
@@ -49,7 +53,7 @@ import Database.Tagger.Query (
   queryForFileByPattern,
   queryForUntaggedFiles,
  )
-import Database.Tagger.Type (File, TaggedConnection)
+import Database.Tagger.Type (File, Tag (..), TaggedConnection)
 import System.IO (hPrint, stderr)
 import Text.TaggerQL.AST (
   ComplexTerm (..),
@@ -62,10 +66,10 @@ import Text.TaggerQL.AST (
   TermTree (..),
  )
 import Text.TaggerQL.Engine.QueryEngine.Query (
-  QueryEnv (QueryEnv, envTagSet),
-  QueryReader,
+  QueryEnv (QueryEnv, envSuperTerm, envTagSet),
+  Sub (..),
+  Super (..),
   getFileSetFromTagSet,
-  joinTagSet,
   queryTerm,
   queryTerms,
  )
@@ -91,7 +95,8 @@ newtype TaggerQLQuery = TaggerQLQuery Text deriving (Show, Eq)
 instance IsString TaggerQLQuery where
   fromString = TaggerQLQuery . T.pack
 
-newtype TermResult = TermResult {termResult :: HashSet File} deriving (Show, Eq)
+newtype TermResult = TermResult {termResult :: HashSet File}
+  deriving (Show, Eq, Semigroup, Monoid)
 
 {- |
  Run a 'TaggerQLQuery` on a connection.
@@ -156,50 +161,76 @@ queryTermTree ::
 queryTermTree tc tt =
   case tt of
     Simple st -> querySimpleTerm tc st
-    Complex ct ->
-      TermResult
-        <$> runReaderT (queryComplexTermTopLevel ct) (QueryEnv mempty tc)
+    Complex ct -> queryComplexTerm tc ct
 
-queryComplexTermTopLevel :: ComplexTerm Text -> QueryReader (HashSet File)
-queryComplexTermTopLevel (Bottom _) = return mempty
-queryComplexTermTopLevel ct@(t :<- _) = do
-  topLevelTagSet <- queryTerm t
-  local (\e -> e{envTagSet = topLevelTagSet}) $ queryComplexTerm ct
- where
-  queryComplexTerm :: ComplexTerm Text -> QueryReader (HashSet File)
-  queryComplexTerm (Bottom _) = return mempty
-  queryComplexTerm (currentTerm :<- ((Bottom bottomTerminal) :| parallelSubTerms)) = do
-    terminalTagSet <- queryTerms currentTerm bottomTerminal
-    terminalFileSet <-
-      asks envTagSet
-        >>= getFileSetFromTagSet . flip joinTagSet terminalTagSet
-    case parallelSubTerms of
-      [] -> return terminalFileSet
-      _ -> do
-        parallelFileSets <-
-          mapM
-            (\pt -> queryComplexTerm (currentTerm :<- (pt :| [])))
-            parallelSubTerms
-        return . intersections $ terminalFileSet : parallelFileSets
-  queryComplexTerm
-    ( currentTerm
-        :<- ( nestedComplexTerm@(firstSubTerm :<- _)
-                :| parallelSubTerms
+queryComplexTerm :: TaggedConnection -> ComplexTerm Text -> IO TermResult
+queryComplexTerm _ (Bottom _) = return mempty
+queryComplexTerm tc ct@(t :<- _) = do
+  queryResults <-
+    runReaderT
+      (queryInitialComplexTerm ct >>= getFileSetFromTagSet . runSuper)
+      (QueryEnv mempty t tc)
+  return . TermResult $ queryResults
+
+queryInitialComplexTerm :: ComplexTerm Text -> ReaderT QueryEnv IO (Super (HashSet Tag))
+queryInitialComplexTerm (_ :<- nestedTerms) = do
+  givenSuperTerm <- asks envSuperTerm
+  initialTagSet <- Super <$> queryTerm givenSuperTerm
+  local (\e -> e{envTagSet = initialTagSet})
+    . queryParallelSubTerms
+    $ nestedTerms
+-- The erroneous terminal case
+queryInitialComplexTerm (Bottom _) = return mempty
+
+{- |
+ width-wise query
+-}
+queryParallelSubTerms ::
+  NonEmpty (ComplexTerm Text) ->
+  ReaderT QueryEnv IO (Super (HashSet Tag))
+queryParallelSubTerms (widthTerminal :| []) = queryNestedSubTerm widthTerminal
+queryParallelSubTerms (term :| parallelTerms) = do
+  (runSuper -> currentTermQueryResults) <- queryNestedSubTerm term
+  (runSuper -> parallelResults) <- queryParallelSubTerms . NE.fromList $ parallelTerms
+  return . Super $
+    HS.intersection
+      currentTermQueryResults
+      parallelResults
+
+{- |
+ depth-wise query
+-}
+queryNestedSubTerm :: ComplexTerm Text -> ReaderT QueryEnv IO (Super (HashSet Tag))
+queryNestedSubTerm (Bottom t) = do
+  currentTermResult <- runSubQuery t
+  currentSuperSet <- asks envTagSet
+  return . joinOnSuperTag currentSuperSet $ currentTermResult
+queryNestedSubTerm (t :<- nestedTerms) = do
+  subQueryResults <- do
+    currentTermResults <- runSubQuery t
+    Sub . runSuper
+      <$> ( local
+              ( \e ->
+                  e
+                    { envTagSet = Super . runSub $ currentTermResults
+                    , envSuperTerm = t
+                    }
               )
-      ) = do
-      tagSet <- queryTerms currentTerm firstSubTerm
-      newTagSet <- asks envTagSet >>= return . flip joinTagSet tagSet
-      depthFirstFileSet <-
-        local (\e -> e{envTagSet = newTagSet}) $
-          queryComplexTerm nestedComplexTerm
-      case parallelSubTerms of
-        [] -> return depthFirstFileSet
-        _ -> do
-          parallelFileSets <-
-            mapM
-              (\pt -> queryComplexTerm (currentTerm :<- (pt :| [])))
-              parallelSubTerms
-          return . intersections $ depthFirstFileSet : parallelFileSets
+              . queryParallelSubTerms
+              $ nestedTerms
+          )
+  currentSuperSet <- asks envTagSet
+  return . joinOnSuperTag currentSuperSet $ subQueryResults
+
+runSubQuery :: Term Text -> ReaderT QueryEnv IO (Sub (HashSet Tag))
+runSubQuery t = do
+  superTerm <- asks envSuperTerm
+  queryTerms superTerm t
+
+joinOnSuperTag :: Super (HashSet Tag) -> Sub (HashSet Tag) -> Super (HashSet Tag)
+joinOnSuperTag (runSuper -> superSet) (runSub -> subSet) =
+  let !subTagOfIdSet = HS.map tagSubtagOfId subSet
+   in Super . HS.filter (flip HS.member subTagOfIdSet . Just . tagId) $ superSet
 
 querySimpleTerm ::
   TaggedConnection ->
@@ -261,7 +292,3 @@ combFun so =
     Union -> HS.union
     Intersect -> HS.intersection
     Difference -> HS.difference
-
-intersections :: Hashable a => [HashSet a] -> HashSet a
-intersections [] = HS.empty
-intersections xs = L.foldl1' HS.intersection xs
