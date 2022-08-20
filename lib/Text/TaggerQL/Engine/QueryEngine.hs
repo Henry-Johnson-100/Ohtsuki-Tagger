@@ -95,7 +95,7 @@ newtype TaggerQLQuery = TaggerQLQuery Text deriving (Show, Eq)
 instance IsString TaggerQLQuery where
   fromString = TaggerQLQuery . T.pack
 
-newtype TermResult = TermResult {termResult :: HashSet File}
+newtype TermResult = TermResult {runTermResult :: HashSet File}
   deriving (Show, Eq, Semigroup, Monoid)
 
 {- |
@@ -138,7 +138,7 @@ querySentenceSet ::
   SentenceSet Text ->
   IO CombinableSentenceResult
 querySentenceSet tc (CombinableSentence so s) =
-  CombinableSentenceResult so . termResult <$> querySentence tc s
+  CombinableSentenceResult so . runTermResult <$> querySentence tc s
 
 {- |
  All 'TermTree`s in a 'Sentence` are intersected with each other.
@@ -165,22 +165,15 @@ queryTermTree tc tt =
 
 queryComplexTerm :: TaggedConnection -> ComplexTerm Text -> IO TermResult
 queryComplexTerm _ (Bottom _) = return mempty
-queryComplexTerm tc ct@(t :<- _) = do
-  queryResults <-
-    runReaderT
-      (queryInitialComplexTerm ct >>= getFileSetFromTagSet . runSuper)
-      (QueryEnv mempty t tc)
-  return . TermResult $ queryResults
-
-queryInitialComplexTerm :: ComplexTerm Text -> ReaderT QueryEnv IO (Super (HashSet Tag))
-queryInitialComplexTerm (_ :<- nestedTerms) = do
+queryComplexTerm tc (t :<- nestedTerms) = flip runReaderT (QueryEnv mempty t tc) $ do
+  -- The same term as t, but using the reader's for the sake of clarity.
   givenSuperTerm <- asks envSuperTerm
   initialTagSet <- Super <$> queryTerm givenSuperTerm
-  local (\e -> e{envTagSet = initialTagSet})
-    . queryParallelSubTerms
-    $ nestedTerms
--- The erroneous terminal case
-queryInitialComplexTerm (Bottom _) = return mempty
+  queryResult <-
+    local (\e -> e{envTagSet = initialTagSet})
+      . queryParallelSubTerms
+      $ nestedTerms
+  TermResult <$> (getFileSetFromTagSet . runSuper $ queryResult)
 
 {- |
  width-wise query
