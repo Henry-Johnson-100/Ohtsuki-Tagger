@@ -10,6 +10,17 @@
 
 ------
 
+#### 1.0.1.1 -- 2022-08-21
+
+* Fixed a bug: a50b7d8d4c81c844f22c502654b790e3895e7bb4
+  * Relating to subquery accuracy. Specifically, queries of the format
+    `r.a{b c} or any general type of criteria c for c.a{b c}` would return a superset of
+    the intended results.
+  * Giving a whole version to this fix because the presence
+  of bugs in the query engine is quite vexing to me no matter how minor.
+
+------
+
 #### 1.0.1.1 -- 2022-07-23
 * Reworked the complex term query engine to be more accurate.
 Refer to Tech-note f02a13240b for some more information.
