@@ -16,6 +16,15 @@ taggerApplicationUI ::
   TaggerModel ->
   TaggerWidget
 taggerApplicationUI _ m =
+  globalKeystrokes
+    . baseZStack m
+    $ [Query.widget m]
+
+baseZStack :: TaggerModel -> [TaggerWidget] -> TaggerWidget
+baseZStack m ws = zstack_ [onlyTopActive_ False] (FilePreview.widget m : ws)
+
+globalKeystrokes :: TaggerWidget -> TaggerWidget
+globalKeystrokes =
   keystroke_
     [ ("Ctrl-r", RefreshUI)
     , ("Ctrl-i", DoFileSelectionEvent CycleNextFile)
@@ -40,8 +49,3 @@ taggerApplicationUI _ m =
     , ("Ctrl-h", ToggleMainVisibility hidePossibleUIVis)
     ]
     []
-    $ zstack_
-      [onlyTopActive_ False]
-      [ FilePreview.widget m
-      , Query.widget m
-      ]

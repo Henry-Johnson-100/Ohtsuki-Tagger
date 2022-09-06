@@ -53,7 +53,7 @@ queryTextField =
       (fileSelectionModel . queryText)
       [ onChange
           ( \t ->
-              if T.null t
+              if T.null . T.strip $ t
                 then DoFileSelectionEvent ResetQueryHistIndex
                 else IOEvent ()
           )
