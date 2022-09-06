@@ -5,6 +5,7 @@ module Interface.Widget.Internal.Core (
   withStyleHover,
   withNodeKey,
   withNodeVisible,
+  defaultElementOpacity,
 ) where
 
 import Data.Event (TaggerEvent)
@@ -64,3 +65,6 @@ withNodeVisible = flip nodeVisible
 
 withNodeKey :: Text -> TaggerWidget -> TaggerWidget
 withNodeKey = flip nodeKey
+
+defaultElementOpacity :: Double
+defaultElementOpacity = 0.5

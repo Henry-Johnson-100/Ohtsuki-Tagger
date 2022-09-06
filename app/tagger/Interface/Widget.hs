@@ -8,6 +8,7 @@ import Data.Event
 import Data.Model
 import Interface.Widget.Internal
 import qualified Interface.Widget.Internal.FilePreview as FilePreview
+import qualified Interface.Widget.Internal.Query as Query
 import Monomer
 
 taggerApplicationUI ::
@@ -41,4 +42,6 @@ taggerApplicationUI _ m =
     []
     $ zstack_
       [onlyTopActive_ False]
-      [FilePreview.widget m]
+      [ FilePreview.widget m
+      , Query.widget m
+      ]

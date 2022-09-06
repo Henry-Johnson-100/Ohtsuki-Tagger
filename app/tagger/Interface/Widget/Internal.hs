@@ -13,8 +13,7 @@ module Interface.Widget.Internal (
   fileSelectionScrollWidgetNodeKey,
   hidePossibleUIVis,
   fileSelectionWidget,
-  fileSelectionOperationWidget,
-  queryTextFieldKey,
+  -- fileSelectionOperationWidget,
   tagTextNodeKey,
   zstackTaggingWidgetVis,
   zstackQueryWidgetVis,
@@ -72,9 +71,6 @@ __        _____ ____   ____ _____ _____
 fileSelectionScrollWidgetNodeKey :: Text
 fileSelectionScrollWidgetNodeKey = "file-selection-scroll-widget"
 
-queryTextFieldKey :: Text
-queryTextFieldKey = "queryTextField"
-
 editFileMode :: Text
 editFileMode = "edit-file"
 
@@ -100,17 +96,17 @@ fileSelectionWidget m =
       , setOpDrowpdown
       ]
 
-fileSelectionOperationWidget :: TaggerModel -> TaggerWidget
-fileSelectionOperationWidget _ =
-  withStyleBasic
-    [borderL 1 black, borderR 1 black]
-    queryWidget
- where
-  queryWidget =
-    box_ [alignTop, alignCenter] $
-      hstack_ [] [runQueryButton, queryTextField]
-   where
-    runQueryButton = styledButton "Search" (DoFileSelectionEvent Query)
+-- fileSelectionOperationWidget :: TaggerModel -> TaggerWidget
+-- fileSelectionOperationWidget _ =
+--   withStyleBasic
+--     [borderL 1 black, borderR 1 black]
+--     queryWidget
+--  where
+--   queryWidget =
+--     box_ [alignTop, alignCenter] $
+--       hstack_ [] [runQueryButton, queryTextField]
+--    where
+--     runQueryButton = styledButton "Search" (DoFileSelectionEvent Query)
 
 fileSelectionFileList :: TaggerModel -> TaggerWidget
 fileSelectionFileList m =
@@ -546,12 +542,12 @@ focusedFileWidget m =
                 ( DoFocusedFileEvent
                     (ToggleFocusedFilePaneVisibility zstackQueryWidgetVis)
                 )
-          , withNodeVisible isVisible queryTextField
+                -- , withNodeVisible isVisible queryTextField
           ]
      where
-      isVisible =
-        (m ^. focusedFileModel . focusedFileVis)
-          `hasVis` VisibilityLabel zstackQueryWidgetVis
+    -- isVisible =
+    --   (m ^. focusedFileModel . focusedFileVis)
+    --     `hasVis` VisibilityLabel zstackQueryWidgetVis
     zstackTaggingWidget :: TaggerWidget
     zstackTaggingWidget =
       box_ [alignLeft, ignoreEmptyArea]
@@ -778,35 +774,6 @@ tagTextField =
                 else
                   IOEvent
                     ()
-          )
-      ]
-
-queryTextField :: TaggerWidget
-queryTextField =
-  keystroke_
-    [ ("Enter", DoFileSelectionEvent Query)
-    , ("Up", DoFileSelectionEvent NextQueryHist)
-    , ("Down", DoFileSelectionEvent PrevQueryHist)
-    ]
-    []
-    . dropTarget_
-      (DoFileSelectionEvent . AppendQueryText . descriptor . concreteTagDescriptor)
-      [dropTargetStyle [border 1 yuiRed]]
-    . dropTarget_
-      (DoFileSelectionEvent . AppendQueryText . filePath)
-      [dropTargetStyle [border 1 yuiOrange]]
-    . dropTarget_
-      (DoFileSelectionEvent . AppendQueryText . descriptor)
-      [dropTargetStyle [border 1 yuiBlue]]
-    . withNodeKey queryTextFieldKey
-    . withStyleBasic [bgColor (yuiLightPeach & a .~ mainPaneFloatingOpacity)]
-    $ textField_
-      (fileSelectionModel . queryText)
-      [ onChange
-          ( \t ->
-              if T.null t
-                then DoFileSelectionEvent ResetQueryHistIndex
-                else IOEvent ()
           )
       ]
 
