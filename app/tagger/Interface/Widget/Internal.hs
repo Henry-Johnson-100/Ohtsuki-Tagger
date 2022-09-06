@@ -38,12 +38,12 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger.Type
 import Interface.Theme
+import Interface.Widget.Internal.Core
+import Interface.Widget.Internal.Type (TaggerWidget)
 import Monomer
 import Monomer.Graphics.Lens
 import Monomer.Lens (fixed)
 import Util (both)
-
-type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
 hidePossibleUIVis :: Text
 hidePossibleUIVis = "hide-possible-elements"
@@ -1068,40 +1068,6 @@ descriptorTreeRefreshBothButton =
     [resizeFactor (-1)]
     "Refresh"
     (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
-
-styledButton :: Text -> TaggerEvent -> TaggerWidget
-styledButton t e =
-  withStyleHover [bgColor yuiYellow, border 1 yuiOrange]
-    . withStyleBasic [bgColor yuiLightPeach, border 1 yuiPeach]
-    $ button t e
-
-styledButton_ ::
-  [ButtonCfg TaggerModel TaggerEvent] ->
-  Text ->
-  TaggerEvent ->
-  TaggerWidget
-styledButton_ opts t e =
-  withStyleHover [bgColor yuiYellow, border 1 yuiOrange]
-    . withStyleBasic [bgColor yuiLightPeach, border 1 yuiPeach]
-    $ button_ t e opts
-
-withStyleBasic ::
-  [StyleState] ->
-  WidgetNode TaggerModel TaggerEvent ->
-  WidgetNode TaggerModel TaggerEvent
-withStyleBasic = flip styleBasic
-
-withStyleHover ::
-  [StyleState] ->
-  WidgetNode TaggerModel TaggerEvent ->
-  WidgetNode TaggerModel TaggerEvent
-withStyleHover = flip styleHover
-
-withNodeVisible :: Bool -> TaggerWidget -> TaggerWidget
-withNodeVisible = flip nodeVisible
-
-withNodeKey :: Text -> TaggerWidget -> TaggerWidget
-withNodeKey = flip nodeKey
 
 descriptorIsMetaInInfoMap :: TaggerModel -> Descriptor -> Bool
 descriptorIsMetaInInfoMap

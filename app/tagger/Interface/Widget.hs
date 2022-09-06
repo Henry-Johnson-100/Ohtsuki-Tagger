@@ -7,6 +7,7 @@ module Interface.Widget (
 import Data.Event
 import Data.Model
 import Interface.Widget.Internal
+import qualified Interface.Widget.Internal.FilePreview as FilePreview
 import Monomer
 
 taggerApplicationUI ::
@@ -38,13 +39,6 @@ taggerApplicationUI _ m =
     , ("Ctrl-h", ToggleMainVisibility hidePossibleUIVis)
     ]
     []
-    $ vsplit_
-      [splitIgnoreChildResize True, splitHandleSize 10]
-      ( flip styleBasic [borderB 1 black] $ focusedFileWidget m
-      , hsplit_
-          [splitIgnoreChildResize True]
-          ( flip styleBasic [borderT 1 black, borderR 1 black] $
-              descriptorTreeWidget m
-          , taggerInfoWidget m
-          )
-      )
+    $ zstack_
+      [onlyTopActive_ False]
+      [FilePreview.widget m]

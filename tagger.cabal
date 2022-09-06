@@ -66,6 +66,10 @@ executable tagger
                       ,Interface.Theme
                       ,Interface.Widget
                       ,Interface.Widget.Internal
+                      ,Interface.Widget.Internal.Core
+                      ,Interface.Widget.Internal.FilePreview
+                      ,Interface.Widget.Internal.Query
+                      ,Interface.Widget.Internal.Type
                       ,Util
 
   other-extensions:   RankNTypes
