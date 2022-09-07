@@ -35,13 +35,19 @@ baseZStack m ws = zstack_ [onlyTopActive_ False] (FilePreview.widget m : ws)
 fileDetailAndDescriptorTreeLayer :: TaggerModel -> TaggerWidget
 fileDetailAndDescriptorTreeLayer m =
   hsplit_
-    [splitIgnoreChildResize True]
+    [ splitIgnoreChildResize True
+    , splitHandlePos
+        (positioningModel . fileDetailAndDescriptorTreePosH)
+    ]
     ( withStyleBasic [maxWidth 10000, borderR 1 $ black & a .~ 0.10]
         . box_ [ignoreEmptyArea]
         . withStyleBasic [maxWidth 0]
         $ spacer_ [resizeFactor (-1)]
     , withStyleBasic [bgColor $ yuiLightPeach & a .~ defaultElementOpacity]
-        . vsplit_ [splitIgnoreChildResize True]
+        . vsplit_
+          [ splitIgnoreChildResize True
+          , splitHandlePos (positioningModel . fileDetailAndDescriptorTreePosV)
+          ]
         . bimap
           (withStyleBasic [borderB 1 black, paddingB 10])
           (withStyleBasic [borderT 1 black, paddingT 3])
@@ -51,10 +57,17 @@ fileDetailAndDescriptorTreeLayer m =
 selectionAndQueryLayer :: TaggerModel -> TaggerWidget
 selectionAndQueryLayer m =
   hsplit_
-    [splitIgnoreChildResize True]
+    [ splitIgnoreChildResize True
+    , splitHandlePos
+        (positioningModel . selectionAndQueryPosH)
+    ]
     ( withStyleBasic
         [bgColor $ yuiLightPeach & a .~ defaultElementOpacity]
-        . vsplit_ [splitIgnoreChildResize True]
+        . vsplit_
+          [ splitIgnoreChildResize True
+          , splitHandlePos
+              (positioningModel . selectionAndQueryPosV)
+          ]
         . bimap
           (withStyleBasic [borderB 1 black, paddingB 10])
           (withStyleBasic [borderT 1 black, paddingT 3])

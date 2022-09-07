@@ -26,6 +26,7 @@ module Data.Model.Core (
   Renderability (..),
   TaggerInfoModel (..),
   createTaggerInfoModel,
+  PositioningModel (..),
 ) where
 
 import Data.HierarchyMap (empty)
@@ -47,6 +48,7 @@ data TaggerModel = TaggerModel
   , _taggermodelFocusedFileModel :: FocusedFileModel
   , _taggermodelFileSelectionModel :: FileSelectionModel
   , _taggermodelTaggerInfoModel :: TaggerInfoModel
+  , _taggermodelPositioningModel :: PositioningModel
   , _taggermodelVisibilityModel :: Visibility
   , _taggermodelConnection :: TaggedConnection
   , _taggermodelIsTagMode :: Bool
@@ -68,6 +70,7 @@ createTaggerModel tc d unRelatedD defaultFilePath =
     , _taggermodelFocusedFileModel = createFocusedFileModel defaultFilePath
     , _taggermodelFileSelectionModel = createFileSelectionModel
     , _taggermodelTaggerInfoModel = createTaggerInfoModel
+    , _taggermodelPositioningModel = createPositioningModel
     , _taggermodelVisibilityModel = VisibilityMain
     , _taggermodelConnection = tc
     , _taggermodelIsTagMode = True
@@ -249,3 +252,19 @@ createTaggerInfoModel =
     mempty
     mempty
     mempty
+
+data PositioningModel = PositioningModel
+  { _positioningSelectionAndQueryPosV :: Double
+  , _positionSelectionAndQueryPosH :: Double
+  , _positionFileDetailAndDescriptorTreePosV :: Double
+  , _positionFileDetailAndDescriptorTreePosH :: Double
+  }
+  deriving (Show, Eq)
+
+createPositioningModel :: PositioningModel
+createPositioningModel =
+  PositioningModel
+    0.5
+    0.2
+    0.5
+    0.8
