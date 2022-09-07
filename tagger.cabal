@@ -67,6 +67,8 @@ executable tagger
                       ,Interface.Widget
                       ,Interface.Widget.Internal
                       ,Interface.Widget.Internal.Core
+                      ,Interface.Widget.Internal.DescriptorTree
+                      ,Interface.Widget.Internal.FileDetail
                       ,Interface.Widget.Internal.FilePreview
                       ,Interface.Widget.Internal.Query
                       ,Interface.Widget.Internal.Selection
