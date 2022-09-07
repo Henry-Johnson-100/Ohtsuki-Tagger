@@ -36,8 +36,10 @@ fileDetailAndDescriptorTreeLayer :: TaggerModel -> TaggerWidget
 fileDetailAndDescriptorTreeLayer m =
   hsplit_
     [splitIgnoreChildResize True]
-    ( withStyleBasic [maxWidth 10000, borderR 1 $ black & a .~ 0.10] $
-        spacer_ [resizeFactor (-1)]
+    ( withStyleBasic [maxWidth 10000, borderR 1 $ black & a .~ 0.10]
+        . box_ [ignoreEmptyArea]
+        . withStyleBasic [maxWidth 0]
+        $ spacer_ [resizeFactor (-1)]
     , withStyleBasic [bgColor $ yuiLightPeach & a .~ defaultElementOpacity]
         . vsplit_ [splitIgnoreChildResize True]
         . bimap
@@ -57,8 +59,10 @@ selectionAndQueryLayer m =
           (withStyleBasic [borderB 1 black, paddingB 10])
           (withStyleBasic [borderT 1 black, paddingT 3])
         $ (Query.widget m, Selection.widget m)
-    , withStyleBasic [maxWidth 10000, borderL 1 $ black & a .~ 0.10] $
-        spacer_ [resizeFactor (-1)]
+    , withStyleBasic [maxWidth 10000, borderL 1 $ black & a .~ 0.10]
+        . box_ [ignoreEmptyArea]
+        . withStyleBasic [maxWidth 0]
+        $ spacer_ [resizeFactor (-1)]
     )
 
 globalKeystrokes :: TaggerWidget -> TaggerWidget
