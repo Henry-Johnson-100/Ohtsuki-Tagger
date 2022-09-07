@@ -19,7 +19,6 @@ import Interface.Widget.Internal.Core
 import Interface.Widget.Internal.Type
 import Monomer
 import Monomer.Core.Lens (fixed)
-import Monomer.Lens (HasA (a))
 import Util
 
 widget :: TaggerModel -> TaggerWidget
@@ -217,6 +216,12 @@ descriptorTreeLeaf
             . keystroke_
               [("Enter", DoDescriptorTreeEvent (UpdateDescriptor dk))]
               []
+            . withStyleBasic
+              [ bgColor
+                  . modulateOpacity
+                    (defaultElementOpacity - defaultOpacityModulator)
+                  $ yuiLightPeach
+              ]
             $ textField_
               ( descriptorTreeModel
                   . descriptorInfoMap
@@ -225,8 +230,18 @@ descriptorTreeLeaf
               )
               []
         , box_ [alignLeft]
-            . withStyleHover [bgColor yuiRed, textColor white]
-            . withStyleBasic [textColor yuiRed]
+            . withStyleHover
+              [ bgColor
+                  . modulateOpacity defaultElementOpacity $yuiRed
+              , textColor white
+              ]
+            . withStyleBasic
+              [ textColor yuiRed
+              , bgColor
+                  . modulateOpacity
+                    (defaultElementOpacity - defaultOpacityModulator)
+                  $ yuiLightPeach
+              ]
             $ button_
               "Delete"
               ( DoDescriptorTreeEvent
@@ -262,6 +277,11 @@ descriptorManagementPane =
           , sizeReqUpdater
               (\(xs, xy) -> both (& fixed .~ 0) (xs, xy))
           ]
+          . withStyleBasic
+            [ bgColor
+                . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+                $ yuiLightPeach
+            ]
           $ textField_ (descriptorTreeModel . newDescriptorText) []
       ]
    where

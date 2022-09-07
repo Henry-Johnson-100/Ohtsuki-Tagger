@@ -104,10 +104,10 @@ createFileSelectionModel =
     , _fileselectionTagOrdering = OrderBy Numeric Desc
     , _fileselectionFileSelectionInfoMap = IntMap.empty
     , _fileselectionSetOp = Union
-    , _fileselectionQueryText = ""
+    , _fileselectionQueryText = "Query..."
     , _fileselectionQueryHistory = createHistory 10
     , _fileselectionFileSelectionVis = VisibilityMain
-    , _fileselectionAddFileText = ""
+    , _fileselectionAddFileText = mempty
     , _fileselectionAddFileHistory = createHistory 30
     }
 
@@ -222,11 +222,11 @@ createDescriptorTreeModel :: Descriptor -> Descriptor -> DescriptorTreeModel
 createDescriptorTreeModel n unrelatedD =
   DescriptorTreeModel
     { _descriptortreeUnrelatedNode = unrelatedD
-    , _descriptortreeUnrelated = []
+    , _descriptortreeUnrelated = mempty
     , _descriptortreeFocusedNode = n
-    , _descriptortreeFocusedTree = []
+    , _descriptortreeFocusedTree = mempty
     , _descriptortreeDescriptorInfoMap = IntMap.empty
-    , _descriptortreeNewDescriptorText = ""
+    , _descriptortreeNewDescriptorText = "Create New Descriptors"
     , _descriptortreeDescriptorTreeVis = VisibilityMain
     }
 

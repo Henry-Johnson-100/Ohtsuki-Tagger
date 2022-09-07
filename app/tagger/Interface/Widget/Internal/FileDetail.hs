@@ -20,7 +20,6 @@ import Interface.Theme
 import Interface.Widget.Internal.Core
 import Interface.Widget.Internal.Type
 import Monomer
-import Monomer.Graphics.Lens (HasA (a))
 
 widget :: TaggerModel -> TaggerWidget
 widget m = detailPane m
