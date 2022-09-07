@@ -4,12 +4,17 @@ module Interface.Widget (
   taggerApplicationUI,
 ) where
 
+import Control.Lens hiding (bimap, both)
 import Data.Event
 import Data.Model
+import Interface.Theme
 import Interface.Widget.Internal
+import Interface.Widget.Internal.Core
 import qualified Interface.Widget.Internal.FilePreview as FilePreview
 import qualified Interface.Widget.Internal.Query as Query
+import qualified Interface.Widget.Internal.Selection as Selection
 import Monomer
+import Monomer.Graphics.Lens (HasA (a))
 
 taggerApplicationUI ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -18,10 +23,25 @@ taggerApplicationUI ::
 taggerApplicationUI _ m =
   globalKeystrokes
     . baseZStack m
-    $ [Query.widget m]
+    $ [selectionAndQueryLayer m]
 
 baseZStack :: TaggerModel -> [TaggerWidget] -> TaggerWidget
 baseZStack m ws = zstack_ [onlyTopActive_ False] (FilePreview.widget m : ws)
+
+selectionAndQueryLayer :: TaggerModel -> TaggerWidget
+selectionAndQueryLayer m =
+  hsplit_
+    [splitIgnoreChildResize True]
+    ( withStyleBasic
+        [bgColor $ yuiLightPeach & a .~ defaultElementOpacity]
+        . vsplit_ [splitIgnoreChildResize True]
+        . bimap
+          (withStyleBasic [borderB 1 black, paddingB 10])
+          (withStyleBasic [borderT 1 black, paddingT 3])
+        $ (Query.widget m, Selection.widget m)
+    , withStyleBasic [maxWidth 10000, borderL 1 $ black & a .~ 0.10] $
+        spacer_ [resizeFactor (-1)]
+    )
 
 globalKeystrokes :: TaggerWidget -> TaggerWidget
 globalKeystrokes =
@@ -49,3 +69,9 @@ globalKeystrokes =
     , ("Ctrl-h", ToggleMainVisibility hidePossibleUIVis)
     ]
     []
+
+both :: (a -> b) -> (a, a) -> (b, b)
+both f (x, y) = (f x, f y)
+
+bimap :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
+bimap f g (x, y) = (f x, g y)

@@ -26,7 +26,6 @@ import Monomer.Graphics.Lens
 widget :: TaggerModel -> TaggerWidget
 widget m =
   visibilities m
-    . alignment
     . container
     $ queryTextField
 
@@ -59,20 +58,12 @@ queryTextField =
           )
       ]
 
-alignment :: TaggerWidget -> TaggerWidget
-alignment w = vgrid_ [] [w, spacer_ [resizeFactor (-1)]]
-
 container :: TaggerWidget -> TaggerWidget
 container w =
-  box_ [alignLeft, alignBottom, ignoreEmptyArea]
-    . hsplit_ [splitIgnoreChildResize True, splitHandlePosV 0.25]
-    . (,withStyleBasic [maxWidth 10000, borderL 1 (black & a .~ 0.3)] $
-          spacer_ [resizeFactor (-1)])
-    . withStyleBasic [borderT 1 black, borderB 1 black, borderR 1 black]
-    . vstack_ []
-    $ [ withStyleBasic [paddingL 15] $ label_ "Query" [resizeFactor (-1)]
-      , w
-      ]
+  withStyleBasic [paddingT 5, paddingL 10]
+    . box_ [alignLeft, alignBottom, ignoreEmptyArea]
+    -- . withStyleBasic [borderT 1 black, borderB 1 black, borderR 1 black]
+    $ w
 
 visibilities :: TaggerModel -> TaggerWidget -> TaggerWidget
 visibilities = withNodeVisible . isVisible
