@@ -1,13 +1,15 @@
 module Interface.Widget.Internal.Core (
-  styledButton,
   styledButton_,
   withStyleBasic,
   withStyleHover,
   withNodeKey,
   withNodeVisible,
   defaultElementOpacity,
+  defaultOpacityModulator,
+  modulateOpacity,
 ) where
 
+import Control.Lens ((&), (.~))
 import Data.Event (TaggerEvent)
 import Data.Model.Core (TaggerModel)
 import Data.Text (Text)
@@ -26,17 +28,11 @@ import Monomer (
   CmbStyleHover (styleHover),
   StyleState,
   WidgetNode,
-  button,
   button_,
   nodeKey,
   nodeVisible,
  )
-
-styledButton :: Text -> TaggerEvent -> TaggerWidget
-styledButton t e =
-  withStyleHover [bgColor yuiYellow, border 1 yuiOrange]
-    . withStyleBasic [bgColor yuiLightPeach, border 1 yuiPeach]
-    $ button t e
+import Monomer.Lens (HasA (a))
 
 styledButton_ ::
   [ButtonCfg TaggerModel TaggerEvent] ->
@@ -44,8 +40,24 @@ styledButton_ ::
   TaggerEvent ->
   TaggerWidget
 styledButton_ opts t e =
-  withStyleHover [bgColor yuiYellow, border 1 yuiOrange]
-    . withStyleBasic [bgColor yuiLightPeach, border 1 yuiPeach]
+  withStyleHover
+    [ bgColor $
+        yuiYellow & a
+          .~ modulateOpacity
+            negate
+            defaultOpacityModulator
+            defaultElementOpacity
+    , border 1 yuiOrange
+    ]
+    . withStyleBasic
+      [ bgColor $
+          yuiLightPeach & a
+            .~ modulateOpacity
+              negate
+              defaultOpacityModulator
+              defaultElementOpacity
+      , border 1 yuiPeach
+      ]
     $ button_ t e opts
 
 withStyleBasic ::
@@ -53,18 +65,31 @@ withStyleBasic ::
   WidgetNode TaggerModel TaggerEvent ->
   WidgetNode TaggerModel TaggerEvent
 withStyleBasic = flip styleBasic
+{-# INLINE withStyleBasic #-}
 
 withStyleHover ::
   [StyleState] ->
   WidgetNode TaggerModel TaggerEvent ->
   WidgetNode TaggerModel TaggerEvent
 withStyleHover = flip styleHover
+{-# INLINE withStyleHover #-}
 
 withNodeVisible :: Bool -> TaggerWidget -> TaggerWidget
 withNodeVisible = flip nodeVisible
+{-# INLINE withNodeVisible #-}
 
 withNodeKey :: Text -> TaggerWidget -> TaggerWidget
 withNodeKey = flip nodeKey
+{-# INLINE withNodeKey #-}
 
 defaultElementOpacity :: Double
 defaultElementOpacity = 0.5
+{-# INLINE defaultElementOpacity #-}
+
+defaultOpacityModulator :: Double
+defaultOpacityModulator = 0.1
+{-# INLINE defaultOpacityModulator #-}
+
+modulateOpacity :: (Double -> Double) -> Double -> Double -> Double
+modulateOpacity f d n = f d + n
+{-# INLINE modulateOpacity #-}

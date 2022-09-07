@@ -216,11 +216,9 @@ deleteTagZone =
     [dropTargetStyle [border 1 yuiRed]]
     . flip styleHoverSet []
     . withStyleBasic
-      [ 
-        bgColor $
+      [ bgColor $
           yuiLightPeach & a
-            .~ 0.0
-      , 
-      border 1 yuiPeach
+            .~ modulateOpacity negate defaultOpacityModulator defaultElementOpacity
+      , border 1 yuiPeach
       ]
     $ buttonD_ "Delete" [resizeFactor (-1)]
