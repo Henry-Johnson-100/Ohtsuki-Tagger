@@ -35,7 +35,8 @@ import Data.Event (
   TaggerEvent (DoFileSelectionEvent, DoFocusedFileEvent, IOEvent),
  )
 import qualified Data.List as L
-import Data.Model (
+import Data.Model.Core (TaggerModel, getSelectionChunk)
+import Data.Model.Lens (
   HasAddFileText (addFileText),
   HasChunkSequence (chunkSequence),
   HasChunkSize (chunkSize),
@@ -51,11 +52,9 @@ import Data.Model (
   HasShellText (shellText),
   HasTagOccurrences (tagOccurrences),
   HasTagOrdering (tagOrdering),
-  TaggerModel,
   fileInfoAt,
-  getSelectionChunk,
  )
-import Data.Model.Shared (
+import Data.Model.Shared.Core (
   OrderBy (OrderBy),
   OrderCriteria (Alphabetic, Numeric),
   OrderDirection (Asc, Desc),
