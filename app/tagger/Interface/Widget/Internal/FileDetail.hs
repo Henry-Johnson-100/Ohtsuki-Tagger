@@ -220,6 +220,9 @@ deleteTagZone =
           . modulateOpacity
             (defaultElementOpacity - defaultOpacityModulator)
           $ yuiLightPeach
-      , border 1 yuiPeach
+      , border 1
+          . modulateOpacity
+            (defaultElementOpacity - defaultOpacityModulator)
+          $ yuiPeach
       ]
     $ buttonD_ "Delete" [resizeFactor (-1)]

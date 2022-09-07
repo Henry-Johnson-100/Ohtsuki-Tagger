@@ -44,16 +44,22 @@ styledButton_ opts t e =
   withStyleHover
     [ bgColor
         . modulateOpacity
-          (defaultElementOpacity - defaultOpacityModulator)
+          defaultElementOpacity
         $ yuiYellow
-    , border 1 yuiOrange
+    , border 1
+        . modulateOpacity
+          defaultElementOpacity
+        $ yuiOrange
     ]
     . withStyleBasic
       [ bgColor
           . modulateOpacity
             (defaultElementOpacity - defaultOpacityModulator)
           $ yuiLightPeach
-      , border 1 yuiPeach
+      , border 1
+          . modulateOpacity
+            (defaultElementOpacity - defaultOpacityModulator)
+          $ yuiPeach
       ]
     $ button_ t e opts
 

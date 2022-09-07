@@ -189,11 +189,24 @@ descriptorTreeLeaf
         []
         [ draggable d
             . box_ [alignLeft]
-            . withStyleHover [border 1 yuiOrange, bgColor yuiLightPeach]
+            . withStyleHover
+              [ bgColor
+                  . modulateOpacity
+                    defaultElementOpacity
+                  $ yuiYellow
+              , border 1
+                  . modulateOpacity
+                    defaultElementOpacity
+                  $ yuiOrange
+              ]
             . withStyleBasic
               [ textColor (if di ^. descriptorIsMeta then yuiBlue else black)
               , textLeft
-              , bgColor $ yuiLightPeach & a .~ 0.0
+              , bgColor
+                  . modulateOpacity
+                    0.0
+                  $ yuiLightPeach
+              , border 1 . modulateOpacity 0.0 $ yuiLightPeach
               ]
             $ button p (DoDescriptorTreeEvent (RequestFocusedNode p))
         ]
