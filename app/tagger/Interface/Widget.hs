@@ -70,8 +70,5 @@ globalKeystrokes =
     ]
     []
 
-both :: (a -> b) -> (a, a) -> (b, b)
-both f (x, y) = (f x, f y)
-
 bimap :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
 bimap f g (x, y) = (f x, g y)

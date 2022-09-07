@@ -34,8 +34,9 @@ import qualified Data.Text as T
 import Data.Version (showVersion)
 import Database.Tagger
 import Interface.Handler.Internal
-import Interface.Widget.Internal (fileSelectionScrollWidgetNodeKey, tagTextNodeKey, zstackQueryWidgetVis, zstackTaggingWidgetVis)
+import Interface.Widget.Internal (tagTextNodeKey, zstackQueryWidgetVis, zstackTaggingWidgetVis)
 import Interface.Widget.Internal.Query (queryTextFieldKey)
+import Interface.Widget.Internal.Selection (fileSelectionScrollWidgetNodeKey)
 import Monomer
 import Paths_tagger
 import System.Directory (getCurrentDirectory)
