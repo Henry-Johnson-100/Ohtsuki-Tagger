@@ -20,6 +20,7 @@ import Interface.Theme
 import Interface.Widget.Internal.Core
 import Interface.Widget.Internal.Type
 import Monomer
+import Monomer.Graphics.Lens (HasA (a))
 
 widget :: TaggerModel -> TaggerWidget
 widget m = detailPane m
@@ -214,5 +215,12 @@ deleteTagZone =
     (DoFocusedFileEvent . DeleteTag . concreteTagId)
     [dropTargetStyle [border 1 yuiRed]]
     . flip styleHoverSet []
-    . withStyleBasic [bgColor yuiLightPeach, border 1 yuiPeach]
+    . withStyleBasic
+      [ 
+        bgColor $
+          yuiLightPeach & a
+            .~ 0.0
+      , 
+      border 1 yuiPeach
+      ]
     $ buttonD_ "Delete" [resizeFactor (-1)]
