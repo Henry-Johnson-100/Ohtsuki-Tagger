@@ -19,6 +19,7 @@ import Interface.Widget.Internal.Core
 import Interface.Widget.Internal.Type
 import Monomer
 import Monomer.Core.Lens (fixed)
+import Monomer.Lens (HasA (a))
 import Util
 
 widget :: TaggerModel -> TaggerWidget
@@ -192,6 +193,7 @@ descriptorTreeLeaf
             . withStyleBasic
               [ textColor (if di ^. descriptorIsMeta then yuiBlue else black)
               , textLeft
+              , bgColor $ yuiLightPeach & a .~ 0.0
               ]
             $ button p (DoDescriptorTreeEvent (RequestFocusedNode p))
         ]

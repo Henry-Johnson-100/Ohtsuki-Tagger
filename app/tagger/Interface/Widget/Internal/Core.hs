@@ -32,6 +32,7 @@ import Monomer (
   nodeKey,
   nodeVisible,
  )
+import Monomer.Graphics (Color)
 import Monomer.Lens (HasA (a))
 
 styledButton_ ::
@@ -41,21 +42,17 @@ styledButton_ ::
   TaggerWidget
 styledButton_ opts t e =
   withStyleHover
-    [ bgColor $
-        yuiYellow & a
-          .~ modulateOpacity
-            negate
-            defaultOpacityModulator
-            defaultElementOpacity
+    [ bgColor
+        . modulateOpacity
+          (defaultElementOpacity - defaultOpacityModulator)
+        $ yuiYellow
     , border 1 yuiOrange
     ]
     . withStyleBasic
-      [ bgColor $
-          yuiLightPeach & a
-            .~ modulateOpacity
-              negate
-              defaultOpacityModulator
-              defaultElementOpacity
+      [ bgColor
+          . modulateOpacity
+            (defaultElementOpacity - defaultOpacityModulator)
+          $ yuiLightPeach
       , border 1 yuiPeach
       ]
     $ button_ t e opts
@@ -87,9 +84,9 @@ defaultElementOpacity = 0.5
 {-# INLINE defaultElementOpacity #-}
 
 defaultOpacityModulator :: Double
-defaultOpacityModulator = 0.1
+defaultOpacityModulator = 0.35
 {-# INLINE defaultOpacityModulator #-}
 
-modulateOpacity :: (Double -> Double) -> Double -> Double -> Double
-modulateOpacity f d n = f d + n
+modulateOpacity :: Double -> Color -> Color
+modulateOpacity d c = c & a .~ d
 {-# INLINE modulateOpacity #-}
