@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Interface.Widget (
   taggerApplicationUI,
@@ -7,6 +8,8 @@ module Interface.Widget (
 import Control.Lens hiding (bimap, both)
 import Data.Event
 import Data.Model
+import Data.Model.Shared.Core
+import Data.Text (Text)
 import Interface.Theme
 import Interface.Widget.Internal
 import Interface.Widget.Internal.Core
@@ -25,58 +28,72 @@ taggerApplicationUI ::
 taggerApplicationUI _ m =
   globalKeystrokes
     . baseZStack m
-    $ [ selectionAndQueryLayer m
+    $ [ selectionQueryLayer m
       , fileDetailAndDescriptorTreeLayer m
       ]
 
 baseZStack :: TaggerModel -> [TaggerWidget] -> TaggerWidget
 baseZStack m ws = zstack_ [onlyTopActive_ False] (FilePreview.widget m : ws)
 
+fileDetailDescriptorTreeHide :: Text
+fileDetailDescriptorTreeHide = "file-detail-and-descriptor-tree-vis"
+
 fileDetailAndDescriptorTreeLayer :: TaggerModel -> TaggerWidget
 fileDetailAndDescriptorTreeLayer m =
-  hsplit_
-    [ splitIgnoreChildResize True
-    , splitHandlePos
-        (positioningModel . fileDetailAndDescriptorTreePosH)
-    ]
-    ( withStyleBasic [maxWidth 10000, borderR 1 $ black & a .~ 0.10]
-        . box_ [ignoreEmptyArea]
-        . withStyleBasic [maxWidth 0]
-        $ spacer_ [resizeFactor (-1)]
-    , withStyleBasic [bgColor $ yuiLightPeach & a .~ defaultElementOpacity]
-        . vsplit_
-          [ splitIgnoreChildResize True
-          , splitHandlePos (positioningModel . fileDetailAndDescriptorTreePosV)
-          ]
-        . bimap
-          (withStyleBasic [borderB 1 black, paddingB 10])
-          (withStyleBasic [borderT 1 black, paddingT 3])
-        $ (FileDetail.widget m, DescriptorTree.widget m)
-    )
+  withNodeHidden ((m ^. visibilityModel) `hasVis` VisibilityLabel fileDetailDescriptorTreeHide) $
+    hsplit_
+      [ splitIgnoreChildResize True
+      , splitHandlePos
+          (positioningModel . fileDetailAndDescriptorTreePosH)
+      ]
+      ( withStyleBasic [maxWidth 10000, borderR 1 $ black & a .~ 0.10]
+          . box_ [ignoreEmptyArea]
+          . withStyleBasic [maxWidth 0]
+          $ spacer_ [resizeFactor (-1)]
+      , withStyleBasic [bgColor $ yuiLightPeach & a .~ defaultElementOpacity]
+          . vsplit_
+            [ splitIgnoreChildResize True
+            , splitHandlePos (positioningModel . fileDetailAndDescriptorTreePosV)
+            ]
+          . bimap
+            (withStyleBasic [borderB 1 black, paddingB 10])
+            (withStyleBasic [borderT 1 black, paddingT 3])
+          $ (FileDetail.widget m, DescriptorTree.widget m)
+      )
 
-selectionAndQueryLayer :: TaggerModel -> TaggerWidget
-selectionAndQueryLayer m =
-  hsplit_
-    [ splitIgnoreChildResize True
-    , splitHandlePos
-        (positioningModel . selectionAndQueryPosH)
-    ]
-    ( withStyleBasic
-        [bgColor $ yuiLightPeach & a .~ defaultElementOpacity]
-        . vsplit_
-          [ splitIgnoreChildResize True
-          , splitHandlePos
-              (positioningModel . selectionAndQueryPosV)
-          ]
-        . bimap
-          (withStyleBasic [borderB 1 black, paddingB 10])
-          (withStyleBasic [borderT 1 black, paddingT 3])
-        $ (Query.widget m, Selection.widget m)
-    , withStyleBasic [maxWidth 10000, borderL 1 $ black & a .~ 0.10]
-        . box_ [ignoreEmptyArea]
-        . withStyleBasic [maxWidth 0]
-        $ spacer_ [resizeFactor (-1)]
+selectionQueryHideLabel :: Text
+selectionQueryHideLabel = "selection-and-query-layer-hide"
+
+selectionQueryHideEvent :: TaggerEvent
+selectionQueryHideEvent = ToggleMainVisibility selectionQueryHideLabel
+
+selectionQueryLayer :: TaggerModel -> TaggerWidget
+selectionQueryLayer m =
+  withNodeHidden
+    ( (m ^. visibilityModel)
+        `hasVis` VisibilityLabel selectionQueryHideLabel
     )
+    $ hsplit_
+      [ splitIgnoreChildResize True
+      , splitHandlePos
+          (positioningModel . selectionAndQueryPosH)
+      ]
+      ( withStyleBasic
+          [bgColor $ yuiLightPeach & a .~ defaultElementOpacity]
+          . vsplit_
+            [ splitIgnoreChildResize True
+            , splitHandlePos
+                (positioningModel . selectionAndQueryPosV)
+            ]
+          . bimap
+            (withStyleBasic [borderB 1 black, paddingB 10])
+            (withStyleBasic [borderT 1 black, paddingT 3])
+          $ (Query.widget m, Selection.widget m)
+      , withStyleBasic [maxWidth 10000, borderL 1 $ black & a .~ 0.10]
+          . box_ [ignoreEmptyArea]
+          . withStyleBasic [maxWidth 0]
+          $ spacer_ [resizeFactor (-1)]
+      )
 
 globalKeystrokes :: TaggerWidget -> TaggerWidget
 globalKeystrokes =
@@ -101,7 +118,9 @@ globalKeystrokes =
     , ("Ctrl-g", DoFileSelectionEvent CycleNextSetOp)
     , ("Ctrl-Shift-g", DoFileSelectionEvent CyclePrevSetOp)
     , ("Ctrl-u", DoFileSelectionEvent ClearSelection)
-    , ("Ctrl-h", ToggleMainVisibility hidePossibleUIVis)
+    , -- , ("Ctrl-h", ToggleMainVisibility hidePossibleUIVis)
+      ("Ctrl-q", selectionQueryHideEvent)
+    , ("Ctrl-e", ToggleMainVisibility fileDetailDescriptorTreeHide)
     ]
     []
 

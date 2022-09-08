@@ -4,6 +4,7 @@ module Interface.Widget.Internal.Core (
   withStyleHover,
   withNodeKey,
   withNodeVisible,
+  withNodeHidden,
   defaultElementOpacity,
   defaultOpacityModulator,
   modulateOpacity,
@@ -77,9 +78,19 @@ withStyleHover ::
 withStyleHover = flip styleHover
 {-# INLINE withStyleHover #-}
 
+{- |
+ Makes the given node visible when the predicate is true.
+-}
 withNodeVisible :: Bool -> TaggerWidget -> TaggerWidget
 withNodeVisible = flip nodeVisible
 {-# INLINE withNodeVisible #-}
+
+{- |
+ Hides the given node when the predicate is true.
+-}
+withNodeHidden :: Bool -> TaggerWidget -> TaggerWidget
+withNodeHidden = withNodeVisible . not
+{-# INLINE withNodeHidden #-}
 
 withNodeKey :: Text -> TaggerWidget -> TaggerWidget
 withNodeKey = flip nodeKey
