@@ -509,32 +509,26 @@ focusedFileEventHandler
                 )
         ]
       CommitTagText ->
-        [ Task
-            ( anonymousEvent
-                <$> ( do
-                        taggerQLTag
-                          ( fileId . concreteTaggedFile $
-                              model ^. focusedFileModel . focusedFile
-                          )
-                          ( TaggerQLTagStmnt . T.strip $
-                              model ^. focusedFileModel . tagText
-                          )
-                          conn
-                        return
-                          [ Event
-                              . ClearTextField
-                              $ TaggerLens (focusedFileModel . tagText)
-                          , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
-                          ]
-                    )
+        anonymousTask $ do
+          taggerQLTag
+            ( fileId . concreteTaggedFile $
+                model ^. focusedFileModel . focusedFile
             )
-        , Model $
-            model
-              & focusedFileModel . tagHistory
-                %~ putHist (T.strip $ model ^. focusedFileModel . tagText)
-        , Model $ model & focusedFileModel . tagText .~ mempty
-        , Task (IOEvent <$> putStrLn (T.unpack $ model ^. focusedFileModel . tagText))
-        ]
+            ( TaggerQLTagStmnt . T.strip $
+                model ^. focusedFileModel . tagText
+            )
+            conn
+          return
+            [ Model $
+                model
+                  & focusedFileModel . tagHistory
+                    %~ putHist
+                      (T.strip $ model ^. focusedFileModel . tagText)
+            , Event
+                . ClearTextField
+                $ TaggerLens (focusedFileModel . tagText)
+            , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
+            ]
       DeleteTag t ->
         [ Task (IOEvent <$> deleteTags [t] conn)
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
@@ -691,6 +685,17 @@ focusedFileEventHandler
         [ Task (IOEvent <$> unSubTags [tk] conn)
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
+
+{- |
+ Performs some IO then executes the returned 'AppEventResponse`s
+
+ The list of 'AppEventResponse`s is like a callback to be executed after the
+ IO body is executed.
+-}
+anonymousTask ::
+  IO [AppEventResponse TaggerModel TaggerEvent] ->
+  [EventResponse s TaggerEvent sp ep]
+anonymousTask = (: []) . Task . fmap anonymousEvent
 
 -- this is kind of stupid but whatever.
 getRenderability :: Text -> Renderability
