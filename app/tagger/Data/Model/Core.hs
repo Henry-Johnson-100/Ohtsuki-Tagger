@@ -107,7 +107,7 @@ createFileSelectionModel =
     , _fileselectionTagOrdering = OrderBy Numeric Desc
     , _fileselectionFileSelectionInfoMap = IntMap.empty
     , _fileselectionSetOp = Union
-    , _fileselectionQueryText = "Query..."
+    , _fileselectionQueryText = mempty
     , _fileselectionQueryHistory = createHistory 10
     , _fileselectionFileSelectionVis = VisibilityMain
     , _fileselectionAddFileText = mempty
@@ -168,7 +168,7 @@ createFocusedFileModel fp =
         ConcreteTaggedFile (File focusedFileDefaultRecordKey fp) empty
     , _focusedfilemodelRenderability = RenderingNotSupported
     , _focusedfilemodelFocusedFileVis = VisibilityMain
-    , _focusedfilemodelTagText = "Tag..."
+    , _focusedfilemodelTagText = mempty
     , _focusedfilemodelTagHistory = createHistory 10
     }
 
