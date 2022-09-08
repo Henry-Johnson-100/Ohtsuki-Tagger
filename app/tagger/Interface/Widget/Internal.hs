@@ -11,7 +11,7 @@ module Interface.Widget.Internal (
   TaggerWidget,
   hidePossibleUIVis,
   -- fileSelectionOperationWidget,
-  tagTextNodeKey,
+  -- tagTextNodeKey,
   zstackTaggingWidgetVis,
   zstackQueryWidgetVis,
   focusedFileWidget,
@@ -79,9 +79,6 @@ __        _____ ____   ____ _____ _____
 mainPaneFloatingOpacity :: Double
 mainPaneFloatingOpacity = 0.5
 
-tagTextNodeKey :: Text
-tagTextNodeKey = "tag-text-field"
-
 zstackTaggingWidgetVis :: Text
 zstackTaggingWidgetVis = "show-tag-field"
 
@@ -132,8 +129,9 @@ focusedFileWidget m =
           . box_
             [alignBottom, alignLeft, ignoreEmptyArea]
           $ vstack
-            [ hstack [zstackNextImage, zstackTaggingWidget]
-            , hstack [zstackPrevImage, zstackQueryWidget]
+            [ --  hstack [zstackNextImage, zstackTaggingWidget]
+              -- ,
+              hstack [zstackPrevImage, zstackQueryWidget]
             ]
       ]
    where
@@ -164,65 +162,13 @@ focusedFileWidget m =
                 -- , withNodeVisible isVisible queryTextField
           ]
      where
-    -- isVisible =
-    --   (m ^. focusedFileModel . focusedFileVis)
-    --     `hasVis` VisibilityLabel zstackQueryWidgetVis
-    zstackTaggingWidget :: TaggerWidget
-    zstackTaggingWidget =
-      box_ [alignLeft, ignoreEmptyArea]
-        . withStyleBasic [maxWidth 400]
-        $ hstack
-          [ vstack . (: [])
-              . withStyleBasic
-                [ bgColor $
-                    yuiLightPeach
-                      & a .~ mainPaneFloatingOpacity
-                ]
-              $ styledButton_
-                [resizeFactor (-1)]
-                "Tag"
-                ( DoFocusedFileEvent
-                    (ToggleFocusedFilePaneVisibility zstackTaggingWidgetVis)
-                )
-          , withNodeVisible
-              isVisible
-              tagTextField
-          ]
-     where
-      isVisible =
-        (m ^. focusedFileModel . focusedFileVis)
-          `hasVis` VisibilityLabel zstackTaggingWidgetVis
+
+-- isVisible =
+--   (m ^. focusedFileModel . focusedFileVis)
+--     `hasVis` VisibilityLabel zstackQueryWidgetVis
 
 imagePreviewRender :: Text -> TaggerWidget
 imagePreviewRender fp = image_ fp [fitEither, alignCenter]
-
-tagTextField :: TaggerWidget
-tagTextField =
-  keystroke_
-    [ ("Enter", DoFocusedFileEvent CommitTagText)
-    , ("Up", DoFocusedFileEvent NextTagHist)
-    , ("Down", DoFocusedFileEvent PrevTagHist)
-    ]
-    []
-    . dropTarget_
-      (DoFocusedFileEvent . AppendTagText . descriptor . concreteTagDescriptor)
-      [dropTargetStyle [border 1 yuiRed]]
-    . dropTarget_
-      (DoFocusedFileEvent . AppendTagText . descriptor)
-      [dropTargetStyle [border 1 yuiBlue]]
-    . withNodeKey tagTextNodeKey
-    . withStyleBasic [bgColor (yuiLightPeach & a .~ mainPaneFloatingOpacity)]
-    $ textField_
-      (focusedFileModel . tagText)
-      [ onChange
-          ( \t ->
-              if T.null t
-                then DoFocusedFileEvent ResetTagHistIndex
-                else
-                  IOEvent
-                    ()
-          )
-      ]
 
 {-
  ____  _____ ____   ____ ____  ___ ____ _____ ___  ____

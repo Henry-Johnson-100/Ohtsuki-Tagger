@@ -4,9 +4,12 @@
 
 {-# HLINT ignore "Eta reduce" #-}
 
-module Interface.Widget.Internal.FileDetail (widget) where
+module Interface.Widget.Internal.FileDetail (
+  widget,
+  tagTextNodeKey,
+) where
 
-import Control.Lens
+import Control.Lens hiding (both)
 import Data.Event
 import qualified Data.HashSet as HS
 import Data.HierarchyMap (HierarchyMap)
@@ -15,6 +18,7 @@ import qualified Data.List as L
 import Data.Model
 import Data.Model.Shared
 import Data.Text (Text)
+import qualified Data.Text as T
 import Database.Tagger
 import Interface.Theme
 import Interface.Widget.Internal.Core
@@ -43,32 +47,35 @@ detailPaneTagsWidget
         []
         [ filePathWidget m
         , separatorLine
-        , vscroll_ [wheelRate 50] $
-            vstack
-              [ metaLeaves
-                  hm
-                  ( L.sortOn (descriptor . concreteTagDescriptor)
-                      . filter
-                        ( \x ->
-                            HM.metaMember x hm
-                              && not (HM.infraMember x hm)
-                        )
-                      . HM.keys
-                      $ hm
-                  )
-              , spacer_ [resizeFactor (-1)]
-              , nullMemberLeaves
-                  ( L.sortOn (descriptor . concreteTagDescriptor)
-                      . filter
-                        ( \x ->
-                            not (HM.metaMember x hm)
-                              && not (HM.infraMember x hm)
-                        )
-                      . HM.keys
-                      $ hm
-                  )
-              , deleteTagZone
-              ]
+        , vstack
+            [ vscroll_ [wheelRate 50] $
+                vstack
+                  [ metaLeaves
+                      hm
+                      ( L.sortOn (descriptor . concreteTagDescriptor)
+                          . filter
+                            ( \x ->
+                                HM.metaMember x hm
+                                  && not (HM.infraMember x hm)
+                            )
+                          . HM.keys
+                          $ hm
+                      )
+                  , spacer_ [resizeFactor (-1)]
+                  , nullMemberLeaves
+                      ( L.sortOn (descriptor . concreteTagDescriptor)
+                          . filter
+                            ( \x ->
+                                not (HM.metaMember x hm)
+                                  && not (HM.infraMember x hm)
+                            )
+                          . HM.keys
+                          $ hm
+                      )
+                  ]
+            , tagTextField
+            , deleteTagZone
+            ]
         ]
 
 filePathWidget :: TaggerModel -> TaggerWidget
@@ -225,3 +232,66 @@ deleteTagZone =
           $ yuiPeach
       ]
     $ buttonD_ "Delete" [resizeFactor (-1)]
+
+tagTextNodeKey :: Text
+tagTextNodeKey = "tag-text-field"
+
+tagTextField :: TaggerWidget
+tagTextField =
+  keystroke_
+    [ ("Enter", DoFocusedFileEvent CommitTagText)
+    , ("Up", DoFocusedFileEvent NextTagHist)
+    , ("Down", DoFocusedFileEvent PrevTagHist)
+    ]
+    []
+    . dropTarget_
+      (DoFocusedFileEvent . AppendTagText . descriptor . concreteTagDescriptor)
+      [dropTargetStyle [border 1 yuiRed]]
+    . dropTarget_
+      (DoFocusedFileEvent . AppendTagText . descriptor)
+      [dropTargetStyle [border 1 yuiBlue]]
+    . withNodeKey tagTextNodeKey
+    . withStyleBasic
+      [ bgColor
+          . modulateOpacity
+            (defaultElementOpacity - defaultOpacityModulator)
+          $ yuiLightPeach
+          -- bgColor (yuiLightPeach & a .~ mainPaneFloatingOpacity)
+      ]
+    $ textField_
+      (focusedFileModel . tagText)
+      [ onChange
+          ( \t ->
+              if T.null t
+                then DoFocusedFileEvent ResetTagHistIndex
+                else
+                  IOEvent
+                    ()
+          )
+      ]
+
+-- zstackTaggingWidget :: TaggerWidget
+-- zstackTaggingWidget =
+--   box_ [alignLeft, ignoreEmptyArea]
+--     . withStyleBasic [maxWidth 400]
+--     $ hstack
+--       [ vstack . (: [])
+--           . withStyleBasic
+--             [ bgColor $
+--                 yuiLightPeach
+--                   & a .~ mainPaneFloatingOpacity
+--             ]
+--           $ styledButton_
+--             [resizeFactor (-1)]
+--             "Tag"
+--             ( DoFocusedFileEvent
+--                 (ToggleFocusedFilePaneVisibility zstackTaggingWidgetVis)
+--             )
+--       , withNodeVisible
+--           isVisible
+--           tagTextField
+--       ]
+--  where
+--   isVisible =
+--     (m ^. focusedFileModel . focusedFileVis)
+--       `hasVis` VisibilityLabel zstackTaggingWidgetVis

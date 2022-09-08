@@ -168,7 +168,7 @@ createFocusedFileModel fp =
         ConcreteTaggedFile (File focusedFileDefaultRecordKey fp) empty
     , _focusedfilemodelRenderability = RenderingNotSupported
     , _focusedfilemodelFocusedFileVis = VisibilityMain
-    , _focusedfilemodelTagText = ""
+    , _focusedfilemodelTagText = "Tag..."
     , _focusedfilemodelTagHistory = createHistory 10
     }
 
