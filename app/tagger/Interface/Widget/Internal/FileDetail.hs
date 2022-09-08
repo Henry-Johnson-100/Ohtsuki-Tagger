@@ -239,9 +239,9 @@ tagTextNodeKey = "tag-text-field"
 tagTextField :: TaggerWidget
 tagTextField =
   keystroke_
-    [ ("Enter", DoFocusedFileEvent CommitTagText)
-    , ("Up", DoFocusedFileEvent NextTagHist)
-    , ("Down", DoFocusedFileEvent PrevTagHist)
+    [ ("Shift-Enter", DoFocusedFileEvent CommitTagText)
+    , ("Shift-Up", DoFocusedFileEvent NextTagHist)
+    , ("Shift-Down", DoFocusedFileEvent PrevTagHist)
     ]
     []
     . dropTarget_
@@ -256,18 +256,19 @@ tagTextField =
           . modulateOpacity
             (defaultElementOpacity - defaultOpacityModulator)
           $ yuiLightPeach
-          -- bgColor (yuiLightPeach & a .~ mainPaneFloatingOpacity)
+      , maxHeight 250
       ]
-    $ textField_
+    $ textArea_
       (focusedFileModel . tagText)
       [ onChange
           ( \t ->
-              if T.null t
+              if T.null . T.strip $ t
                 then DoFocusedFileEvent ResetTagHistIndex
                 else
                   IOEvent
                     ()
           )
+      , acceptTab
       ]
 
 -- zstackTaggingWidget :: TaggerWidget

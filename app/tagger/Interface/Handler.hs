@@ -1,11 +1,10 @@
+{-# HLINT ignore "Use list comprehension" #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# HLINT ignore "Use const" #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use list comprehension" #-}
 
 module Interface.Handler (
   taggerEventHandler,
@@ -127,6 +126,7 @@ taggerEventHandler
       ToggleTagMode -> [Model $ model & isTagMode %~ not]
       CloseConnection -> [Task (IOEvent <$> close conn)]
       IOEvent _ -> []
+      AnonymousEvent (fmap (\(TaggerAnonymousEvent e) -> e) -> es) -> es
       ClearTextField (TaggerLens l) -> [Model $ model & l .~ ""]
 
 fileSelectionEventHandler ::
@@ -510,17 +510,30 @@ focusedFileEventHandler
         ]
       CommitTagText ->
         [ Task
-            ( IOEvent
-                <$> taggerQLTag
-                  (fileId . concreteTaggedFile $ model ^. focusedFileModel . focusedFile)
-                  (TaggerQLTagStmnt . T.strip $ model ^. focusedFileModel . tagText)
-                  conn
+            ( anonymousEvent
+                <$> ( do
+                        taggerQLTag
+                          ( fileId . concreteTaggedFile $
+                              model ^. focusedFileModel . focusedFile
+                          )
+                          ( TaggerQLTagStmnt . T.strip $
+                              model ^. focusedFileModel . tagText
+                          )
+                          conn
+                        return
+                          [ Event
+                              . ClearTextField
+                              $ TaggerLens (focusedFileModel . tagText)
+                          , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
+                          ]
+                    )
             )
         , Model $
-            model & focusedFileModel . tagHistory
-              %~ putHist (T.strip $ model ^. focusedFileModel . tagText)
-        , Event (ClearTextField (TaggerLens $ focusedFileModel . tagText))
-        , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
+            model
+              & focusedFileModel . tagHistory
+                %~ putHist (T.strip $ model ^. focusedFileModel . tagText)
+        , Model $ model & focusedFileModel . tagText .~ mempty
+        , Task (IOEvent <$> putStrLn (T.unpack $ model ^. focusedFileModel . tagText))
         ]
       DeleteTag t ->
         [ Task (IOEvent <$> deleteTags [t] conn)

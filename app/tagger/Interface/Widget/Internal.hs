@@ -23,7 +23,6 @@ import Data.Event
 import Data.Model
 import Data.Model.Shared
 import Data.Text (Text)
-import qualified Data.Text as T
 import Database.Tagger.Type
 import Interface.Theme
 import Interface.Widget.Internal.Core

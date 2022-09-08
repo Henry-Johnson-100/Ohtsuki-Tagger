@@ -5,6 +5,8 @@
 
 module Data.Event (
   TaggerEvent (..),
+  TaggerAnonymousEvent (..),
+  anonymousEvent,
   FileSelectionEvent (..),
   FileSelectionWidgetEvent (..),
   DescriptorTreeEvent (..),
@@ -19,6 +21,7 @@ import Data.OccurrenceHashMap (OccurrenceHashMap)
 import Data.Sequence (Seq)
 import Data.Text (Text)
 import Database.Tagger.Type
+import Monomer (AppEventResponse)
 
 data TaggerEvent
   = DoFocusedFileEvent FocusedFileEvent
@@ -33,8 +36,24 @@ data TaggerEvent
   | ToggleTagMode
   | CloseConnection
   | IOEvent ()
+  | -- | A constructor for producing nested lists of tasks in other tasks.
+    -- a slightly more flexible way of calling 'Event` that should be easier to use
+    -- in either a 'Task` or normal 'Event` context
+    AnonymousEvent [TaggerAnonymousEvent]
   | ClearTextField (TaggerLens TaggerModel Text)
   deriving (Show, Eq)
+
+anonymousEvent :: [AppEventResponse TaggerModel TaggerEvent] -> TaggerEvent
+anonymousEvent = AnonymousEvent . fmap TaggerAnonymousEvent
+
+newtype TaggerAnonymousEvent
+  = TaggerAnonymousEvent (AppEventResponse TaggerModel TaggerEvent)
+
+instance Eq TaggerAnonymousEvent where
+  _ == _ = False
+
+instance Show TaggerAnonymousEvent where
+  show _ = "TaggerAnonymousEvent"
 
 data FileSelectionEvent
   = AddFiles
