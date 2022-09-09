@@ -64,7 +64,6 @@ import qualified Data.OccurrenceHashMap as OHM
 import qualified Data.Ord as O
 import Data.Sequence ((|>))
 import qualified Data.Sequence as Seq
-import Data.Tagger (SetOp (Difference, Intersect, Union))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger (Descriptor (descriptor), File (File))
@@ -102,7 +101,6 @@ import Monomer (
   black,
   box_,
   draggable,
-  dropdown,
   hgrid_,
   hstack,
   hstack_,
