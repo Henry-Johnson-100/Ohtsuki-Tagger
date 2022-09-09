@@ -2,17 +2,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Interface.Widget.Internal (
-  hidePossibleUIVis,
   zstackTaggingWidgetVis,
   zstackQueryWidgetVis,
 ) where
 
 import Data.Text (Text)
-
--- # TODO need to change the handlers and how some other visibiltiies work before I
--- I can delete / change / move this value.
-hidePossibleUIVis :: Text
-hidePossibleUIVis = "hide-possible-elements"
 
 -- # TODO need to change the handlers and how some other visibiltiies work before I
 -- I can delete / change / move this value.

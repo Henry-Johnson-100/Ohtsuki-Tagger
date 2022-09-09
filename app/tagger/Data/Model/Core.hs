@@ -27,6 +27,9 @@ module Data.Model.Core (
   TaggerInfoModel (..),
   createTaggerInfoModel,
   PositioningModel (..),
+  createPositioningModel,
+  defaultSelectionAndQueryPositioningModel,
+  defaultFileDetailAndDescriptorTreePositioningModel,
 ) where
 
 import Data.HierarchyMap (empty)
@@ -268,3 +271,13 @@ createPositioningModel =
     0.2
     0.5
     0.8
+
+defaultSelectionAndQueryPositioningModel :: PositioningModel -> PositioningModel
+defaultSelectionAndQueryPositioningModel (PositioningModel _ _ ov oh) =
+  let (PositioningModel v h _ _) = createPositioningModel
+   in PositioningModel v h ov oh
+
+defaultFileDetailAndDescriptorTreePositioningModel :: PositioningModel -> PositioningModel
+defaultFileDetailAndDescriptorTreePositioningModel (PositioningModel ov oh _ _) =
+  let (PositioningModel _ _ v h) = createPositioningModel
+   in PositioningModel ov oh v h

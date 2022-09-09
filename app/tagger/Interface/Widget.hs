@@ -27,11 +27,14 @@ taggerApplicationUI ::
   TaggerModel ->
   TaggerWidget
 taggerApplicationUI _ m =
-  globalKeystrokes
+  globalKeystrokes m
     . baseZStack m
     $ [ selectionQueryLayer m
       , fileDetailAndDescriptorTreeLayer m
       ]
+
+globalWidgetHideLabel :: Text
+globalWidgetHideLabel = "global-widget-hide"
 
 baseZStack :: TaggerModel -> [TaggerWidget] -> TaggerWidget
 baseZStack m ws = zstack_ [onlyTopActive_ False] (FilePreview.widget m : ws)
@@ -41,8 +44,13 @@ fileDetailDescriptorTreeHide = "file-detail-and-descriptor-tree-vis"
 
 fileDetailAndDescriptorTreeLayer :: TaggerModel -> TaggerWidget
 fileDetailAndDescriptorTreeLayer m =
-  withNodeHidden ((m ^. visibilityModel) `hasVis` VisibilityLabel fileDetailDescriptorTreeHide) $
-    hsplit_
+  withNodeHidden
+    ( or
+        ( hasVis (m ^. visibilityModel) . VisibilityLabel
+            <$> [fileDetailDescriptorTreeHide, globalWidgetHideLabel]
+        )
+    )
+    $ hsplit_
       [ splitIgnoreChildResize True
       , splitHandlePos
           (positioningModel . fileDetailAndDescriptorTreePosH)
@@ -65,14 +73,13 @@ fileDetailAndDescriptorTreeLayer m =
 selectionQueryHideLabel :: Text
 selectionQueryHideLabel = "selection-and-query-layer-hide"
 
-selectionQueryHideEvent :: TaggerEvent
-selectionQueryHideEvent = ToggleMainVisibility selectionQueryHideLabel
-
 selectionQueryLayer :: TaggerModel -> TaggerWidget
 selectionQueryLayer m =
   withNodeHidden
-    ( (m ^. visibilityModel)
-        `hasVis` VisibilityLabel selectionQueryHideLabel
+    ( or
+        ( hasVis (m ^. visibilityModel) . VisibilityLabel
+            <$> [selectionQueryHideLabel, globalWidgetHideLabel]
+        )
     )
     $ hsplit_
       [ splitIgnoreChildResize True
@@ -96,8 +103,8 @@ selectionQueryLayer m =
           $ spacer_ [resizeFactor (-1)]
       )
 
-globalKeystrokes :: TaggerWidget -> TaggerWidget
-globalKeystrokes =
+globalKeystrokes :: TaggerModel -> TaggerWidget -> TaggerWidget
+globalKeystrokes m =
   keystroke_
     [ ("Ctrl-r", RefreshUI)
     , ("Ctrl-i", DoFileSelectionEvent CycleNextFile)
@@ -119,9 +126,31 @@ globalKeystrokes =
     , ("Ctrl-g", DoFileSelectionEvent CycleNextSetOp)
     , ("Ctrl-Shift-g", DoFileSelectionEvent CyclePrevSetOp)
     , ("Ctrl-u", DoFileSelectionEvent ClearSelection)
-    , -- , ("Ctrl-h", ToggleMainVisibility hidePossibleUIVis)
-      ("Ctrl-q", selectionQueryHideEvent)
-    , ("Ctrl-e", ToggleMainVisibility fileDetailDescriptorTreeHide)
+    ,
+      ( "Ctrl-h"
+      , anonymousEvent
+          [ Model $ m & positioningModel .~ createPositioningModel
+          , Event . ToggleMainVisibility $ globalWidgetHideLabel
+          ]
+      )
+    ,
+      ( "Ctrl-q"
+      , anonymousEvent
+          [ Model $
+              m & positioningModel
+                %~ defaultSelectionAndQueryPositioningModel
+          , Event . ToggleMainVisibility $ selectionQueryHideLabel
+          ]
+      )
+    ,
+      ( "Ctrl-e"
+      , anonymousEvent
+          [ Model $
+              m & positioningModel
+                %~ defaultFileDetailAndDescriptorTreePositioningModel
+          , Event . ToggleMainVisibility $ fileDetailDescriptorTreeHide
+          ]
+      )
     ]
     []
 
