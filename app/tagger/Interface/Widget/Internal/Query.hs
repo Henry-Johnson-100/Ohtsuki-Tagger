@@ -30,7 +30,8 @@ widget _ =
 queryTextField :: TaggerWidget
 queryTextField =
   keystroke_
-    [ ("Enter", DoFileSelectionEvent RunQuerySequence)
+    [ ("Enter", DoFileSelectionEvent CreateNewWidgetQueryNode)
+    , ("Shift-Enter", DoFileSelectionEvent RunQuerySequence)
     , ("Up", DoFileSelectionEvent NextQueryHist)
     , ("Down", DoFileSelectionEvent PrevQueryHist)
     ]
