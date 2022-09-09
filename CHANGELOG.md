@@ -4,9 +4,22 @@
 
 # Unreleased
 
+* Enhanced the UI so that image is central and always fit to the full size of the page.
+  * Other widgets are semi-transparent and float on top to the left or right side
+  as resizeable panels.
+  * Added new hotkeys for selectively hiding and showing each respective panel.
+  * Furthermore, the layout of the widgets was changed and some extraneous widgets were
+  removed altogether.
+
 ------
 
 # Planned
+
+* A Query builder element in the query widget section.
+
+------
+
+### 1.0.2.0 -- ????-??-??
 
 ------
 
