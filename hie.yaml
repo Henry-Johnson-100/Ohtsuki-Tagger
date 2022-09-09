@@ -42,7 +42,28 @@ cradle:
     - path: "app/tagger/Interface/Widget.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/tagger/Interface/Widget/Internal.hs"
+    - path: "app/tagger/Interface/Widget/Internal/Core.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Interface/Widget/Internal/DescriptorTree.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Interface/Widget/Internal/FileDetail.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Interface/Widget/Internal/FilePreview.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Interface/Widget/Internal/InfoPanel.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Interface/Widget/Internal/Query.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Interface/Widget/Internal/Selection.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Interface/Widget/Internal/Type.hs"
       component: "tagger:exe:tagger"
 
     - path: "app/tagger/Util.hs"
