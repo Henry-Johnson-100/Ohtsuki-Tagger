@@ -4,24 +4,36 @@
 
 # Unreleased
 
+* Enhanced the UI so that image is central and always fit to the full size of the page.
+  * Other widgets are semi-transparent and float on top to the left or right side
+  as resizeable panels.
+  * Added new hotkeys for selectively hiding and showing each respective panel.
+  * Furthermore, the layout of the widgets was changed and some extraneous widgets were
+  removed altogether.
+
 ------
 
 # Planned
-
-### 1.0.2.0
 In order of priority
 * Visual query history/builder/editor.
   * https://holedigging.club/cgi-bin/tagger/tktview?name=4433af1d6b
-* Adjusting the layout of all widgets so that image is central and other widgets
-are floating panels that can be selectively hidden, this will remove the bottom and right
-panels that are resizeable, make them a fixed size, and make them floating above the image.
-  * Having a separate tagging and query mode to reduce confusion and mistakes that may
-  occur from using one textfield or the other.
-* Changing the function of adding files from adding certain files or recursive directories
-to just scanning and adding all files recursively from the directory that the database is
-placed in.
 * Minor adjustment to library architecture, moving the tagging engine to its own module,
 just like the new query engine in v1.0.1.1.
+
+------
+
+### 1.0.2.0 -- ????-??-??
+
+------
+
+#### 1.0.1.1 -- 2022-08-21
+
+* Fixed a bug: a50b7d8d4c81c844f22c502654b790e3895e7bb4
+  * Relating to subquery accuracy. Specifically, queries of the format
+    `r.a{b c} or any general type of criteria c for c.a{b c}` would return a superset of
+    the intended results.
+  * Giving a whole version to this fix because the presence
+  of bugs in the query engine is quite vexing to me no matter how minor.
 
 ------
 

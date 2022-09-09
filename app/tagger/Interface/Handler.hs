@@ -1,11 +1,10 @@
+{-# HLINT ignore "Use list comprehension" #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# HLINT ignore "Use const" #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use list comprehension" #-}
 
 module Interface.Handler (
   taggerEventHandler,
@@ -25,8 +24,10 @@ import Data.Event (
   FileSelectionEvent (..),
   FileSelectionWidgetEvent (..),
   FocusedFileEvent (..),
+  TaggerAnonymousEvent (TaggerAnonymousEvent),
   TaggerEvent (..),
   TaggerInfoEvent (..),
+  anonymousEvent,
  )
 import qualified Data.Foldable as F
 import Data.HierarchyMap (empty)
@@ -80,7 +81,8 @@ import Interface.Handler.Internal (
   shuffleSequence,
  )
 import Interface.Handler.WidgetQueryRequest
-import Interface.Widget.Internal (fileSelectionScrollWidgetNodeKey, queryTextFieldKey, tagTextNodeKey, zstackQueryWidgetVis, zstackTaggingWidgetVis)
+import Interface.Widget.Internal.Query (queryTextFieldKey)
+import Interface.Widget.Internal.Selection (fileSelectionScrollWidgetNodeKey)
 import Monomer (
   AppEventResponse,
   EventResponse (Event, Message, Model, SetFocusOnKey, Task),
@@ -113,30 +115,6 @@ taggerEventHandler
       DoFileSelectionEvent e -> fileSelectionEventHandler wenv node model e
       DoDescriptorTreeEvent e -> descriptorTreeEventHandler wenv node model e
       DoTaggerInfoEvent e -> taggerInfoEventHandler wenv node model e
-      FocusTagTextField ->
-        if (model ^. focusedFileModel . focusedFileVis)
-          `hasVis` VisibilityLabel zstackTaggingWidgetVis
-          then [SetFocusOnKey . WidgetKey $ tagTextNodeKey]
-          else
-            [ Event
-                ( DoFocusedFileEvent
-                    (ToggleFocusedFilePaneVisibility zstackTaggingWidgetVis)
-                )
-            , SetFocusOnKey . WidgetKey $ tagTextNodeKey
-            ]
-      FocusQueryTextField ->
-        if (model ^. focusedFileModel . focusedFileVis)
-          `hasVis` VisibilityLabel zstackQueryWidgetVis
-          then [SetFocusOnKey . WidgetKey $ queryTextFieldKey]
-          else
-            [ Event
-                ( DoFocusedFileEvent
-                    ( ToggleFocusedFilePaneVisibility
-                        zstackQueryWidgetVis
-                    )
-                )
-            , SetFocusOnKey . WidgetKey $ queryTextFieldKey
-            ]
       TaggerInit ->
         [ Event (DoDescriptorTreeEvent DescriptorTreeInit)
         , Task
@@ -162,11 +140,7 @@ taggerEventHandler
               .~ "Thank you for using tagger!"
               & taggerInfoModel . versionMessage
               .~ mempty
-        , Event
-            ( DoFocusedFileEvent
-                (ToggleFocusedFilePaneVisibility zstackQueryWidgetVis)
-            )
-        , Event FocusQueryTextField
+        , SetFocusOnKey . WidgetKey $ queryTextFieldKey
         ]
       RefreshUI ->
         [ Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
@@ -177,6 +151,7 @@ taggerEventHandler
       ToggleTagMode -> [Model $ model & isTagMode %~ not]
       CloseConnection -> [Task (IOEvent <$> close conn)]
       IOEvent _ -> []
+      AnonymousEvent (fmap (\(TaggerAnonymousEvent e) -> e) -> es) -> es
       ClearTextField (TaggerLens l) -> [Model $ model & l .~ ""]
 
 fileSelectionEventHandler ::
@@ -583,19 +558,26 @@ focusedFileEventHandler
                 )
         ]
       CommitTagText ->
-        [ Task
-            ( IOEvent
-                <$> taggerQLTag
-                  (fileId . concreteTaggedFile $ model ^. focusedFileModel . focusedFile)
-                  (TaggerQLTagStmnt . T.strip $ model ^. focusedFileModel . tagText)
-                  conn
+        anonymousTask $ do
+          taggerQLTag
+            ( fileId . concreteTaggedFile $
+                model ^. focusedFileModel . focusedFile
             )
-        , Model $
-            model & focusedFileModel . tagHistory
-              %~ putHist (T.strip $ model ^. focusedFileModel . tagText)
-        , Event (ClearTextField (TaggerLens $ focusedFileModel . tagText))
-        , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
-        ]
+            ( TaggerQLTagStmnt . T.strip $
+                model ^. focusedFileModel . tagText
+            )
+            conn
+          callback
+            [ Model $
+                model
+                  & focusedFileModel . tagHistory
+                    %~ putHist
+                      (T.strip $ model ^. focusedFileModel . tagText)
+            , Event
+                . ClearTextField
+                $ TaggerLens (focusedFileModel . tagText)
+            , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
+            ]
       DeleteTag t ->
         [ Task (IOEvent <$> deleteTags [t] conn)
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
@@ -603,65 +585,65 @@ focusedFileEventHandler
       MoveTag
         (ConcreteTag oldTagKey (Descriptor dk dp) oldSubTagKey)
         newMaybeSubTagKey ->
-          let (File fk _) =
+          let (fileId -> fk) =
                 concreteTaggedFile $
                   model
                     ^. focusedFileModel . focusedFile
-           in [ Task
-                  ( IOEvent
-                      <$> do
-                        result <-
-                          runExceptT $ do
-                            withExceptT
-                              (const "Cannot move tags of the default file.")
-                              ( guard (fk /= focusedFileDefaultRecordKey) ::
-                                  ExceptT String IO ()
-                              )
-                            withExceptT
-                              ( const
-                                  ( "Cannot move tag, "
-                                      ++ T.unpack dp
-                                      ++ ", to be a subtag of itself."
-                                  )
-                              )
-                              ( guard
-                                  ( maybe
-                                      True
-                                      ( \newSubTagKey ->
-                                          not
-                                            . HAM.isInfraTo newSubTagKey oldTagKey
-                                            . HAM.mapHierarchyMap concreteTagId
-                                            . concreteTaggedFileDescriptors
-                                            $ model ^. focusedFileModel . focusedFile
-                                      )
-                                      newMaybeSubTagKey
-                                  ) ::
-                                  ExceptT String IO ()
-                              )
-                            withExceptT
-                              ( const
-                                  ( "Tag, "
-                                      ++ T.unpack dp
-                                      ++ ", is already subtagged to the destination."
-                                  )
-                              )
-                              ( guard
-                                  ( oldSubTagKey
-                                      /= newMaybeSubTagKey
-                                  ) ::
-                                  ExceptT String IO ()
-                              )
-                            newTags <-
-                              lift $
-                                insertTags [(fk, dk, newMaybeSubTagKey)] conn
-                            -- moving all old subtags to the new tag
-                            -- or else they will be cascade deleted when the old tag is.
-                            lift $ moveSubTags ((oldTagKey,) <$> newTags) conn
-                            lift $ deleteTags [oldTagKey] conn
-                        either (hPutStrLn stderr) return result
+           in anonymousTask $ do
+                moveTagTask fk
+                callback [Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection]
+         where
+          moveTagTask :: RecordKey File -> IO ()
+          moveTagTask fk = do
+            result <-
+              runExceptT $ do
+                withExceptT
+                  (const "Cannot move tags of the default file.")
+                  ( guard (fk /= focusedFileDefaultRecordKey) ::
+                      ExceptT String IO ()
                   )
-              , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
-              ]
+                withExceptT
+                  ( const
+                      ( "Cannot move tag, "
+                          ++ T.unpack dp
+                          ++ ", to be a subtag of itself."
+                      )
+                  )
+                  ( guard
+                      ( maybe
+                          True
+                          ( \newSubTagKey ->
+                              not
+                                . HAM.isInfraTo newSubTagKey oldTagKey
+                                . HAM.mapHierarchyMap concreteTagId
+                                . concreteTaggedFileDescriptors
+                                $ model ^. focusedFileModel . focusedFile
+                          )
+                          newMaybeSubTagKey
+                      ) ::
+                      ExceptT String IO ()
+                  )
+                withExceptT
+                  ( const
+                      ( "Tag, "
+                          ++ T.unpack dp
+                          ++ ", is already subtagged to the destination."
+                      )
+                  )
+                  ( guard
+                      ( oldSubTagKey
+                          /= newMaybeSubTagKey
+                      ) ::
+                      ExceptT String IO ()
+                  )
+                newTags <-
+                  lift $
+                    insertTags [(fk, dk, newMaybeSubTagKey)] conn
+                -- moving all old subtags to the new tag
+                -- or else they will be cascade deleted when the old tag is.
+                lift $ moveSubTags ((oldTagKey,) <$> newTags) conn
+                lift $ deleteTags [oldTagKey] conn
+            either (hPutStrLn stderr) return result
       NextTagHist ->
         [ Model $
             model
@@ -752,6 +734,23 @@ focusedFileEventHandler
         [ Task (IOEvent <$> unSubTags [tk] conn)
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
+
+{- |
+ Performs some IO then executes the returned 'AppEventResponse`s
+
+ The list of 'AppEventResponse`s is like a callback to be executed after the
+ IO body is executed.
+-}
+anonymousTask ::
+  IO [AppEventResponse TaggerModel TaggerEvent] ->
+  [EventResponse s TaggerEvent sp ep]
+anonymousTask = (: []) . Task . fmap anonymousEvent
+
+{- |
+ 'return` alias
+-}
+callback :: Monad m => a -> m a
+callback = return
 
 -- this is kind of stupid but whatever.
 getRenderability :: Text -> Renderability

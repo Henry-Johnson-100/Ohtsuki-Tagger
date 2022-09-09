@@ -1,7 +1,7 @@
 cabal-version:       2.4
 
 name:                tagger
-version:             1.0.1.1
+version:             1.0.2.0
 synopsis:            A file/image tagger that connects to or initializes sqlite databases.
 -- description:
 -- bug-reports:
@@ -66,7 +66,14 @@ executable tagger
                       ,Interface.Handler.WidgetQueryRequest
                       ,Interface.Theme
                       ,Interface.Widget
-                      ,Interface.Widget.Internal
+                      ,Interface.Widget.Internal.Core
+                      ,Interface.Widget.Internal.DescriptorTree
+                      ,Interface.Widget.Internal.FileDetail
+                      ,Interface.Widget.Internal.FilePreview
+                      ,Interface.Widget.Internal.InfoPanel
+                      ,Interface.Widget.Internal.Query
+                      ,Interface.Widget.Internal.Selection
+                      ,Interface.Widget.Internal.Type
                       ,Util
 
   other-extensions:   RankNTypes

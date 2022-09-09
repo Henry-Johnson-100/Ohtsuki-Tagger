@@ -37,6 +37,8 @@ makeLensesWith abbreviatedFields ''FileInfo
 
 makeLensesWith abbreviatedFields ''TaggerInfoModel
 
+makeLensesWith abbreviatedFields ''PositioningModel
+
 fileInfoAt :: Int -> Lens' (IntMap FileInfo) FileInfo
 fileInfoAt n =
   lens
