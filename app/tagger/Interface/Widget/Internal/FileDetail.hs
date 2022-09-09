@@ -9,21 +9,96 @@ module Interface.Widget.Internal.FileDetail (
   tagTextNodeKey,
 ) where
 
-import Control.Lens hiding (both)
-import Data.Event
+import Control.Lens ((^.))
+import Data.Event (
+  FileSelectionEvent (RenameFile),
+  FocusedFileEvent (
+    AppendTagText,
+    CommitTagText,
+    DeleteTag,
+    MoveTag,
+    NextTagHist,
+    PrevTagHist,
+    ResetTagHistIndex,
+    TagFile,
+    ToggleFocusedFilePaneVisibility
+  ),
+  TaggerEvent (DoFileSelectionEvent, DoFocusedFileEvent, IOEvent),
+ )
 import qualified Data.HashSet as HS
 import Data.HierarchyMap (HierarchyMap)
 import qualified Data.HierarchyMap as HM
 import qualified Data.List as L
-import Data.Model
-import Data.Model.Shared
+import Data.Model (
+  HasFileInfoRenameText (fileInfoRenameText),
+  HasFileSelectionInfoMap (fileSelectionInfoMap),
+  HasFileSelectionModel (fileSelectionModel),
+  HasFocusedFile (focusedFile),
+  HasFocusedFileModel (focusedFileModel),
+  HasFocusedFileVis (focusedFileVis),
+  HasTagText (tagText),
+  TaggerModel,
+  fileInfoAt,
+  focusedFileDefaultRecordKey,
+ )
+import Data.Model.Shared (Visibility (VisibilityLabel), hasVis)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger
-import Interface.Theme
-import Interface.Widget.Internal.Core
-import Interface.Widget.Internal.Type
-import Monomer
+import Database.Tagger (
+  ConcreteTag (ConcreteTag, concreteTagDescriptor, concreteTagId),
+  ConcreteTaggedFile (ConcreteTaggedFile, concreteTaggedFile),
+  Descriptor (Descriptor, descriptor),
+  File (fileId, filePath),
+  RecordKey,
+  Tag,
+ )
+import Interface.Theme (yuiBlue, yuiLightPeach, yuiPeach, yuiRed)
+import Interface.Widget.Internal.Core (
+  defaultElementOpacity,
+  defaultOpacityModulator,
+  modulateOpacity,
+  styledButton_,
+  withNodeKey,
+  withNodeVisible,
+  withStyleBasic,
+ )
+import Interface.Widget.Internal.Type (TaggerWidget)
+import Monomer (
+  CmbAcceptTab (acceptTab),
+  CmbAlignLeft (alignLeft),
+  CmbAlignTop (alignTop),
+  CmbBgColor (bgColor),
+  CmbBorder (border),
+  CmbBorderB (borderB),
+  CmbMaxHeight (maxHeight),
+  CmbOnChange (onChange),
+  CmbPaddingR (paddingR),
+  CmbResizeFactor (resizeFactor),
+  CmbStyleHover (styleHoverSet),
+  CmbTextColor (textColor),
+  CmbWheelRate (wheelRate),
+  CmbWidth (width),
+  WidgetNode,
+  black,
+  box_,
+  buttonD_,
+  draggable,
+  dropTargetStyle,
+  dropTarget_,
+  hstack_,
+  keystroke_,
+  label,
+  label_,
+  separatorLine,
+  spacer,
+  spacer_,
+  textArea_,
+  textField_,
+  vscroll_,
+  vstack,
+  vstack_,
+  zstack_,
+ )
 
 widget :: TaggerModel -> TaggerWidget
 widget m = detailPane m

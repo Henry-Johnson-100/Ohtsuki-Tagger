@@ -5,20 +5,72 @@ module Interface.Widget (
   taggerApplicationUI,
 ) where
 
-import Control.Lens hiding (bimap, both)
-import Data.Event
-import Data.Model
-import Data.Model.Shared.Core
+import Control.Lens ((%~), (&), (.~), (^.))
+import Data.Event (
+  FileSelectionEvent (
+    ClearSelection,
+    CycleNextFile,
+    CycleNextSetOp,
+    CyclePrevFile,
+    CyclePrevSetOp
+  ),
+  TaggerEvent (DoFileSelectionEvent, RefreshUI, ToggleMainVisibility),
+  anonymousEvent,
+ )
+import Data.Model (
+  HasFileDetailAndDescriptorTreePosH (fileDetailAndDescriptorTreePosH),
+  HasFileDetailAndDescriptorTreePosV (fileDetailAndDescriptorTreePosV),
+  HasPositioningModel (positioningModel),
+  HasSelectionAndQueryPosH (selectionAndQueryPosH),
+  HasSelectionAndQueryPosV (selectionAndQueryPosV),
+  HasVisibilityModel (visibilityModel),
+  TaggerModel,
+  createPositioningModel,
+  defaultFileDetailAndDescriptorTreePositioningModel,
+  defaultSelectionAndQueryPositioningModel,
+ )
+import Data.Model.Shared.Core (
+  Visibility (VisibilityLabel),
+  hasVis,
+ )
 import Data.Text (Text)
 import Interface.Theme
-import Interface.Widget.Internal.Core
+import Interface.Widget.Internal.Core (
+  defaultElementOpacity,
+  withNodeHidden,
+  withStyleBasic,
+ )
 import qualified Interface.Widget.Internal.DescriptorTree as DescriptorTree
 import qualified Interface.Widget.Internal.FileDetail as FileDetail
 import qualified Interface.Widget.Internal.FilePreview as FilePreview
 import qualified Interface.Widget.Internal.Query as Query
 import qualified Interface.Widget.Internal.Selection as Selection
 import Interface.Widget.Internal.Type (TaggerWidget)
-import Monomer
+import Monomer (
+  CmbBgColor (bgColor),
+  CmbBorderB (borderB),
+  CmbBorderL (borderL),
+  CmbBorderR (borderR),
+  CmbBorderT (borderT),
+  CmbIgnoreEmptyArea (ignoreEmptyArea),
+  CmbMaxWidth (maxWidth),
+  CmbPaddingB (paddingB),
+  CmbPaddingT (paddingT),
+  CmbResizeFactor (resizeFactor),
+  EventResponse (Event, Model, SetFocusOnKey),
+  WidgetEnv,
+  WidgetKey (WidgetKey),
+  black,
+  box_,
+  hsplit_,
+  keystroke_,
+  onlyTopActive_,
+  spacer_,
+  splitHandlePos,
+  splitIgnoreChildResize,
+  vsplit_,
+  zstack_,
+ )
 import Monomer.Graphics.Lens (HasA (a))
 
 taggerApplicationUI ::

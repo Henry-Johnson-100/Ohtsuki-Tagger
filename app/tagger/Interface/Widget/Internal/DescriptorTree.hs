@@ -7,19 +7,92 @@
 
 module Interface.Widget.Internal.DescriptorTree (widget) where
 
-import Control.Lens hiding (both)
-import Data.Event
+import Control.Lens ((&), (.~), (^.))
+import Data.Event (
+  DescriptorTreeEvent (
+    CreateRelation,
+    DeleteDescriptor,
+    InsertDescriptor,
+    RefreshBothDescriptorTrees,
+    RequestFocusedNode,
+    RequestFocusedNodeParent,
+    ToggleDescriptorTreeVisibility,
+    UpdateDescriptor
+  ),
+  TaggerEvent (DoDescriptorTreeEvent),
+ )
 import qualified Data.List as L
-import Data.Model
-import Data.Model.Shared
+import Data.Model (
+  HasDescriptorInfoMap (descriptorInfoMap),
+  HasDescriptorIsMeta (descriptorIsMeta),
+  HasDescriptorTreeModel (descriptorTreeModel),
+  HasDescriptorTreeVis (descriptorTreeVis),
+  HasFocusedNode (focusedNode),
+  HasFocusedTree (focusedTree),
+  HasNewDescriptorText (newDescriptorText),
+  HasRenameText (renameText),
+  HasUnrelated (unrelated),
+  HasUnrelatedNode (unrelatedNode),
+  TaggerModel,
+  descriptorInfoAt,
+ )
+import Data.Model.Shared (Visibility (VisibilityLabel), hasVis)
 import Data.Text (Text)
-import Database.Tagger
-import Interface.Theme
-import Interface.Widget.Internal.Core
-import Interface.Widget.Internal.Type
-import Monomer
+import Database.Tagger (Descriptor (Descriptor, descriptor))
+import Interface.Theme (
+  yuiBlue,
+  yuiLightPeach,
+  yuiOrange,
+  yuiRed,
+  yuiYellow,
+ )
+import Interface.Widget.Internal.Core (
+  defaultElementOpacity,
+  defaultOpacityModulator,
+  modulateOpacity,
+  styledButton_,
+  withNodeKey,
+  withNodeVisible,
+  withStyleBasic,
+  withStyleHover,
+ )
+import Interface.Widget.Internal.Type (TaggerWidget)
+import Monomer (
+  CmbAlignBottom (alignBottom),
+  CmbAlignLeft (alignLeft),
+  CmbAlignMiddle (alignMiddle),
+  CmbBgColor (bgColor),
+  CmbBorder (border),
+  CmbBorderL (borderL),
+  CmbBorderR (borderR),
+  CmbMergeRequired (mergeRequired),
+  CmbResizeFactor (resizeFactor),
+  CmbSizeReqUpdater (sizeReqUpdater),
+  CmbTextColor (textColor),
+  CmbTextLeft (textLeft),
+  CmbWheelRate (wheelRate),
+  black,
+  box_,
+  button,
+  button_,
+  draggable,
+  dropTargetStyle,
+  dropTarget_,
+  expandContent,
+  hsplit_,
+  hstack_,
+  keystroke_,
+  label_,
+  separatorLine,
+  splitIgnoreChildResize,
+  textField_,
+  vscroll_,
+  vstack_,
+  white,
+  zstack_,
+ )
 import Monomer.Core.Lens (fixed)
-import Util
+import Util (both)
 
 widget :: TaggerModel -> TaggerWidget
 widget m = descriptorTreeWidget m
