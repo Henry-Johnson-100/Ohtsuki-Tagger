@@ -28,8 +28,6 @@ data TaggerEvent
   | DoFileSelectionEvent FileSelectionEvent
   | DoDescriptorTreeEvent DescriptorTreeEvent
   | DoTaggerInfoEvent TaggerInfoEvent
-  | FocusTagTextField
-  | FocusQueryTextField
   | TaggerInit
   | RefreshUI
   | ToggleMainVisibility Text

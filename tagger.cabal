@@ -65,7 +65,6 @@ executable tagger
                       ,Interface.Handler.Internal
                       ,Interface.Theme
                       ,Interface.Widget
-                      ,Interface.Widget.Internal
                       ,Interface.Widget.Internal.Core
                       ,Interface.Widget.Internal.DescriptorTree
                       ,Interface.Widget.Internal.FileDetail

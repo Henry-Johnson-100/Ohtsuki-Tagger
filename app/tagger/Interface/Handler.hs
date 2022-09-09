@@ -33,8 +33,6 @@ import qualified Data.Text as T
 import Data.Version (showVersion)
 import Database.Tagger
 import Interface.Handler.Internal
-import Interface.Widget.Internal (zstackQueryWidgetVis, zstackTaggingWidgetVis)
-import Interface.Widget.Internal.FileDetail (tagTextNodeKey)
 import Interface.Widget.Internal.Query (queryTextFieldKey)
 import Interface.Widget.Internal.Selection (fileSelectionScrollWidgetNodeKey)
 import Monomer
@@ -62,30 +60,6 @@ taggerEventHandler
       DoFileSelectionEvent e -> fileSelectionEventHandler wenv node model e
       DoDescriptorTreeEvent e -> descriptorTreeEventHandler wenv node model e
       DoTaggerInfoEvent e -> taggerInfoEventHandler wenv node model e
-      FocusTagTextField ->
-        if (model ^. focusedFileModel . focusedFileVis)
-          `hasVis` VisibilityLabel zstackTaggingWidgetVis
-          then [SetFocusOnKey . WidgetKey $ tagTextNodeKey]
-          else
-            [ Event
-                ( DoFocusedFileEvent
-                    (ToggleFocusedFilePaneVisibility zstackTaggingWidgetVis)
-                )
-            , SetFocusOnKey . WidgetKey $ tagTextNodeKey
-            ]
-      FocusQueryTextField ->
-        if (model ^. focusedFileModel . focusedFileVis)
-          `hasVis` VisibilityLabel zstackQueryWidgetVis
-          then [SetFocusOnKey . WidgetKey $ queryTextFieldKey]
-          else
-            [ Event
-                ( DoFocusedFileEvent
-                    ( ToggleFocusedFilePaneVisibility
-                        zstackQueryWidgetVis
-                    )
-                )
-            , SetFocusOnKey . WidgetKey $ queryTextFieldKey
-            ]
       TaggerInit ->
         [ Event (DoDescriptorTreeEvent DescriptorTreeInit)
         , Task
@@ -111,11 +85,7 @@ taggerEventHandler
               .~ "Thank you for using tagger!"
               & taggerInfoModel . versionMessage
               .~ mempty
-        , Event
-            ( DoFocusedFileEvent
-                (ToggleFocusedFilePaneVisibility zstackQueryWidgetVis)
-            )
-        , Event FocusQueryTextField
+        , SetFocusOnKey . WidgetKey $ queryTextFieldKey
         ]
       RefreshUI ->
         [ Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)

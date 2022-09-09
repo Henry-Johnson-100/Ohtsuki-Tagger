@@ -13,7 +13,6 @@ module Interface.Widget.Internal.Query (
 import Control.Lens
 import Data.Event
 import Data.Model
-import Data.Model.Shared
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger
@@ -24,10 +23,9 @@ import Monomer
 import Monomer.Graphics.Lens
 
 widget :: TaggerModel -> TaggerWidget
-widget m =
-  visibilities m
-    . container
-    $ queryTextField
+widget _ =
+  container
+    queryTextField
 
 queryTextField :: TaggerWidget
 queryTextField =
@@ -64,19 +62,6 @@ container w =
     . box_ [alignLeft, alignBottom, ignoreEmptyArea]
     -- . withStyleBasic [borderT 1 black, borderB 1 black, borderR 1 black]
     $ w
-
-visibilities :: TaggerModel -> TaggerWidget -> TaggerWidget
-visibilities = withNodeVisible . isVisible
-{-# INLINE visibilities #-}
-
-isVisible :: TaggerModel -> Bool
-isVisible m =
-  (m ^. focusedFileModel . focusedFileVis)
-    `hasVis` VisibilityLabel zstackQueryWidgetVis
-
-zstackQueryWidgetVis :: Text
-zstackQueryWidgetVis = "show-query-field"
-{-# INLINE zstackQueryWidgetVis #-}
 
 queryTextFieldKey :: Text
 queryTextFieldKey = "queryTextField"

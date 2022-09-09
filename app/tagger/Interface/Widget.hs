@@ -11,7 +11,6 @@ import Data.Model
 import Data.Model.Shared.Core
 import Data.Text (Text)
 import Interface.Theme
-import Interface.Widget.Internal
 import Interface.Widget.Internal.Core
 import qualified Interface.Widget.Internal.DescriptorTree as DescriptorTree
 import qualified Interface.Widget.Internal.FileDetail as FileDetail
@@ -109,19 +108,25 @@ globalKeystrokes m =
     [ ("Ctrl-r", RefreshUI)
     , ("Ctrl-i", DoFileSelectionEvent CycleNextFile)
     , ("Ctrl-k", DoFileSelectionEvent CyclePrevFile)
-    , ("Ctrl-t", FocusTagTextField)
     ,
-      ( "Ctrl-Shift-t"
-      , DoFocusedFileEvent
-          ( ToggleFocusedFilePaneVisibility
-              zstackTaggingWidgetVis
-          )
+      ( "Ctrl-t"
+      , anonymousEvent $
+          if (m ^. visibilityModel) `hasVis` VisibilityLabel fileDetailDescriptorTreeHide
+            then
+              [ Event . ToggleMainVisibility $ fileDetailDescriptorTreeHide
+              , SetFocusOnKey . WidgetKey $ FileDetail.tagTextNodeKey
+              ]
+            else [SetFocusOnKey . WidgetKey $ FileDetail.tagTextNodeKey]
       )
-    , ("Ctrl-f", FocusQueryTextField)
     ,
-      ( "Ctrl-Shift-f"
-      , DoFocusedFileEvent
-          (ToggleFocusedFilePaneVisibility zstackQueryWidgetVis)
+      ( "Ctrl-f"
+      , anonymousEvent $
+          if (m ^. visibilityModel) `hasVis` VisibilityLabel selectionQueryHideLabel
+            then
+              [ Event . ToggleMainVisibility $ selectionQueryHideLabel
+              , SetFocusOnKey . WidgetKey $ Query.queryTextFieldKey
+              ]
+            else [SetFocusOnKey . WidgetKey $ Query.queryTextFieldKey]
       )
     , ("Ctrl-g", DoFileSelectionEvent CycleNextSetOp)
     , ("Ctrl-Shift-g", DoFileSelectionEvent CyclePrevSetOp)

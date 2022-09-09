@@ -276,29 +276,3 @@ tagTextField =
           )
       , acceptTab
       ]
-
--- zstackTaggingWidget :: TaggerWidget
--- zstackTaggingWidget =
---   box_ [alignLeft, ignoreEmptyArea]
---     . withStyleBasic [maxWidth 400]
---     $ hstack
---       [ vstack . (: [])
---           . withStyleBasic
---             [ bgColor $
---                 yuiLightPeach
---                   & a .~ mainPaneFloatingOpacity
---             ]
---           $ styledButton_
---             [resizeFactor (-1)]
---             "Tag"
---             ( DoFocusedFileEvent
---                 (ToggleFocusedFilePaneVisibility zstackTaggingWidgetVis)
---             )
---       , withNodeVisible
---           isVisible
---           tagTextField
---       ]
---  where
---   isVisible =
---     (m ^. focusedFileModel . focusedFileVis)
---       `hasVis` VisibilityLabel zstackTaggingWidgetVis
