@@ -18,6 +18,7 @@ import qualified Interface.Widget.Internal.FileDetail as FileDetail
 import qualified Interface.Widget.Internal.FilePreview as FilePreview
 import qualified Interface.Widget.Internal.Query as Query
 import qualified Interface.Widget.Internal.Selection as Selection
+import Interface.Widget.Internal.Type (TaggerWidget)
 import Monomer
 import Monomer.Graphics.Lens (HasA (a))
 
