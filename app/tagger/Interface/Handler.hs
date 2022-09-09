@@ -518,7 +518,7 @@ focusedFileEventHandler
                 model ^. focusedFileModel . tagText
             )
             conn
-          return
+          callback
             [ Model $
                 model
                   & focusedFileModel . tagHistory
@@ -536,65 +536,65 @@ focusedFileEventHandler
       MoveTag
         (ConcreteTag oldTagKey (Descriptor dk dp) oldSubTagKey)
         newMaybeSubTagKey ->
-          let (File fk _) =
+          let (fileId -> fk) =
                 concreteTaggedFile $
                   model
                     ^. focusedFileModel . focusedFile
-           in [ Task
-                  ( IOEvent
-                      <$> do
-                        result <-
-                          runExceptT $ do
-                            withExceptT
-                              (const "Cannot move tags of the default file.")
-                              ( guard (fk /= focusedFileDefaultRecordKey) ::
-                                  ExceptT String IO ()
-                              )
-                            withExceptT
-                              ( const
-                                  ( "Cannot move tag, "
-                                      ++ T.unpack dp
-                                      ++ ", to be a subtag of itself."
-                                  )
-                              )
-                              ( guard
-                                  ( maybe
-                                      True
-                                      ( \newSubTagKey ->
-                                          not
-                                            . HAM.isInfraTo newSubTagKey oldTagKey
-                                            . HAM.mapHierarchyMap concreteTagId
-                                            . concreteTaggedFileDescriptors
-                                            $ model ^. focusedFileModel . focusedFile
-                                      )
-                                      newMaybeSubTagKey
-                                  ) ::
-                                  ExceptT String IO ()
-                              )
-                            withExceptT
-                              ( const
-                                  ( "Tag, "
-                                      ++ T.unpack dp
-                                      ++ ", is already subtagged to the destination."
-                                  )
-                              )
-                              ( guard
-                                  ( oldSubTagKey
-                                      /= newMaybeSubTagKey
-                                  ) ::
-                                  ExceptT String IO ()
-                              )
-                            newTags <-
-                              lift $
-                                insertTags [(fk, dk, newMaybeSubTagKey)] conn
-                            -- moving all old subtags to the new tag
-                            -- or else they will be cascade deleted when the old tag is.
-                            lift $ moveSubTags ((oldTagKey,) <$> newTags) conn
-                            lift $ deleteTags [oldTagKey] conn
-                        either (hPutStrLn stderr) return result
+           in anonymousTask $ do
+                moveTagTask fk
+                callback [Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection]
+         where
+          moveTagTask :: RecordKey File -> IO ()
+          moveTagTask fk = do
+            result <-
+              runExceptT $ do
+                withExceptT
+                  (const "Cannot move tags of the default file.")
+                  ( guard (fk /= focusedFileDefaultRecordKey) ::
+                      ExceptT String IO ()
                   )
-              , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
-              ]
+                withExceptT
+                  ( const
+                      ( "Cannot move tag, "
+                          ++ T.unpack dp
+                          ++ ", to be a subtag of itself."
+                      )
+                  )
+                  ( guard
+                      ( maybe
+                          True
+                          ( \newSubTagKey ->
+                              not
+                                . HAM.isInfraTo newSubTagKey oldTagKey
+                                . HAM.mapHierarchyMap concreteTagId
+                                . concreteTaggedFileDescriptors
+                                $ model ^. focusedFileModel . focusedFile
+                          )
+                          newMaybeSubTagKey
+                      ) ::
+                      ExceptT String IO ()
+                  )
+                withExceptT
+                  ( const
+                      ( "Tag, "
+                          ++ T.unpack dp
+                          ++ ", is already subtagged to the destination."
+                      )
+                  )
+                  ( guard
+                      ( oldSubTagKey
+                          /= newMaybeSubTagKey
+                      ) ::
+                      ExceptT String IO ()
+                  )
+                newTags <-
+                  lift $
+                    insertTags [(fk, dk, newMaybeSubTagKey)] conn
+                -- moving all old subtags to the new tag
+                -- or else they will be cascade deleted when the old tag is.
+                lift $ moveSubTags ((oldTagKey,) <$> newTags) conn
+                lift $ deleteTags [oldTagKey] conn
+            either (hPutStrLn stderr) return result
       NextTagHist ->
         [ Model $
             model
@@ -696,6 +696,12 @@ anonymousTask ::
   IO [AppEventResponse TaggerModel TaggerEvent] ->
   [EventResponse s TaggerEvent sp ep]
 anonymousTask = (: []) . Task . fmap anonymousEvent
+
+{- |
+ 'return` alias
+-}
+callback :: Monad m => a -> m a
+callback = return
 
 -- this is kind of stupid but whatever.
 getRenderability :: Text -> Renderability

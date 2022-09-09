@@ -110,6 +110,12 @@ filePathWidget m =
                 )
               ]
               []
+            . withStyleBasic
+              [ bgColor
+                  . modulateOpacity
+                    (defaultElementOpacity - defaultOpacityModulator)
+                  $ yuiLightPeach
+              ]
             $ textField_
               ( fileSelectionModel
                   . fileSelectionInfoMap
