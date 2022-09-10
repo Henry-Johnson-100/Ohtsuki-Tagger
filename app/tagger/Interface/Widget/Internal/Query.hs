@@ -79,7 +79,7 @@ queryBuilderWidget m =
     )
 
 queryBuilderNode :: WidgetQueryNode -> TaggerWidget
-queryBuilderNode wqn@(WidgetQueryNodeComp _ (formatSentenceTree -> tst) isNull _) =
+queryBuilderNode wqn@(WidgetQueryNodeComp _ _ isNull _) =
   withStyleBasic
     [ bgColor
         . modulateOpacity
@@ -103,7 +103,7 @@ queryBuilderNode wqn@(WidgetQueryNodeComp _ (formatSentenceTree -> tst) isNull _
           ]
           . draggable wqn
           $ label_
-            tst
+            (formatWidgetQueryNode wqn)
             [resizeFactor (-1), ellipsis]
       ]
 queryBuilderNode _ = label_ "Weird _ pattern in queryBuilderNode" [resizeFactor (-1)]

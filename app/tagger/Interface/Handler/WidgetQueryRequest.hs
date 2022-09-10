@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# HLINT ignore "Use lambda-case" #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -26,7 +27,7 @@ module Interface.Handler.WidgetQueryRequest (
   deleteWidgetQueryNode,
   appendWidgetQueryNode,
   createWidgetQueryNode,
-  formatSentenceTree,
+  formatWidgetQueryNode,
 ) where
 
 import Control.Lens (Lens', lens, (&), (.~), (^.))
@@ -165,6 +166,13 @@ createWidgetQueryNode tc q = do
         . combinableSentenceResultSet
         <$> queryRequest tc req
   return $ WidgetQueryNode q (SentenceBranch explicitSetOp sts) searchIsNull defaultId
+
+formatWidgetQueryNode :: WidgetQueryNode -> Text
+formatWidgetQueryNode (widgetQueryNode -> st) =
+  case st of
+    SentenceBranch _ st' -> T.unwords $ formatSentenceTree <$> st'
+    -- coming from a WidgetQueryNode, this case should never match
+    SentenceNode ss -> formatSentenceSet ss
 
 formatSentenceTree :: SentenceTree Text -> Text
 formatSentenceTree (SentenceNode ss) = formatSentenceSet ss
