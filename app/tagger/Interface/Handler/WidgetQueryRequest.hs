@@ -26,6 +26,7 @@ module Interface.Handler.WidgetQueryRequest (
   deleteWidgetQueryNode,
   appendWidgetQueryNode,
   createWidgetQueryNode,
+  formatSentenceTree,
 ) where
 
 import Control.Lens (Lens', lens, (&), (.~), (^.))
@@ -81,9 +82,9 @@ widgetQueryNodeIdLens =
     (\(WidgetQueryNode _ _ _ k) -> k)
     (\wsb k -> wsb{widgetQueryNodeId = k})
 
-pattern WidgetQueryNodeComp :: Text -> Int -> SetOp -> WidgetQueryNode
-pattern WidgetQueryNodeComp t c so <-
-  WidgetQueryNode t ((^. sentenceTreeSetOpLens) -> so) c _
+pattern WidgetQueryNodeComp :: Text -> SentenceTree Text -> Int -> Int -> WidgetQueryNode
+pattern WidgetQueryNodeComp t ts c i <-
+  WidgetQueryNode t ts c i
 
 widgetQueryNodeSetOpLens :: Lens' WidgetQueryNode SetOp
 widgetQueryNodeSetOpLens =
