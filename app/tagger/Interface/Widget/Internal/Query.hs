@@ -1,9 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
+{-# LANGUAGE ViewPatterns #-}
 {-# HLINT ignore "Eta reduce" #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Interface.Widget.Internal.Query (
   queryTextFieldKey,
@@ -16,6 +16,7 @@ import Data.Model
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger
+import Interface.Handler.WidgetQueryRequest
 import Interface.Theme
 import Interface.Widget.Internal.Core
 import Interface.Widget.Internal.Type (TaggerWidget)
@@ -23,9 +24,9 @@ import Monomer
 import Monomer.Graphics.Lens
 
 widget :: TaggerModel -> TaggerWidget
-widget _ =
-  container
-    queryTextField
+widget m =
+  container . vstack_ [] $
+    [queryBuilderWidget m, queryTextField]
 
 queryTextField :: TaggerWidget
 queryTextField =
@@ -67,3 +68,33 @@ container w =
 queryTextFieldKey :: Text
 queryTextFieldKey = "queryTextField"
 {-# INLINE queryTextFieldKey #-}
+
+queryBuilderWidget :: TaggerModel -> TaggerWidget
+queryBuilderWidget m =
+  vstack_
+    []
+    ( queryBuilderNode
+        <$> widgetQueryRequest
+          (m ^. fileSelectionModel . fileSelectionQueryWidgetRequest)
+    )
+
+queryBuilderNode :: WidgetQueryNode -> TaggerWidget
+queryBuilderNode wqn@(WidgetQueryNodeComp _ (formatSentenceTree -> tst) affectedCount _) =
+  hstack_
+    []
+    [ styledButton_ [resizeFactor (-1)] "-" (DoFileSelectionEvent . DeleteQueryNode $ wqn)
+    , dropTarget_
+        (DoFileSelectionEvent . flip MoveQueryNodeBefore wqn)
+        [ dropTargetStyle
+            [ borderT 1
+                . modulateOpacity
+                  (defaultElementOpacity - defaultOpacityModulator)
+                $ yuiOrange
+            ]
+        ]
+        . draggable wqn
+        $ label_
+          (tst <> " : " <> (T.pack . show $ affectedCount))
+          [resizeFactor (-1), ellipsis]
+    ]
+queryBuilderNode _ = label_ "Weird _ pattern in queryBuilderNode" [resizeFactor (-1)]

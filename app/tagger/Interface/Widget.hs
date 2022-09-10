@@ -138,8 +138,7 @@ selectionQueryLayer m =
       ( withStyleBasic
           [bgColor $ yuiLightPeach & a .~ defaultElementOpacity]
           . vsplit_
-            [ splitIgnoreChildResize True
-            , splitHandlePos
+            [ splitHandlePos
                 (positioningModel . selectionAndQueryPosV)
             ]
           . bimap
