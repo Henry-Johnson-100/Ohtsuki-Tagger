@@ -121,7 +121,11 @@ sentenceTreeNodeParser = SentenceNode <$> combinableSentenceParser
 
 combinableSentenceParser :: Parser (SentenceSet T.Text)
 combinableSentenceParser = do
-  so <- explicitOpParser <|> pure Union
+  -- is it ever possible to get this default SetOp value from a query?
+  -- -- yes, "a d| (b u| c) d e f" produces this default value in the SentenceNode
+  -- -- containing [d, e, f] so that:
+  -- -- SentenceNode (SentenceSet {DefaultValue} (Sentence [d, e, f]))
+  so <- explicitOpParser <|> pure Intersect
   spaces
   s <- sentenceParser
   return $ SentenceSet so s
