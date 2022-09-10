@@ -1,8 +1,8 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StrictData #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# HLINT ignore "Use lambda-case" #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -12,12 +12,12 @@ module Interface.Handler.WidgetQueryRequest (
   WidgetQueryNode (
     widgetQueryNodeText,
     widgetQueryNode,
-    widgetQueryNodeCount
+    widgetQueryNodeNull
   ),
   pattern WidgetQueryNodeComp,
   widgetQueryNodeTextLens,
   widgetQueryNodeLens,
-  widgetQueryNodeCountLens,
+  widgetQueryNodeNullLens,
   widgetQueryNodeSetOpLens,
   widgetQueryNodeIdLens,
   emptyWidgetQueryRequest,
@@ -53,8 +53,9 @@ newtype WidgetQueryRequest = WidgetQueryRequest
 data WidgetQueryNode = WidgetQueryNode
   { widgetQueryNodeText :: Text
   , widgetQueryNode :: SentenceTree Text
-  , widgetQueryNodeCount :: Int
-  , widgetQueryNodeId :: Int
+  , widgetQueryNodeNull :: Bool
+  , -- , widgetQueryNodeCount :: Int
+    widgetQueryNodeId :: Int
   }
   deriving (Show, Eq)
 
@@ -70,11 +71,17 @@ widgetQueryNodeLens =
     (\(WidgetQueryNode _ st _ _) -> st)
     (\wsb st -> wsb{widgetQueryNode = st})
 
-widgetQueryNodeCountLens :: Lens' WidgetQueryNode Int
-widgetQueryNodeCountLens =
+-- widgetQueryNodeCountLens :: Lens' WidgetQueryNode Int
+-- widgetQueryNodeCountLens =
+--   lens
+--     (\(WidgetQueryNode _ _ c _) -> c)
+--     (\wsb c -> wsb{widgetQueryNodeCount = c})
+
+widgetQueryNodeNullLens :: Lens' WidgetQueryNode Bool
+widgetQueryNodeNullLens =
   lens
-    (\(WidgetQueryNode _ _ c _) -> c)
-    (\wsb c -> wsb{widgetQueryNodeCount = c})
+    (\(WidgetQueryNode _ _ n _) -> n)
+    (\wqn b -> wqn{widgetQueryNodeNull = b})
 
 widgetQueryNodeIdLens :: Lens' WidgetQueryNode Int
 widgetQueryNodeIdLens =
@@ -82,9 +89,9 @@ widgetQueryNodeIdLens =
     (\(WidgetQueryNode _ _ _ k) -> k)
     (\wsb k -> wsb{widgetQueryNodeId = k})
 
-pattern WidgetQueryNodeComp :: Text -> SentenceTree Text -> Int -> Int -> WidgetQueryNode
-pattern WidgetQueryNodeComp t ts c i <-
-  WidgetQueryNode t ts c i
+pattern WidgetQueryNodeComp :: Text -> SentenceTree Text -> Bool -> Int -> WidgetQueryNode
+pattern WidgetQueryNodeComp t ts n i <-
+  WidgetQueryNode t ts n i
 
 widgetQueryNodeSetOpLens :: Lens' WidgetQueryNode SetOp
 widgetQueryNodeSetOpLens =
@@ -151,12 +158,13 @@ createWidgetQueryNode tc q = do
         case sts of
           [] -> Intersect
           x : _ -> x ^. sentenceTreeSetOpLens
-  affectedFileCount <-
+      defaultId = 0
+  !searchIsNull <-
     lift $
-      HS.size
+      HS.null
         . combinableSentenceResultSet
         <$> queryRequest tc req
-  return $ WidgetQueryNode q (SentenceBranch explicitSetOp sts) affectedFileCount 0
+  return $ WidgetQueryNode q (SentenceBranch explicitSetOp sts) searchIsNull defaultId
 
 formatSentenceTree :: SentenceTree Text -> Text
 formatSentenceTree (SentenceNode ss) = formatSentenceSet ss

@@ -79,22 +79,31 @@ queryBuilderWidget m =
     )
 
 queryBuilderNode :: WidgetQueryNode -> TaggerWidget
-queryBuilderNode wqn@(WidgetQueryNodeComp _ (formatSentenceTree -> tst) affectedCount _) =
-  hstack_
-    []
-    [ styledButton_ [resizeFactor (-1)] "-" (DoFileSelectionEvent . DeleteQueryNode $ wqn)
-    , dropTarget_
-        (DoFileSelectionEvent . flip MoveQueryNodeBefore wqn)
-        [ dropTargetStyle
-            [ borderT 1
-                . modulateOpacity
-                  (defaultElementOpacity - defaultOpacityModulator)
-                $ yuiOrange
-            ]
-        ]
-        . draggable wqn
-        $ label_
-          (tst <> " : " <> (T.pack . show $ affectedCount))
-          [resizeFactor (-1), ellipsis]
+queryBuilderNode wqn@(WidgetQueryNodeComp _ (formatSentenceTree -> tst) isNull _) =
+  withStyleBasic
+    [ bgColor
+        . modulateOpacity
+          (defaultElementOpacity - defaultOpacityModulator)
+        $ if isNull then yuiRed else yuiLightPeach
     ]
+    $ hstack_
+      []
+      [ styledButton_
+          [resizeFactor (-1)]
+          "-"
+          (DoFileSelectionEvent . DeleteQueryNode $ wqn)
+      , dropTarget_
+          (DoFileSelectionEvent . flip MoveQueryNodeBefore wqn)
+          [ dropTargetStyle
+              [ borderT 1
+                  . modulateOpacity
+                    (defaultElementOpacity - defaultOpacityModulator)
+                  $ yuiOrange
+              ]
+          ]
+          . draggable wqn
+          $ label_
+            tst
+            [resizeFactor (-1), ellipsis]
+      ]
 queryBuilderNode _ = label_ "Weird _ pattern in queryBuilderNode" [resizeFactor (-1)]
