@@ -52,7 +52,8 @@ executable tagger
 
   main-is:             Main.hs
 
-  other-modules:       Config
+  other-modules:       Class
+                      ,Config
                       ,Data.Event
                       ,Data.Model
                       ,Data.Model.Core
@@ -60,6 +61,10 @@ executable tagger
                       ,Data.Model.Shared
                       ,Data.Model.Shared.Core
                       ,Data.Model.Shared.Lens
+                      ,Data.QueryBuilder
+                      ,Data.QueryBuilder.AST
+                      ,Data.QueryBuilder.AST.Core
+                      ,Data.QueryBuilder.AST.Lens
                       ,Interface
                       ,Interface.Handler
                       ,Interface.Handler.Internal
@@ -76,8 +81,10 @@ executable tagger
                       ,Interface.Widget.Internal.Type
                       ,Util
 
-  other-extensions:   RankNTypes
+  other-extensions:   InstanceSigs
+                     ,RankNTypes
                      ,MultiWayIf
+                     ,MultiParamTypeClasses
                      ,NoImplicitPrelude
 
   -- ghc-options:

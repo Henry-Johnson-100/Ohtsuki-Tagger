@@ -3,6 +3,9 @@ cradle:
     - path: "app/tagger/Main.hs"
       component: "tagger:exe:tagger"
 
+    - path: "app/tagger/Class.hs"
+      component: "tagger:exe:tagger"
+
     - path: "app/tagger/Config.hs"
       component: "tagger:exe:tagger"
 
@@ -25,6 +28,18 @@ cradle:
       component: "tagger:exe:tagger"
 
     - path: "app/tagger/Data/Model/Shared/Lens.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Data/QueryBuilder.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Data/QueryBuilder/AST.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Data/QueryBuilder/AST/Core.hs"
+      component: "tagger:exe:tagger"
+
+    - path: "app/tagger/Data/QueryBuilder/AST/Lens.hs"
       component: "tagger:exe:tagger"
 
     - path: "app/tagger/Interface.hs"
