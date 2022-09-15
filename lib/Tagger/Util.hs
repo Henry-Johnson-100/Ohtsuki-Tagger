@@ -9,7 +9,10 @@ module Tagger.Util (
 ) where
 
 import Control.Monad.Trans.Maybe
+import qualified Data.Foldable as F
 import Data.Maybe
+import Data.Sequence (Seq, (<|), (><))
+import qualified Data.Sequence as Seq
 
 {-# INLINE head' #-}
 head' :: [a] -> Maybe a

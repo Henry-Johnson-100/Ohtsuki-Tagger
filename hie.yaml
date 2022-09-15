@@ -36,6 +36,9 @@ cradle:
     - path: "app/tagger/Interface/Handler/Internal.hs"
       component: "tagger:exe:tagger"
 
+    - path: "app/tagger/Interface/Handler/QueryBuilder.hs"
+      component: "tagger:exe:tagger"
+
     - path: "app/tagger/Interface/Handler/WidgetQueryRequest.hs"
       component: "tagger:exe:tagger"
 

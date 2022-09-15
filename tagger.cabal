@@ -63,6 +63,7 @@ executable tagger
                       ,Interface
                       ,Interface.Handler
                       ,Interface.Handler.Internal
+                      ,Interface.Handler.QueryBuilder
                       ,Interface.Handler.WidgetQueryRequest
                       ,Interface.Theme
                       ,Interface.Widget
@@ -122,6 +123,7 @@ library tagger-lib
                       ,Text.TaggerQL
                       ,Text.TaggerQL.Parser.Internal
                       ,Text.TaggerQL.AST
+                      ,Text.TaggerQL.AST.Lens
 
   other-modules:       Database.Tagger.Script
                       ,Database.Tagger.Type.Lens
