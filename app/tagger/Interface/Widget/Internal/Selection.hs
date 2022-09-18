@@ -144,7 +144,6 @@ widget m =
     hstack_
       []
       [ selectionSizeLabel m
-      , clearSelectionButton
       , setOpDrowpdown
       ]
 
@@ -195,9 +194,10 @@ tagListWidget m =
   tagListHeader =
     hstack_
       []
-      [ tagListOrderCritCycleButton
+      [ toggleViewSelectionButton
+      , clearSelectionButton
+      , tagListOrderCritCycleButton
       , tagListOrderDirCycleButton
-      , toggleViewSelectionButton
       ]
   sortedOccurrenceMapList =
     let (OrderBy ordCrit ordDir) = m ^. fileSelectionModel . tagOrdering
@@ -317,6 +317,7 @@ fileSelectionFileList m =
     hstack_
       []
       [ toggleViewSelectionButton
+      , clearSelectionButton
       , shuffleSelectionButton
       , refreshFileSelectionButton
       , fileSelectionChunkSizeNumField
