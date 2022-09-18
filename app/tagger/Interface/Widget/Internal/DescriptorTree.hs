@@ -84,6 +84,7 @@ import Monomer (
   keystroke_,
   label_,
   separatorLine,
+  splitHandlePosV,
   splitIgnoreChildResize,
   textField_,
   vscroll_,
@@ -111,6 +112,7 @@ descriptorTreeWidget m =
           [ mainPaneLeftButtonStack
           , hsplit_
               [ splitIgnoreChildResize True
+              , splitHandlePosV 0.75
               ]
               ( descriptorTreeFocusedNodeWidget m
               , descriptorTreeUnrelatedWidget m
