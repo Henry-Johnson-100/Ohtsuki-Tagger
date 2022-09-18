@@ -144,7 +144,6 @@ widget m =
     hstack_
       []
       [ selectionSizeLabel m
-      , clearSelectionButton
       , setOpDrowpdown
       ]
 
@@ -164,14 +163,14 @@ clearSelectionButton =
     (DoFileSelectionEvent ClearSelection)
 
 selectionSizeLabel :: TaggerModel -> TaggerWidget
-selectionSizeLabel m =
-  flip label_ [resizeFactor (-1)] $
-    "In Selection: ("
-      <> ( T.pack . show
-            . Seq.length
-            $ m ^. fileSelectionModel . selection
-         )
-      <> ")"
+selectionSizeLabel ((^. fileSelectionModel . selection) -> selSeq) =
+  withStyleBasic [maxWidth 80]
+    . box_ [alignCenter]
+    . flip label_ [resizeFactor (-1)]
+    $ ( T.pack . show
+          . Seq.length
+          $ selSeq
+      )
 
 tagListWidget :: TaggerModel -> TaggerWidget
 tagListWidget m =
@@ -195,9 +194,10 @@ tagListWidget m =
   tagListHeader =
     hstack_
       []
-      [ tagListOrderCritCycleButton
+      [ toggleViewSelectionButton
+      , clearSelectionButton
+      , tagListOrderCritCycleButton
       , tagListOrderDirCycleButton
-      , toggleViewSelectionButton
       ]
   sortedOccurrenceMapList =
     let (OrderBy ordCrit ordDir) = m ^. fileSelectionModel . tagOrdering
@@ -317,6 +317,7 @@ fileSelectionFileList m =
     hstack_
       []
       [ toggleViewSelectionButton
+      , clearSelectionButton
       , shuffleSelectionButton
       , refreshFileSelectionButton
       , fileSelectionChunkSizeNumField
