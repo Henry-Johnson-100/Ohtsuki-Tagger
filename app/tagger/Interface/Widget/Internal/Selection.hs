@@ -163,14 +163,14 @@ clearSelectionButton =
     (DoFileSelectionEvent ClearSelection)
 
 selectionSizeLabel :: TaggerModel -> TaggerWidget
-selectionSizeLabel m =
-  flip label_ [resizeFactor (-1)] $
-    "In Selection: ("
-      <> ( T.pack . show
-            . Seq.length
-            $ m ^. fileSelectionModel . selection
-         )
-      <> ")"
+selectionSizeLabel ((^. fileSelectionModel . selection) -> selSeq) =
+  withStyleBasic [maxWidth 80]
+    . box_ [alignCenter]
+    . flip label_ [resizeFactor (-1)]
+    $ ( T.pack . show
+          . Seq.length
+          $ selSeq
+      )
 
 tagListWidget :: TaggerModel -> TaggerWidget
 tagListWidget m =
