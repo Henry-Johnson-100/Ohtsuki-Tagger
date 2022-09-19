@@ -26,6 +26,10 @@ module Data.Model.Core (
   Renderability (..),
   TaggerInfoModel (..),
   createTaggerInfoModel,
+  PositioningModel (..),
+  createPositioningModel,
+  defaultSelectionAndQueryPositioningModel,
+  defaultFileDetailAndDescriptorTreePositioningModel,
 ) where
 
 import Data.HierarchyMap (empty)
@@ -47,6 +51,7 @@ data TaggerModel = TaggerModel
   , _taggermodelFocusedFileModel :: FocusedFileModel
   , _taggermodelFileSelectionModel :: FileSelectionModel
   , _taggermodelTaggerInfoModel :: TaggerInfoModel
+  , _taggermodelPositioningModel :: PositioningModel
   , _taggermodelVisibilityModel :: Visibility
   , _taggermodelConnection :: TaggedConnection
   , _taggermodelIsTagMode :: Bool
@@ -68,6 +73,7 @@ createTaggerModel tc d unRelatedD defaultFilePath =
     , _taggermodelFocusedFileModel = createFocusedFileModel defaultFilePath
     , _taggermodelFileSelectionModel = createFileSelectionModel
     , _taggermodelTaggerInfoModel = createTaggerInfoModel
+    , _taggermodelPositioningModel = createPositioningModel
     , _taggermodelVisibilityModel = VisibilityMain
     , _taggermodelConnection = tc
     , _taggermodelIsTagMode = True
@@ -104,10 +110,10 @@ createFileSelectionModel =
     , _fileselectionTagOrdering = OrderBy Numeric Desc
     , _fileselectionFileSelectionInfoMap = IntMap.empty
     , _fileselectionSetOp = Union
-    , _fileselectionQueryText = ""
+    , _fileselectionQueryText = mempty
     , _fileselectionQueryHistory = createHistory 10
     , _fileselectionFileSelectionVis = VisibilityMain
-    , _fileselectionAddFileText = ""
+    , _fileselectionAddFileText = mempty
     , _fileselectionAddFileHistory = createHistory 30
     }
 
@@ -165,7 +171,7 @@ createFocusedFileModel fp =
         ConcreteTaggedFile (File focusedFileDefaultRecordKey fp) empty
     , _focusedfilemodelRenderability = RenderingNotSupported
     , _focusedfilemodelFocusedFileVis = VisibilityMain
-    , _focusedfilemodelTagText = ""
+    , _focusedfilemodelTagText = mempty
     , _focusedfilemodelTagHistory = createHistory 10
     }
 
@@ -222,11 +228,11 @@ createDescriptorTreeModel :: Descriptor -> Descriptor -> DescriptorTreeModel
 createDescriptorTreeModel n unrelatedD =
   DescriptorTreeModel
     { _descriptortreeUnrelatedNode = unrelatedD
-    , _descriptortreeUnrelated = []
+    , _descriptortreeUnrelated = mempty
     , _descriptortreeFocusedNode = n
-    , _descriptortreeFocusedTree = []
+    , _descriptortreeFocusedTree = mempty
     , _descriptortreeDescriptorInfoMap = IntMap.empty
-    , _descriptortreeNewDescriptorText = ""
+    , _descriptortreeNewDescriptorText = "Create New Descriptors"
     , _descriptortreeDescriptorTreeVis = VisibilityMain
     }
 
@@ -249,3 +255,29 @@ createTaggerInfoModel =
     mempty
     mempty
     mempty
+
+data PositioningModel = PositioningModel
+  { _positioningSelectionAndQueryPosV :: Double
+  , _positionSelectionAndQueryPosH :: Double
+  , _positionFileDetailAndDescriptorTreePosV :: Double
+  , _positionFileDetailAndDescriptorTreePosH :: Double
+  }
+  deriving (Show, Eq)
+
+createPositioningModel :: PositioningModel
+createPositioningModel =
+  PositioningModel
+    0.5
+    0.2
+    0.5
+    0.8
+
+defaultSelectionAndQueryPositioningModel :: PositioningModel -> PositioningModel
+defaultSelectionAndQueryPositioningModel (PositioningModel _ _ ov oh) =
+  let (PositioningModel v h _ _) = createPositioningModel
+   in PositioningModel v h ov oh
+
+defaultFileDetailAndDescriptorTreePositioningModel :: PositioningModel -> PositioningModel
+defaultFileDetailAndDescriptorTreePositioningModel (PositioningModel ov oh _ _) =
+  let (PositioningModel _ _ v h) = createPositioningModel
+   in PositioningModel ov oh v h
