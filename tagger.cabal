@@ -96,7 +96,10 @@ executable taggercli
 
   main-is:             Main.hs
 
-  -- other-modules:
+  other-modules:       Opt
+                      ,Opt.Data
+                      ,Opt.Data.Lens
+                      ,Opt.Parser
 
   -- other-extensions:
 
