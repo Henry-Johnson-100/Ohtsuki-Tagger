@@ -1,7 +1,7 @@
 import Opt.Parser
 import Options.Applicative
+import Control.Monad
 
 main :: IO ()
 main = do
-  programOpts <- execParser opts
-  print programOpts
+  join $ execParser p'
