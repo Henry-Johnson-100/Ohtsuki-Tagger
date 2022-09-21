@@ -1,2 +1,7 @@
+import Opt.Parser
+import Options.Applicative
+
 main :: IO ()
-main = putStrLn "taggercli"
+main = do
+  programOpts <- execParser opts
+  print programOpts

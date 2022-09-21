@@ -9,25 +9,35 @@ module Opt (
   reportAudit,
 ) where
 
-import Control.Lens
+import Control.Lens ((&), (.~), (^.))
 import Control.Monad
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Reader
-import Control.Monad.Trans.State.Strict
+import Control.Monad.IO.Class (MonadIO (liftIO))
+import Control.Monad.Trans.Class (MonadTrans (lift))
+import Control.Monad.Trans.Reader (ReaderT, ask)
+import Control.Monad.Trans.State.Strict (
+  StateT,
+  execStateT,
+  modify,
+ )
 import qualified Data.Foldable as F
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import qualified Data.IntMap.Strict as IM
 import Data.List (sortOn)
-import qualified Data.OccurrenceMap as OM
+import qualified Data.OccurrenceMap as OM (
+  OccurrenceMap (occurrenceMap),
+ )
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import Database.Tagger
-import Opt.Data
+import Opt.Data (TaggerDBAudit)
 import Opt.Data.Lens
-import System.Directory
-import System.FilePath
+import System.Directory (
+  doesFileExist,
+  getCurrentDirectory,
+  setCurrentDirectory,
+ )
+import System.FilePath (takeDirectory)
 
 -- Currently handles opening a db connection when auditing.
 -- This may change in the future.
