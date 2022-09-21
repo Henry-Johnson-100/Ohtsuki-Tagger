@@ -1,7 +1,9 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Opt (
   auditDatabase,
+  reportAudit,
 ) where
 
 import Control.Lens
@@ -14,12 +16,28 @@ import qualified Data.Foldable as F
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import qualified Data.IntMap.Strict as IM
+import Data.List (sortOn)
 import qualified Data.OccurrenceMap as OM
 import qualified Data.Text as T
+import qualified Data.Text.IO as T.IO
 import Database.Tagger
 import Opt.Data
 import Opt.Data.Lens
 import System.Directory
+
+reportAudit :: TaggerDBAudit -> IO ()
+reportAudit a = do
+  T.IO.putStrLn $
+    "Files in database that are unable to be found in the filesystem: "
+      <> (T.pack . show . length $ a ^. missingFiles)
+  mapM_ (\f -> T.IO.putStrLn $ "\t" <> filePath f) (a ^. missingFiles)
+  T.IO.putStrLn ""
+  T.IO.putStrLn $
+    "Descriptors that are unused and have no InfraDescriptors that are used: "
+      <> (T.pack . show . length $ a ^. unusedDescriptorTrees)
+  mapM_
+    (\d -> T.IO.putStrLn $ "\t" <> descriptor d)
+    (sortOn descriptor $a ^. unusedDescriptorTrees)
 
 auditDatabase :: TaggedConnection -> IO TaggerDBAudit
 auditDatabase tc =
@@ -39,14 +57,15 @@ findMissingFiles = do
   tc <- ask
   allDBFiles <- lift $ allFiles tc
   allMissingFiles <-
-    filterM
-      ( lift
-          . fmap not
-          . doesFileExist
-          . T.unpack
-          . filePath
-      )
-      allDBFiles
+    sortOn filePath
+      <$> filterM
+        ( lift
+            . fmap not
+            . doesFileExist
+            . T.unpack
+            . filePath
+        )
+        allDBFiles
   return $ mempty & missingFiles .~ allMissingFiles
 
 {- |
@@ -63,7 +82,12 @@ findUnusedDescriptorTrees = do
   tc <- ask
   allDBDescriptors <- lift (allDescriptors tc)
   unusedDescriptorTreeList <-
-    F.toList
+    filter
+      ( \(Descriptor _ dt) ->
+          not
+            ("#" `T.isPrefixOf` dt && "#" `T.isSuffixOf` dt)
+      )
+      . F.toList
       <$> execStateT (scanDBDescriptorSet allDBDescriptors) mempty
   return $ mempty & unusedDescriptorTrees .~ unusedDescriptorTreeList
  where
