@@ -9,14 +9,11 @@
 {-# HLINT ignore "Use const" #-}
 
 module Opt.Parser (
-  TaggerCLIOptions (..),
-  TaggerCLIReaderOptions (..),
-  optsParser,
   p',
 ) where
 
 import Control.Lens ((^.))
-import Control.Monad (join, unless, when, (<=<))
+import Control.Monad (filterM, join, unless, when, (<=<))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Cont
@@ -35,6 +32,7 @@ import Options.Applicative.Builder
 import Options.Applicative.Types
 import System.Directory
 import System.FilePath
+import System.IO (hPutStrLn, stderr)
 import Text.TaggerQL
 
 type CLICont r a = ContT r (ReaderT TaggedConnection IO) a
@@ -45,7 +43,7 @@ p' =
     ( helper
         <*> ( runContWithDB <$> databasePathArgParser
                 <*> ( ( auditParser
-                          <|> runQueryParser
+                          <|> (runQueryParser <|> addFileParser)
                       )
                         <**> pure continueInDir
                     )
@@ -104,91 +102,56 @@ runQuery makeAbs (TaggerQLQuery . head -> q) = do
         . F.toList
         $ queryResults
 
-optsParser :: ParserInfo TaggerCLIOptions
-optsParser =
-  info
-    ( helper
-        <*> ( versionFlagParser $> TCLIVersion
-                <|> TCLIOnDatabase <$> taggerCLIReaderOptionsParser
-            )
-    )
-    (header "TAGGERCLI")
+addFileParser :: Parser (CLICont r ())
+addFileParser =
+  switch (short 'a' <> long "add-files" <> help "Add files to the database.")
+    *> (addFileCont <$> many (argument str idm))
 
-data TaggerCLIOptions
-  = TCLIVersion
-  | TCLIOnDatabase TaggerCLIReaderOptions
-  deriving (Show, Eq)
+addFileCont :: [FilePath] -> CLICont r ()
+addFileCont fps =
+  lift $ do
+    tc <- ask
+    relativeRealFPs <- prepareFilesForDatabase fps
+    liftIO $ do
+      insertFiles relativeRealFPs tc
+      T.IO.hPutStrLn stderr "Inserted the following files:"
+      mapM_ (hPutStrLn stderr) relativeRealFPs
+
+removeFilesCont :: [FilePath] -> CLICont r ()
+removeFilesCont fps =
+  lift $ do
+    tc <- ask
+    relativeRealFPs <- prepareFilesForDatabase fps
+    liftIO $ do
+      fks <-
+        map fileId
+          . concat
+          <$> mapM ((`queryForFileByPattern` tc) . T.pack) relativeRealFPs
+      deleteFiles fks tc
 
 {- |
- records specified in the sequence that serial options should occur
+ Given a list of file paths and a connection. Make the files relative to the name
+ of the connection.
 -}
-data TaggerCLIReaderOptions = TaggerCLIReaderOptions
-  { tCLIDBPath :: FilePath
-  , tCLIFileCommand :: [WithFilesCommand]
-  , tCLIDescriptorCommand :: [WithDescriptorsCommand]
-  , tCLIQueryLikeCommand :: [QueryLikeCommand]
-  }
-  deriving (Show, Eq)
-
-data QueryLikeCommand = Query Text deriving (Show, Eq)
-
-data WithDescriptorsCommand = AddDescriptors [Text] deriving (Show, Eq)
-
-data WithFilesCommand
-  = AddFiles [FilePath]
-  | RemoveFiles [FilePath]
-  | DeleteFiles [FilePath]
-  deriving (Show, Eq)
+prepareFilesForDatabase :: [FilePath] -> ReaderT TaggedConnection IO [FilePath]
+prepareFilesForDatabase fps = do
+  tc <- ask
+  liftIO $ do
+    dbConnAbs <- makeAbsolute . T.unpack $ tc ^. connName
+    filteredRealFPs <- filterM filterNotRealFiles <=< mapM makeAbsolute $ fps
+    return $ makeRelative dbConnAbs <$> filteredRealFPs
+ where
+  filterNotRealFiles fp' = do
+    exists <- doesFileExist fp'
+    if not exists
+      then
+        T.IO.hPutStrLn stderr (T.pack fp' <> " does not exist or is not visible.")
+          >> return False
+      else return True
 
 databasePathArgParser :: Parser FilePath
 databasePathArgParser =
   argument str (metavar "DATABASE")
-
-taggerCLIReaderOptionsParser :: Parser TaggerCLIReaderOptions
-taggerCLIReaderOptionsParser =
-  TaggerCLIReaderOptions
-    <$> databasePathArgParser
-    <*> many withFilesCommandParser
-    <*> pure mempty
-    <*> pure mempty
-
-withFilesCommandParser :: Parser WithFilesCommand
-withFilesCommandParser =
-  addFilesParser
-    <|> removeFilesParser
-    <|> deleteFilesParser
-
-addFilesParser :: Parser WithFilesCommand
-addFilesParser =
-  AddFiles
-    <$> option
-      filePathListReader
-      ( short 'a'
-          <> long "add-files"
-          <> help "Add the list of given files to the database."
-      )
-
-removeFilesParser :: Parser WithFilesCommand
-removeFilesParser =
-  RemoveFiles
-    <$> option
-      filePathListReader
-      ( short 'r'
-          <> long "remove-files"
-          <> help "Remove the given list of files from the database"
-      )
-
-deleteFilesParser :: Parser WithFilesCommand
-deleteFilesParser =
-  DeleteFiles
-    <$> option
-      filePathListReader
-      ( long "delete-files"
-          <> help "Delete the given list of files from the database AND the filesystem"
-      )
-
-filePathListReader :: ReadM [FilePath]
-filePathListReader = (: []) <$> str
 
 versionFlagParser :: Parser Bool
 versionFlagParser =
