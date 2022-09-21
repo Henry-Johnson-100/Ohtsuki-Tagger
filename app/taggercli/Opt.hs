@@ -37,7 +37,7 @@ reportAudit a = do
       <> (T.pack . show . length $ a ^. unusedDescriptorTrees)
   mapM_
     (\d -> T.IO.putStrLn $ "\t" <> descriptor d)
-    (sortOn descriptor $a ^. unusedDescriptorTrees)
+    (a ^. unusedDescriptorTrees)
 
 auditDatabase :: TaggedConnection -> IO TaggerDBAudit
 auditDatabase tc =
@@ -89,7 +89,7 @@ findUnusedDescriptorTrees = do
       )
       . F.toList
       <$> execStateT (scanDBDescriptorSet allDBDescriptors) mempty
-  return $ mempty & unusedDescriptorTrees .~ unusedDescriptorTreeList
+  return $ mempty & unusedDescriptorTrees .~ sortOn descriptor unusedDescriptorTreeList
  where
   -- Treats the state as an accumulator as it traverses the given list.
   scanDBDescriptorSet ::
