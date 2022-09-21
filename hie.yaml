@@ -84,6 +84,9 @@ cradle:
     - path: "app/taggercli/Opt/Parser.hs"
       component: "tagger:exe:taggercli"
 
+    - path: "lib/tagger-exe-internal"
+      component: "tagger:lib:tagger-exe-internal"
+
     - path: "lib"
       component: "tagger:lib:tagger-lib"
 

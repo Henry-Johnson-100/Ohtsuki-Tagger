@@ -81,6 +81,7 @@ executable tagger
   -- ghc-options:
 
   build-depends:      tagger-lib
+                      ,tagger-exe-internal
                       ,monomer == 1.4.1.0
                       ,directory == 1.3.6.0
                       ,filepath == 1.4.2.1
@@ -106,11 +107,26 @@ executable taggercli
   -- ghc-options:
 
   build-depends:       tagger-lib
+                      ,tagger-exe-internal
                       ,optparse-applicative
                       ,directory
                       ,filepath
 
   hs-source-dirs:      app/taggercli
+
+library tagger-exe-internal
+  import:
+    haskell-common
+    ,tagger-common
+
+  exposed-modules:
+    Tagger.Shared
+
+  build-depends:
+    tagger-lib
+  
+  hs-source-dirs:
+    lib/tagger-exe-internal
 
 library tagger-lib
   import:              haskell-common
