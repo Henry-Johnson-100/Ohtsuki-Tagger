@@ -1,7 +1,10 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Opt (
+  mainReportAudit,
   auditDatabase,
   reportAudit,
 ) where
@@ -24,6 +27,23 @@ import Database.Tagger
 import Opt.Data
 import Opt.Data.Lens
 import System.Directory
+import System.FilePath
+
+-- Currently handles opening a db connection when auditing.
+-- This may change in the future.
+mainReportAudit :: ReaderT TaggedConnection IO ()
+mainReportAudit = do
+  tc <- ask
+  let dbText@(T.unpack -> dbPath) = tc ^. connName
+  !curDir <- lift getCurrentDirectory
+  let dbDir = takeDirectory dbPath
+  lift $ setCurrentDirectory dbDir
+  void $
+    do
+      liftIO . T.IO.putStrLn $ "Running audit on: " <> dbText
+      auditResult <- auditDatabase
+      liftIO $ reportAudit auditResult
+  lift $ setCurrentDirectory curDir
 
 reportAudit :: TaggerDBAudit -> IO ()
 reportAudit a = do
@@ -39,10 +59,8 @@ reportAudit a = do
     (\d -> T.IO.putStrLn $ "\t" <> descriptor d)
     (a ^. unusedDescriptorTrees)
 
-auditDatabase :: TaggedConnection -> IO TaggerDBAudit
-auditDatabase tc =
-  flip runReaderT tc $
-    mconcat <$> sequence [findMissingFiles, findUnusedDescriptorTrees]
+auditDatabase :: ReaderT TaggedConnection IO TaggerDBAudit
+auditDatabase = mconcat <$> sequence [findMissingFiles, findUnusedDescriptorTrees]
 
 {- |
  Reports all files that do not exist or are impossible to find from the current
