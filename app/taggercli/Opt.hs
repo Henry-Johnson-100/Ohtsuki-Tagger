@@ -39,21 +39,15 @@ import System.Directory (
  )
 import System.FilePath (takeDirectory)
 
--- Currently handles opening a db connection when auditing.
--- This may change in the future.
 mainReportAudit :: ReaderT TaggedConnection IO ()
 mainReportAudit = do
   tc <- ask
-  let dbText@(T.unpack -> dbPath) = tc ^. connName
-  !curDir <- lift getCurrentDirectory
-  let dbDir = takeDirectory dbPath
-  lift $ setCurrentDirectory dbDir
+  let dbText = tc ^. connName
   void $
     do
       liftIO . T.IO.putStrLn $ "Running audit on: " <> dbText
       auditResult <- auditDatabase
       liftIO $ reportAudit auditResult
-  lift $ setCurrentDirectory curDir
 
 reportAudit :: TaggerDBAudit -> IO ()
 reportAudit a = do

@@ -1,9 +1,12 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use const" #-}
 
 module Opt.Parser (
   TaggerCLIOptions (..),
@@ -13,18 +16,20 @@ module Opt.Parser (
 ) where
 
 import Control.Lens ((^.))
-import Control.Monad ((<=<))
+import Control.Monad (join, unless, when, (<=<))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Cont
 import Control.Monad.Trans.Reader
 import qualified Data.Foldable as F
 import Data.Functor
+import qualified Data.HashSet as HS
 import Data.List (sortOn)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import Database.Tagger
+import Opt
 import Options.Applicative
 import Options.Applicative.Builder
 import Options.Applicative.Types
@@ -37,16 +42,24 @@ type CLICont r a = ContT r (ReaderT TaggedConnection IO) a
 p' :: ParserInfo (IO ())
 p' =
   info
-    ( runContWithDB <$> databasePathArgParser
-        <*> (runQueryParser <**> pure continueInDir)
+    ( helper
+        <*> ( runContWithDB <$> databasePathArgParser
+                <*> ( ( auditParser
+                          <|> runQueryParser
+                      )
+                        <**> pure continueInDir
+                    )
+            )
     )
     idm
 
-runContWithDB :: FilePath -> CLICont r r -> IO r
-runContWithDB dp c = do
-  absoluteDBPath <- makeAbsolute dp
-  tc <- open absoluteDBPath
-  (`runReaderT` tc) $ runContT c return
+runContWithDB :: FilePath -> CLICont () () -> IO ()
+runContWithDB dp c = void . join . evalContT . callCC $ \exit -> do
+  absoluteDBPath <- liftIO $ makeAbsolute dp
+  absPathExists <- liftIO $ doesFileExist absoluteDBPath
+  unless absPathExists $ exit (T.IO.putStrLn $ "No file exists at: " <> T.pack dp)
+  tc <- liftIO $ open' absoluteDBPath
+  return $ (`runReaderT` tc) (runContT c return)
 
 continueInDir :: CLICont r r -> CLICont r r
 continueInDir c = do
@@ -58,24 +71,38 @@ continueInDir c = do
   liftIO $ setCurrentDirectory curDir
   return contResult
 
-runQueryParser :: Parser (CLICont r ())
-runQueryParser = runQuery <$> argument ((: []) <$> str) idm
+auditParser :: Parser (CLICont r ())
+auditParser = switch (long "audit" <> help "Audit the database.") $> lift mainReportAudit
 
-runQuery :: [Text] -> CLICont r ()
-runQuery (TaggerQLQuery . head -> q) = do
+runQueryParser :: Parser (CLICont r ())
+runQueryParser =
+  flip runQuery
+    <$> option
+      ((: []) <$> str)
+      ( short 'q'
+          <> long "query"
+          <> help "Run a query on the database using TaggerQL"
+      )
+      <*> switch (long "absolute" <> help "Report query results with absolute paths.")
+
+runQuery :: Bool -> [Text] -> CLICont r ()
+runQuery makeAbs (TaggerQLQuery . head -> q) = do
   tc <- lift ask
   let (T.unpack -> connPath) = tc ^. connName
   queryResults <- liftIO $ taggerQL q tc
-  liftIO
-    . mapM_
-      ( (T.IO.putStrLn . T.pack <=< makeAbsolute)
-          . makeRelative connPath
-          . T.unpack
-          . filePath
-      )
-    . sortOn filePath
-    . F.toList
-    $ queryResults
+  if HS.null queryResults
+    then liftIO . T.IO.putStrLn $ "No results."
+    else
+      liftIO
+        . mapM_
+          ( (T.IO.putStrLn . T.pack <=< if makeAbs then makeAbsolute else pure)
+              . makeRelative connPath
+              . T.unpack
+              . filePath
+          )
+        . sortOn filePath
+        . F.toList
+        $ queryResults
 
 optsParser :: ParserInfo TaggerCLIOptions
 optsParser =
