@@ -8,6 +8,7 @@
 
 # Planned
 
+* CLI operations for a separate executable: taggercli
 * A Query builder element in the query widget section.
 
 ------

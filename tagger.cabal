@@ -90,21 +90,24 @@ executable tagger
 
   hs-source-dirs:      app/tagger
 
--- executable taggercli
---   import:              haskell-common
---                       ,tagger-common
+executable taggercli
+  import:              haskell-common
+                      ,tagger-common
 
---   main-is:             Main.hs
+  main-is:             Main.hs
 
---   -- other-modules:
+  -- other-modules:
 
---   -- other-extensions:
+  -- other-extensions:
 
---   -- ghc-options:
+  -- ghc-options:
 
---   build-depends:       tagger-lib
+  build-depends:       tagger-lib
+                      ,optparse-applicative
+                      ,directory
+                      ,filepath
 
---   hs-source-dirs:      app/taggercli
+  hs-source-dirs:      app/taggercli
 
 library tagger-lib
   import:              haskell-common
