@@ -1,7 +1,8 @@
+import Control.Monad.Trans.Cont (evalContT)
 import Opt.Parser
 import Options.Applicative
-import Control.Monad
 
 main :: IO ()
 main = do
-  join $ execParser p'
+  pc <- execParser p'
+  evalContT pc
