@@ -163,7 +163,13 @@ runQueryParser =
                   <> metavar "QUERY"
               )
         )
-      <*> switch (long "absolute" <> help "Report query results with absolute paths.")
+      <*> switch
+        ( long "absolute"
+            <> help
+              "Report query results with relative paths. \
+              \The files are stored with their paths relative to the database file \
+              \then made absolute by default when reporting query results."
+        )
 
 runQuery :: Bool -> [Text] -> ReaderT TaggedConnection (ContT () IO) ()
 runQuery makeAbs (TaggerQLQuery . head -> q) =
