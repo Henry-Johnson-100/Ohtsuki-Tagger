@@ -124,6 +124,8 @@ library tagger-exe-internal
 
   build-depends:
     tagger-lib
+    ,directory
+    ,filepath
   
   hs-source-dirs:
     lib/tagger-exe-internal

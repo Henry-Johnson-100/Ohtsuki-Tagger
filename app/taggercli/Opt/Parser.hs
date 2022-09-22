@@ -34,6 +34,7 @@ import System.Directory
 import System.FilePath
 import System.IO (hPutStrLn, stderr)
 import Text.TaggerQL
+import Tagger.Shared
 
 type CLICont r a = ContT r (ReaderT TaggedConnection IO) a
 
@@ -111,11 +112,7 @@ addFileCont :: [FilePath] -> CLICont r ()
 addFileCont fps =
   lift $ do
     tc <- ask
-    relativeRealFPs <- prepareFilesForDatabase fps
-    liftIO $ do
-      insertFiles relativeRealFPs tc
-      T.IO.hPutStrLn stderr "Inserted the following files:"
-      mapM_ (hPutStrLn stderr) relativeRealFPs
+    liftIO . mapM_ (addFiles tc . T.pack) $ fps
 
 removeFilesCont :: [FilePath] -> CLICont r ()
 removeFilesCont fps =
