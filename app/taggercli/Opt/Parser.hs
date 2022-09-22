@@ -33,8 +33,8 @@ import Options.Applicative.Types
 import System.Directory
 import System.FilePath
 import System.IO (hPutStrLn, stderr)
-import Text.TaggerQL
 import Tagger.Shared
+import Text.TaggerQL
 
 type CLICont r a = ContT r (ReaderT TaggedConnection IO) a
 
@@ -85,23 +85,28 @@ runQueryParser =
       <*> switch (long "absolute" <> help "Report query results with absolute paths.")
 
 runQuery :: Bool -> [Text] -> CLICont r ()
-runQuery makeAbs (TaggerQLQuery . head -> q) = do
-  tc <- lift ask
-  let (T.unpack -> connPath) = tc ^. connName
-  queryResults <- liftIO $ taggerQL q tc
-  if HS.null queryResults
-    then liftIO . T.IO.putStrLn $ "No results."
-    else
-      liftIO
-        . mapM_
-          ( (T.IO.putStrLn . T.pack <=< if makeAbs then makeAbsolute else pure)
-              . makeRelative connPath
-              . T.unpack
-              . filePath
-          )
-        . sortOn filePath
-        . F.toList
-        $ queryResults
+runQuery makeAbs (TaggerQLQuery . head -> q) =
+  lift $ do
+    tc <- ask
+    let (T.unpack -> connPath) = tc ^. connName
+    liftIO $ do
+      queryResults <- taggerQL q tc
+      if HS.null queryResults
+        then T.IO.hPutStrLn stderr "No results."
+        else
+          mapM_
+            ( ( T.IO.putStrLn . T.pack
+                  <=< if makeAbs
+                    then makeAbsolute
+                    else pure
+              )
+                . makeRelative connPath
+                . T.unpack
+                . filePath
+            )
+            . sortOn filePath
+            . F.toList
+            $ queryResults
 
 addFileParser :: Parser (CLICont r ())
 addFileParser =
