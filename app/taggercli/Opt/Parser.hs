@@ -13,27 +13,58 @@ module Opt.Parser (
 ) where
 
 import Control.Lens ((^.))
-import Control.Monad (unless, when, (<=<))
+import Control.Monad ((<=<))
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Trans.Cont
-import Control.Monad.Trans.Reader
+import Control.Monad.Trans.Cont (ContT)
+import Control.Monad.Trans.Reader (
+  ReaderT (runReaderT),
+  ask,
+  mapReaderT,
+ )
 import qualified Data.Foldable as F
-import Data.Functor
+import Data.Functor (($>))
 import qualified Data.HashSet as HS
 import Data.List (sortOn)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import Data.Version (showVersion)
-import Database.Tagger
-import Opt
-import Options.Applicative
-import System.Directory
-import System.FilePath
+import Database.Tagger (
+  File (filePath),
+  HasConnName (connName),
+  TaggedConnection,
+  open,
+  open',
+ )
+import Opt (mainReportAudit, showStats)
+import Options.Applicative (
+  Alternative (many, (<|>)),
+  Parser,
+  ParserInfo,
+  argument,
+  header,
+  help,
+  helper,
+  info,
+  long,
+  metavar,
+  option,
+  progDesc,
+  short,
+  str,
+  switch,
+ )
+import System.Directory (
+  doesFileExist,
+  getCurrentDirectory,
+  makeAbsolute,
+  setCurrentDirectory,
+ )
+import System.FilePath (makeRelative, takeDirectory)
 import System.IO (stderr)
-import Tagger.Info
-import Tagger.Shared
-import Text.TaggerQL
+import Tagger.Info (taggerVersion)
+import Tagger.Shared (addFiles)
+import Text.TaggerQL (TaggerQLQuery (TaggerQLQuery), taggerQL)
 
 p' :: ParserInfo (ContT () IO ())
 p' =
@@ -54,7 +85,13 @@ p' =
                     )
             )
     )
-    idm
+    ( header
+        "TaggerCLI"
+        <> progDesc
+          "Allows a user to perform a limited set of \
+          \actions on a tagger database.\n\
+          \It is also possible to print some stats and run an audit."
+    )
 
 runFutureReader ::
   FilePath ->
@@ -154,8 +191,13 @@ runQuery makeAbs (TaggerQLQuery . head -> q) =
 
 addFileParser :: Parser (ReaderT TaggedConnection (ContT () IO) ())
 addFileParser =
-  switch (short 'a' <> long "add-files" <> help "Add files to the database.")
-    *> (addFileCont <$> many (argument str idm))
+  switch
+    ( short 'a' <> long "add-files"
+        <> help
+          "Add files to the database. \
+          \Recursively add any files found at PATH."
+    )
+    *> (addFileCont <$> many (argument str (metavar "PATH")))
 
 addFileCont :: [FilePath] -> ReaderT TaggedConnection (ContT () IO) ()
 addFileCont fps =

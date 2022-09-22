@@ -1,6 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Opt (
@@ -11,7 +10,7 @@ module Opt (
 ) where
 
 import Control.Lens ((&), (.~), (^.))
-import Control.Monad
+import Control.Monad (filterM, void, when)
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Reader (ReaderT, ask, asks)
@@ -30,15 +29,25 @@ import qualified Data.OccurrenceMap as OM (
  )
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
-import Database.Tagger
+import Database.Tagger (
+  Descriptor (..),
+  File (filePath),
+  HasConnName (connName),
+  TaggedConnection,
+  allDescriptors,
+  allFiles,
+  allTags,
+  getAllInfra,
+  getTagOccurrencesByDescriptorKeys,
+ )
 import Opt.Data (TaggerDBAudit, TaggerDBStats (..))
-import Opt.Data.Lens
+import Opt.Data.Lens (
+  HasMissingFiles (missingFiles),
+  HasUnusedDescriptorTrees (unusedDescriptorTrees),
+ )
 import System.Directory (
   doesFileExist,
-  getCurrentDirectory,
-  setCurrentDirectory,
  )
-import System.FilePath (takeDirectory)
 
 mainReportAudit :: ReaderT TaggedConnection IO ()
 mainReportAudit = do
