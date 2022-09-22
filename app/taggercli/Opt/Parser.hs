@@ -154,25 +154,17 @@ showStatsCont = mapReaderT liftIO showStats
 runQueryParser :: Parser (ReaderT TaggedConnection (ContT () IO) ())
 runQueryParser =
   flip runQuery
-    <$> ( argument ((: []) <$> str) (metavar "QUERY")
-            <|> option
-              ((: []) <$> str)
-              ( short 'q'
-                  <> long "query"
-                  <> help "Run a query on the database using TaggerQL"
-                  <> metavar "QUERY"
-              )
-        )
+    <$> argument str (metavar "QUERY")
       <*> switch
-        ( long "absolute"
+        ( long "relative"
             <> help
               "Report query results with relative paths. \
               \The files are stored with their paths relative to the database file \
               \then made absolute by default when reporting query results."
         )
 
-runQuery :: Bool -> [Text] -> ReaderT TaggedConnection (ContT () IO) ()
-runQuery makeAbs (TaggerQLQuery . head -> q) =
+runQuery :: Bool -> Text -> ReaderT TaggedConnection (ContT () IO) ()
+runQuery leaveRelative (TaggerQLQuery -> q) =
   do
     tc <- ask
     let (T.unpack -> connPath) = tc ^. connName
@@ -183,9 +175,9 @@ runQuery makeAbs (TaggerQLQuery . head -> q) =
         else
           mapM_
             ( ( T.IO.putStrLn . T.pack
-                  <=< if makeAbs
-                    then makeAbsolute
-                    else pure
+                  <=< if leaveRelative
+                    then pure
+                    else makeAbsolute
               )
                 . makeRelative connPath
                 . T.unpack
