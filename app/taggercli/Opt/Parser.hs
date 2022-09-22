@@ -13,7 +13,7 @@ module Opt.Parser (
 ) where
 
 import Control.Lens ((^.))
-import Control.Monad (unless, (<=<))
+import Control.Monad (unless, when, (<=<))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Cont
 import Control.Monad.Trans.Reader
@@ -42,6 +42,7 @@ p' =
         <*> ( showVersionParser
                 <|> ( runFutureReader
                         <$> databasePathArgParser
+                          <*> createDBSwitch
                           <*> ( continueInDir
                                   <$> ( ( auditParser
                                             <|> showStatsParser
@@ -55,16 +56,28 @@ p' =
     )
     idm
 
-runFutureReader :: FilePath -> ReaderT TaggedConnection (ContT r IO) () -> ContT r IO ()
-runFutureReader fp r = do
+runFutureReader ::
+  FilePath ->
+  Bool ->
+  ReaderT TaggedConnection (ContT r IO) () ->
+  ContT r IO ()
+runFutureReader fp createIfNotExists r = do
   absPath <- liftIO $ makeAbsolute fp
   absPathExists <- liftIO $ doesFileExist absPath
-  callCC $ \exit -> do
-    unless absPathExists $ do
-      liftIO . T.IO.hPutStrLn stderr $ "No file exists at: " <> T.pack fp
-      exit ()
-    tc <- liftIO $ open' absPath
-    runReaderT r tc
+  if not absPathExists && not createIfNotExists
+    then liftIO . T.IO.hPutStrLn stderr $ "No such file exists: " <> T.pack fp
+    else do
+      tc <- liftIO $ (if createIfNotExists then open else open') absPath
+      runReaderT r tc
+
+createDBSwitch :: Parser Bool
+createDBSwitch =
+  switch
+    ( long "create"
+        <> help
+          "Create a database at the given location if none exists. \
+          \Otherwise, will run patches, initialization, etc. if required."
+    )
 
 continueInDir ::
   ReaderT TaggedConnection (ContT () IO) () ->
