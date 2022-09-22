@@ -11,6 +11,19 @@
 * CLI operations for a separate executable: taggercli
 * A Query builder element in the query widget section.
 
+### 1.0.2.1 -- ????-??-??
+
+* Limited CLI functionality.
+  * Creating database
+  * Querying
+  * Adding files
+  * Removing files
+  * Deleting files
+  * Moving files
+  * Adding descriptors
+  * Removing descriptors
+  * Report stats or audit results
+
 ------
 
 ### 1.0.2.0 -- 2022-09-19
