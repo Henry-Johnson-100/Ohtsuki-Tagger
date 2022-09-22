@@ -25,6 +25,7 @@ import Data.List (sortOn)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
+import Data.Version (showVersion)
 import Database.Tagger
 import Opt
 import Options.Applicative
@@ -33,6 +34,7 @@ import Options.Applicative.Types
 import System.Directory
 import System.FilePath
 import System.IO (hPutStrLn, stderr)
+import Tagger.Info
 import Tagger.Shared
 import Text.TaggerQL
 
@@ -42,11 +44,14 @@ p' :: ParserInfo (IO ())
 p' =
   info
     ( helper
-        <*> ( runContWithDB <$> databasePathArgParser
-                <*> ( ( auditParser
-                          <|> (runQueryParser <|> addFileParser)
-                      )
-                        <**> pure continueInDir
+        <*> ( (evalContT <$> showVersionParser)
+                <|> ( runContWithDB <$> databasePathArgParser
+                        <*> ( ( auditParser
+                                  <|> showStatsParser
+                                  <|> (runQueryParser <|> addFileParser)
+                              )
+                                <**> pure continueInDir
+                            )
                     )
             )
     )
@@ -72,6 +77,23 @@ continueInDir c = do
 
 auditParser :: Parser (CLICont r ())
 auditParser = switch (long "audit" <> help "Audit the database.") $> lift mainReportAudit
+
+showVersionParser :: Parser (ContT r IO ())
+showVersionParser =
+  switch (short 'v' <> long "version" <> help "Show the version")
+    $> showVersionCont
+
+showVersionCont :: ContT r IO ()
+showVersionCont =
+  liftIO . T.IO.putStrLn . T.pack . showVersion $ taggerVersion
+
+showStatsParser :: Parser (CLICont r ())
+showStatsParser =
+  switch (long "stats" <> help "Show statistics about the database")
+    $> showStatsCont
+
+showStatsCont :: CLICont r ()
+showStatsCont = lift showStats
 
 runQueryParser :: Parser (CLICont r ())
 runQueryParser =
@@ -154,20 +176,3 @@ prepareFilesForDatabase fps = do
 databasePathArgParser :: Parser FilePath
 databasePathArgParser =
   argument str (metavar "DATABASE")
-
-versionFlagParser :: Parser Bool
-versionFlagParser =
-  switch
-    ( long "version"
-        <> short 'v'
-        <> help "Print the version number."
-    )
-
-auditFlagParser :: Parser Bool
-auditFlagParser =
-  switch
-    ( long "audit"
-        <> help
-          "Audit the database, performing a series of queries and \
-          \printing the results."
-    )

@@ -5,10 +5,30 @@
 
 module Opt.Data (
   TaggerDBAudit (..),
-  emptyAudit,
+  TaggerDBStats (..),
 ) where
 
 import Database.Tagger
+
+data TaggerDBStats = TaggerDBStats
+  { _taggerdbstatsNumberOfFiles :: Int
+  , _taggerdbstatsNumberOfDescriptors :: Int
+  , _taggerdbstatsNumberOfTags :: Int
+  }
+  deriving (Show, Eq)
+
+emptyStats :: TaggerDBStats
+emptyStats =
+  TaggerDBStats 0 0 0
+
+instance Semigroup TaggerDBStats where
+  (<>) :: TaggerDBStats -> TaggerDBStats -> TaggerDBStats
+  (TaggerDBStats a b c) <> (TaggerDBStats x y z) =
+    TaggerDBStats (a + x) (b + y) (c + z)
+
+instance Monoid TaggerDBStats where
+  mempty :: TaggerDBStats
+  mempty = emptyStats
 
 {- |
  A data structure to report the results of a database

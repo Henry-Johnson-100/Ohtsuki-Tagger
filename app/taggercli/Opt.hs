@@ -7,13 +7,14 @@ module Opt (
   mainReportAudit,
   auditDatabase,
   reportAudit,
+  showStats,
 ) where
 
 import Control.Lens ((&), (.~), (^.))
 import Control.Monad
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Trans.Class (MonadTrans (lift))
-import Control.Monad.Trans.Reader (ReaderT, ask)
+import Control.Monad.Trans.Reader (ReaderT, ask, asks)
 import Control.Monad.Trans.State.Strict (
   StateT,
   execStateT,
@@ -30,7 +31,7 @@ import qualified Data.OccurrenceMap as OM (
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import Database.Tagger
-import Opt.Data (TaggerDBAudit)
+import Opt.Data (TaggerDBAudit, TaggerDBStats (..))
 import Opt.Data.Lens
 import System.Directory (
   doesFileExist,
@@ -138,3 +139,22 @@ findUnusedDescriptorTrees = do
                 tc
             )
       when (infraOccurrences <= 0) (modify (HS.insert d))
+
+showStats :: ReaderT TaggedConnection IO ()
+showStats = do
+  connPath <- asks (^. connName)
+  (TaggerDBStats fc dc tc) <- getStats
+  liftIO $ do
+    T.IO.putStrLn $ "The database, " <> connPath <> ", has:"
+    T.IO.putStrLn $ (T.pack . show $ fc) <> " files"
+    T.IO.putStrLn $ (T.pack . show $ dc) <> " descriptors"
+    T.IO.putStrLn $ (T.pack . show $ tc) <> " applied tags"
+
+getStats :: ReaderT TaggedConnection IO TaggerDBStats
+getStats = do
+  tc <- ask
+  liftIO $ do
+    !numberOfFiles <- length <$> allFiles tc
+    !numberOfDescriptors <- length <$> allDescriptors tc
+    !numberOfTags <- length <$> allTags tc
+    return (TaggerDBStats numberOfFiles numberOfDescriptors numberOfTags)
