@@ -35,8 +35,9 @@ import Database.Tagger (
   TaggedConnection,
   open,
   open',
+  queryForFileByPattern,
  )
-import Opt (mainReportAudit, showStats)
+import Opt (getConcreteFiles, mainReportAudit, reportTags, showStats)
 import Options.Applicative (
   Alternative (many, (<|>)),
   Parser,
@@ -80,6 +81,7 @@ p' =
                                         )
                                           <|> runQueryParser
                                           <|> addFileParser
+                                          <|> showAppliedTagsParser
                                       )
                               )
                     )
@@ -206,3 +208,14 @@ addFileCont fps =
 databasePathArgParser :: Parser FilePath
 databasePathArgParser =
   argument str (metavar "DATABASE")
+
+showAppliedTagsParser =
+  switch (long "show-tags" <> help "Show tags applied to the given files")
+    *> (showAppliedTagsCont <$> many (argument str (metavar "PATH")))
+
+showAppliedTagsCont :: [FilePath] -> ReaderT TaggedConnection (ContT () IO) ()
+showAppliedTagsCont fps = do
+  tc <- ask
+  fs <- liftIO . fmap concat . mapM (flip queryForFileByPattern tc . T.pack) $ fps
+  cfs <- mapReaderT liftIO $ getConcreteFiles fs
+  liftIO $ mapM_ reportTags cfs
