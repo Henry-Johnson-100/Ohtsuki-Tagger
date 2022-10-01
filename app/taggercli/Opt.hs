@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Opt (
@@ -7,13 +8,16 @@ module Opt (
   auditDatabase,
   reportAudit,
   showStats,
+  getConcreteFiles,
+  reportTags,
 ) where
 
 import Control.Lens ((&), (.~), (^.))
-import Control.Monad (filterM, void, when)
+import Control.Monad (filterM, unless, void, when)
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Trans.Class (MonadTrans (lift))
-import Control.Monad.Trans.Reader (ReaderT, ask, asks)
+import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Reader (ReaderT (..), ask, asks)
 import Control.Monad.Trans.State.Strict (
   StateT,
   execStateT,
@@ -22,11 +26,15 @@ import Control.Monad.Trans.State.Strict (
 import qualified Data.Foldable as F
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
+import Data.HierarchyMap (HierarchyMap, mapHierarchyMap)
+import qualified Data.HierarchyMap as HRM
 import qualified Data.IntMap.Strict as IM
 import Data.List (sortOn)
+import Data.Maybe
 import qualified Data.OccurrenceMap as OM (
   OccurrenceMap (occurrenceMap),
  )
+import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import Database.Tagger (
@@ -39,7 +47,9 @@ import Database.Tagger (
   allTags,
   getAllInfra,
   getTagOccurrencesByDescriptorKeys,
+  queryForConcreteTaggedFileWithFileId,
  )
+import Database.Tagger.Type
 import Opt.Data (TaggerDBAudit, TaggerDBStats (..))
 import Opt.Data.Lens (
   HasMissingFiles (missingFiles),
@@ -167,3 +177,45 @@ getStats = do
     !numberOfDescriptors <- length <$> allDescriptors tc
     !numberOfTags <- length <$> allTags tc
     return (TaggerDBStats numberOfFiles numberOfDescriptors numberOfTags)
+
+getConcreteFiles :: [File] -> ReaderT TaggedConnection IO [ConcreteTaggedFile]
+getConcreteFiles fs = do
+  tc <- ask
+  liftIO
+    . fmap catMaybes
+    . mapM (runMaybeT . flip queryForConcreteTaggedFileWithFileId tc)
+    $ (fileId <$> fs)
+
+reportTags :: ConcreteTaggedFile -> IO ()
+reportTags (ConcreteTaggedFile _ hrm) = do
+  reportMetaTags hrm
+  reportNormalTags hrm
+  T.IO.putStrLn ""
+
+reportMetaTags :: HierarchyMap ConcreteTag -> IO ()
+reportMetaTags hrm = do
+  let topLevelMembers = getOnlyTopLevelMembers hrm
+  unless (null topLevelMembers)
+    . mapM_ (flip runReaderT hrm . reportHierarchyMap' 0)
+    $ topLevelMembers
+ where
+  getOnlyTopLevelMembers hrm' =
+    filter (\x -> HRM.metaMember x hrm' && not (HRM.infraMember x hrm')) . HRM.keys $ hrm'
+  reportHierarchyMap' :: Int -> ConcreteTag -> ReaderT (HierarchyMap ConcreteTag) IO ()
+  reportHierarchyMap' indentLevel ct@(concreteTagDescriptor -> (descriptor -> dp)) = do
+    cts <-
+      sortOn (descriptor . concreteTagDescriptor)
+        . F.toList
+        <$> (asks . HRM.find $ ct)
+    liftIO . T.IO.putStrLn $
+      T.replicate (2 * indentLevel) " "
+        <> dp
+    mapM_ (reportHierarchyMap' (indentLevel + 1)) cts
+
+reportNormalTags :: HierarchyMap ConcreteTag -> IO ()
+reportNormalTags hrm =
+  mapM_ (T.IO.putStrLn . descriptor . concreteTagDescriptor)
+    . sortOn (descriptor . concreteTagDescriptor)
+    . filter (\x -> not (HRM.metaMember x hrm) && not (HRM.infraMember x hrm))
+    . HRM.keys
+    $ hrm
