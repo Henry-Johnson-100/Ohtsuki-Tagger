@@ -7,16 +7,41 @@ module Opt.Data (
   TaggerDBAudit (..),
   TaggerDBStats (..),
   TaggerCommand (..),
+  TaggerDBCommand (..),
+  TaggerEx (..),
 ) where
 
+import Data.Monoid (Any)
 import Data.Text (Text)
 import Database.Tagger
+
+data TaggerEx
+  = TaggerExVersion
+  | TaggerExDB FilePath TaggerDBCommand
+  deriving (Show, Eq)
+
+data TaggerDBCommand = TaggerDBCommand
+  { _tdbcAudit :: Any
+  , _tdbcStats :: Any
+  , _tdbcTaggerCommand :: TaggerCommand
+  }
+  deriving (Show, Eq)
+
+instance Semigroup TaggerDBCommand where
+  (<>) :: TaggerDBCommand -> TaggerDBCommand -> TaggerDBCommand
+  (TaggerDBCommand a s c) <> (TaggerDBCommand a' s' c') =
+    TaggerDBCommand (a <> a') (s <> s') (c <> c')
+
+instance Monoid TaggerDBCommand where
+  mempty :: TaggerDBCommand
+  mempty = TaggerDBCommand mempty mempty mempty
 
 data TaggerCommand = TaggerCommand
   { _tcAddFile :: [Text]
   , _tcRemoveFile :: [Text]
   , _tcDeleteFile :: [Text]
   , _tcMoveFile :: [(Text, Text)]
+  , _tcReportTags :: [Text]
   , _tcAddDescriptor :: [Text]
   , _tcRemoveDescriptor :: [Text]
   , _tcTagFile :: [(Text, Text)]
@@ -26,21 +51,22 @@ data TaggerCommand = TaggerCommand
 
 instance Semigroup TaggerCommand where
   (<>) :: TaggerCommand -> TaggerCommand -> TaggerCommand
-  (TaggerCommand a b c d e f g h) <> (TaggerCommand i j k l m n o p) =
+  (TaggerCommand a b c d e f g h i) <> (TaggerCommand a' b' c' d' e' f' g' h' i') =
     TaggerCommand
-      (a <> i)
-      (b <> j)
-      (c <> k)
-      (d <> l)
-      (e <> m)
-      (f <> n)
-      (g <> o)
-      (h <> p)
+      (a <> a')
+      (b <> b')
+      (c <> c')
+      (d <> d')
+      (e <> e')
+      (f <> f')
+      (g <> g')
+      (h <> h')
+      (i <> i')
 
 instance Monoid TaggerCommand where
   mempty :: TaggerCommand
   mempty =
-    TaggerCommand [] [] [] [] [] [] [] []
+    TaggerCommand [] [] [] [] [] [] [] [] []
 
 data TaggerDBStats = TaggerDBStats
   { _taggerdbstatsNumberOfFiles :: Int

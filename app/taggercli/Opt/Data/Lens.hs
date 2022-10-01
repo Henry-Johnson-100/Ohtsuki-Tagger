@@ -12,3 +12,5 @@ makeLensesWith abbreviatedFields ''TaggerDBAudit
 makeLensesWith abbreviatedFields ''TaggerDBStats
 
 makeLensesWith abbreviatedFields ''TaggerCommand
+
+makeLensesWith abbreviatedFields ''TaggerDBCommand
