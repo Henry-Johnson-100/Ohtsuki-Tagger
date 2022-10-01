@@ -9,7 +9,7 @@ module Opt (
   reportAudit,
   showStats,
   getConcreteFiles,
-  reportTags, 
+  reportTags,
 ) where
 
 import Control.Lens ((&), (.~), (^.))
@@ -187,14 +187,14 @@ getConcreteFiles fs = do
     $ (fileId <$> fs)
 
 reportTags :: ConcreteTaggedFile -> IO ()
-reportTags (ConcreteTaggedFile (File _ fp) hrm) = do
-  T.IO.putStrLn fp
-  reportHierarchyMap hrm
+reportTags (ConcreteTaggedFile _ hrm) = do
+  reportMetaTags hrm
+  reportNormalTags hrm
+  T.IO.putStrLn ""
 
-reportHierarchyMap :: HierarchyMap ConcreteTag -> IO ()
-reportHierarchyMap hrm = do
-  let ks = HRM.keys hrm
-      topLevelMembers = getOnlyTopLevelMembers hrm
+reportMetaTags :: HierarchyMap ConcreteTag -> IO ()
+reportMetaTags hrm = do
+  let topLevelMembers = getOnlyTopLevelMembers hrm
   unless (null topLevelMembers)
     . mapM_ (flip runReaderT hrm . reportHierarchyMap' 0)
     $ topLevelMembers
@@ -203,11 +203,19 @@ reportHierarchyMap hrm = do
     filter (\x -> HRM.metaMember x hrm' && not (HRM.infraMember x hrm')) . HRM.keys $ hrm'
   reportHierarchyMap' :: Int -> ConcreteTag -> ReaderT (HierarchyMap ConcreteTag) IO ()
   reportHierarchyMap' indentLevel ct@(concreteTagDescriptor -> (descriptor -> dp)) = do
-    cts@(map (descriptor . concreteTagDescriptor) -> dps) <-
-      F.toList <$> (asks . HRM.find $ ct)
+    cts <-
+      sortOn (descriptor . concreteTagDescriptor)
+        . F.toList
+        <$> (asks . HRM.find $ ct)
     liftIO . T.IO.putStrLn $
       T.replicate (2 * indentLevel) " "
         <> dp
-        <> (if null dps then mempty else " {")
     mapM_ (reportHierarchyMap' (indentLevel + 1)) cts
-    when (null dps) . liftIO . T.IO.putStrLn $ T.replicate (2 * indentLevel) " " <> "}"
+
+reportNormalTags :: HierarchyMap ConcreteTag -> IO ()
+reportNormalTags hrm =
+  mapM_ (T.IO.putStrLn . descriptor . concreteTagDescriptor)
+    . sortOn (descriptor . concreteTagDescriptor)
+    . filter (\x -> not (HRM.metaMember x hrm) && not (HRM.infraMember x hrm))
+    . HRM.keys
+    $ hrm
