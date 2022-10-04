@@ -9,6 +9,14 @@
 # Planned
 
 * A Query builder element in the query widget section.
+* Filter tags showing up in the results pane by pattern and meta-descriptor.
+
+### 1.0.2.1 -- 2021-10-04
+
+* Limited CLI functionality.
+Exposed through the `taggercli` program.
+  * Querying
+  * Report stats or audit results
 
 ------
 
