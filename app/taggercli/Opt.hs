@@ -26,22 +26,17 @@ import Control.Monad.Trans.State.Strict (
 import qualified Data.Foldable as F
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
-import Data.HierarchyMap (HierarchyMap, mapHierarchyMap)
+import Data.HierarchyMap (HierarchyMap)
 import qualified Data.HierarchyMap as HRM
 import qualified Data.IntMap.Strict as IM
 import Data.List (sortOn)
-import Data.Maybe
+import Data.Maybe (catMaybes)
 import qualified Data.OccurrenceMap as OM (
   OccurrenceMap (occurrenceMap),
  )
-import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import Database.Tagger (
-  Descriptor (..),
-  File (filePath),
-  HasConnName (connName),
-  TaggedConnection,
   allDescriptors,
   allFiles,
   allTags,
@@ -49,7 +44,14 @@ import Database.Tagger (
   getTagOccurrencesByDescriptorKeys,
   queryForConcreteTaggedFileWithFileId,
  )
-import Database.Tagger.Type
+import Database.Tagger.Type (
+  ConcreteTag (concreteTagDescriptor),
+  ConcreteTaggedFile (ConcreteTaggedFile),
+  Descriptor (..),
+  File (fileId, filePath),
+  HasConnName (connName),
+  TaggedConnection,
+ )
 import Opt.Data (TaggerDBAudit, TaggerDBStats (..))
 import Opt.Data.Lens (
   HasMissingFiles (missingFiles),

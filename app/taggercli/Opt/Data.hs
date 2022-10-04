@@ -1,5 +1,6 @@
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
@@ -7,13 +8,14 @@ module Opt.Data (
   TaggerDBAudit (..),
   TaggerDBStats (..),
   TaggerCommand (..),
+  TaggerQueryCommand (..),
   TaggerDBCommand (..),
   TaggerEx (..),
 ) where
 
 import Data.Monoid (Any)
 import Data.Text (Text)
-import Database.Tagger
+import Database.Tagger (Descriptor, File)
 
 data TaggerEx
   = TaggerExVersion
@@ -37,36 +39,33 @@ instance Monoid TaggerDBCommand where
   mempty = TaggerDBCommand mempty mempty mempty
 
 data TaggerCommand = TaggerCommand
-  { _tcAddFile :: [Text]
-  , _tcRemoveFile :: [Text]
-  , _tcDeleteFile :: [Text]
-  , _tcMoveFile :: [(Text, Text)]
-  , _tcReportTags :: [Text]
-  , _tcAddDescriptor :: [Text]
-  , _tcRemoveDescriptor :: [Text]
-  , _tcTagFile :: [(Text, Text)]
-  , _tcRelateDescriptor :: [(Text, Text)]
+  { _tcQueryCommand :: Maybe TaggerQueryCommand
   }
   deriving (Show, Eq)
 
 instance Semigroup TaggerCommand where
   (<>) :: TaggerCommand -> TaggerCommand -> TaggerCommand
-  (TaggerCommand a b c d e f g h i) <> (TaggerCommand a' b' c' d' e' f' g' h' i') =
-    TaggerCommand
-      (a <> a')
-      (b <> b')
-      (c <> c')
-      (d <> d')
-      (e <> e')
-      (f <> f')
-      (g <> g')
-      (h <> h')
-      (i <> i')
+  (TaggerCommand q) <> (TaggerCommand q') = TaggerCommand (q <> q')
 
 instance Monoid TaggerCommand where
   mempty :: TaggerCommand
   mempty =
-    TaggerCommand [] [] [] [] [] [] [] [] []
+    TaggerCommand mempty
+
+data TaggerQueryCommand = TaggerQueryCommand
+  { _tqcQuery :: Text
+  , _tqcRelative :: Any
+  }
+  deriving (Show, Eq)
+
+instance Semigroup TaggerQueryCommand where
+  (<>) :: TaggerQueryCommand -> TaggerQueryCommand -> TaggerQueryCommand
+  (TaggerQueryCommand q r) <> (TaggerQueryCommand q' r') =
+    TaggerQueryCommand (q <> q') (r <> r')
+
+instance Monoid TaggerQueryCommand where
+  mempty :: TaggerQueryCommand
+  mempty = TaggerQueryCommand mempty mempty
 
 data TaggerDBStats = TaggerDBStats
   { _taggerdbstatsNumberOfFiles :: Int

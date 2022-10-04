@@ -13,4 +13,5 @@ makeLensesWith abbreviatedFields ''TaggerDBStats
 
 makeLensesWith abbreviatedFields ''TaggerCommand
 
+makeLensesWith abbreviatedFields ''TaggerQueryCommand
 makeLensesWith abbreviatedFields ''TaggerDBCommand
