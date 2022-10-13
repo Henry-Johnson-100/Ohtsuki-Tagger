@@ -7,9 +7,20 @@
 ------
 
 # Planned
+In order of priority
 
-* A Query builder element in the query widget section.
 * Filter tags showing up in the results pane by pattern and meta-descriptor.
+* Organize the detail pane so that tags with subtags always appear above tags without
+subtags, ordered alphabetically
+* Add some feedback when adding files to the database so the user knows then the process
+is complete, optionally how many files were added.
+* A Query builder element in the query widget section.
+
+------
+
+### 1.0.2.2 -- ????-??-??
+
+------
 
 ### 1.0.2.1 -- 2021-10-04
 
