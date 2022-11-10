@@ -14,16 +14,26 @@
 subtags, ordered alphabetically
 * Add some feedback when adding files to the database so the user knows then the process
 is complete, optionally how many files were added.
-* A Query builder element in the query widget section.
+* A Query builder element in the query widget section. (feature 4433af1d6b)
+* Add option to rescan known folders. (feature b9302e895e)
+* Sort nested tags (feature 67c304be05)
+* Bug Fixes
+  * Ensure that shell processes spawned via GUI are non-blocking in the GUI
+  (defect c58e8a29dd)
+
+## CLI changes
+* Add option to add files. -A or --add or something.
 
 ## Major Library Changes
 * A macro system for storing queries and expanding them as text in a query.
+  (feature 0c4167a588)
   * Will be a library change, so will contribute to a major version.
-* Multi-plex databases.
+* Multi-plex databases. (feature 96f1604a94)
   * Connect to more than one database at a time.
   * Join tags and descriptors on virtual tables.
   * Dispatch new tagging queries to the appropriate database 
   with the appropriate descriptor.
+* Easier additive queries. (feature 97e33329bd)
 
 ## Minor Library Changes
 * Reorganize tagging engine code to be like the query engine.
