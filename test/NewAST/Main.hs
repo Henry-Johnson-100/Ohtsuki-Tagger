@@ -231,6 +231,120 @@ parserTests =
             )
             (parseExpression "a(b i| c i| (d i| (e i| f) i| g) i| h)")
         )
+    , testCase
+        "Distributivity over Implicit SetOp"
+        ( assertEqual
+            ""
+            (parseExpression "a(b) a(c) i| (a(d) i| (a(e) a(f)) a(g)) a(h)")
+            (parseExpression "a(b c i| (d i| (e f) g) h)")
+        )
+    , testCase
+        "Implicit SetOps defer to Implicit Distribution"
+        ( assertEqual
+            ""
+            ( Right
+                ( Expression
+                    ( Expression
+                        ( Value . NAry $
+                            Term MetaDescriptorCriteria "a"
+                              :<- Bottom (Term MetaDescriptorCriteria "b")
+                        )
+                        Intersect
+                        ( Expression
+                            ( Expression
+                                ( Value . NAry $
+                                    Term MetaDescriptorCriteria "a"
+                                      :<- ( Term MetaDescriptorCriteria "c"
+                                              :<- ( Term MetaDescriptorCriteria "d"
+                                                      :<- Bottom (Term MetaDescriptorCriteria "e")
+                                                  )
+                                          )
+                                )
+                                Intersect
+                                ( Value . NAry $
+                                    Term MetaDescriptorCriteria "a"
+                                      :<- ( Term MetaDescriptorCriteria "c"
+                                              :<- ( Term MetaDescriptorCriteria "d"
+                                                      :<- Bottom (Term MetaDescriptorCriteria "f")
+                                                  )
+                                          )
+                                )
+                            )
+                            Intersect
+                            ( Value . NAry $
+                                Term MetaDescriptorCriteria "a"
+                                  :<- ( Term MetaDescriptorCriteria "c"
+                                          :<- Bottom (Term MetaDescriptorCriteria "g")
+                                      )
+                            )
+                        )
+                    )
+                    Intersect
+                    ( Value . NAry $
+                        Term MetaDescriptorCriteria "a"
+                          :<- Bottom (Term MetaDescriptorCriteria "h")
+                    )
+                )
+            )
+            (parseExpression "a(b c(d(e f) g) h)")
+        )
+    , testCase
+        "Defined previous test case correctly"
+        ( assertEqual
+            ""
+            ( Right
+                ( Expression
+                    ( Expression
+                        ( Value . NAry $
+                            Term MetaDescriptorCriteria "a"
+                              :<- Bottom (Term MetaDescriptorCriteria "b")
+                        )
+                        Intersect
+                        ( Expression
+                            ( Expression
+                                ( Value . NAry $
+                                    Term MetaDescriptorCriteria "a"
+                                      :<- ( Term MetaDescriptorCriteria "c"
+                                              :<- ( Term MetaDescriptorCriteria "d"
+                                                      :<- Bottom (Term MetaDescriptorCriteria "e")
+                                                  )
+                                          )
+                                )
+                                Intersect
+                                ( Value . NAry $
+                                    Term MetaDescriptorCriteria "a"
+                                      :<- ( Term MetaDescriptorCriteria "c"
+                                              :<- ( Term MetaDescriptorCriteria "d"
+                                                      :<- Bottom (Term MetaDescriptorCriteria "f")
+                                                  )
+                                          )
+                                )
+                            )
+                            Intersect
+                            ( Value . NAry $
+                                Term MetaDescriptorCriteria "a"
+                                  :<- ( Term MetaDescriptorCriteria "c"
+                                          :<- Bottom (Term MetaDescriptorCriteria "g")
+                                      )
+                            )
+                        )
+                    )
+                    Intersect
+                    ( Value . NAry $
+                        Term MetaDescriptorCriteria "a"
+                          :<- Bottom (Term MetaDescriptorCriteria "h")
+                    )
+                )
+            )
+            (parseExpression "((a(b) i| (a(c(d(e)))) i| a(c(d(f)))) i| a(c(g))) i| a(h)")
+        )
+    , testCase
+        "Implicit SetOps defer to Implicit Distribution - In-Situ"
+        ( assertEqual
+            ""
+            (parseExpression "((a(b) i| (a(c(d(e)))) i| a(c(d(f)))) i| a(c(g))) i| a(h)")
+            (parseExpression "a(b c(d(e f) g) h)")
+        )
     ]
 
 valnullR :: T.Text -> Expression
