@@ -95,18 +95,6 @@ intersectOpParser = ichar 'i' >> ichar '|' >> return Intersect
 diffOpParser :: SetOpParser
 diffOpParser = ichar 'd' >> ichar '|' >> return Difference
 
-queryOpenParser :: Parser ()
-queryOpenParser = void (ichar '(') >> spaces
-
-queryCloseParser :: Parser ()
-queryCloseParser = void spaces >> void (ichar ')')
-
-subClauseScopeOpenParser :: Parser ()
-subClauseScopeOpenParser = void (ichar '{') >> spaces
-
-subClauseScopeCloseParser :: Parser ()
-subClauseScopeCloseParser = spaces >> void (ichar '}')
-
 anyCriteriaLiteralParser :: QueryCriteriaLiteralParser
 anyCriteriaLiteralParser =
   ( choice . map try $
