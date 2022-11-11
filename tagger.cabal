@@ -144,6 +144,7 @@ library tagger-lib
                       ,Text.TaggerQL
                       ,Text.TaggerQL.Parser.Internal
                       ,Text.TaggerQL.AST
+                      ,Text.TaggerQL.NewAST.AST
 
   other-modules:       Database.Tagger.Script
                       ,Database.Tagger.Type.Lens
