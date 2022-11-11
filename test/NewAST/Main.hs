@@ -140,6 +140,97 @@ parserTests =
             )
             (parseExpression "a i| b i| (c i| (d i| e)) i| f")
         )
+    , testCase
+        "Implicit Intersection Expressions"
+        ( assertEqual
+            ""
+            ( Right
+                ( Expression
+                    ( Expression
+                        ( Expression
+                            (valnullR "a")
+                            Intersect
+                            (valnullR "b")
+                        )
+                        Intersect
+                        (valnullR "c")
+                    )
+                    Intersect
+                    (valnullR "d")
+                )
+            )
+            (parseExpression "a b c d")
+        )
+    , testCase
+        "Single Distribution"
+        ( assertEqual
+            ""
+            ( Right
+                ( Value
+                    ( NAry
+                        ( Term MetaDescriptorCriteria "a"
+                            :<- Bottom (Term MetaDescriptorCriteria "b")
+                        )
+                    )
+                )
+            )
+            (parseExpression "a(b)")
+        )
+    , testCase
+        "Binary Distribution"
+        ( assertEqual
+            ""
+            ( Right
+                ( Expression
+                    ( Value
+                        ( NAry
+                            ( Term MetaDescriptorCriteria "a"
+                                :<- Bottom (Term MetaDescriptorCriteria "b")
+                            )
+                        )
+                    )
+                    Intersect
+                    ( Value
+                        ( NAry
+                            ( Term MetaDescriptorCriteria "a"
+                                :<- Bottom (Term MetaDescriptorCriteria "c")
+                            )
+                        )
+                    )
+                )
+            )
+            (parseExpression "a(b i| c)")
+        )
+    , testCase
+        "Distributive Property In-Situ 1"
+        ( assertEqual
+            ""
+            (parseExpression "a(b) i| a(c)")
+            (parseExpression "a(b i| c)")
+        )
+    , testCase
+        "Distributivity does not affect associativity 1"
+        ( assertEqual
+            ""
+            (parseExpression "a(b) i| a(c) i| a(d)")
+            (parseExpression "a(b i| c i| d)")
+        )
+    , testCase
+        "Distributivity does not affect associativity 2"
+        ( assertEqual
+            ""
+            (parseExpression "a(b) i| (a(c) i| (a(d) i| a(e)))")
+            (parseExpression "a(b i| (c i| (d i| e)))")
+        )
+    , testCase
+        "Distributivity over Mixed Associativity"
+        ( assertEqual
+            ""
+            ( parseExpression
+                "a(b) i| a(c) i| (a(d) i| (a(e) i| a(f)) i| a(g)) i| a(h)"
+            )
+            (parseExpression "a(b i| c i| (d i| (e i| f) i| g) i| h)")
+        )
     ]
 
 valnullR :: T.Text -> Expression
