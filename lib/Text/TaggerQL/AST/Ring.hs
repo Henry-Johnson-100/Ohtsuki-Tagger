@@ -2,6 +2,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use newtype instead of data" #-}
 
 module Text.TaggerQL.AST.Ring () where
 
@@ -71,68 +74,63 @@ liftComplex :: ComplexTerm -> TermRing
 liftComplex = Relational
 
 data Expression
-  = Universal TermRing
-  | Operand Expression
-  | Operator Expression SetOp Expression
+  = Value TermRing
+  | Expression Expression SetOp Expression
   deriving (Show, Eq)
 
-(<+|) :: TermRing -> Expression -> Expression
-x <+| expr =
-  case x of
-    -- Union identity
-    Zero -> expr
-    -- Union annihilation
-    U -> Universal U
-    variable -> Operator (Universal variable) Union expr
+{-
+"o%yui {cute smile} d| (happy d| (happy {maybe}) i| amused) d| halloween u| (witch u| frog)"
 
-(<*|) :: TermRing -> Expression -> Expression
-x <*| expr =
-  case x of
-    -- Intersection identity
-    U -> expr
-    -- Intersection annihilation
-    Zero -> Universal Zero
-    variable -> Operator (Universal variable) Intersect expr
+Keeping in mind that set operations are left-associative,
+  this is the resulting expression:
 
-(<-|) :: TermRing -> Expression -> Expression
-x <-| expr =
-  case x of
-    -- Difference annihilation
-    Zero -> Universal Zero
-    variable -> Operator (Universal variable) Difference expr
+((a D| b) D| c) U| d
 
-{- |
- Simplifies the given expression as much as possible by propagating
- identity and annihilations through an 'Operator`
+where
+  a = Relational (o%yui :<- [cute, smile])
+  b = (e D| f) I| g
+    where
+      e = Mundane happy
+      f = Relational (happy :<- [maybe])
+      g = Mundane amused
+  c = Mundane halloween
+  d = h U| i
+    where
+      h = Mundane witch
+      i = Mundane frog
+
+More concretely, this would be:
+Expression
+  (
+    Expression
+      (
+        Expression
+          (Value (Relational (o%yui :<- [cute, smile])))
+          Difference
+          (
+            Expression
+              (
+                Expression
+                  (Value (Mundane happy))
+                  Difference
+                  (Value (Relational (happy :<- [maybe])))
+              )
+              Intersect
+              (Value (Mundane amused))
+          )
+      )
+      Difference
+      (Value (Mundane halloween))
+  )
+  Union
+  (
+    Expression
+      (Value (Mundane witch))
+      Union
+      (Value (Mundane frog))
+  )
+
+this is weird and may be difficult to parse because of the left-associativity
+I wonder how it works right now, because I'm pretty sure queries are already
+left-associative and I don't have to build the AST like this unless I am misremembering.
 -}
-normalizeExpression :: Expression -> Expression
-normalizeExpression expr =
-  case expr of
-    Operator x so y ->
-      let normalX = normalizeExpression x
-          normalY = normalizeExpression y
-       in case so of
-            Union ->
-              case normalX of
-                Universal Zero -> normalY
-                Universal U -> normalX
-                _nonLaw ->
-                  case normalY of
-                    Universal Zero -> normalX
-                    Universal U -> normalY
-                    _nonLaw -> Operator normalX so normalY
-            Intersect ->
-              case normalX of
-                Universal Zero -> normalX
-                Universal U -> normalY
-                _nonLaw ->
-                  case normalY of
-                    Universal Zero -> normalY
-                    Universal U -> normalX
-                    _nonLaw -> Operator normalX so normalY
-            Difference ->
-              case normalX of
-                Universal Zero -> Universal Zero
-                _nonAnnihilating -> Operator normalX so normalY
-    Operand expr' -> normalizeExpression expr'
-    _normal -> expr
