@@ -22,7 +22,7 @@ parserEdgeCases =
                 ( Request
                     [ SentenceNode
                         ( CombinableSentence
-                            Union
+                            Intersect
                             ( Sentence
                                 [ Simple
                                     ( SimpleTerm
@@ -35,7 +35,7 @@ parserEdgeCases =
                         Difference
                         [ SentenceNode
                             ( CombinableSentence
-                                Union
+                                Intersect
                                 ( Sentence
                                     [ Simple
                                         ( SimpleTerm
@@ -48,7 +48,7 @@ parserEdgeCases =
                             Union
                             [ SentenceNode
                                 ( CombinableSentence
-                                    Union
+                                    Intersect
                                     ( Sentence
                                         [ Simple
                                             ( SimpleTerm
@@ -72,7 +72,7 @@ parserEdgeCases =
                 ( Request
                     [ SentenceNode
                         ( CombinableSentence
-                            Union
+                            Intersect
                             ( Sentence
                                 [ Simple
                                     ( SimpleTerm
@@ -85,7 +85,7 @@ parserEdgeCases =
                         Difference
                         [ SentenceNode
                             ( CombinableSentence
-                                Union
+                                Intersect
                                 ( Sentence
                                     [ Simple
                                         ( SimpleTerm
@@ -98,7 +98,7 @@ parserEdgeCases =
                             Union
                             [ SentenceNode
                                 ( CombinableSentence
-                                    Union
+                                    Intersect
                                     ( Sentence
                                         [ Simple
                                             ( SimpleTerm
@@ -122,7 +122,7 @@ parserEdgeCases =
                 ( Request
                     [ SentenceNode
                         ( CombinableSentence
-                            Union
+                            Intersect
                             ( Sentence
                                 [ Simple
                                     ( SimpleTerm
@@ -146,7 +146,7 @@ parserEdgeCases =
                         Union
                         [ SentenceNode
                             ( CombinableSentence
-                                Union
+                                Intersect
                                 ( Sentence
                                     [ Simple
                                         ( SimpleTerm
