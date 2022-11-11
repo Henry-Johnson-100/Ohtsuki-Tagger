@@ -29,7 +29,7 @@ parserTests =
                     ( assertEqual
                         ""
                         ( Right
-                            ( Value . Nullary $ Term a s
+                            ( Value . Nullary $ Term a "_"
                             )
                         )
                         (parseExpression (s <> "_"))
@@ -248,154 +248,87 @@ parserTests =
             ( Right
                 ( Expression
                     ( Expression
-                        ( Value . NAry $
-                            Term MetaDescriptorCriteria "a"
-                              :<- Bottom (Term MetaDescriptorCriteria "b")
-                        )
+                        (Value . NAry $ trm "a" :<- Bottom (trm "b"))
                         Intersect
                         ( Expression
                             ( Expression
-                                ( Value . NAry $
-                                    Term MetaDescriptorCriteria "a"
-                                      :<- ( Term MetaDescriptorCriteria "c"
-                                              :<- ( Term MetaDescriptorCriteria "d"
-                                                      :<- Bottom (Term MetaDescriptorCriteria "e")
-                                                  )
-                                          )
-                                )
+                                (Value . NAry $ trm "a" :<- (trm "c" :<- (trm "d" :<- Bottom (trm "e"))))
                                 Intersect
-                                ( Value . NAry $
-                                    Term MetaDescriptorCriteria "a"
-                                      :<- ( Term MetaDescriptorCriteria "c"
-                                              :<- ( Term MetaDescriptorCriteria "d"
-                                                      :<- Bottom (Term MetaDescriptorCriteria "f")
-                                                  )
-                                          )
-                                )
+                                (Value . NAry $ trm "a" :<- (trm "c" :<- (trm "d" :<- Bottom (trm "f"))))
                             )
                             Intersect
-                            ( Value . NAry $
-                                Term MetaDescriptorCriteria "a"
-                                  :<- ( Term MetaDescriptorCriteria "c"
-                                          :<- Bottom (Term MetaDescriptorCriteria "g")
-                                      )
-                            )
+                            (Value . NAry $ trm "a" :<- (trm "c" :<- Bottom (trm "g")))
                         )
                     )
                     Intersect
-                    ( Value . NAry $
-                        Term MetaDescriptorCriteria "a"
-                          :<- Bottom (Term MetaDescriptorCriteria "h")
-                    )
+                    (Value . NAry $ trm "a" :<- Bottom (trm "h"))
                 )
             )
-            (parseExpression "a(b c(d(e f) g) h)")
+            ( parseExpression "a(b c(d(e f) g) h)"
+            {-
+            desugaring and back again:
+
+            a(b c(d(e f) g) h)
+            distribute d
+            a(b c((d(e) d(f)) g) h)
+            distribute c
+            a(b (c(d(e) d(f)) c(g)) h)
+            distribute c
+            a(b ((c(d(e)) c(d(f))) c(g)) h)
+            distribute a
+            (a(b) a((c(d(e)) c(d(f))) c(g)) a(h))
+            distribute a
+            (a(b) (a(c(d(e)) c(d(f))) a(c(g))) a(h))
+            distribute a
+            (a(b) ((a(c(d(e))) a(c(d(f)))) a(c(g))) a(h))
+            make setop explicit
+            (a(b) I| ((a(c(d(e))) I| a(c(d(f)))) I| a(c(g))) I| a(h))
+            substitute terms: v w x y z
+            (v I| ((w I| x) I| y) I| z)
+              where
+                v = a(b)
+                w = a(c(d(e)))
+                x = a(c(d(f)))
+                y = a(c(g))
+                z = a(h)
+
+            add explicit SetOps to original query
+            a(b I| c(d(e I| f) I| g) I| h)
+            -}
+            )
         )
     , testCase
-        "Defined previous test case correctly"
+        "Desugared previous test case"
         ( assertEqual
             ""
             ( Right
                 ( Expression
                     ( Expression
-                        ( Value . NAry $
-                            Term MetaDescriptorCriteria "a"
-                              :<- Bottom (Term MetaDescriptorCriteria "b")
-                        )
+                        (Value . NAry $ trm "a" :<- Bottom (trm "b"))
                         Intersect
                         ( Expression
                             ( Expression
-                                ( Value . NAry $
-                                    Term MetaDescriptorCriteria "a"
-                                      :<- ( Term MetaDescriptorCriteria "c"
-                                              :<- ( Term MetaDescriptorCriteria "d"
-                                                      :<- Bottom (Term MetaDescriptorCriteria "e")
-                                                  )
-                                          )
-                                )
+                                (Value . NAry $ trm "a" :<- (trm "c" :<- (trm "d" :<- Bottom (trm "e"))))
                                 Intersect
-                                ( Value . NAry $
-                                    Term MetaDescriptorCriteria "a"
-                                      :<- ( Term MetaDescriptorCriteria "c"
-                                              :<- ( Term MetaDescriptorCriteria "d"
-                                                      :<- Bottom (Term MetaDescriptorCriteria "f")
-                                                  )
-                                          )
-                                )
+                                (Value . NAry $ trm "a" :<- (trm "c" :<- (trm "d" :<- Bottom (trm "f"))))
                             )
                             Intersect
-                            ( Value . NAry $
-                                Term MetaDescriptorCriteria "a"
-                                  :<- ( Term MetaDescriptorCriteria "c"
-                                          :<- Bottom (Term MetaDescriptorCriteria "g")
-                                      )
-                            )
+                            (Value . NAry $ trm "a" :<- (trm "c" :<- Bottom (trm "g")))
                         )
                     )
                     Intersect
-                    ( Value . NAry $
-                        Term MetaDescriptorCriteria "a"
-                          :<- Bottom (Term MetaDescriptorCriteria "h")
-                    )
+                    (Value . NAry $ trm "a" :<- Bottom (trm "h"))
                 )
             )
-            (parseExpression "((a(b) i| (a(c(d(e)))) i| a(c(d(f)))) i| a(c(g))) i| a(h)")
+            (parseExpression "a(b I| c(d(e I| f) I| g) I| h)")
         )
     , testCase
         "Implicit SetOps defer to Implicit Distribution - In-Situ"
         ( assertEqual
             ""
-            (parseExpression "((a(b) i| (a(c(d(e)))) i| a(c(d(f)))) i| a(c(g))) i| a(h)")
+            (parseExpression "(a(b) I| ((a(c(d(e))) I| a(c(d(f)))) I| a(c(g))) I| a(h))")
             (parseExpression "a(b c(d(e f) g) h)")
         )
-    , testGroup
-        "testing tools"
-        [ testCase
-            "texpr works 1"
-            ( assertEqual
-                ""
-                ( texpr
-                    (parseExpression "a")
-                    Intersect
-                    (parseExpression "b")
-                )
-                (parseExpression "a i| b")
-            )
-        , testCase
-            "texpr works 2"
-            ( assertEqual
-                ""
-                ( texpr
-                    ( texpr
-                        (parseExpression "a")
-                        Intersect
-                        (parseExpression "b")
-                    )
-                    Intersect
-                    (parseExpression "c")
-                )
-                (parseExpression "a i| b i| c")
-            )
-        , testCase
-            "texpr works 3"
-            ( assertEqual
-                ""
-                ( texpr
-                    (parseExpression "a")
-                    Intersect
-                    ( texpr
-                        (parseExpression "b")
-                        Intersect
-                        ( texpr
-                            (parseExpression "c")
-                            Intersect
-                            (parseExpression "d")
-                        )
-                    )
-                )
-                (parseExpression "a i| (b i| (c i| d))")
-            )
-        ]
     ]
 
 valnullR :: T.Text -> Expression
@@ -403,8 +336,3 @@ valnullR = Value . Nullary . Term MetaDescriptorCriteria
 
 trm :: T.Text -> Term
 trm = Term MetaDescriptorCriteria
-
-texpr l so r = do
-  l' <- l
-  r' <- r
-  return (Expression l' so r')
