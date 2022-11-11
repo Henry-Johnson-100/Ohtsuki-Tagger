@@ -263,9 +263,9 @@ acceptableCharParser = do
         <|> ichar '\\'
       )
       <|> notDisallowedChars
-  when (c `elem` ("ud" :: String)) (notFollowedBy (ichar '|' <|> ichar '.'))
-  when (c `elem` ("rp" :: String)) (notFollowedBy $ ichar '.')
-  when (c == 'i') (notFollowedBy $ ichar '|')
+  when (c `elem` ("udUD" :: String)) (notFollowedBy (ichar '|' <|> ichar '.'))
+  when (c `elem` ("rpRP" :: String)) (notFollowedBy $ ichar '.')
+  when (c `elem` ("iI" :: String)) (notFollowedBy $ ichar '|')
   return c
 
 notDisallowedChars :: Parser Char

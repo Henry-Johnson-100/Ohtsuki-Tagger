@@ -95,7 +95,6 @@ normalParsers =
                     , (Union, "U|")
                     , (Intersect, "i|")
                     , (Intersect, "I|")
-                    , (Intersect, " ")
                     , (Difference, "d|")
                     , (Difference, "D|")
                     ]
