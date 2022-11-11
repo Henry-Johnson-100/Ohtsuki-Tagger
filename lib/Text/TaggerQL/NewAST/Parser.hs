@@ -10,6 +10,7 @@ module Text.TaggerQL.NewAST.Parser (
 
 import Control.Monad (void, when)
 import Data.Char (toLower)
+import Data.Functor (($>))
 import Data.Tagger
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -35,19 +36,14 @@ expressionParser =
     (spaces *> setOpOperator explicitOpParser)
 
 parenthesizedExpression :: Parser Expression
-parenthesizedExpression = do
-  t <- optionMaybe (Term <$> anyCriteriaLiteralParser <*> acceptablePatternParser)
-  spaces
-  void $ ichar '('
-  expr <- expressionParser
-  spaces
-  void $ ichar ')'
-  return $ maybe expr (`distributeComplexity` expr) t
+parenthesizedExpression =
+  (\mt expr -> maybe expr (`distributeComplexity` expr) mt)
+    <$> optionMaybe (Term <$> anyCriteriaLiteralParser <*> acceptablePatternParser)
+    <*> (spaces *> ichar '(' *> expressionParser <* spaces <* ichar ')')
 
 setOpOperator :: Monad m => m SetOp -> m (Expression -> Expression -> Expression)
-setOpOperator sop = do
-  so <- sop
-  return $ \l r -> Expression l so r
+setOpOperator sop =
+  flip Expression <$> sop
 
 {-
 This example below
@@ -82,13 +78,13 @@ explicitOpParser :: SetOpParser
 explicitOpParser = choice . map try $ [unionOpParser, intersectOpParser, diffOpParser]
 
 unionOpParser :: SetOpParser
-unionOpParser = ichar 'u' >> ichar '|' >> return Union
+unionOpParser = (ichar 'u' *> ichar '|') $> Union
 
 intersectOpParser :: SetOpParser
-intersectOpParser = ichar 'i' >> ichar '|' >> return Intersect
+intersectOpParser = (ichar 'i' *> ichar '|') $> Intersect
 
 diffOpParser :: SetOpParser
-diffOpParser = ichar 'd' >> ichar '|' >> return Difference
+diffOpParser = (ichar 'd' *> ichar '|') $> Difference
 
 anyCriteriaLiteralParser :: QueryCriteriaLiteralParser
 anyCriteriaLiteralParser =
@@ -102,17 +98,17 @@ anyCriteriaLiteralParser =
     <|> pure MetaDescriptorCriteria
 
 descriptorCriteriaLiteralParser :: QueryCriteriaLiteralParser
-descriptorCriteriaLiteralParser = ichar 'd' >> ichar '.' >> return DescriptorCriteria
+descriptorCriteriaLiteralParser = (ichar 'd' *> ichar '.') $> DescriptorCriteria
 
 metaDescriptorCriteriaLiteralParser :: QueryCriteriaLiteralParser
 metaDescriptorCriteriaLiteralParser =
-  ichar 'r' >> ichar '.' >> return MetaDescriptorCriteria
+  (ichar 'r' *> ichar '.') $> MetaDescriptorCriteria
 
 filePatternCriteriaLiteralParser :: QueryCriteriaLiteralParser
-filePatternCriteriaLiteralParser = ichar 'p' >> ichar '.' >> return FilePatternCriteria
+filePatternCriteriaLiteralParser = (ichar 'p' *> ichar '.') $> FilePatternCriteria
 
 untaggedCriteriaLiteralParser :: QueryCriteriaLiteralParser
-untaggedCriteriaLiteralParser = ichar 'u' >> ichar '.' >> return UntaggedCriteria
+untaggedCriteriaLiteralParser = (ichar 'u' *> ichar '.') $> UntaggedCriteria
 
 {- |
  Case-insensitive 'Char` parser.
