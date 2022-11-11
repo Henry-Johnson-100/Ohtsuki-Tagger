@@ -1,5 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use <$>" #-}
 
 module NewAST.Main (
   parserTests,
@@ -345,7 +348,63 @@ parserTests =
             (parseExpression "((a(b) i| (a(c(d(e)))) i| a(c(d(f)))) i| a(c(g))) i| a(h)")
             (parseExpression "a(b c(d(e f) g) h)")
         )
+    , testGroup
+        "testing tools"
+        [ testCase
+            "texpr works 1"
+            ( assertEqual
+                ""
+                ( texpr
+                    (parseExpression "a")
+                    Intersect
+                    (parseExpression "b")
+                )
+                (parseExpression "a i| b")
+            )
+        , testCase
+            "texpr works 2"
+            ( assertEqual
+                ""
+                ( texpr
+                    ( texpr
+                        (parseExpression "a")
+                        Intersect
+                        (parseExpression "b")
+                    )
+                    Intersect
+                    (parseExpression "c")
+                )
+                (parseExpression "a i| b i| c")
+            )
+        , testCase
+            "texpr works 3"
+            ( assertEqual
+                ""
+                ( texpr
+                    (parseExpression "a")
+                    Intersect
+                    ( texpr
+                        (parseExpression "b")
+                        Intersect
+                        ( texpr
+                            (parseExpression "c")
+                            Intersect
+                            (parseExpression "d")
+                        )
+                    )
+                )
+                (parseExpression "a i| (b i| (c i| d))")
+            )
+        ]
     ]
 
 valnullR :: T.Text -> Expression
 valnullR = Value . Nullary . Term MetaDescriptorCriteria
+
+trm :: T.Text -> Term
+trm = Term MetaDescriptorCriteria
+
+texpr l so r = do
+  l' <- l
+  r' <- r
+  return (Expression l' so r')
