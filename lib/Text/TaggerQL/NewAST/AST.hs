@@ -11,8 +11,6 @@ module Text.TaggerQL.NewAST.AST (
   ComplexTerm (..),
   TermIdentity (..),
   Expression (..),
-  liftSimple,
-  liftComplex,
 ) where
 
 import Data.List.NonEmpty (NonEmpty)
@@ -27,60 +25,29 @@ data Term = Term
   deriving (Show, Eq)
 
 data ComplexTerm
-  = BottomTerm Term
-  | Term :<- (NonEmpty ComplexTerm)
+  = Bottom Term
+  | Term :<- ComplexTerm
   deriving (Show, Eq)
 
-{- |
- A sum type that encompasses different key members of the set of 'Term` sets.
+{-
+New complex term does not define these subqueries as lists, but rather singular
+terms that are joined via expressions.
 
- Every member of a 'TermIdentity` corresponds to a set of 'File`s from a Tagger database.
- This sum type is used to abstract building expressions that the query engine can
- interpret as expressions of operations taking place on the Set of 'Term` sets.
+in this way, "a{b c d}" is actually syntactic sugar for this data type's real expression:
+  "I|(a{b} i| a{c} i| a{d})"
 
- The additive identity 'Zero`
-  which corresponds to a set of 0 'File`s.
+this should allow for expressions to be more easily lifted into a complex term
 
- and multiplicative identity 'U` (intersection)
-  which corresponds to the set of all 'File`s in a database.
-
-  And two members for the set of Simple terms (marked 'Simple`)
-  and Complex (marked 'Relational`)
-
- These variable sets correspond to Simple and Complex terms in the current AST.
+we can see that complexifying an expression takes on a distributive property:
+  a normal expression: "b c d" which is desugared to "b i| c i| d"
+    can be distributed over by "a{}" and become "a{b c d}" which is then desugared
+    to "a{b} i| a{c} i| a{d}"
 -}
+
 data TermIdentity
-  = Zero
-  | U
-  | Simple Term
+  = Simple Term
   | Relational ComplexTerm
   deriving (Show, Eq)
-
-{- |
- Constructs a 'Simple` 'TermIdentity`
-
- Unless the 'QueryCriteria` is 'FilePatternCriteria` and the pattern is equal to \"%\""
- then it constructs 'U`
-
- If the pattern is ever null, then 'Zero` is constructed.
--}
-liftSimple :: Term -> TermIdentity
-liftSimple t@(Term qc p) =
-  case qc of
-    FilePatternCriteria ->
-      case T.strip p of
-        "%" -> U
-        notAll -> if T.null notAll then Zero else Simple t
-    _nonQuantifiable ->
-      if T.null . T.strip $ p then Zero else Simple t
-
-{- |
- It is generally not possible to guarantee that a ComplexTerm
- can be either 'Zero` or 'U` so it is always constructed as
- 'Relational`
--}
-liftComplex :: ComplexTerm -> TermIdentity
-liftComplex = Relational
 
 data Expression
   = Value TermIdentity

@@ -4,7 +4,9 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Text.TaggerQL.NewAST.Parser () where
+module Text.TaggerQL.NewAST.Parser (
+  expressionParser,
+) where
 
 import Control.Monad (void, when)
 import Data.Char (toLower)
@@ -20,49 +22,63 @@ type QueryCriteriaLiteralParser = Parser QueryCriteria
 
 type SetOpParser = Parser SetOp
 
-simpleTermIdentityParser :: Parser TermIdentity
-simpleTermIdentityParser =
-  spaces
-    *> ( ( \qc p ->
-            if T.null p
-              then Zero
-              else case qc of
-                FilePatternCriteria -> if p == "%" then U else Simple $ Term qc p
-                _other -> Simple $ Term qc p
-         )
-          <$> anyCriteriaLiteralParser
-          <*> acceptablePatternParser
-       )
+expressionParser :: Parser Expression
+expressionParser =
+  chainl1
+    ( spaces
+        *> ( bracketedExpressionParser
+              <|> try distributedExpressionParser
+              <|> ( (\qc p -> Value . Simple $ Term qc p)
+                      <$> anyCriteriaLiteralParser <*> acceptablePatternParser
+                  )
+           )
+    )
+    (spaces *> setOpOperator explicitOpParser)
 
--- I think it would be best to try to handle this expansion in the parser,
--- Adding this expansion during interpretation would confuse the simplicity of the AST
--- datatypes and may necessitate introduction of another sum type to
--- differentiate expanded vs. non-expanded complex terms.
-
-{- |
- This parses a complex term as an expression.
- Since a complex term could contain syntactic sugar like branching queries which would
- expand into several expressions.
-
- e.g. \"a {b u| (c d)}\" -> \"a {b} u| a {c d}\"
--}
-complexExpressionParser :: Parser Expression
-complexExpressionParser = do
-  spaces
+distributedExpressionParser :: Parser Expression
+distributedExpressionParser = do
   t <- Term <$> anyCriteriaLiteralParser <*> acceptablePatternParser
   spaces
   void $ ichar '{'
-  contents <- undefined
+  expr <- expressionParser
   spaces
   void $ ichar '}'
-  undefined
+  return $ distributeComplexity t expr
 
-bottomTermParser :: Parser ComplexTerm
-bottomTermParser =
-  spaces
-    *> ( fmap BottomTerm . Term
-          <$> anyCriteriaLiteralParser <*> acceptablePatternParser
-       )
+bracketedExpressionParser :: Parser Expression
+bracketedExpressionParser =
+  ichar '(' *> expressionParser <* spaces <* ichar ')'
+
+setOpOperator :: Monad m => m SetOp -> m (Expression -> Expression -> Expression)
+setOpOperator sop = do
+  so <- sop
+  return $ \l r -> Expression l so r
+
+{-
+This example below
+@distributeComplexity "a" "b{c} u| (d i| e{f})" == "a{b{c}} u| (a{d} i| a{e{f}})"@
+would previously be sugared as:
+  "a{b{c}} u| (a{d e{f}})" but the new AST desugars this automatically and distributes
+  a{} over all of its predicates.
+-}
+
+{- |
+ Given a term and expression, distribute the term over the expression as a new
+ expression of 'ComplexTerm`s
+
+ @distributeComplexity "a" "b u| d" == "a{b} u| a{d}"@
+ @distributeComplexity "a" "b{c} u| (d i| e{f})" == "a{b{c}} u| (a{d} i| a{e{f}})"@
+-}
+distributeComplexity :: Term -> Expression -> Expression
+distributeComplexity t expr = case expr of
+  Value ti -> case ti of
+    Simple te -> Value . Relational $ t :<- Bottom te
+    Relational ct -> Value . Relational $ t :<- ct
+  Expression ex so ex' ->
+    Expression
+      (distributeComplexity t ex)
+      so
+      (distributeComplexity t ex')
 
 {- |
  Parses a 'SetOp` literal or nothing.
