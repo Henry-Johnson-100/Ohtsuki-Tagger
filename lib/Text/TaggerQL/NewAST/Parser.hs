@@ -37,7 +37,7 @@ import Text.TaggerQL.NewAST.AST (
   ComplexTerm (Bottom, (:<-)),
   Expression (..),
   Term (Term),
-  TermIdentity (Relational, Simple),
+  TermArity (NAry, Nullary),
  )
 
 type Parser a = Parsec Text () a
@@ -54,7 +54,7 @@ expressionParser =
   chainl1
     ( spaces
         *> ( try parenthesizedExpression
-              <|> ( (\qc p -> Value . Simple $ Term qc p)
+              <|> ( (\qc p -> Value . Nullary $ Term qc p)
                       <$> anyCriteriaLiteralParser <*> acceptablePatternParser
                   )
            )
@@ -89,8 +89,8 @@ would previously be sugared as:
 distributeComplexity :: Term -> Expression -> Expression
 distributeComplexity t expr = case expr of
   Value ti -> case ti of
-    Simple te -> Value . Relational $ t :<- Bottom te
-    Relational ct -> Value . Relational $ t :<- ct
+    Nullary te -> Value . NAry $ t :<- Bottom te
+    NAry ct -> Value . NAry $ t :<- ct
   Expression ex so ex' ->
     Expression
       (distributeComplexity t ex)

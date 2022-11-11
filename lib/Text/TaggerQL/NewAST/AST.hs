@@ -1,7 +1,4 @@
-{-# LANGUAGE InstanceSigs #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use newtype instead of data" #-}
@@ -9,24 +6,20 @@
 module Text.TaggerQL.NewAST.AST (
   Term (..),
   ComplexTerm (..),
-  TermIdentity (..),
+  TermArity (..),
   Expression (..),
 ) where
 
-import Data.List.NonEmpty (NonEmpty)
-import Data.Tagger (QueryCriteria (FilePatternCriteria), SetOp)
+import Data.Tagger (QueryCriteria, SetOp)
 import Data.Text (Text)
-import qualified Data.Text as T
 
+{- |
+ Smallest unit of a TaggerQL query.
+-}
 data Term = Term
   { termCriteria :: QueryCriteria
   , termPattern :: Text
   }
-  deriving (Show, Eq)
-
-data ComplexTerm
-  = Bottom Term
-  | Term :<- ComplexTerm
   deriving (Show, Eq)
 
 {-
@@ -44,69 +37,28 @@ we can see that complexifying an expression takes on a distributive property:
     to "a{b} i| a{c} i| a{d}"
 -}
 
-data TermIdentity
-  = Simple Term
-  | Relational ComplexTerm
+{- |
+ Denotes a 'Term` that is subtagged by another 'Term`
+-}
+data ComplexTerm
+  = Bottom Term
+  | Term :<- ComplexTerm
   deriving (Show, Eq)
 
+{- |
+ A disjunction of 'Term` and 'ComplexTerm` based on whether a 'Term` is distributed
+ over another 'Term` or not.
+-}
+data TermArity
+  = Nullary Term
+  | NAry ComplexTerm
+  deriving (Show, Eq)
+
+{- |
+ An expression of a value of a term of any arity or an expression of
+ a binary operation on two expressions.
+-}
 data Expression
-  = Value TermIdentity
+  = Value TermArity
   | Expression Expression SetOp Expression
   deriving (Show, Eq)
-
-{-
-"o%yui {cute smile} d| (happy d| (happy {maybe}) i| amused) d| halloween u| (witch u| frog)"
-
-Keeping in mind that 'Term` set operations are left-associative,
-  this is the resulting expression:
-
-((a D| b) D| c) U| d
-
-where
-  a = Relational (o%yui :<- [cute, smile])
-  b = (e D| f) I| g
-    where
-      e = Simple happy
-      f = Relational (happy :<- [maybe])
-      g = Simple amused
-  c = Simple halloween
-  d = h U| i
-    where
-      h = Simple witch
-      i = Simple frog
-
-More concretely, this would be:
-Expression
-  (
-    Expression
-      (
-        Expression
-          (Value (Relational (o%yui :<- [cute, smile])))
-          Difference
-          (
-            Expression
-              (
-                Expression
-                  (Value (Simple happy))
-                  Difference
-                  (Value (Relational (happy :<- [maybe])))
-              )
-              Intersect
-              (Value (Simple amused))
-          )
-      )
-      Difference
-      (Value (Simple halloween))
-  )
-  Union
-  (
-    Expression
-      (Value (Simple witch))
-      Union
-      (Value (Simple frog))
-  )
-
-this is weird and may be difficult to parse because of the left-associativity
-I wonder how it works right now, because I'm pretty sure queries are already
-left-associative and I don't have to build the AST like this unless I am misremembering.
--}
