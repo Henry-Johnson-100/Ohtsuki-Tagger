@@ -26,8 +26,7 @@ expressionParser :: Parser Expression
 expressionParser =
   chainl1
     ( spaces
-        *> ( bracketedExpressionParser
-              <|> try distributedExpressionParser
+        *> ( try parenthesizedExpression
               <|> ( (\qc p -> Value . Simple $ Term qc p)
                       <$> anyCriteriaLiteralParser <*> acceptablePatternParser
                   )
@@ -35,19 +34,15 @@ expressionParser =
     )
     (spaces *> setOpOperator explicitOpParser)
 
-distributedExpressionParser :: Parser Expression
-distributedExpressionParser = do
-  t <- Term <$> anyCriteriaLiteralParser <*> acceptablePatternParser
+parenthesizedExpression :: Parser Expression
+parenthesizedExpression = do
+  t <- optionMaybe (Term <$> anyCriteriaLiteralParser <*> acceptablePatternParser)
   spaces
-  void $ ichar '{'
+  void $ ichar '('
   expr <- expressionParser
   spaces
-  void $ ichar '}'
-  return $ distributeComplexity t expr
-
-bracketedExpressionParser :: Parser Expression
-bracketedExpressionParser =
-  ichar '(' *> expressionParser <* spaces <* ichar ')'
+  void $ ichar ')'
+  return $ maybe expr (`distributeComplexity` expr) t
 
 setOpOperator :: Monad m => m SetOp -> m (Expression -> Expression -> Expression)
 setOpOperator sop = do
@@ -56,18 +51,18 @@ setOpOperator sop = do
 
 {-
 This example below
-@distributeComplexity "a" "b{c} u| (d i| e{f})" == "a{b{c}} u| (a{d} i| a{e{f}})"@
+@distributeComplexity "a" "b(c) u| (d i| e(f))" == "a(b(c)) u| (a(d) i| a(e(f)))"@
 would previously be sugared as:
-  "a{b{c}} u| (a{d e{f}})" but the new AST desugars this automatically and distributes
-  a{} over all of its predicates.
+  "a(b(c)) u| (a(d e(f)))" but the new AST desugars this automatically and distributes
+  a() over all of its predicates.
 -}
 
 {- |
  Given a term and expression, distribute the term over the expression as a new
  expression of 'ComplexTerm`s
 
- @distributeComplexity "a" "b u| d" == "a{b} u| a{d}"@
- @distributeComplexity "a" "b{c} u| (d i| e{f})" == "a{b{c}} u| (a{d} i| a{e{f}})"@
+ @distributeComplexity "a" "b u| d" == "a(b) u| a(d)"@
+ @distributeComplexity "a" "b(c) u| (d i| e(f))" == "a(b(c)) u| (a(d) i| a(e(f)))"@
 -}
 distributeComplexity :: Term -> Expression -> Expression
 distributeComplexity t expr = case expr of
@@ -153,4 +148,4 @@ notDisallowedChars :: Parser Char
 notDisallowedChars = noneOf charRequiringEscape
 
 charRequiringEscape :: [Char]
-charRequiringEscape = "{}().| \t\n\r"
+charRequiringEscape = "().| \t\n\r"
