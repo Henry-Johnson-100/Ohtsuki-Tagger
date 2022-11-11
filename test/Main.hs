@@ -9,9 +9,10 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Text.TaggerQL.AST
 import Text.TaggerQL.Parser.Internal
+import NewAST.Main
 
 main :: IO ()
-main = defaultMain (testGroup "Test" [normalParsers, parserEdgeCases])
+main = defaultMain (testGroup "Test" [normalParsers, parserEdgeCases, parserTests])
 
 normalParsers :: TestTree
 normalParsers =
