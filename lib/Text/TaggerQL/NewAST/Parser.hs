@@ -5,23 +5,49 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Text.TaggerQL.NewAST.Parser (
-  expressionParser,
+  parseExpression,
 ) where
 
 import Control.Monad (void, when)
 import Data.Char (toLower)
 import Data.Functor (($>))
-import Data.Tagger
+import Data.Tagger (QueryCriteria (..), SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
-import Text.Parsec
-import Text.TaggerQL.NewAST.AST
+import Text.Parsec (
+  ParseError,
+  Parsec,
+  ParsecT,
+  Stream,
+  chainl1,
+  choice,
+  many1,
+  noneOf,
+  notFollowedBy,
+  oneOf,
+  optionMaybe,
+  parse,
+  satisfy,
+  spaces,
+  try,
+  (<?>),
+  (<|>),
+ )
+import Text.TaggerQL.NewAST.AST (
+  ComplexTerm (Bottom, (:<-)),
+  Expression (..),
+  Term (Term),
+  TermIdentity (Relational, Simple),
+ )
 
 type Parser a = Parsec Text () a
 
 type QueryCriteriaLiteralParser = Parser QueryCriteria
 
 type SetOpParser = Parser SetOp
+
+parseExpression :: Text -> Either ParseError Expression
+parseExpression = parse expressionParser "TaggerQL"
 
 expressionParser :: Parser Expression
 expressionParser =
