@@ -14,26 +14,24 @@
 subtags, ordered alphabetically
 * Add some feedback when adding files to the database so the user knows then the process
 is complete, optionally how many files were added.
-* A Query builder element in the query widget section. (feature 4433af1d6b)
-* Add option to rescan known folders. (feature b9302e895e)
-* Sort nested tags (feature 67c304be05)
+* A Query builder element in the query widget section.
+* Add option to rescan known folders.
+* Sort nested tags
 * Bug Fixes
   * Ensure that shell processes spawned via GUI are non-blocking in the GUI
-  (defect c58e8a29dd)
 
 ## CLI changes
 * Add option to add files. -A or --add or something.
 
 ## Major Library Changes
 * A macro system for storing queries and expanding them as text in a query.
-  (feature 0c4167a588)
   * Will be a library change, so will contribute to a major version.
-* Multi-plex databases. (feature 96f1604a94)
+* Multi-plex databases.
   * Connect to more than one database at a time.
   * Join tags and descriptors on virtual tables.
   * Dispatch new tagging queries to the appropriate database 
   with the appropriate descriptor.
-* Easier additive queries. (feature 97e33329bd)
+* Easier additive queries.
 
 ## Minor Library Changes
 * Reorganize tagging engine code to be like the query engine.
@@ -48,7 +46,7 @@ is complete, optionally how many files were added.
 ### 1.0.2.1 -- 2021-10-04
 
 * Limited CLI functionality.
-Exposed through the `taggercli` program.
+  Exposed through the `taggercli` program.
   * Querying
   * Report stats or audit results
 
@@ -280,7 +278,7 @@ Some restrictions:
 * Draggable tag association.
   * In the Image details pane, for tags on a single image only, each tag is draggable.
     * A new zone has been designated `untag` for these tags. When a tag is drag-and-dropped into that zone,
-    that specific tag will be deleted.
+      that specific tag will be deleted.
       * Untagging can still be done via the Tag text field but is less precise and may end up deleting more than you wanted to.
   * New subtags can be made from existing tags by dragging one tag on top of another, this will place the dragged tag as a 
   sub tag of the target.
@@ -362,9 +360,9 @@ The buffer will not flush but rather be unioned, intersected, or diffed appropri
 ### 0.1.2.0 -- 2022-04-26
 
 * Adjusted the Cmd so that, if Solo Tagging Mode is enabled, the shell cmd
-will take the file currently previewed as the command's only argument.
-If Solo Tagging Mode is not enabled or there is no file previewed then all files in the
-selection are arguments to the shell cmd.
+  will take the file currently previewed as the command's only argument.
+  If Solo Tagging Mode is not enabled or there is no file previewed then all files in the
+  selection are arguments to the shell cmd.
   * The argument substitution keyword is still '`%file`'
 
 ------
