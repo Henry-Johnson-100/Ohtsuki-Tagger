@@ -87,77 +87,88 @@ databaseTests = withResource secureResource removeResource $
   \conn ->
     testGroup
       "Database Tests"
-      [ testCaseSteps "Setup 0 - Initialize Database" $ \step -> do
-          step "Inserting test files (file_1..file_100)"
-          conn >>= insertFiles (T.unpack . filePath <$> testFiles)
-
-          step "Inserting test descriptors (d_0 .. d_Z)"
-          conn >>= insertDescriptors (descriptor <$> newDescriptors)
-
-          step "Inserting Basic Descriptor Relations for Descriptors 4 meta to [5..20]"
-          mapM_
-            (\(m, i) -> conn >>= insertDescriptorRelation m i)
-            newRelations
-
-          step "Tagging some files"
-          _ <-
-            conn
-              >>= insertTags
-                (toTagTriple <$> testTags)
-
-          assertBool
-            ""
-            True
-      , after AllSucceed "Setup 0" $
-          testGroup
-            "Setup 1 - Test Initialization"
-            [ testCase
-                "All Test Files Inserted"
-                ( do
-                    actualFiles <- conn >>= allFiles
-                    assertEqual
-                      "Failed to insert test files"
-                      (HS.fromList testFiles)
-                      (HS.fromList actualFiles)
-                )
-            , testCase
-                "All Test Descriptors Inserted"
-                ( do
-                    actualDescriptors <- conn >>= allDescriptors
-                    assertEqual
-                      "Failed to insert test descriptors"
-                      (HS.fromList testDescriptors)
-                      (HS.fromList actualDescriptors)
-                )
-            , testCase
-                "New Relations Inserted Properly"
-                ( do
-                    actual <- conn >>= getAllInfra newMetaTarget
-                    corrTestData <-
-                      conn
-                        >>= ( \c ->
-                                fmap catMaybes
-                                  . mapM
-                                    ( runMaybeT
-                                        . flip
-                                          queryForSingleDescriptorByDescriptorId
-                                          c
-                                    )
-                                  $ (newMetaTarget : newInfraTargets)
-                            )
-                    assertEqual
-                      "Test relations not inserted correctly."
-                      (HS.fromList corrTestData)
-                      (HS.fromList actual)
-                )
-            , testCase
-                "All Test Tags Inserted"
-                ( do
-                    actual <- conn >>= allTags
-                    assertEqual
-                      "Failed to insert test tags"
-                      (HS.fromList testTags)
-                      (HS.fromList actual)
-                )
-            ]
+      [ setup_0_InitializeDatabase conn
+      , after AllSucceed "Setup 0" $ setup_1_TestInitialization conn
+      , after AllSucceed "Setup" $ queryEdgeCases conn
       ]
+
+setup_0_InitializeDatabase :: IO TaggedConnection -> TestTree
+setup_0_InitializeDatabase conn =
+  testCaseSteps "Setup 0 - Initialize Database" $ \step -> do
+    step "Inserting test files"
+    conn >>= insertFiles (T.unpack . filePath <$> testFiles)
+
+    step "Inserting test descriptors"
+    conn >>= insertDescriptors (descriptor <$> newDescriptors)
+
+    step "Inserting Basic Descriptor Relations"
+    mapM_
+      (\(m, i) -> conn >>= insertDescriptorRelation m i)
+      newRelations
+
+    step "Tagging files"
+    _ <-
+      conn
+        >>= insertTags
+          (toTagTriple <$> testTags)
+
+    assertBool
+      ""
+      True
+
+setup_1_TestInitialization :: IO TaggedConnection -> TestTree
+setup_1_TestInitialization conn =
+  testGroup
+    "Setup 1 - Test Initialization"
+    [ testCase
+        "All Test Files Inserted"
+        ( do
+            actualFiles <- conn >>= allFiles
+            assertEqual
+              "Failed to insert test files"
+              (HS.fromList testFiles)
+              (HS.fromList actualFiles)
+        )
+    , testCase
+        "All Test Descriptors Inserted"
+        ( do
+            actualDescriptors <- conn >>= allDescriptors
+            assertEqual
+              "Failed to insert test descriptors"
+              (HS.fromList testDescriptors)
+              (HS.fromList actualDescriptors)
+        )
+    , testCase
+        "New Relations Inserted Properly"
+        ( do
+            actual <- conn >>= getAllInfra newMetaTarget
+            corrTestData <-
+              conn
+                >>= ( \c ->
+                        fmap catMaybes
+                          . mapM
+                            ( runMaybeT
+                                . flip
+                                  queryForSingleDescriptorByDescriptorId
+                                  c
+                            )
+                          $ (newMetaTarget : newInfraTargets)
+                    )
+            assertEqual
+              "Test relations not inserted correctly."
+              (HS.fromList corrTestData)
+              (HS.fromList actual)
+        )
+    , testCase
+        "All Test Tags Inserted"
+        ( do
+            actual <- conn >>= allTags
+            assertEqual
+              "Failed to insert test tags"
+              (HS.fromList testTags)
+              (HS.fromList actual)
+        )
+    ]
+
+queryEdgeCases :: IO TaggedConnection -> TestTree
+queryEdgeCases conn = testGroup "Query Edge Cases" []
