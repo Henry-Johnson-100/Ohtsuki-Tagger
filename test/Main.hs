@@ -5,14 +5,24 @@
 import Data.List.NonEmpty
 import Data.Tagger
 import qualified Data.Text as T
+import Database.Tagger.Main
+import NewAST.Main
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.TaggerQL.AST
 import Text.TaggerQL.Parser.Internal
-import NewAST.Main
 
 main :: IO ()
-main = defaultMain (testGroup "Test" [normalParsers, parserEdgeCases, parserTests])
+main =
+    defaultMain
+        ( testGroup
+            "Test"
+            [ normalParsers
+            , parserEdgeCases
+            , parserTests
+            , databaseTests
+            ]
+        )
 
 normalParsers :: TestTree
 normalParsers =
