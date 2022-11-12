@@ -78,6 +78,24 @@ testTags =
   , Tag 15 7 9 (Just 13)
   , Tag 16 7 9 (Just 14)
   , Tag 17 7 10 (Just 16)
+  , {-
+      For testing the edge case discussed in
+        ticket a50b7d8
+    -}
+    -- for descriptors 12 meta to 13 and 12 meta to 14
+    -- file_8 tagged with 13{15 16}
+    Tag 18 8 13 Nothing
+  , Tag 19 8 15 (Just 18)
+  , Tag 20 8 16 (Just 18)
+  , -- file_9 tagged with 14{15 16}
+    Tag 21 9 14 Nothing
+  , Tag 22 9 15 (Just 21)
+  , Tag 23 9 16 (Just 21)
+  , -- file_10 tagged with 13{15} 14{16}
+    Tag 24 10 13 Nothing
+  , Tag 25 10 15 (Just 24)
+  , Tag 26 10 14 Nothing
+  , Tag 27 10 16 (Just 26)
   ]
 
 toTagTriple ::
@@ -92,10 +110,12 @@ newInfraTargets :: [RecordKey Descriptor]
 newInfraTargets = [5 .. 20]
 
 newRelations :: [(RecordKey Descriptor, RecordKey Descriptor)]
-newRelations = (newMetaTarget,) <$> newInfraTargets
-
-testRelations :: [(RecordKey Descriptor, RecordKey Descriptor)]
-testRelations = newRelations <> defaultRelations
+newRelations =
+  ((newMetaTarget,) <$> newInfraTargets)
+    <> [ -- for testing ticket a50b7d8
+         (12, 13)
+       , (12, 14)
+       ]
 
 databaseTests :: TestTree
 databaseTests = withResource secureResource removeResource $
@@ -175,6 +195,12 @@ setup_1_TestInitialization conn =
               (HS.fromList corrTestData)
               (HS.fromList actual)
         )
+    , testCase "All Relations Present" $ do
+        actual <- conn >>= allMetaDescriptorRows
+        assertEqual
+          "Not all relations inserted"
+          (length testDescriptors - 1 {-Because #ALL# is not infra to anything-})
+          (length actual)
     , testCase
         "All Test Tags Inserted"
         ( do
@@ -236,6 +262,43 @@ queryEdgeCases conn =
             assertEqual
               ""
               [File 7 "file_7"]
+              r
+        ]
+    , testGroup
+        "Ticket a50b7d8"
+        [ testCase "Relational subqueries are not disjoint" $ do
+            r <-
+              conn
+                >>= taggerQL
+                  ( TaggerQLQuery
+                      "r.descriptor_12 {d.descriptor_15 d.descriptor_16}"
+                  )
+            assertEqual
+              ""
+              [File 8 "file_8", File 9 "file_9"]
+              r
+        , testCase "Disjoint, single arity, relational subqueries are a superset" $ do
+            r <-
+              conn
+                >>= taggerQL
+                  ( TaggerQLQuery
+                      "r.descriptor_12 {d.descriptor_15} \
+                      \r.descriptor_12 {d.descriptor_16}"
+                  )
+            assertEqual
+              ""
+              [File 8 "file_8", File 9 "file_9", File 10 "file_10"]
+              r
+        , testCase "Descriptor subqueries are not disjoint" $ do
+            r <-
+              conn
+                >>= taggerQL
+                  ( TaggerQLQuery
+                      "d.descriptor_13 {d.descriptor_15 d.descriptor_16}"
+                  )
+            assertEqual
+              ""
+              [File 8 "file_8"]
               r
         ]
     ]
