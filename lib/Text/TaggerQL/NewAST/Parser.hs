@@ -21,12 +21,13 @@ import Text.Parsec (
   Stream,
   chainl1,
   choice,
+  getState,
   many1,
   noneOf,
   notFollowedBy,
   oneOf,
   optionMaybe,
-  parse,
+  runParser,
   satisfy,
   space,
   spaces,
@@ -41,14 +42,15 @@ import Text.TaggerQL.NewAST.AST (
   TermArity (NAry, Nullary),
  )
 
-type Parser a = Parsec Text () a
+-- | This SetOp state is the SetOp that is defaulted when there is none explicit
+type Parser a = Parsec Text SetOp a
 
 type QueryCriteriaLiteralParser = Parser QueryCriteria
 
 type SetOpParser = Parser SetOp
 
 parseExpression :: Text -> Either ParseError Expression
-parseExpression = parse expressionParser "TaggerQL"
+parseExpression = runParser expressionParser Intersect "taggerQL"
 
 expressionParser :: Parser Expression
 expressionParser =
@@ -64,7 +66,9 @@ expressionParser =
         <|> defaultSetOpOperator
     )
  where
-  defaultSetOpOperator = space $> (`Expression` Intersect) <* spaces
+  defaultSetOpOperator :: Parser (Expression -> Expression -> Expression)
+  defaultSetOpOperator =
+    space *> (flip Expression <$> getState) <* spaces
 
 parenthesizedExpression :: Parser Expression
 parenthesizedExpression =
