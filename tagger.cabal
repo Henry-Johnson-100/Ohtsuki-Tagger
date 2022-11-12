@@ -193,6 +193,9 @@ test-suite tagger-test
 
   main-is:             Main.hs
 
+  other-modules:
+    NewAST.Main
+
   build-depends:       tagger-lib
                       ,tasty
                       ,tasty-hunit
