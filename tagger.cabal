@@ -194,7 +194,8 @@ test-suite tagger-test
   main-is:             Main.hs
 
   other-modules:
-    NewAST.Main
+    Database.Tagger.Main
+    ,NewAST.Main
 
   build-depends:       tagger-lib
                       ,tasty
