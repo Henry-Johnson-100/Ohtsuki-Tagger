@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# HLINT ignore "Use const" #-}
 {-# LANGUAGE TupleSections #-}
@@ -15,6 +16,7 @@ import qualified Data.Text as T
 import Database.Tagger
 import Test.Tasty
 import Test.Tasty.HUnit
+import Text.TaggerQL
 
 secureResource :: IO TaggedConnection
 secureResource = open "integrated_testing_database.db"
@@ -89,6 +91,7 @@ databaseTests = withResource secureResource removeResource $
       "Database Tests"
       [ setup_0_InitializeDatabase conn
       , after AllSucceed "Setup 0" $ setup_1_TestInitialization conn
+      , after AllSucceed "Setup" $ basicQueryFunctionality conn
       , after AllSucceed "Setup" $ queryEdgeCases conn
       ]
 
@@ -168,6 +171,28 @@ setup_1_TestInitialization conn =
               (HS.fromList testTags)
               (HS.fromList actual)
         )
+    ]
+
+basicQueryFunctionality :: IO TaggedConnection -> TestTree
+basicQueryFunctionality conn =
+  testGroup
+    "Basic Queries"
+    [ testCase "Pattern Wildcard" $ do
+        r <- conn >>= taggerQL (TaggerQLQuery "p.%")
+        a <- conn >>= allFiles
+        assertEqual "p.% should retrieve all files in the database" (HS.fromList a) r
+    , testCase "Relational Search 0" $ do
+        r <- conn >>= taggerQL (TaggerQLQuery "descriptor_4")
+        assertEqual
+          "descriptor_4 should return all files tagged with that relation"
+          (HS.fromList . take 5 $ testFiles)
+          r
+    , testCase "Subtag Search 0" $ do
+        r <- conn >>= taggerQL (TaggerQLQuery "d.descriptor_5 {d.descriptor_6}")
+        assertEqual
+          "d.descriptor_5 {d.descriptor_6}"
+          [File 4 "file_4", File 5 "file_5"]
+          r
     ]
 
 queryEdgeCases :: IO TaggedConnection -> TestTree
