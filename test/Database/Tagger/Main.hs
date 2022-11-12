@@ -65,6 +65,19 @@ testTags =
   , Tag 7 5 5 Nothing
   , Tag 8 5 6 (Just 7)
   , Tag 9 5 7 (Just 8)
+  , {-
+      For testing TaggerQL edge cases related to Tech-note f02a13240b,
+    -}
+    -- file_6 tagged with 8{9{10}}
+    Tag 10 6 8 Nothing
+  , Tag 11 6 9 (Just 10)
+  , Tag 12 6 10 (Just 11)
+  , -- file_7 tagged with 8{9} 11{9{10}}
+    Tag 13 7 8 Nothing
+  , Tag 14 7 11 Nothing
+  , Tag 15 7 9 (Just 13)
+  , Tag 16 7 9 (Just 14)
+  , Tag 17 7 10 (Just 16)
   ]
 
 toTagTriple ::
@@ -181,12 +194,6 @@ basicQueryFunctionality conn =
         r <- conn >>= taggerQL (TaggerQLQuery "p.%")
         a <- conn >>= allFiles
         assertEqual "p.% should retrieve all files in the database" (HS.fromList a) r
-    , testCase "Relational Search 0" $ do
-        r <- conn >>= taggerQL (TaggerQLQuery "descriptor_4")
-        assertEqual
-          "descriptor_4 should return all files tagged with that relation"
-          (HS.fromList . take 5 $ testFiles)
-          r
     , testCase "Subtag Search 0" $ do
         r <- conn >>= taggerQL (TaggerQLQuery "d.descriptor_5 {d.descriptor_6}")
         assertEqual
@@ -196,4 +203,39 @@ basicQueryFunctionality conn =
     ]
 
 queryEdgeCases :: IO TaggedConnection -> TestTree
-queryEdgeCases conn = testGroup "Query Edge Cases" []
+queryEdgeCases conn =
+  testGroup
+    "Query Edge Cases"
+    [ testGroup
+        "Tech-note f02a13240b for files, A: a{b{c}} and B: a{b} d{b{c}}"
+        [ testCase
+            "Return A for query a{b{c}}"
+            $ do
+              r <-
+                conn
+                  >>= taggerQL
+                    (TaggerQLQuery "d.descriptor_8 {d.descriptor_9 {d.descriptor_10}}")
+              assertEqual
+                ""
+                (HS.singleton $ File 6 "file_6")
+                r
+        , testCase "Return A, B for a{b}" $ do
+            r <- conn >>= taggerQL (TaggerQLQuery "d.descriptor_8 {d.descriptor_9}}")
+            assertEqual
+              ""
+              [File 6 "file_6", File 7 "file_7"]
+              r
+        , testCase "Return A, B for b{c}" $ do
+            r <- conn >>= taggerQL (TaggerQLQuery "d.descriptor_9 {d.descriptor_10}")
+            assertEqual
+              ""
+              [File 6 "file_6", File 7 "file_7"]
+              r
+        , testCase "Return B for d{b}" $ do
+            r <- conn >>= taggerQL (TaggerQLQuery "d.descriptor_11 {d.descriptor_9}")
+            assertEqual
+              ""
+              [File 7 "file_7"]
+              r
+        ]
+    ]
