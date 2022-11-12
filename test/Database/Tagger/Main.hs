@@ -8,9 +8,9 @@ module Database.Tagger.Main (
   databaseTests,
 ) where
 
+import Control.Monad.Trans.Maybe (runMaybeT)
 import qualified Data.HashSet as HS
-import Data.List (sort)
-import Data.Text (Text)
+import Data.Maybe (catMaybes)
 import qualified Data.Text as T
 import Database.Tagger
 import Test.Tasty
@@ -43,11 +43,14 @@ defaultRelations =
 testFiles :: [File]
 testFiles = map (\n -> File n ("file_" <> (T.pack . show $ n))) [1 .. 100]
 
-testDescriptors :: [Descriptor]
-testDescriptors =
+newDescriptors :: [Descriptor]
+newDescriptors =
   map
     (\n -> Descriptor n ("descriptor_" <> (T.pack . show $ n)))
     [4 .. 104]
+
+testDescriptors :: [Descriptor]
+testDescriptors = newDescriptors <> defaultDescriptors
 
 testTags :: [Tag]
 testTags =
@@ -67,8 +70,17 @@ toTagTriple ::
   (RecordKey File, RecordKey Descriptor, Maybe (RecordKey Tag))
 toTagTriple (Tag _ fid did mstid) = (fid, did, mstid)
 
+newMetaTarget :: RecordKey Descriptor
+newMetaTarget = 4
+
+newInfraTargets :: [RecordKey Descriptor]
+newInfraTargets = [5 .. 20]
+
 newRelations :: [(RecordKey Descriptor, RecordKey Descriptor)]
-newRelations = (4,) <$> [5 .. 20]
+newRelations = (newMetaTarget,) <$> newInfraTargets
+
+testRelations :: [(RecordKey Descriptor, RecordKey Descriptor)]
+testRelations = newRelations <> defaultRelations
 
 databaseTests :: TestTree
 databaseTests = withResource secureResource removeResource $
@@ -80,7 +92,7 @@ databaseTests = withResource secureResource removeResource $
           conn >>= insertFiles (T.unpack . filePath <$> testFiles)
 
           step "Inserting test descriptors (d_0 .. d_Z)"
-          conn >>= insertDescriptors (descriptor <$> testDescriptors)
+          conn >>= insertDescriptors (descriptor <$> newDescriptors)
 
           step "Inserting Basic Descriptor Relations for Descriptors 4 meta to [5..20]"
           mapM_
@@ -96,4 +108,56 @@ databaseTests = withResource secureResource removeResource $
           assertBool
             ""
             True
+      , after AllSucceed "Initialize Database" $
+          testGroup
+            "Initialization Tests"
+            [ testCase
+                "All Test Files Inserted"
+                ( do
+                    actualFiles <- conn >>= allFiles
+                    assertEqual
+                      "Failed to insert test files"
+                      (HS.fromList testFiles)
+                      (HS.fromList actualFiles)
+                )
+            , testCase
+                "All Test Descriptors Inserted"
+                ( do
+                    actualDescriptors <- conn >>= allDescriptors
+                    assertEqual
+                      "Failed to insert test descriptors"
+                      (HS.fromList testDescriptors)
+                      (HS.fromList actualDescriptors)
+                )
+            , testCase
+                "New Relations Inserted Properly"
+                ( do
+                    actual <- conn >>= getAllInfra newMetaTarget
+                    corrTestData <-
+                      conn
+                        >>= ( \c ->
+                                fmap catMaybes
+                                  . mapM
+                                    ( runMaybeT
+                                        . flip
+                                          queryForSingleDescriptorByDescriptorId
+                                          c
+                                    )
+                                  $ (newMetaTarget : newInfraTargets)
+                            )
+                    assertEqual
+                      "Test relations not inserted correctly."
+                      (HS.fromList corrTestData)
+                      (HS.fromList actual)
+                )
+            , testCase
+                "All Test Tags Inserted"
+                ( do
+                    actual <- conn >>= allTags
+                    assertEqual
+                      "Failed to insert test tags"
+                      (HS.fromList testTags)
+                      (HS.fromList actual)
+                )
+            ]
       ]
