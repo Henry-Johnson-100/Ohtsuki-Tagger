@@ -13,7 +13,16 @@ import Text.TaggerQL.AST
 import Text.TaggerQL.Parser.Internal
 
 main :: IO ()
-main = defaultMain (testGroup "Test" [normalParsers, parserEdgeCases, parserTests])
+main =
+    defaultMain
+        ( testGroup
+            "Test"
+            [ normalParsers
+            , parserEdgeCases
+            , parserTests
+            , databaseTests
+            ]
+        )
 
 normalParsers :: TestTree
 normalParsers =

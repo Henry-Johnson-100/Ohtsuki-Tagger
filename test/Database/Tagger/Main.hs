@@ -8,7 +8,9 @@ module Database.Tagger.Main (
   databaseTests,
 ) where
 
-import Data.List (isInfixOf, sort)
+import qualified Data.HashSet as HS
+import Data.List (sort)
+import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger
 import Test.Tasty
@@ -25,52 +27,73 @@ removeResource c = do
   teardownDatabase c
   close c
 
+-- Values that get inserted automatically by the schema definition.
+defaultDescriptors :: [Descriptor]
+defaultDescriptors =
+  [ Descriptor 1 "#ALL#"
+  , Descriptor 2 "#META#"
+  , Descriptor 3 "#UNRELATED#"
+  ]
+
+defaultRelations :: [(RecordKey Descriptor, RecordKey Descriptor)]
+defaultRelations =
+  [(1, 2), (1, 3)] ::
+    [(RecordKey Descriptor, RecordKey Descriptor)]
+
+testFiles :: [File]
+testFiles = map (\n -> File n ("file_" <> (T.pack . show $ n))) [1 .. 100]
+
+testDescriptors :: [Descriptor]
+testDescriptors =
+  map
+    (\n -> Descriptor n ("descriptor_" <> (T.pack . show $ n)))
+    [4 .. 104]
+
+testTags :: [Tag]
+testTags =
+  [ Tag 1 1 4 Nothing
+  , Tag 2 2 5 Nothing
+  , Tag 3 3 6 Nothing
+  , Tag 4 3 7 Nothing
+  , Tag 5 4 5 Nothing
+  , Tag 6 4 6 (Just 5)
+  , Tag 7 5 5 Nothing
+  , Tag 8 5 6 (Just 7)
+  , Tag 9 5 7 (Just 8)
+  ]
+
+toTagTriple ::
+  Tag ->
+  (RecordKey File, RecordKey Descriptor, Maybe (RecordKey Tag))
+toTagTriple (Tag _ fid did mstid) = (fid, did, mstid)
+
+newRelations :: [(RecordKey Descriptor, RecordKey Descriptor)]
+newRelations = (4,) <$> [5 .. 20]
+
 databaseTests :: TestTree
 databaseTests = withResource secureResource removeResource $
   \conn ->
     testGroup
       "Database Tests"
       [ testCaseSteps "Initialize Database" $ \step -> do
-          let testFileNames = ("file_" <>) <$> (show <$> [1 .. 100 :: Int])
-              testDescriptors = ("d_" <>) <$> (T.pack . show <$> ['0' .. 'Z'])
-              -- Values that get inserted automatically by the schema definition.
-              defaultDescriptors =
-                [ Descriptor 1 "#ALL#"
-                , Descriptor 2 "#META#"
-                , Descriptor 3 "#UNRELATED#"
-                ]
-              defaultRelations =
-                [(1, 2), (1, 3)] ::
-                  [(RecordKey Descriptor, RecordKey Descriptor)]
-
           step "Inserting test files (file_1..file_100)"
-          conn >>= insertFiles testFileNames
+          conn >>= insertFiles (T.unpack . filePath <$> testFiles)
 
           step "Inserting test descriptors (d_0 .. d_Z)"
-          conn >>= insertDescriptors testDescriptors
+          conn >>= insertDescriptors (descriptor <$> testDescriptors)
 
           step "Inserting Basic Descriptor Relations for Descriptors 4 meta to [5..20]"
-          let newRelations = (4,) <$> [5 .. 20]
+
           mapM_
             (\(m, i) -> conn >>= insertDescriptorRelation m i)
             newRelations
 
           step "Tagging some files"
-          let tagsToInsert =
-                [ (1, 4, Nothing) -- 1
-                , (2, 5, Nothing) -- 2
-                , (3, 6, Nothing) -- 3
-                , (3, 7, Nothing) -- 4
-                , (4, 5, Nothing) -- 5
-                , (4, 6, Just 5) -- 6
-                , (5, 5, Nothing) -- 7
-                , (5, 6, Just 7) -- 8
-                , (5, 7, Just 8) -- 9
-                ]
+
           _ <-
             conn
               >>= insertTags
-                tagsToInsert
+                (toTagTriple <$> testTags)
 
           step "Testing Inserted Data Counts"
           actualFiles <- conn >>= allFiles
@@ -78,15 +101,14 @@ databaseTests = withResource secureResource removeResource $
           actualRelations <- conn >>= allMetaDescriptorRows
           actualTags <- conn >>= allTags
           let actualFilesMatch =
-                sort testFileNames == (sort . map (T.unpack . filePath)) actualFiles
+                HS.fromList testFiles == HS.fromList actualFiles
               actualDescriptorsMatch =
-                sort (testDescriptors ++ map descriptor defaultDescriptors)
-                  == (sort . map descriptor) actualDescriptors
+                HS.fromList (testDescriptors <> defaultDescriptors)
+                  == HS.fromList actualDescriptors
               actualRelationsMatch =
                 sort (newRelations ++ defaultRelations) == sort actualRelations
               actualTagsMatch =
-                sort tagsToInsert
-                  == (sort . map (\(Tag _ fid did mstid) -> (fid, did, mstid))) actualTags
+                HS.fromList testTags == HS.fromList actualTags
           assertBool
             "Database failed to initialize in an expected way"
             ( and
