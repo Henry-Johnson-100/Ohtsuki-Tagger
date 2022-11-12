@@ -28,6 +28,7 @@ import Text.Parsec (
   optionMaybe,
   parse,
   satisfy,
+  space,
   spaces,
   try,
   (<?>),
@@ -59,7 +60,11 @@ expressionParser =
                   )
            )
     )
-    (spaces *> setOpOperator explicitOpParser)
+    ( try (spaces *> setOpOperator explicitOpParser)
+        <|> defaultSetOpOperator
+    )
+ where
+  defaultSetOpOperator = space $> (`Expression` Intersect) <* spaces
 
 parenthesizedExpression :: Parser Expression
 parenthesizedExpression =
