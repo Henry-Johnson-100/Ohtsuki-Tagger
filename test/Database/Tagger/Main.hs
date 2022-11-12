@@ -87,7 +87,7 @@ databaseTests = withResource secureResource removeResource $
   \conn ->
     testGroup
       "Database Tests"
-      [ testCaseSteps "Initialize Database" $ \step -> do
+      [ testCaseSteps "Setup 0 - Initialize Database" $ \step -> do
           step "Inserting test files (file_1..file_100)"
           conn >>= insertFiles (T.unpack . filePath <$> testFiles)
 
@@ -108,9 +108,9 @@ databaseTests = withResource secureResource removeResource $
           assertBool
             ""
             True
-      , after AllSucceed "Initialize Database" $
+      , after AllSucceed "Setup 0" $
           testGroup
-            "Initialization Tests"
+            "Setup 1 - Test Initialization"
             [ testCase
                 "All Test Files Inserted"
                 ( do
