@@ -11,6 +11,7 @@ module Text.TaggerQL.NewAST.Parser (
 import Control.Monad (void, when)
 import Data.Char (toLower)
 import Data.Functor (($>))
+import Data.Functor.Identity (Identity, runIdentity)
 import Data.Tagger (QueryCriteria (..), SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -49,34 +50,33 @@ type QueryCriteriaLiteralParser = Parser QueryCriteria
 
 type SetOpParser = Parser SetOp
 
-parseExpression :: Text -> Either ParseError Expression
+parseExpression :: Text -> Either ParseError (Expression Identity)
 parseExpression = runParser expressionParser Intersect "taggerQL"
 
-expressionParser :: Parser Expression
+expressionParser :: Parser (Expression Identity)
 expressionParser =
   chainl1
     ( spaces
         *> ( try parenthesizedExpression
-              <|> ( (\qc p -> Value . Nullary $ Term qc p)
-                      <$> anyCriteriaLiteralParser <*> acceptablePatternParser
-                  )
+              <|> (\qc p -> Value . pure . Nullary $ Term qc p)
+                <$> anyCriteriaLiteralParser <*> acceptablePatternParser
            )
     )
     ( try (spaces *> setOpOperator explicitOpParser)
         <|> defaultSetOpOperator
     )
  where
-  defaultSetOpOperator :: Parser (Expression -> Expression -> Expression)
+  defaultSetOpOperator :: Parser (Expression Identity -> Expression Identity -> Expression Identity)
   defaultSetOpOperator =
     space *> (flip Expression <$> getState) <* spaces
 
-parenthesizedExpression :: Parser Expression
+parenthesizedExpression :: Parser (Expression Identity)
 parenthesizedExpression =
   (\mt expr -> maybe expr (`distributeComplexity` expr) mt)
     <$> optionMaybe (Term <$> anyCriteriaLiteralParser <*> acceptablePatternParser)
     <*> (spaces *> ichar '(' *> expressionParser <* spaces <* ichar ')')
 
-setOpOperator :: Monad m => m SetOp -> m (Expression -> Expression -> Expression)
+setOpOperator :: Monad m => m SetOp -> m (Expression Identity -> Expression Identity -> Expression Identity)
 setOpOperator sop =
   flip Expression <$> sop
 
@@ -95,11 +95,11 @@ would previously be sugared as:
  @distributeComplexity "a" "b u| d" == "a(b) u| a(d)"@
  @distributeComplexity "a" "b(c) u| (d i| e(f))" == "a(b(c)) u| (a(d) i| a(e(f)))"@
 -}
-distributeComplexity :: Term -> Expression -> Expression
+distributeComplexity :: Term -> Expression Identity -> Expression Identity
 distributeComplexity t expr = case expr of
-  Value ti -> case ti of
-    Nullary te -> Value . NAry $ t :<- Bottom te
-    NAry ct -> Value . NAry $ t :<- ct
+  Value ti -> case runIdentity ti of
+    Nullary te -> Value . pure . NAry $ t :<- Bottom te
+    NAry ct -> Value . pure . NAry $ t :<- ct
   Expression ex so ex' ->
     Expression
       (distributeComplexity t ex)
@@ -113,13 +113,13 @@ explicitOpParser :: SetOpParser
 explicitOpParser = choice . map try $ [unionOpParser, intersectOpParser, diffOpParser]
 
 unionOpParser :: SetOpParser
-unionOpParser = (ichar 'u' *> ichar '|') $> Union
+unionOpParser = ichar 'u' *> ichar '|' $> Union
 
 intersectOpParser :: SetOpParser
-intersectOpParser = (ichar 'i' *> ichar '|') $> Intersect
+intersectOpParser = ichar 'i' *> ichar '|' $> Intersect
 
 diffOpParser :: SetOpParser
-diffOpParser = (ichar 'd' *> ichar '|') $> Difference
+diffOpParser = ichar 'd' *> ichar '|' $> Difference
 
 anyCriteriaLiteralParser :: QueryCriteriaLiteralParser
 anyCriteriaLiteralParser =
@@ -133,17 +133,17 @@ anyCriteriaLiteralParser =
     <|> pure MetaDescriptorCriteria
 
 descriptorCriteriaLiteralParser :: QueryCriteriaLiteralParser
-descriptorCriteriaLiteralParser = (ichar 'd' *> ichar '.') $> DescriptorCriteria
+descriptorCriteriaLiteralParser = ichar 'd' *> ichar '.' $> DescriptorCriteria
 
 metaDescriptorCriteriaLiteralParser :: QueryCriteriaLiteralParser
 metaDescriptorCriteriaLiteralParser =
-  (ichar 'r' *> ichar '.') $> MetaDescriptorCriteria
+  ichar 'r' *> ichar '.' $> MetaDescriptorCriteria
 
 filePatternCriteriaLiteralParser :: QueryCriteriaLiteralParser
-filePatternCriteriaLiteralParser = (ichar 'p' *> ichar '.') $> FilePatternCriteria
+filePatternCriteriaLiteralParser = ichar 'p' *> ichar '.' $> FilePatternCriteria
 
 untaggedCriteriaLiteralParser :: QueryCriteriaLiteralParser
-untaggedCriteriaLiteralParser = (ichar 'u' *> ichar '.') $> UntaggedCriteria
+untaggedCriteriaLiteralParser = ichar 'u' *> ichar '.' $> UntaggedCriteria
 
 {- |
  Case-insensitive 'Char` parser.
@@ -162,13 +162,12 @@ acceptablePatternParser =
 acceptableCharParser :: Parser Char
 acceptableCharParser = do
   c <-
-    ( try
-        ( do
-            void $ ichar '\\'
-            oneOf charRequiringEscape
-        )
-        <|> ichar '\\'
+    try
+      ( do
+          void $ ichar '\\'
+          oneOf charRequiringEscape
       )
+      <|> ichar '\\'
       <|> notDisallowedChars
   when (c `elem` ("udUD" :: String)) (notFollowedBy (ichar '|' <|> ichar '.'))
   when (c `elem` ("rpRP" :: String)) (notFollowedBy $ ichar '.')
@@ -178,5 +177,5 @@ acceptableCharParser = do
 notDisallowedChars :: Parser Char
 notDisallowedChars = noneOf charRequiringEscape
 
-charRequiringEscape :: [Char]
+charRequiringEscape :: String
 charRequiringEscape = "().| \t\n\r"

@@ -8,6 +8,7 @@ module NewAST.Main (
     parserTests,
 ) where
 
+import Data.Functor.Identity (Identity)
 import Data.Tagger
 import qualified Data.Text as T
 import Test.Tasty
@@ -29,7 +30,7 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( Value . Nullary $ Term a "_"
+                                    ( Value . pure . Nullary $ Term a "_"
                                     )
                                 )
                                 (parseExpression (s <> "_"))
@@ -170,10 +171,11 @@ parserTests =
                 ""
                 ( Right
                     ( Value
-                        ( NAry
-                            ( Term MetaDescriptorCriteria "a"
-                                :<- Bottom (Term MetaDescriptorCriteria "b")
-                            )
+                        ( pure $
+                            NAry
+                                ( Term MetaDescriptorCriteria "a"
+                                    :<- Bottom (Term MetaDescriptorCriteria "b")
+                                )
                         )
                     )
                 )
@@ -186,18 +188,20 @@ parserTests =
                 ( Right
                     ( Expression
                         ( Value
-                            ( NAry
-                                ( Term MetaDescriptorCriteria "a"
-                                    :<- Bottom (Term MetaDescriptorCriteria "b")
-                                )
+                            ( pure $
+                                NAry
+                                    ( Term MetaDescriptorCriteria "a"
+                                        :<- Bottom (Term MetaDescriptorCriteria "b")
+                                    )
                             )
                         )
                         Intersect
                         ( Value
-                            ( NAry
-                                ( Term MetaDescriptorCriteria "a"
-                                    :<- Bottom (Term MetaDescriptorCriteria "c")
-                                )
+                            ( pure $
+                                NAry
+                                    ( Term MetaDescriptorCriteria "a"
+                                        :<- Bottom (Term MetaDescriptorCriteria "c")
+                                    )
                             )
                         )
                     )
@@ -248,20 +252,20 @@ parserTests =
                 ( Right
                     ( Expression
                         ( Expression
-                            (Value . NAry $ trm "a" :<- Bottom (trm "b"))
+                            (Value . pure . NAry $ trm "a" :<- Bottom (trm "b"))
                             Intersect
                             ( Expression
                                 ( Expression
-                                    (Value . NAry $ trm "a" :<- (trm "c" :<- (trm "d" :<- Bottom (trm "e"))))
+                                    (Value . pure . NAry $ trm "a" :<- (trm "c" :<- (trm "d" :<- Bottom (trm "e"))))
                                     Intersect
-                                    (Value . NAry $ trm "a" :<- (trm "c" :<- (trm "d" :<- Bottom (trm "f"))))
+                                    (Value . pure . NAry $ trm "a" :<- (trm "c" :<- (trm "d" :<- Bottom (trm "f"))))
                                 )
                                 Intersect
-                                (Value . NAry $ trm "a" :<- (trm "c" :<- Bottom (trm "g")))
+                                (Value . pure . NAry $ trm "a" :<- (trm "c" :<- Bottom (trm "g")))
                             )
                         )
                         Intersect
-                        (Value . NAry $ trm "a" :<- Bottom (trm "h"))
+                        (Value . pure . NAry $ trm "a" :<- Bottom (trm "h"))
                     )
                 )
                 ( parseExpression "a(b c(d(e f) g) h)"
@@ -304,20 +308,20 @@ parserTests =
                 ( Right
                     ( Expression
                         ( Expression
-                            (Value . NAry $ trm "a" :<- Bottom (trm "b"))
+                            (Value . pure . NAry $ trm "a" :<- Bottom (trm "b"))
                             Intersect
                             ( Expression
                                 ( Expression
-                                    (Value . NAry $ trm "a" :<- (trm "c" :<- (trm "d" :<- Bottom (trm "e"))))
+                                    (Value . pure . NAry $ trm "a" :<- (trm "c" :<- (trm "d" :<- Bottom (trm "e"))))
                                     Intersect
-                                    (Value . NAry $ trm "a" :<- (trm "c" :<- (trm "d" :<- Bottom (trm "f"))))
+                                    (Value . pure . NAry $ trm "a" :<- (trm "c" :<- (trm "d" :<- Bottom (trm "f"))))
                                 )
                                 Intersect
-                                (Value . NAry $ trm "a" :<- (trm "c" :<- Bottom (trm "g")))
+                                (Value . pure . NAry $ trm "a" :<- (trm "c" :<- Bottom (trm "g")))
                             )
                         )
                         Intersect
-                        (Value . NAry $ trm "a" :<- Bottom (trm "h"))
+                        (Value . pure . NAry $ trm "a" :<- Bottom (trm "h"))
                     )
                 )
                 (parseExpression "a(b I| c(d(e I| f) I| g) I| h)")
@@ -331,8 +335,8 @@ parserTests =
             )
         ]
 
-valnullR :: T.Text -> Expression
-valnullR = Value . Nullary . Term MetaDescriptorCriteria
+valnullR :: T.Text -> Expression Identity
+valnullR = Value . pure . Nullary . Term MetaDescriptorCriteria
 
 trm :: T.Text -> Term
 trm = Term MetaDescriptorCriteria

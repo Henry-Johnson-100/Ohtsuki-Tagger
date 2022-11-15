@@ -1,7 +1,11 @@
-{-# LANGUAGE StrictData #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Use newtype instead of data" #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# HLINT ignore "Use record patterns" #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE StrictData #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Text.TaggerQL.NewAST.AST (
   Term (..),
@@ -10,7 +14,8 @@ module Text.TaggerQL.NewAST.AST (
   Expression (..),
 ) where
 
-import Data.Tagger (QueryCriteria, SetOp)
+import Data.Functor.Identity (Identity, runIdentity)
+import Data.Tagger (QueryCriteria (..), SetOp (..))
 import Data.Text (Text)
 
 {- |
@@ -58,7 +63,22 @@ data TermArity
  An expression of a value of a term of any arity or an expression of
  a binary operation on two expressions.
 -}
-data Expression
-  = Value TermArity
-  | Expression Expression SetOp Expression
-  deriving (Show, Eq)
+data Expression t
+  = Value (t TermArity)
+  | Expression (Expression t) SetOp (Expression t)
+
+instance Eq (Expression Identity) where
+  (==) :: Expression Identity -> Expression Identity -> Bool
+  x == y =
+    case (x, y) of
+      (Value x', Value y') -> runIdentity x' == runIdentity y'
+      (Expression x' so' y', Expression x'' so'' y'') ->
+        so' == so'' && x' == x'' && y' == y''
+      _NEq -> False
+
+instance Show (Expression Identity) where
+  show :: Expression Identity -> String
+  show ex =
+    case ex of
+      Value (runIdentity -> v) -> show v
+      Expression x so y -> show x <> " `" <> show so <> "` " <> show y
