@@ -59,6 +59,21 @@ data TermArity
   | NAry ComplexTerm
   deriving (Show, Eq)
 
+data ExpressionType
+  = FileType
+  | TagType
+  deriving (Show, Eq, Ord, Enum)
+
+instance Semigroup ExpressionType where
+  (<>) :: ExpressionType -> ExpressionType -> ExpressionType
+  TagType <> _ = TagType
+  _ <> TagType = TagType
+  _ <> _ = FileType
+
+instance Monoid ExpressionType where
+  mempty :: ExpressionType
+  mempty = FileType
+
 {- |
  An expression of a value of a term of any arity or an expression of
  a binary operation on two expressions.
