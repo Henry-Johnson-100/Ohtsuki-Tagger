@@ -1,3 +1,4 @@
+\begin{code}
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# HLINT ignore "Use record patterns" #-}
@@ -97,3 +98,6 @@ instance Show (Expression Identity) where
     case ex of
       Value (runIdentity -> v) -> show v
       Expression x so y -> show x <> " `" <> show so <> "` " <> show y
+
+\end{code}
+bruh
