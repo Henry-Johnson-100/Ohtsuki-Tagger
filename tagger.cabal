@@ -144,6 +144,7 @@ library tagger-lib
                       ,Text.TaggerQL
                       ,Text.TaggerQL.Parser.Internal
                       ,Text.TaggerQL.AST
+                      ,Text.TaggerQL.Expression
                       ,Text.TaggerQL.NewAST.AST
                       ,Text.TaggerQL.NewAST.Parser
 
