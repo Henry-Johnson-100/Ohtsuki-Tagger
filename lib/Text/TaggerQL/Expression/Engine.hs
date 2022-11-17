@@ -2,14 +2,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use const" #-}
 
 module Text.TaggerQL.Expression.Engine (
   runExpr,
   evalExpr,
-  evalTagExpr,
 ) where
 
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask)
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
@@ -17,6 +21,8 @@ import Data.Hashable (Hashable)
 import Data.Tagger (SetOp (..))
 import Database.Tagger.Connection (query)
 import Database.Tagger.Query (
+  flatQueryForFileByTagDescriptorPattern,
+  flatQueryForFileOnMetaRelationPattern,
   queryForFileByPattern,
   queryForUntaggedFiles,
  )
@@ -29,7 +35,7 @@ import Text.RawString.QQ (r)
 import Text.TaggerQL.Expression.AST (
   Expression (..),
   FileTerm (FileTerm),
-  TagExpression (..),
+  SubExpression (..),
   TagTerm (..),
  )
 
@@ -46,50 +52,60 @@ evalExpr expr = case expr of
   UntaggedConst -> ask >>= liftIO . fmap HS.fromList . queryForUntaggedFiles
   FileTermValue (FileTerm txt) ->
     ask >>= liftIO . fmap HS.fromList . queryForFileByPattern txt
-  TagExpression te -> do
-    tagResults <- evalTagExpr te
-    ask >>= liftIO . toFileSet tagResults
+  TagTermValue tt ->
+    ask
+      >>= liftIO . fmap HS.fromList . case tt of
+        DescriptorTerm txt -> flatQueryForFileByTagDescriptorPattern txt
+        MetaDescriptorTerm txt -> flatQueryForFileOnMetaRelationPattern txt
+  TagExpression tt subExpr -> do
+    supertags <- ask >>= liftIO . fmap HS.fromList . queryTags tt
+    subExprResult <- runReaderT (evalSubExpression subExpr) supertags
+    ask >>= liftIO . toFileSet subExprResult
   Binary ex so ex' -> do
     lhs <- evalExpr ex
     rhs <- evalExpr ex'
     return $ dispatchComb so lhs rhs
 
--- there's no way this is right.
---
--- It's so much simpler than the last query engine that it has to be wrong.
---
--- Returns a set of supertags that is rolled up through higher recursions.
--- Instead of recursing down through an expression, we pretend that we work our way
--- bottom-up. From this assumption, it is clear that the way we search via subtags
--- is by filtering the set of supertags by membership in a set of subtags.
--- This way, all returned tag sets are a subset of the original tagset returned
--- by the TagTerm tt
-evalTagExpr ::
-  TagExpression -> ReaderT TaggedConnection IO (HashSet Tag)
-evalTagExpr texpr = case texpr of
-  TagValue tt -> ask >>= liftIO . fmap HS.fromList . queryTags tt
-  TagDistribution tt te -> do
-    supertags <- ask >>= liftIO . fmap HS.fromList . queryTags tt
-    !subtags <- HS.map tagSubtagOfId <$> evalTagExpr te
-    return
-      . HS.filter
-        (\supertag -> HS.member (Just . tagId $ supertag) subtags)
-      $ supertags
-  TagBinaryDistribution tt ex so ex' -> do
-    supertags <- ask >>= liftIO . fmap HS.fromList . queryTags tt
-    !lhs <- HS.map tagSubtagOfId <$> evalTagExpr ex
-    !rhs <- HS.map tagSubtagOfId <$> evalTagExpr ex'
-    let filterCriteria x y = case so of
+evalSubExpression ::
+  SubExpression ->
+  ReaderT
+    (HashSet Tag)
+    (ReaderT TaggedConnection IO)
+    (HashSet Tag)
+evalSubExpression subExpr = case subExpr of
+  SubTag tt -> do
+    subtags <-
+      lift ask
+        >>= liftIO
+          . fmap (HS.fromList . map tagSubtagOfId)
+          . queryTags tt
+    joinSubtags subtags
+  SubBinary se so se' -> do
+    let binaryCond x y = case so of
           Union -> x || y
           Intersect -> x && y
           Difference -> x && not y
-    return
-      . HS.filter
-        ( \st ->
-            let superId = Just . tagId $ st
-             in filterCriteria (HS.member superId lhs) (HS.member superId rhs)
-        )
-      $ supertags
+    lhs <- HS.map tagSubtagOfId <$> evalSubExpression se
+    rhs <- HS.map tagSubtagOfId <$> evalSubExpression se'
+    fmap
+      ( HS.filter
+          ( \supertag ->
+              HS.member (Just . tagId $ supertag) lhs
+                `binaryCond` HS.member (Just . tagId $ supertag) rhs
+          )
+      )
+      ask
+  SubExpression tt se -> do
+    nextSupertags <- lift ask >>= liftIO . fmap HS.fromList . queryTags tt
+    nestedSubExprResult <-
+      HS.map tagSubtagOfId
+        <$> lift (runReaderT (evalSubExpression se) nextSupertags)
+    joinSubtags nestedSubExprResult
+ where
+  -- Filter the given set of tags based on whether or not it appears in the latter given
+  -- set of subTagOfIds.
+  joinSubtags subtags =
+    fmap (HS.filter (\(Just . tagId -> supertagId) -> HS.member supertagId subtags)) ask
 
 dispatchComb :: Hashable a => SetOp -> HashSet a -> HashSet a -> HashSet a
 dispatchComb so =

@@ -1,10 +1,13 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE StrictData #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use newtype instead of data" #-}
 
 module Text.TaggerQL.Expression.AST (
   TagTerm (..),
   FileTerm (..),
-  TagExpression (..),
+  SubExpression (..),
   Expression (..),
 ) where
 
@@ -19,15 +22,16 @@ data TagTerm
 
 newtype FileTerm = FileTerm Text deriving (Show, Eq, Semigroup, Monoid, IsString)
 
-data TagExpression
-  = TagValue TagTerm
-  | TagDistribution TagTerm TagExpression
-  | TagBinaryDistribution TagTerm TagExpression SetOp TagExpression
+data SubExpression
+  = SubTag TagTerm
+  | SubBinary SubExpression SetOp SubExpression
+  | SubExpression TagTerm SubExpression
   deriving (Show, Eq)
 
 data Expression
   = UntaggedConst
   | FileTermValue FileTerm
-  | TagExpression TagExpression
+  | TagTermValue TagTerm
+  | TagExpression TagTerm SubExpression
   | Binary Expression SetOp Expression
   deriving (Show, Eq)
