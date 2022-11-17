@@ -197,7 +197,6 @@ test-suite tagger-test
 
   other-modules:
     Database.Tagger.Main
-    ,NewAST.Main
     ,Text.TaggerQL.Expression.Engine
 
   build-depends:       tagger-lib

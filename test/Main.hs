@@ -6,7 +6,6 @@ import Data.List.NonEmpty
 import Data.Tagger
 import qualified Data.Text as T
 import Database.Tagger.Main
-import NewAST.Main
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.TaggerQL.AST
@@ -19,7 +18,6 @@ main =
             "Test"
             [ normalParsers
             , parserEdgeCases
-            , parserTests
             , databaseTests
             ]
         )
