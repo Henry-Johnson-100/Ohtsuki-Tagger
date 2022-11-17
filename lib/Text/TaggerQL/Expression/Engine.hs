@@ -73,33 +73,28 @@ evalSubExpression ::
     IO
     (HashSet Tag)
 evalSubExpression subExpr supertags = case subExpr of
-  SubTag tt -> do
-    subtags <-
-      ask
-        >>= liftIO
-          . fmap (HS.fromList . map tagSubtagOfId)
-          . queryTags tt
-    return $ joinSubtags subtags
-  SubBinary se so se' -> do
+  SubTag tt ->
+    joinSubtags
+      <$> (ask >>= liftIO . fmap (HS.fromList . map tagSubtagOfId) . queryTags tt)
+  SubExpression tt se ->
+    joinSubtags
+      <$> ( ask >>= liftIO . fmap HS.fromList . queryTags tt
+              >>= fmap (HS.map tagSubtagOfId) . evalSubExpression se
+          )
+  SubBinary se so se' ->
     let binaryCond x y = case so of
           Union -> x || y
           Intersect -> x && y
           Difference -> x && not y
-    lhs <- HS.map tagSubtagOfId <$> evalSubExpression se supertags
-    rhs <- HS.map tagSubtagOfId <$> evalSubExpression se' supertags
-    return $
-      HS.filter
-        ( \supertag ->
-            HS.member (Just . tagId $ supertag) lhs
-              `binaryCond` HS.member (Just . tagId $ supertag) rhs
-        )
-        supertags
-  SubExpression tt se -> do
-    nextSupertags <- ask >>= liftIO . fmap HS.fromList . queryTags tt
-    nestedSubExprResult <-
-      HS.map tagSubtagOfId
-        <$> evalSubExpression se nextSupertags
-    return $ joinSubtags nestedSubExprResult
+        binaryFilter lhs rhs =
+          HS.filter
+            ( \(Just . tagId -> supertagId) ->
+                HS.member supertagId lhs `binaryCond` HS.member supertagId rhs
+            )
+            supertags
+     in binaryFilter
+          <$> (HS.map tagSubtagOfId <$> evalSubExpression se supertags)
+          <*> (HS.map tagSubtagOfId <$> evalSubExpression se' supertags)
  where
   -- Filter the given set of tags based on whether or not it appears in the latter given
   -- set of subTagOfIds.
