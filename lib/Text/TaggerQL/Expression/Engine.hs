@@ -3,7 +3,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Text.TaggerQL.Expression.QueryEngine (
+module Text.TaggerQL.Expression.Engine (
   runExpr,
   evalExpr,
   evalTagExpr,
