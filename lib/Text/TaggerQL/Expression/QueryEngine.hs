@@ -1,52 +1,25 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE StrictData #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# OPTIONS_GHC -Wno-typed-holes #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Avoid lambda using `infix`" #-}
-
-module Text.TaggerQL.Expression (
+module Text.TaggerQL.Expression.QueryEngine (
   runExpr,
+  evalExpr,
+  evalTagExpr,
 ) where
+
+import Text.TaggerQL.Expression.AST
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Reader
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
-import Data.String (IsString)
 import Data.Tagger (SetOp (..))
-import Data.Text (Text)
 import Database.Tagger
 import Text.RawString.QQ
 
-data TagTerm
-  = DescriptorTerm Text
-  | MetaDescriptorTerm Text
-  deriving (Show, Eq)
-
-newtype FileTerm = FileTerm Text deriving (Show, Eq, Semigroup, Monoid, IsString)
-
-data TagExpression
-  = TagValue TagTerm
-  | TagDistribution TagTerm TagExpression
-  | TagBinaryDistribution TagTerm TagExpression SetOp TagExpression
-  deriving (Show, Eq)
-
-data Expression
-  = UntaggedConst
-  | FileTermValue FileTerm
-  | TagExpression TagExpression
-  | Binary Expression SetOp Expression
-  deriving (Show, Eq)
-
-{-
-Below is the query engine
--}
 runExpr :: Expression -> TaggedConnection -> IO (HashSet File)
 runExpr expr = runReaderT (evalExpr expr)
 
