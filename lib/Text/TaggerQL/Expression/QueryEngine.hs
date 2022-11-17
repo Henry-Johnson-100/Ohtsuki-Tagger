@@ -9,17 +9,35 @@ module Text.TaggerQL.Expression.QueryEngine (
   evalTagExpr,
 ) where
 
-import Text.TaggerQL.Expression.AST
-
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Trans.Reader
+import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask)
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
 import Data.Tagger (SetOp (..))
-import Database.Tagger
-import Text.RawString.QQ
+import Database.Tagger.Connection (query)
+import Database.Tagger.Query (
+  queryForFileByPattern,
+  queryForUntaggedFiles,
+ )
+import Database.Tagger.Type (
+  File,
+  Tag (tagId, tagSubtagOfId),
+  TaggedConnection,
+ )
+import Text.RawString.QQ (r)
+import Text.TaggerQL.Expression.AST (
+  Expression (..),
+  FileTerm (FileTerm),
+  TagExpression (..),
+  TagTerm (..),
+ )
 
+{- |
+ Query an 'Expression`
+
+ thin wrapper for 'evalExpr`
+-}
 runExpr :: Expression -> TaggedConnection -> IO (HashSet File)
 runExpr expr = runReaderT (evalExpr expr)
 
