@@ -194,8 +194,8 @@ test-suite tagger-test
   main-is:             Main.hs
 
   other-modules:
-    Database.Tagger.Main
-    ,Text.TaggerQL.Expression.Engine
+    Test.Database.Tagger.Main
+    ,Test.Text.TaggerQL.Expression.Engine
 
   build-depends:       tagger-lib
                       ,tasty

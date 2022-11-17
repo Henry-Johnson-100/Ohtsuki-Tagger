@@ -5,7 +5,7 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Database.Tagger.Main (
+module Test.Database.Tagger.Main (
   databaseTests,
 ) where
 
