@@ -34,7 +34,7 @@ newtype FileTerm = FileTerm Text deriving (Show, Eq, Semigroup, Monoid, IsString
 data TagExpression
   = TagValue TagTerm
   | TagDistribution TagTerm TagExpression
-  | TagBinary TagExpression SetOp TagExpression
+  | TagBinaryDistribution TagTerm TagExpression SetOp TagExpression
   deriving (Show, Eq)
 
 data Expression
@@ -57,7 +57,7 @@ evalExpr expr = case expr of
     ask >>= liftIO . fmap HS.fromList . queryForFileByPattern txt
   TagExpression te -> do
     tagResults <- evalTagExpr te
-    ask >>= liftIO . getFileSetFromTagSet tagResults
+    ask >>= liftIO . toFileSet tagResults
   Binary ex so ex' -> do
     lhs <- evalExpr ex
     rhs <- evalExpr ex'
@@ -66,6 +66,13 @@ evalExpr expr = case expr of
 -- there's no way this is right.
 --
 -- It's so much simpler than the last query engine that it has to be wrong.
+--
+-- Returns a set of supertags that is rolled up through higher recursions.
+-- Instead of recursing down through an expression, we pretend that we work our way
+-- bottom-up. From this assumption, it is clear that the way we search via subtags
+-- is by filtering the set of supertags by membership in a set of subtags.
+-- This way, all returned tag sets are a subset of the original tagset returned
+-- by the TagTerm tt
 evalTagExpr ::
   TagExpression -> ReaderT TaggedConnection IO (HashSet Tag)
 evalTagExpr texpr = case texpr of
@@ -73,20 +80,25 @@ evalTagExpr texpr = case texpr of
   TagDistribution tt te -> do
     supertags <- ask >>= liftIO . fmap HS.fromList . queryTags tt
     !subtags <- HS.map tagSubtagOfId <$> evalTagExpr te
-    -- Returns a set of supertags that is rolled up through higher recursions.
-    -- Instead of recursing down through an expression, we pretend that we work our way
-    -- bottom-up. From this assumption, it is clear that the way we search via subtags
-    -- is by filtering the set of supertags by membership in a set of subtags.
-    -- This way, all returned tag sets are a subset of the original tagset returned
-    -- by the TagTerm tt
     return
       . HS.filter
         (\supertag -> HS.member (Just . tagId $ supertag) subtags)
       $ supertags
-  TagBinary ex so ex' -> do
-    lhs <- evalTagExpr ex
-    rhs <- evalTagExpr ex'
-    return $ dispatchComb so lhs rhs
+  TagBinaryDistribution tt ex so ex' -> do
+    supertags <- ask >>= liftIO . fmap HS.fromList . queryTags tt
+    !lhs <- HS.map tagSubtagOfId <$> evalTagExpr ex
+    !rhs <- HS.map tagSubtagOfId <$> evalTagExpr ex'
+    let filterCriteria x y = case so of
+          Union -> x || y
+          Intersect -> x && y
+          Difference -> x && not y
+    return
+      . HS.filter
+        ( \st ->
+            let superId = Just . tagId $ st
+             in filterCriteria (HS.member superId lhs) (HS.member superId rhs)
+        )
+      $ supertags
 
 dispatchComb :: Hashable a => SetOp -> HashSet a -> HashSet a -> HashSet a
 dispatchComb so =
@@ -95,8 +107,8 @@ dispatchComb so =
     Intersect -> HS.intersection
     Difference -> HS.difference
 
-getFileSetFromTagSet :: HashSet Tag -> TaggedConnection -> IO (HashSet File)
-getFileSetFromTagSet (map tagId . HS.toList -> ts) conn = do
+toFileSet :: HashSet Tag -> TaggedConnection -> IO (HashSet File)
+toFileSet (map tagId . HS.toList -> ts) conn = do
   results <- mapM (query conn q . (: [])) ts
   return . HS.unions . map HS.fromList $ results
  where
