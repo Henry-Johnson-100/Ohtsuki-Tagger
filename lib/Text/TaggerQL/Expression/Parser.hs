@@ -94,31 +94,34 @@ fileTermValueParser :: Parser Expression
 fileTermValueParser = FileTermValue <$> fileTermParser
 
 subExpressionParser :: Parser SubExpression
-subExpressionParser = lhsSubExpressionParser
-
-lhsSubExpressionParser :: Parser SubExpression
-lhsSubExpressionParser =
+subExpressionParser =
   spaces
-    *> ( ( tagTermParser
-            <**> ( spaces
-                    *> ( subExpressionOperator
-                          <|> ( (\so rhs lht -> SubBinary (SubTag lht) so rhs)
-                                  <$> setOpParser <*> subExpressionParser
-                              )
-                          <|> simpleSubtag
-                       )
-                 )
-         )
-          <|> subBinaryParser
+    *> ( try
+          ( chainl1
+              lhsSubExpressionParser
+              (flip SubBinary <$> setOpParser)
+          )
+          <|> lhsSubExpressionParser
        )
  where
-  subExpressionOperator =
-    flip SubExpression
-      <$> between
-        (char '{')
-        (spaces *> char '}')
-        subExpressionParser
-  simpleSubtag = pure SubTag
+  lhsSubExpressionParser :: Parser SubExpression
+  lhsSubExpressionParser =
+    spaces
+      *> ( between
+            (char '(')
+            (spaces *> char ')')
+            subExpressionParser
+            <|> ( tagTermParser
+                    <**> ( ( flip SubExpression
+                              <$> between
+                                (try (spaces *> char '{'))
+                                (spaces *> char '}')
+                                subExpressionParser
+                           )
+                            <|> pure SubTag
+                         )
+                )
+         )
 
 subTagParser :: Parser SubExpression
 subTagParser = SubTag <$> tagTermParser
