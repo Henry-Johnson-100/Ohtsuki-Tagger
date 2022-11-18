@@ -27,6 +27,8 @@ module Text.TaggerQL.Expression.Parser (
   patternParser,
 ) where
 
+import Control.Applicative ((<**>))
+import Control.Monad (void)
 import Data.Char (toLower, toUpper)
 import Data.Functor (($>), (<&>))
 import Data.Tagger (SetOp (..))
@@ -41,6 +43,7 @@ import Text.Parsec (
   char,
   many1,
   noneOf,
+  notFollowedBy,
   parse,
   space,
   spaces,
@@ -89,21 +92,32 @@ binaryParser = chainl1 expressionParser (flip Binary <$> setOpParser)
 subExpressionParser :: Parser SubExpression
 subExpressionParser =
   spaces
-    *> ( between
-          (char '(')
-          (spaces *> char ')')
-          subExpressionParser
-          <|> ( try subBinaryParser
-                  <|> try subExpressionSubParser
-                  <|> subTagParser
-              )
+    *> ( ( tagTermParser
+            <**> ( spaces
+                    *> ( ( flip SubExpression
+                            <$> between
+                              (char '{')
+                              (spaces *> char '}')
+                              subExpressionParser
+                         )
+                          <|> ( (\so rhs lht -> SubBinary (SubTag lht) so rhs)
+                                  <$> setOpParser <*> subExpressionParser
+                              )
+                          <|> pure SubTag
+                       )
+                 )
+         )
+          <|> subBinaryParser
        )
 
 subTagParser :: Parser SubExpression
 subTagParser = SubTag <$> tagTermParser
 
 subBinaryParser :: Parser SubExpression
-subBinaryParser = chainl1 subExpressionParser (flip SubBinary <$> setOpParser)
+subBinaryParser =
+  chainl1
+    (between (char '(') (spaces *> char ')') subExpressionParser <|> subTagParser)
+    (flip SubBinary <$> setOpParser)
 
 subExpressionSubParser :: Parser SubExpression
 subExpressionSubParser =
