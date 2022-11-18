@@ -6,6 +6,7 @@ module Test.Text.TaggerQL.Expression.Engine (
   queryEngineASTTests,
 ) where
 
+import Control.Monad.Trans.Reader (runReaderT)
 import qualified Data.HashSet as HS
 import Data.Tagger
 import Database.Tagger
@@ -174,6 +175,56 @@ basicQueryFunctionality c =
             assertEqual
               "SubExpressions modify the supertag environment for lower depths."
               [File 15 "file_15"]
+              r
+        , testCase "SubTag Expression - 1" $ do
+            r <-
+              c
+                >>= runExpr
+                  ( TagExpression
+                      (DescriptorTerm "descriptor_17")
+                      (SubTag (DescriptorTerm "descriptor_18"))
+                  )
+            assertEqual
+              "The LHS of the below test."
+              [ File 11 "file_11"
+              , File 13 "file_13"
+              , File 15 "file_15"
+              , File 16 "file_16"
+              ]
+              r
+        , testCase "SubExpression Tags - 0" $ do
+            h <- c >>= queryTags (DescriptorTerm "descriptor_17")
+            r <-
+              c
+                >>= runReaderT
+                  ( evalSubExpression
+                      (SubTag (DescriptorTerm "descriptor_18"))
+                      (HS.fromList h)
+                  )
+            assertEqual
+              "Matches the tags returned by the LHS of the \
+              \\"TagExpressions - SubBinary Sub Union\" test."
+              [ Tag 28 11 17 Nothing
+              , Tag 32 13 17 Nothing
+              , Tag 38 15 17 Nothing
+              , Tag 41 16 17 Nothing
+              ]
+              r
+        , testCase "SubExpression Tags - 1" $ do
+            h <- c >>= queryTags (DescriptorTerm "descriptor_17")
+            r <-
+              c
+                >>= runReaderT
+                  ( evalSubExpression
+                      (SubTag (DescriptorTerm "descriptor_19"))
+                      (HS.fromList h)
+                  )
+            assertEqual
+              "Matches the tags returned by the RHS of the \
+              \\"TagExpressions - SubBinary Sub Union\" test."
+              [ Tag 30 12 17 Nothing
+              , Tag 32 13 17 Nothing
+              ]
               r
         , testGroup
             "TagExpressions - SubBinary"

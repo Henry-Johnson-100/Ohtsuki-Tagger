@@ -10,6 +10,9 @@
 module Text.TaggerQL.Expression.Engine (
   runExpr,
   evalExpr,
+  -- for testing
+  evalSubExpression,
+  queryTags,
 ) where
 
 import Control.Monad.IO.Class (liftIO)
@@ -86,7 +89,7 @@ evalSubExpression subExpr supertags = case subExpr of
     nextTagEnv <- liftIO . fmap HS.fromList $ queryTags tt c
     subExprResult <- fmap (HS.map tagSubtagOfId) . evalSubExpression se $ nextTagEnv
     return $ joinSubtags subExprResult
-  SubBinary se so se' ->
+  SubBinary se so se' -> do
     let binaryCond x y = case so of
           Union -> x || y
           Intersect -> x && y
@@ -97,9 +100,9 @@ evalSubExpression subExpr supertags = case subExpr of
                 HS.member supertagId lhs `binaryCond` HS.member supertagId rhs
             )
             supertags
-     in binaryFilter
-          <$> (HS.map tagSubtagOfId <$> evalSubExpression se supertags)
-          <*> (HS.map tagSubtagOfId <$> evalSubExpression se' supertags)
+    lhs <- HS.map tagSubtagOfId <$> evalSubExpression se supertags
+    rhs <- HS.map tagSubtagOfId <$> evalSubExpression se' supertags
+    return $ binaryFilter lhs rhs
  where
   -- Filter the given set of tags based on whether or not it appears in the latter given
   -- set of subTagOfIds.
