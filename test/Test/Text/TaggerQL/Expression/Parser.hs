@@ -6,7 +6,6 @@ module Test.Text.TaggerQL.Expression.Parser (
 
 import Data.Either (isLeft)
 import Data.Tagger (SetOp (..))
-import qualified Data.Text as T
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.TaggerQL.Expression.AST
