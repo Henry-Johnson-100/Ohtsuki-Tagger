@@ -6,6 +6,7 @@ module Test.Text.TaggerQL.Expression.Engine (
   queryEngineASTTests,
 ) where
 
+import Control.Monad.Trans.Maybe (runMaybeT)
 import Control.Monad.Trans.Reader (runReaderT)
 import qualified Data.HashSet as HS
 import Data.Tagger
@@ -22,6 +23,7 @@ queryEngineASTTests c =
     "Query Engine AST Tests"
     [ basicQueryFunctionality c
     , queryEdgeCases c
+    , taggingEngineTests c
     ]
 
 basicQueryFunctionality :: IO TaggedConnection -> TestTree
@@ -429,5 +431,164 @@ queryEdgeCases c =
         ]
     ]
 
+taggingEngineTests :: IO TaggedConnection -> TestTree
+taggingEngineTests c =
+  testGroup
+    "Tagging Engine Tests"
+    [ testCase "Tagging Engine - 0" $ do
+        let se =
+              SubExpression
+                (td 21)
+                ( SubBinary
+                    (SubTag (td 22))
+                    Intersect
+                    (SubTag (td 23))
+                )
+            fk = 17
+            expectedResults =
+              [ Tag 44 17 21 Nothing
+              , Tag 45 17 22 (Just 44)
+              , Tag 46 17 23 (Just 44)
+              ]
+        c
+          >>= runSubExprOnFile
+            se
+            fk
+        f <- fmap taggedFileTags <$> (c >>= runMaybeT . queryForTaggedFileWithFileId fk)
+        assertEqual
+          ""
+          ( Just
+              expectedResults
+          )
+          f
+    , after AllSucceed "Tagging Engine - 0" $
+        testCase "Tagging Engine - 1" $ do
+          let se =
+                SubExpression
+                  (td 21)
+                  ( SubBinary
+                      ( SubExpression
+                          (td 22)
+                          ( SubBinary
+                              (SubTag (td 24))
+                              Intersect
+                              (SubTag (td 25))
+                          )
+                      )
+                      Intersect
+                      (SubTag (td 23))
+                  )
+              fk = 17
+              expectedResults =
+                [ Tag 44 17 21 Nothing
+                , Tag 45 17 22 (Just 44)
+                , Tag 46 17 23 (Just 44)
+                , Tag 47 17 24 (Just 45)
+                , Tag 48 17 25 (Just 45)
+                ]
+          c
+            >>= runSubExprOnFile
+              se
+              fk
+          f <- fmap taggedFileTags <$> (c >>= runMaybeT . queryForTaggedFileWithFileId fk)
+          assertEqual
+            ""
+            ( Just
+                expectedResults
+            )
+            f
+    , after AllSucceed "Tagging Engine - 1" $
+        testCase "Tagging Engine - 2" $ do
+          let se =
+                SubExpression
+                  (td 26)
+                  ( SubBinary
+                      ( SubExpression
+                          (td 27)
+                          ( SubBinary
+                              ( SubExpression
+                                  (td 28)
+                                  (SubTag (td 29))
+                              )
+                              Intersect
+                              (SubTag (td 30))
+                          )
+                      )
+                      Intersect
+                      (SubTag (td 31))
+                  )
+              fk = 18
+              expectedResults =
+                [ Tag 49 18 26 Nothing
+                , Tag 50 18 27 (Just 49)
+                , Tag 51 18 28 (Just 50)
+                , Tag 52 18 29 (Just 51)
+                , Tag 53 18 30 (Just 50)
+                , Tag 54 18 31 (Just 49)
+                ]
+          c
+            >>= runSubExprOnFile
+              se
+              fk
+          f <- fmap taggedFileTags <$> (c >>= runMaybeT . queryForTaggedFileWithFileId fk)
+          assertEqual
+            ""
+            ( Just
+                expectedResults
+            )
+            f
+    , after AllSucceed "Tagging Engine - 2" . testCase "Tagging Engine - 3" $ do
+        let se =
+              SubBinary
+                ( SubBinary
+                    (SubTag (td 32))
+                    Intersect
+                    (SubTag (td 33))
+                )
+                Intersect
+                (SubTag (td 34))
+            fk = 19
+            expectedResults =
+              [ Tag 55 19 32 Nothing
+              , Tag 56 19 33 Nothing
+              , Tag 57 19 34 Nothing
+              ]
+        c
+          >>= runSubExprOnFile
+            se
+            fk
+        f <- fmap taggedFileTags <$> (c >>= runMaybeT . queryForTaggedFileWithFileId fk)
+        assertEqual
+          ""
+          ( Just
+              expectedResults
+          )
+          f
+    , after AllSucceed "Tagging Engine - 3" . testCase "Tagging Engine - 4" $ do
+        let se =
+              SubExpression (td 33) (SubTag (td 32))
+            fk = 19
+            expectedResults =
+              [ Tag 55 19 32 Nothing
+              , Tag 56 19 33 Nothing
+              , Tag 57 19 34 Nothing
+              , Tag 58 19 32 (Just 56)
+              ]
+        c
+          >>= runSubExprOnFile
+            se
+            fk
+        f <- fmap taggedFileTags <$> (c >>= runMaybeT . queryForTaggedFileWithFileId fk)
+        assertEqual
+          ""
+          ( Just
+              expectedResults
+          )
+          f
+    ]
+
 file :: RecordKey File -> File
 file n = File n ("file_" <> (T.pack . show $ n))
+
+td :: RecordKey Descriptor -> TagTerm
+td n = MetaDescriptorTerm ("descriptor_" <> (T.pack . show $ n))
