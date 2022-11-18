@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Test.Text.TaggerQL.Expression.Engine (
   queryEngineASTTests,
@@ -134,5 +135,129 @@ basicQueryFunctionality c =
         ]
     , testGroup
         "TagExpressions"
-        []
+        [ testCase "Simple TagExpression" $ do
+            r <-
+              c
+                >>= runExpr
+                  ( TagExpression
+                      (DescriptorTerm "descriptor_5")
+                      (SubTag (DescriptorTerm "descriptor_6"))
+                  )
+            assertEqual
+              "Simple subtag 4{5} should find files with 4{5} tags."
+              [File 4 "file_4", File 5 "file_5"]
+              r
+        , testCase "Flat SubTag TagExpression" $ do
+            r <-
+              c
+                >>= runExpr
+                  ( TagExpression
+                      (DescriptorTerm "descriptor_6")
+                      (SubTag (DescriptorTerm "descriptor_7"))
+                  )
+            assertEqual
+              "SubTag queries are a flat operation."
+              [File 5 "file_5"]
+              r
+        , testCase "Complex Nested SubTag" $ do
+            r <-
+              c
+                >>= runExpr
+                  ( TagExpression
+                      (DescriptorTerm "descriptor_17")
+                      ( SubExpression
+                          (DescriptorTerm "descriptor_18")
+                          (SubTag (DescriptorTerm "descriptor_20"))
+                      )
+                  )
+            assertEqual
+              "SubExpressions modify the supertag environment for lower depths."
+              [File 15 "file_15"]
+              r
+        , testGroup
+            "TagExpressions - SubBinary"
+            [ testCase "Sub Union" $ do
+                r <-
+                  c
+                    >>= runExpr
+                      ( TagExpression
+                          (DescriptorTerm "descriptor_17")
+                          ( SubBinary
+                              (SubTag (DescriptorTerm "descriptor_18"))
+                              Union
+                              (SubTag (DescriptorTerm "descriptor_19"))
+                          )
+                      )
+                assertEqual
+                  "SubUnion filters supertags if the supertag\
+                  \ is subtagged by either one or the other subtag sets."
+                  [ File 11 "file_11"
+                  , File 12 "file_12"
+                  , File 13 "file_13"
+                  , File 15 "file_15"
+                  , File 16 "file_16"
+                  ]
+                  r
+            , testCase "Sub Intersection" $ do
+                r <-
+                  c
+                    >>= runExpr
+                      ( TagExpression
+                          (DescriptorTerm "descriptor_17")
+                          ( SubBinary
+                              (SubTag (DescriptorTerm "descriptor_18"))
+                              Intersect
+                              (SubTag (DescriptorTerm "descriptor_19"))
+                          )
+                      )
+                assertEqual
+                  "SubUnion filters supertags if the supertag\
+                  \ is a member of both subtag sets."
+                  [ File 13 "file_13"
+                  ]
+                  r
+            , testCase "Sub Difference" $ do
+                r <-
+                  c
+                    >>= runExpr
+                      ( TagExpression
+                          (DescriptorTerm "descriptor_17")
+                          ( SubBinary
+                              (SubTag (DescriptorTerm "descriptor_18"))
+                              Difference
+                              (SubTag (DescriptorTerm "descriptor_19"))
+                          )
+                      )
+                assertEqual
+                  "SubUnion filters supertags if the supertag\
+                  \ is a member of the first and not the second subtag set."
+                  [ File 11 "file_11"
+                  , File 15 "file_15"
+                  , File 16 "file_16"
+                  ]
+                  r
+            ]
+        ]
+    , testGroup
+        "Misc queries"
+        [ testCase "Descriptor Wildcard and SubExpressions - 0" $ do
+            r <-
+              c
+                >>= runExpr
+                  ( TagExpression
+                      (DescriptorTerm "%") -- yields tags 35, 36, 37 among others (for file 14)
+                      ( SubBinary
+                          (SubTag (DescriptorTerm "descriptor_20")) -- yields tag 35
+                          Difference
+                          (SubTag (DescriptorTerm "descriptor_18")) -- yields []
+                      )
+                  )
+            assertEqual
+              ""
+              [ File 14 "file_14" -- this file is not appearing in the actual results for some reason
+              , File 15 "file_15"
+              -- , File 16 "file_16" This file is removed by difference
+              ]
+              r
+        ]
     ]
