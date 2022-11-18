@@ -284,6 +284,19 @@ parserTests =
                           (parseSE "a b")
                       )
                   , testCase
+                      "Alternate SubBinary operator"
+                      ( assertEqual
+                          ""
+                          ( Right
+                              ( SubBinary
+                                  (SubTag (MetaDescriptorTerm "a"))
+                                  Union
+                                  (SubTag (MetaDescriptorTerm "b"))
+                              )
+                          )
+                          (parseSE "a | b")
+                      )
+                  , testCase
                       "SubBinary is left-associative"
                       ( assertEqual
                           ""

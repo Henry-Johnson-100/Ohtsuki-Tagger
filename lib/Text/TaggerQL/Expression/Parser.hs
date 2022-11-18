@@ -107,10 +107,7 @@ subExpressionParser =
   lhsSubExpressionParser :: Parser SubExpression
   lhsSubExpressionParser =
     spaces
-      *> ( between
-            (char '(')
-            (spaces *> char ')')
-            subExpressionParser
+      *> ( precedentSubExpressionParser
             <|> ( tagTermParser
                     <**> ( ( flip SubExpression
                               <$> between
@@ -122,6 +119,12 @@ subExpressionParser =
                          )
                 )
          )
+   where
+    precedentSubExpressionParser =
+      between
+        (char '(')
+        (spaces *> char ')')
+        subExpressionParser
 
 subTagParser :: Parser SubExpression
 subTagParser = SubTag <$> tagTermParser
@@ -148,7 +151,7 @@ fileTermParser = ichar 'p' *> char '.' *> patternParser <&> FileTerm
 tagTermParser :: Parser TagTerm
 tagTermParser =
   ( ( try (ichar 'r' *> char '.' $> MetaDescriptorTerm)
-        <|> (ichar 'd' *> char '.' $> DescriptorTerm)
+        <|> try (ichar 'd' *> char '.' $> DescriptorTerm)
     )
       <|> pure MetaDescriptorTerm
   )
