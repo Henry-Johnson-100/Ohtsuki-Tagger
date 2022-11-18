@@ -6,6 +6,7 @@ module Text.TaggerQL.Expression.Parser (
   ParseError,
 
   -- * For Testing
+  parse,
 
   -- ** Expression Parsers
   expressionParser,
