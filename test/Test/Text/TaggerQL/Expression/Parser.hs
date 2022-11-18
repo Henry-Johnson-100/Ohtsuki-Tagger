@@ -90,7 +90,133 @@ parserTests =
                   ]
             )
         ]
-    , testGroup "Expression Parser Tests" []
+    , testGroup
+        "Expression Parser Tests"
+        [ testCase
+            "Parse implicit tag term expr"
+            ( assertEqual
+                ""
+                (Right (TagTermValue (MetaDescriptorTerm "hello")))
+                (parseExpr "hello")
+            )
+        , testCase
+            "Parse explicit tag term expr"
+            ( assertEqual
+                ""
+                (Right (TagTermValue (DescriptorTerm "hello")))
+                (parseExpr "d.hello")
+            )
+        , testCase
+            "untagged const"
+            (assertEqual "" (Right UntaggedConst) (parseExpr "u."))
+        , testCase
+            "file term value"
+            (assertEqual "" (Right (FileTermValue "hello")) (parseExpr "p.hello"))
+        , testCase
+            "tag expression entrance"
+            ( assertEqual
+                ""
+                ( Right
+                    ( TagExpression
+                        (MetaDescriptorTerm "a")
+                        (SubTag (MetaDescriptorTerm "b"))
+                    )
+                )
+                (parseExpr "a{b}")
+            )
+        , testGroup
+            "Binary tests"
+            [ testCase
+                "Simple explicit binary"
+                ( assertEqual
+                    ""
+                    ( Right
+                        ( Binary
+                            (TagTermValue (MetaDescriptorTerm "a"))
+                            Union
+                            (TagTermValue (MetaDescriptorTerm "b"))
+                        )
+                    )
+                    (parseExpr "a | b")
+                )
+            , testCase
+                "Simple implicit binary"
+                ( assertEqual
+                    ""
+                    ( Right
+                        ( Binary
+                            (TagTermValue (MetaDescriptorTerm "a"))
+                            Intersect
+                            (TagTermValue (MetaDescriptorTerm "b"))
+                        )
+                    )
+                    (parseExpr "a b")
+                )
+            , testCase
+                "Binary is left-associative"
+                ( assertEqual
+                    ""
+                    ( Right
+                        ( Binary
+                            ( Binary
+                                (TagTermValue (MetaDescriptorTerm "a"))
+                                Union
+                                (TagTermValue (MetaDescriptorTerm "b"))
+                            )
+                            Difference
+                            (TagTermValue (MetaDescriptorTerm "c"))
+                        )
+                    )
+                    (parseExpr "a | b ! c")
+                )
+            , testCase
+                "Can change binary precedence"
+                ( assertEqual
+                    ""
+                    ( Right
+                        ( Binary
+                            ( TagTermValue (MetaDescriptorTerm "a")
+                            )
+                            Union
+                            ( Binary
+                                (TagTermValue (MetaDescriptorTerm "b"))
+                                Difference
+                                (TagTermValue (MetaDescriptorTerm "c"))
+                            )
+                        )
+                    )
+                    (parseExpr "a | (b ! c)")
+                )
+            , testCase
+                "Can nest binary operations"
+                ( assertEqual
+                    ""
+                    ( Right
+                        ( Binary
+                            ( Binary
+                                ( Binary
+                                    (TagTermValue (MetaDescriptorTerm "a"))
+                                    Intersect
+                                    ( TagExpression
+                                        (MetaDescriptorTerm "b")
+                                        (SubTag (MetaDescriptorTerm "c"))
+                                    )
+                                )
+                                Union
+                                ( Binary
+                                    (FileTermValue "hi")
+                                    Intersect
+                                    (FileTermValue "bye")
+                                )
+                            )
+                            Difference
+                            (TagTermValue (DescriptorTerm "unwanted"))
+                        )
+                    )
+                    (parseExpr "a b{c} | (p.hi & p.bye) ! d.unwanted")
+                )
+            ]
+        ]
     , testGroup
         "SubExpression Parser Tests"
         ( let parseSE = parse subExpressionParser ""
