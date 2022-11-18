@@ -8,9 +8,13 @@
 {-# HLINT ignore "Use const" #-}
 
 module Text.TaggerQL.Expression.Engine (
+  runQuery,
+
+  -- * Primitive Functions
   runExpr,
   evalExpr,
-  -- for testing
+
+  -- ** For Testing
   evalSubExpression,
   queryTags,
 ) where
@@ -21,6 +25,8 @@ import Data.Functor ((<&>))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Tagger (SetOp (..))
+import Data.Text (Text)
+import qualified Data.Text as T
 import Database.Tagger.Connection (query)
 import Database.Tagger.Query (
   flatQueryForFileByTagDescriptorPattern,
@@ -33,6 +39,7 @@ import Database.Tagger.Type (
   Tag (tagId, tagSubtagOfId),
   TaggedConnection,
  )
+import Text.Parsec.Error (errorMessages, messageString)
 import Text.RawString.QQ (r)
 import Text.TaggerQL.Expression.AST (
   Expression (..),
@@ -40,6 +47,17 @@ import Text.TaggerQL.Expression.AST (
   SubExpression (..),
   TagTerm (..),
  )
+import Text.TaggerQL.Expression.Parser (parseExpr)
+
+{- |
+ Run a TaggerQL query on the given database.
+-}
+runQuery :: TaggedConnection -> Text -> Either [Text] (IO (HashSet File))
+runQuery c t =
+  let result = parseExpr t
+   in case result of
+        Left pe -> Left . map (T.pack . messageString) . errorMessages $ pe
+        Right ex -> Right . flip runExpr c $ ex
 
 {- |
  Query an 'Expression`
