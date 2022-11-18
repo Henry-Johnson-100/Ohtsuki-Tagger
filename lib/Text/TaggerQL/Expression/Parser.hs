@@ -2,8 +2,6 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Redundant bracket" #-}
-
 module Text.TaggerQL.Expression.Parser (
   parseExpr,
   ParseError,
@@ -72,7 +70,17 @@ expressionParser =
 lhsExprParser :: Parser Expression
 lhsExprParser =
   spaces
-    *> ( try untaggedConstParser <|> try fileTermValueParser <|> tagTermValueParser
+    *> ( try untaggedConstParser <|> try fileTermValueParser
+          <|> ( tagTermParser
+                  <**> ( ( flip TagExpression
+                            <$> between
+                              (spaces *> char '{')
+                              (spaces *> char '}')
+                              subExpressionParser
+                         )
+                          <|> pure TagTermValue
+                       )
+              )
        )
 
 untaggedConstParser :: Parser Expression
