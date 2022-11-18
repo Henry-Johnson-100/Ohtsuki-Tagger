@@ -5,6 +5,7 @@ module Test.Text.TaggerQL.Expression.Parser (
 ) where
 
 import Data.Either (isLeft)
+import Data.Tagger (SetOp (..))
 import qualified Data.Text as T
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -114,6 +115,93 @@ parserTests =
                       (Right (SubTag (MetaDescriptorTerm "hello")))
                       (parseSE "(  hello  )")
                   )
+              , testCase
+                  "Parse simple sub expression"
+                  ( assertEqual
+                      ""
+                      ( Right
+                          ( SubExpression
+                              (MetaDescriptorTerm "a")
+                              (SubTag (MetaDescriptorTerm "b"))
+                          )
+                      )
+                      (parseSE "a{b}")
+                  )
+              , testGroup
+                  "SubBinary tests"
+                  [ testCase
+                      "Parse simple subBinary"
+                      ( assertEqual
+                          ""
+                          ( Right
+                              ( SubBinary
+                                  (SubTag (MetaDescriptorTerm "a"))
+                                  Intersect
+                                  (SubTag (MetaDescriptorTerm "b"))
+                              )
+                          )
+                          (parseSE "a b")
+                      )
+                  , testCase
+                      "SubBinary is left-associative"
+                      ( assertEqual
+                          ""
+                          ( Right
+                              ( SubBinary
+                                  ( SubBinary
+                                      (SubTag (MetaDescriptorTerm "a"))
+                                      Intersect
+                                      (SubTag (MetaDescriptorTerm "b"))
+                                  )
+                                  Intersect
+                                  (SubTag (MetaDescriptorTerm "c"))
+                              )
+                          )
+                          (parseSE "a b c")
+                      )
+                  , testCase
+                      "SubBinary can use different set ops"
+                      ( assertEqual
+                          ""
+                          ( Right
+                              ( SubBinary
+                                  ( SubBinary
+                                      ( SubBinary
+                                          (SubTag (MetaDescriptorTerm "a"))
+                                          Union
+                                          (SubTag (MetaDescriptorTerm "b"))
+                                      )
+                                      Intersect
+                                      (SubTag (MetaDescriptorTerm "c"))
+                                  )
+                                  Difference
+                                  (SubTag (MetaDescriptorTerm "d"))
+                              )
+                          )
+                          (parseSE "a | b & c ! d")
+                      )
+                  , testCase
+                      "Can change SubBinary precedence"
+                      ( assertEqual
+                          ""
+                          ( Right
+                              ( SubBinary
+                                  ( SubBinary
+                                      (SubTag (MetaDescriptorTerm "a"))
+                                      Union
+                                      (SubTag (MetaDescriptorTerm "b"))
+                                  )
+                                  Intersect
+                                  ( SubBinary
+                                      (SubTag (MetaDescriptorTerm "c"))
+                                      Difference
+                                      (SubTag (MetaDescriptorTerm "d"))
+                                  )
+                              )
+                          )
+                          (parseSE "a | b & (c ! d)")
+                      )
+                  ]
               ]
         )
     ]
