@@ -82,4 +82,31 @@ parserTests =
                   ]
             )
         ]
+    , testGroup "Expression Parser Tests" []
+    , testGroup
+        "SubExpression Parser Tests"
+        ( let parseSE = parse subExpressionParser ""
+           in [ testCase
+                  "Parse a single subtag"
+                  ( assertEqual
+                      ""
+                      (Right (SubTag (DescriptorTerm "hello")))
+                      (parseSE "d.hello")
+                  )
+              , testCase
+                  "Parse a single MetaDescriptor Term Subtag"
+                  ( assertEqual
+                      ""
+                      (Right (SubTag (MetaDescriptorTerm "hello")))
+                      (parseSE "hello")
+                  )
+              , testCase
+                  "Parse a parenthesized subtag"
+                  ( assertEqual
+                      ""
+                      (Right (SubTag (MetaDescriptorTerm "hello")))
+                      (parseSE "(  hello  )")
+                  )
+              ]
+        )
     ]
