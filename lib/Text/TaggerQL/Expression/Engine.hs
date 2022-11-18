@@ -16,7 +16,6 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask)
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
-import Data.Hashable (Hashable)
 import Data.Tagger (SetOp (..))
 import Database.Tagger.Connection (query)
 import Database.Tagger.Query (
@@ -56,14 +55,19 @@ evalExpr expr = case expr of
       >>= liftIO . fmap HS.fromList . case tt of
         DescriptorTerm txt -> flatQueryForFileByTagDescriptorPattern txt
         MetaDescriptorTerm txt -> flatQueryForFileOnMetaRelationPattern txt
-  TagExpression tt subExpr -> do
-    supertags <- ask >>= liftIO . fmap HS.fromList . queryTags tt
-    subExprResult <- evalSubExpression subExpr supertags
-    ask >>= liftIO . toFileSet subExprResult
-  Binary ex so ex' -> do
-    lhs <- evalExpr ex
-    rhs <- evalExpr ex'
-    return $ dispatchComb so lhs rhs
+  TagExpression tt subExpr ->
+    ask >>= \c -> do
+      supertags <- liftIO . fmap HS.fromList $ queryTags tt c
+      subExprResult <- evalSubExpression subExpr supertags
+      liftIO $ toFileSet subExprResult c
+  Binary lhs so rhs ->
+    ( case so of
+        Union -> HS.union
+        Intersect -> HS.intersection
+        Difference -> HS.difference
+    )
+      <$> evalExpr lhs
+      <*> evalExpr rhs
 
 evalSubExpression ::
   SubExpression ->
@@ -73,14 +77,15 @@ evalSubExpression ::
     IO
     (HashSet Tag)
 evalSubExpression subExpr supertags = case subExpr of
-  SubTag tt ->
-    joinSubtags
-      <$> (ask >>= liftIO . fmap (HS.fromList . map tagSubtagOfId) . queryTags tt)
-  SubExpression tt se ->
-    joinSubtags
-      <$> ( ask >>= liftIO . fmap HS.fromList . queryTags tt
-              >>= fmap (HS.map tagSubtagOfId) . evalSubExpression se
-          )
+  SubTag tt -> do
+    c <- ask
+    subtags <- liftIO . fmap (HS.fromList . map tagSubtagOfId) $ queryTags tt c
+    return $ joinSubtags subtags
+  SubExpression tt se -> do
+    c <- ask
+    nextTagEnv <- liftIO . fmap HS.fromList $ queryTags tt c
+    subExprResult <- fmap (HS.map tagSubtagOfId) . evalSubExpression se $ nextTagEnv
+    return $ joinSubtags subExprResult
   SubBinary se so se' ->
     let binaryCond x y = case so of
           Union -> x || y
@@ -100,13 +105,6 @@ evalSubExpression subExpr supertags = case subExpr of
   -- set of subTagOfIds.
   joinSubtags subtags =
     HS.filter (\(Just . tagId -> supertagId) -> HS.member supertagId subtags) supertags
-
-dispatchComb :: Hashable a => SetOp -> HashSet a -> HashSet a -> HashSet a
-dispatchComb so =
-  case so of
-    Union -> HS.union
-    Intersect -> HS.intersection
-    Difference -> HS.difference
 
 toFileSet :: HashSet Tag -> TaggedConnection -> IO (HashSet File)
 toFileSet (map tagId . HS.toList -> ts) conn = do
