@@ -17,6 +17,7 @@ module Text.TaggerQL.Expression.Engine (
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask)
+import Data.Functor ((<&>))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Tagger (SetOp (..))
@@ -89,20 +90,23 @@ evalSubExpression subExpr supertags = case subExpr of
     nextTagEnv <- liftIO . fmap HS.fromList $ queryTags tt c
     subExprResult <- fmap (HS.map tagSubtagOfId) . evalSubExpression se $ nextTagEnv
     return $ joinSubtags subExprResult
-  SubBinary se so se' -> do
-    let binaryCond x y = case so of
-          Union -> x || y
-          Intersect -> x && y
-          Difference -> x && not y
-        binaryFilter lhs rhs =
-          HS.filter
-            ( \(Just . tagId -> supertagId) ->
-                HS.member supertagId lhs `binaryCond` HS.member supertagId rhs
+  {-
+  For a given set of supertags, evalSubExpression.joinSubtags is closed on that set.
+  Meaning that any given set of tags returned by evalSubExpression will be a subset of
+    the set it was given.
+
+  Therefore, the SubBinary case does not need a final intersection of its
+  product with supertags, because both operands are subsets of the supertag set.
+  -}
+  SubBinary se so se' ->
+    ( evalSubExpression se supertags
+        <&> ( case so of
+                Union -> HS.union
+                Intersect -> HS.intersection
+                Difference -> HS.difference
             )
-            supertags
-    lhs <- HS.map tagSubtagOfId <$> evalSubExpression se supertags
-    rhs <- HS.map tagSubtagOfId <$> evalSubExpression se' supertags
-    return $ binaryFilter lhs rhs
+    )
+      <*> evalSubExpression se' supertags
  where
   -- Filter the given set of tags based on whether or not it appears in the latter given
   -- set of subTagOfIds.
