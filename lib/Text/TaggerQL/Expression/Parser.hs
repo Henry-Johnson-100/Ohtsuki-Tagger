@@ -2,23 +2,27 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Text.TaggerQL.Expression.Parser (
-  expressionParser,
+  parseExpr,
+  ParseError,
 
-  -- * Expression Parsers
+  -- * For Testing
+
+  -- ** Expression Parsers
+  expressionParser,
   untaggedConstParser,
   binaryParser,
   tagExpressionParser,
 
-  -- * SubExpression Parsers
+  -- ** SubExpression Parsers
   subExpressionParser,
   subBinaryParser,
   subExpressionSubParser,
 
-  -- * Term Parsers
+  -- ** Term Parsers
   tagTermParser,
   fileTermParser,
 
-  -- * Misc
+  -- ** Misc
   patternParser,
 ) where
 
@@ -28,6 +32,7 @@ import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Text.Parsec (
+  ParseError,
   Parsec,
   anyChar,
   between,
@@ -35,6 +40,7 @@ import Text.Parsec (
   char,
   many1,
   noneOf,
+  parse,
   space,
   spaces,
   try,
@@ -48,6 +54,9 @@ import Text.TaggerQL.Expression.AST (
  )
 
 type Parser a = Parsec Text () a
+
+parseExpr :: Text -> Either ParseError Expression
+parseExpr = parse expressionParser "TaggerQL"
 
 expressionParser :: Parser Expression
 expressionParser =

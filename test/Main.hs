@@ -5,10 +5,16 @@
 import Data.List.NonEmpty
 import Data.Tagger
 import qualified Data.Text as T
-import Test.Resources
+import Test.Resources (
+    removeResource,
+    secureResource,
+    setup_0_InitializeDatabase,
+    setup_1_TestInitialization,
+ )
 import Test.Tasty
 import Test.Tasty.HUnit
-import Test.Text.TaggerQL.Expression.Engine
+import Test.Text.TaggerQL.Expression.Engine (queryEngineASTTests)
+import Test.Text.TaggerQL.Expression.Parser (parserTests)
 import Text.TaggerQL.AST
 import Text.TaggerQL.Parser.Internal
 
@@ -19,6 +25,7 @@ main =
             "Test"
             [ normalParsers
             , parserEdgeCases
+            , parserTests
             , withResource secureResource removeResource $
                 \conn ->
                     testGroup
