@@ -62,24 +62,30 @@ expressionParser =
     *> ( try (chainl1 lhsExprParser (flip Binary <$> setOpParser))
           <|> lhsExprParser
        )
-
-lhsExprParser :: Parser Expression
-lhsExprParser =
-  spaces
-    *> ( between (char '(') (spaces *> char ')') expressionParser
-          <|> ( try untaggedConstParser <|> try fileTermValueParser
-                  <|> ( tagTermParser
-                          <**> ( ( flip TagExpression
-                                    <$> between
-                                      (try (spaces *> char '{'))
-                                      (spaces *> char '}')
-                                      subExpressionParser
+ where
+  lhsExprParser :: Parser Expression
+  lhsExprParser =
+    spaces
+      *> ( precedentExpressionParser
+            <|> ( try untaggedConstParser
+                    <|> try fileTermValueParser
+                    <|> ( tagTermParser
+                            <**> ( tagExpressionLookAhead
+                                    <|> tagTermValueDefaultLookAhead
                                  )
-                                  <|> pure TagTermValue
-                               )
-                      )
-              )
-       )
+                        )
+                )
+         )
+   where
+    precedentExpressionParser =
+      between (char '(') (spaces *> char ')') expressionParser
+    tagExpressionLookAhead =
+      flip TagExpression
+        <$> between
+          (try (spaces *> char '{'))
+          (spaces *> char '}')
+          subExpressionParser
+    tagTermValueDefaultLookAhead = pure TagTermValue
 
 untaggedConstParser :: Parser Expression
 untaggedConstParser = ichar 'u' *> char '.' $> UntaggedConst
