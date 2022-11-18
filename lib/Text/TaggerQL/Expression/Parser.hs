@@ -39,6 +39,8 @@ import Text.Parsec (
   between,
   chainl1,
   char,
+  eof,
+  lookAhead,
   many1,
   noneOf,
   notFollowedBy,
@@ -176,4 +178,4 @@ ichar :: Char -> Parser Char
 ichar c = char (toUpper c) <|> char (toLower c)
 
 restrictedChars :: [Char]
-restrictedChars = "(){}!&|.\r\n"
+restrictedChars = "(){}!&|. \r\n"
