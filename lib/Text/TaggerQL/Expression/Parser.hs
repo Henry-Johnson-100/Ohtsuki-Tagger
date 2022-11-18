@@ -94,21 +94,24 @@ subExpressionParser =
   spaces
     *> ( ( tagTermParser
             <**> ( spaces
-                    *> ( ( flip SubExpression
-                            <$> between
-                              (char '{')
-                              (spaces *> char '}')
-                              subExpressionParser
-                         )
+                    *> ( subExpressionOperator
                           <|> ( (\so rhs lht -> SubBinary (SubTag lht) so rhs)
                                   <$> setOpParser <*> subExpressionParser
                               )
-                          <|> pure SubTag
+                          <|> simpleSubtag
                        )
                  )
          )
           <|> subBinaryParser
        )
+ where
+  subExpressionOperator =
+    flip SubExpression
+      <$> between
+        (char '{')
+        (spaces *> char '}')
+        subExpressionParser
+  simpleSubtag = pure SubTag
 
 subTagParser :: Parser SubExpression
 subTagParser = SubTag <$> tagTermParser

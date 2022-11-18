@@ -127,6 +127,21 @@ parserTests =
                       )
                       (parseSE "a{b}")
                   )
+              , testCase
+                  "Parse nested sub expression"
+                  ( assertEqual
+                      ""
+                      ( Right
+                          ( SubExpression
+                              (MetaDescriptorTerm "a")
+                              ( SubExpression
+                                  (MetaDescriptorTerm "b")
+                                  (SubTag (MetaDescriptorTerm "c"))
+                              )
+                          )
+                      )
+                      (parseSE "a{b{c}}")
+                  )
               , testGroup
                   "SubBinary tests"
                   [ testCase
@@ -200,6 +215,29 @@ parserTests =
                               )
                           )
                           (parseSE "a | b & (c ! d)")
+                      )
+                  , testCase
+                      "Nest SubExpressions in SubBinary"
+                      ( assertEqual
+                          ""
+                          ( Right
+                              ( SubBinary
+                                  ( SubExpression
+                                      (MetaDescriptorTerm "a")
+                                      (SubTag (MetaDescriptorTerm "b"))
+                                  )
+                                  Union
+                                  ( SubExpression
+                                      (MetaDescriptorTerm "c")
+                                      ( SubBinary
+                                          (SubTag (MetaDescriptorTerm "d"))
+                                          Intersect
+                                          (SubTag (MetaDescriptorTerm "e"))
+                                      )
+                                  )
+                              )
+                          )
+                          (parseSE "a{b} | c{d e}")
                       )
                   ]
               ]
