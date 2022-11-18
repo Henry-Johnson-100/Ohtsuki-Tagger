@@ -1,5 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Redundant bracket" #-}
 
 module Text.TaggerQL.Expression.Parser (
   parseExpr,
@@ -10,14 +13,9 @@ module Text.TaggerQL.Expression.Parser (
 
   -- ** Expression Parsers
   expressionParser,
-  untaggedConstParser,
-  binaryParser,
-  tagExpressionParser,
 
   -- ** SubExpression Parsers
   subExpressionParser,
-  subBinaryParser,
-  subExpressionSubParser,
 
   -- ** Term Parsers
   tagTermParser,
@@ -65,16 +63,14 @@ parseExpr = parse expressionParser "TaggerQL"
 expressionParser :: Parser Expression
 expressionParser =
   spaces
-    *> ( between
-          (char '(')
-          (spaces *> char ')')
-          expressionParser
-          <|> ( try binaryParser
-                  <|> try tagExpressionParser
-                  <|> try fileTermValueParser
-                  <|> try untaggedConstParser
-                  <|> tagTermValueParser
-              )
+    *> ( try (chainl1 lhsExprParser (flip Binary <$> setOpParser))
+          <|> lhsExprParser
+       )
+
+lhsExprParser :: Parser Expression
+lhsExprParser =
+  spaces
+    *> ( try untaggedConstParser <|> try fileTermValueParser <|> tagTermValueParser
        )
 
 untaggedConstParser :: Parser Expression
@@ -90,7 +86,10 @@ binaryParser :: Parser Expression
 binaryParser = chainl1 expressionParser (flip Binary <$> setOpParser)
 
 subExpressionParser :: Parser SubExpression
-subExpressionParser =
+subExpressionParser = lhsSubExpressionParser
+
+lhsSubExpressionParser :: Parser SubExpression
+lhsSubExpressionParser =
   spaces
     *> ( ( tagTermParser
             <**> ( spaces
