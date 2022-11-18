@@ -9,6 +9,7 @@ import Test.Database.Tagger.Main
 import Test.Resources
 import Test.Tasty
 import Test.Tasty.HUnit
+import Test.Text.TaggerQL.Expression.Engine
 import Text.TaggerQL.AST
 import Text.TaggerQL.Parser.Internal
 
@@ -25,6 +26,7 @@ main =
                         "Database Tests"
                         [ setup_0_InitializeDatabase conn
                         , after AllSucceed "Setup 0" $ setup_1_TestInitialization conn
+                        , after AllSucceed "Setup" $ queryEngineASTTests conn
                         ]
             ]
         )
