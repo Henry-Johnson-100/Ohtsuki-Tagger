@@ -9,6 +9,7 @@ module Test.Text.TaggerQL.Expression.Engine (
 import Control.Monad.Trans.Reader (runReaderT)
 import qualified Data.HashSet as HS
 import Data.Tagger
+import qualified Data.Text as T
 import Database.Tagger
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -372,4 +373,61 @@ queryEdgeCases c =
               [File 7 "file_7"]
               r
         ]
+    , testGroup
+        "Ticket a50b7d8"
+        [ testCase "Relational subqueries are not disjoint" $ do
+            r <-
+              c
+                >>= runExpr
+                  ( TagExpression
+                      (MetaDescriptorTerm "descriptor_12")
+                      ( SubBinary
+                          (SubTag (DescriptorTerm "descriptor_15"))
+                          Intersect
+                          (SubTag (DescriptorTerm "descriptor_16"))
+                      )
+                  )
+            assertEqual
+              ""
+              [File 8 "file_8", File 9 "file_9"]
+              r
+        , testCase "Disjoint, single arity, relational subqueries are a superset" $ do
+            r <-
+              c
+                >>= runExpr
+                  ( Binary
+                      ( TagExpression
+                          (MetaDescriptorTerm "descriptor_12")
+                          (SubTag (DescriptorTerm "descriptor_15"))
+                      )
+                      Intersect
+                      ( TagExpression
+                          (MetaDescriptorTerm "descriptor_12")
+                          (SubTag (DescriptorTerm "descriptor_16"))
+                      )
+                  )
+            assertEqual
+              ""
+              [file 8, file 9, file 10]
+              r
+        , testCase "Descriptor subqueries are not disjoint" $ do
+            r <-
+              c
+                >>= runExpr
+                  ( TagExpression
+                      (DescriptorTerm "descriptor_13")
+                      ( SubBinary
+                          (SubTag (DescriptorTerm "descriptor_15"))
+                          Intersect
+                          (SubTag (DescriptorTerm "descriptor_16"))
+                      )
+                  )
+            assertEqual
+              ""
+              [file 8]
+              r
+        ]
     ]
+
+file :: RecordKey File -> File
+file n = File n ("file_" <> (T.pack . show $ n))
