@@ -32,4 +32,54 @@ parserTests =
                   ]
             )
         ]
+    , testGroup
+        "Term Parser Tests"
+        [ testGroup
+            "fileTermParser"
+            ( let parseFT = parse fileTermParser ""
+               in [ testCase
+                      "Requires preceding token"
+                      ( assertEqual
+                          "A file term must be preceded by \"p.\""
+                          (Right "hello")
+                          (parseFT "p.hello")
+                      )
+                  , testCase
+                      "Preceding token is case insensitive"
+                      (assertEqual "" (Right "hello") (parseFT "P.hello"))
+                  , testCase
+                      "Fails without preceding token"
+                      ( assertBool
+                          "A file term must be preceded by \"p.\""
+                          (isLeft (parseFT "hello"))
+                      )
+                  ]
+            )
+        , testGroup
+            "tagTermParser"
+            ( let parseTT = parse tagTermParser ""
+               in [ testCase
+                      "MetaDescriptor can be preceded by token"
+                      ( assertEqual
+                          "A MetaDescriptor pattern can be preceded by \'r.\'"
+                          (Right (MetaDescriptorTerm "hello"))
+                          (parseTT "r.hello")
+                      )
+                  , testCase
+                      "A Descriptor must be preceded by a token"
+                      ( assertEqual
+                          "A Descriptor pattern must be preceded by \'d.\'"
+                          (Right (DescriptorTerm "hello"))
+                          (parseTT "d.hello")
+                      )
+                  , testCase
+                      "A MetaDescriptor does not have to be preceded by a pattern"
+                      ( assertEqual
+                          ""
+                          (Right (MetaDescriptorTerm "hello"))
+                          (parseTT "hello")
+                      )
+                  ]
+            )
+        ]
     ]
