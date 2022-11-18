@@ -24,7 +24,6 @@ module Text.TaggerQL.Expression.Parser (
 ) where
 
 import Control.Applicative ((<**>))
-import Control.Monad (void)
 import Data.Char (toLower, toUpper)
 import Data.Functor (($>), (<&>))
 import Data.Tagger (SetOp (..))
@@ -37,11 +36,8 @@ import Text.Parsec (
   between,
   chainl1,
   char,
-  eof,
-  lookAhead,
   many1,
   noneOf,
-  notFollowedBy,
   parse,
   space,
   spaces,
@@ -91,12 +87,6 @@ untaggedConstParser = ichar 'u' *> char '.' $> UntaggedConst
 fileTermValueParser :: Parser Expression
 fileTermValueParser = FileTermValue <$> fileTermParser
 
-tagTermValueParser :: Parser Expression
-tagTermValueParser = TagTermValue <$> tagTermParser
-
-binaryParser :: Parser Expression
-binaryParser = chainl1 expressionParser (flip Binary <$> setOpParser)
-
 subExpressionParser :: Parser SubExpression
 subExpressionParser = lhsSubExpressionParser
 
@@ -136,16 +126,6 @@ subBinaryParser =
 subExpressionSubParser :: Parser SubExpression
 subExpressionSubParser =
   SubExpression <$> tagTermParser
-    <*> ( spaces
-            *> between
-              (char '{')
-              (spaces *> char '}')
-              subExpressionParser
-        )
-
-tagExpressionParser :: Parser Expression
-tagExpressionParser =
-  TagExpression <$> tagTermParser
     <*> ( spaces
             *> between
               (char '{')
