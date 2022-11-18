@@ -9,6 +9,7 @@
 
 module Text.TaggerQL.Expression.Engine (
   runQuery,
+  tagFile,
 
   -- * Primitive Functions
   runExpr,
@@ -22,9 +23,9 @@ module Text.TaggerQL.Expression.Engine (
 
 import Control.Monad (void)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Trans.Except
+import Control.Monad.Trans.Except (ExceptT, throwE)
 import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask, asks)
-import Data.Functor ((<&>))
+import Data.Functor (($>), (<&>))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import qualified Data.List as L
@@ -32,9 +33,20 @@ import Data.Maybe (fromJust)
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger (RecordKey, insertTags, queryForDescriptorByPattern, queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf)
+import Database.Tagger (
+  RecordKey,
+  insertTags,
+  queryForDescriptorByPattern,
+  queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf,
+ )
 import Database.Tagger.Connection (query)
-import Database.Tagger.Query (flatQueryForFileByTagDescriptorPattern, flatQueryForFileOnMetaRelationPattern, queryForFileByPattern, queryForTagBySubTagTriple, queryForUntaggedFiles)
+import Database.Tagger.Query (
+  flatQueryForFileByTagDescriptorPattern,
+  flatQueryForFileOnMetaRelationPattern,
+  queryForFileByPattern,
+  queryForTagBySubTagTriple,
+  queryForUntaggedFiles,
+ )
 import Database.Tagger.Type (
   File,
   Tag (tagId, tagSubtagOfId),
@@ -49,7 +61,7 @@ import Text.TaggerQL.Expression.AST (
   SubExpression (..),
   TagTerm (..),
  )
-import Text.TaggerQL.Expression.Parser (parseExpr)
+import Text.TaggerQL.Expression.Parser (parseExpr, parseTagExpr)
 
 {- |
  Run a TaggerQL query on the given database.
@@ -188,6 +200,19 @@ queryTags tt c =
 
 -- Tagging Engine
 
+{- |
+ Run a subset of the TaggerQL to tag a file with Descriptors
+ matching the given patterns.
+
+ Returns Just error messages if parsing fails. Otherwise Nothing.
+-}
+tagFile :: RecordKey File -> TaggedConnection -> Text -> IO (Maybe Text)
+tagFile fk c =
+  either
+    (return . Just . T.pack . show)
+    (\se -> runSubExprOnFile se fk c $> Nothing)
+    . parseTagExpr
+
 runSubExprOnFile :: SubExpression -> RecordKey File -> TaggedConnection -> IO ()
 runSubExprOnFile se fk c = void (runReaderT (insertSubExpr se Nothing) (fk, c))
 
@@ -198,6 +223,14 @@ insertSubExpr ::
 insertSubExpr se supertags =
   asks snd >>= \c ->
     ( case se of
+        SubExpression tt se' -> do
+          insertedSubtags <- insertSubExpr (SubTag tt) supertags
+          insertSubExpr se' (Just insertedSubtags)
+        SubBinary se' _ se2 -> do
+          void $ insertSubExpr se' supertags
+          void $ insertSubExpr se2 supertags
+          -- tags inserted by a SubBinary is indeterminate and empty by default
+          return mempty
         SubTag tt -> do
           let txt = termTxt tt
           withDescriptors <- qDescriptor txt
@@ -228,14 +261,6 @@ insertSubExpr se supertags =
                       (`queryForTagBySubTagTriple` c)
                       (third fromJust <$> tagTriples)
                   )
-        SubExpression tt se' -> do
-          insertedSubtags <- insertSubExpr (SubTag tt) supertags
-          insertSubExpr se' (Just insertedSubtags)
-        SubBinary se' _ se2 -> do
-          void $ insertSubExpr se' supertags
-          void $ insertSubExpr se2 supertags
-          -- tags inserted by a SubBinary is indeterminate and empty by default
-          return mempty
     )
  where
   termTxt tt =

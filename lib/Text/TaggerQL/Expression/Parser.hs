@@ -4,6 +4,7 @@
 
 module Text.TaggerQL.Expression.Parser (
   parseExpr,
+  parseTagExpr,
   ParseError,
 
   -- * For Testing
@@ -55,6 +56,9 @@ type Parser a = Parsec Text () a
 
 parseExpr :: Text -> Either ParseError Expression
 parseExpr = parse expressionParser "TaggerQL"
+
+parseTagExpr :: Text -> Either ParseError SubExpression
+parseTagExpr = parse subExpressionParser "TaggerQL"
 
 expressionParser :: Parser Expression
 expressionParser =
