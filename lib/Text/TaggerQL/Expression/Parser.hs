@@ -71,7 +71,7 @@ expressionParser =
                     <|> try fileTermValueParser
                     <|> ( tagTermParser
                             <**> ( tagExpressionLookAhead
-                                    <|> tagTermValueDefaultLookAhead
+                                    <|> pure TagTermValue
                                  )
                         )
                 )
@@ -85,7 +85,6 @@ expressionParser =
           (try (spaces *> char '{'))
           (spaces *> char '}')
           subExpressionParser
-    tagTermValueDefaultLookAhead = pure TagTermValue
 
 untaggedConstParser :: Parser Expression
 untaggedConstParser = ichar 'u' *> char '.' $> UntaggedConst
@@ -109,12 +108,7 @@ subExpressionParser =
     spaces
       *> ( precedentSubExpressionParser
             <|> ( tagTermParser
-                    <**> ( ( flip SubExpression
-                              <$> between
-                                (try (spaces *> char '{'))
-                                (spaces *> char '}')
-                                subExpressionParser
-                           )
+                    <**> ( subExpressionLookAheadParser
                             <|> pure SubTag
                          )
                 )
@@ -125,25 +119,12 @@ subExpressionParser =
         (char '(')
         (spaces *> char ')')
         subExpressionParser
-
-subTagParser :: Parser SubExpression
-subTagParser = SubTag <$> tagTermParser
-
-subBinaryParser :: Parser SubExpression
-subBinaryParser =
-  chainl1
-    (between (char '(') (spaces *> char ')') subExpressionParser <|> subTagParser)
-    (flip SubBinary <$> setOpParser)
-
-subExpressionSubParser :: Parser SubExpression
-subExpressionSubParser =
-  SubExpression <$> tagTermParser
-    <*> ( spaces
-            *> between
-              (char '{')
-              (spaces *> char '}')
-              subExpressionParser
-        )
+    subExpressionLookAheadParser =
+      flip SubExpression
+        <$> between
+          (try (spaces *> char '{'))
+          (spaces *> char '}')
+          subExpressionParser
 
 fileTermParser :: Parser FileTerm
 fileTermParser = ichar 'p' *> char '.' *> patternParser <&> FileTerm
