@@ -19,6 +19,7 @@ queryEngineASTTests c =
   testGroup
     "Query Engine AST Tests"
     [ basicQueryFunctionality c
+    , queryEdgeCases c
     ]
 
 basicQueryFunctionality :: IO TaggedConnection -> TestTree
@@ -258,6 +259,66 @@ basicQueryFunctionality c =
               , File 15 "file_15"
               -- , File 16 "file_16" This file is removed by difference
               ]
+              r
+        ]
+    ]
+
+queryEdgeCases :: IO TaggedConnection -> TestTree
+queryEdgeCases c =
+  testGroup
+    "Query Engine AST - Edge Cases"
+    [ testGroup
+        "Tech-note f02a13240b for files, A: a{b{c}} and B: a{b} d{b{c}}"
+        [ testCase "Return A for query a{b{c}}" $ do
+            r <-
+              c
+                >>= runExpr
+                  ( TagExpression
+                      (DescriptorTerm "descriptor_8")
+                      ( SubExpression
+                          (DescriptorTerm "descriptor_9")
+                          (SubTag (DescriptorTerm "descriptor_10"))
+                      )
+                  )
+            assertEqual
+              ""
+              [File 6 "file_6"]
+              r
+        , testCase "Return A, B for a{b}" $ do
+            r <-
+              c
+                >>= runExpr
+                  ( TagExpression
+                      (DescriptorTerm "descriptor_8")
+                      (SubTag (DescriptorTerm "descriptor_9"))
+                  )
+            assertEqual
+              ""
+              [File 6 "file_6", File 7 "file_7"]
+              r
+        , testCase "Return A, B for b{c}" $ do
+            r <-
+              c
+                >>= runExpr
+                  ( TagExpression
+                      (DescriptorTerm "descriptor_9")
+                      (SubTag (DescriptorTerm "descriptor_10"))
+                  )
+            assertEqual
+              ""
+              [File 6 "file_6", File 7 "file_7"]
+              r
+        , testCase "Return B for d{b}" $ do
+            r <-
+              c
+                >>= runExpr
+                  ( TagExpression
+                      (DescriptorTerm "descriptor_11")
+                      (SubTag (DescriptorTerm "descriptor_9"))
+                  )
+            assertEqual
+              ""
+              [File 7 "file_7"]
               r
         ]
     ]
