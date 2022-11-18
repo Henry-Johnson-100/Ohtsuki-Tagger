@@ -74,7 +74,7 @@ lhsExprParser =
           <|> ( tagTermParser
                   <**> ( ( flip TagExpression
                             <$> between
-                              (spaces *> char '{')
+                              (try (spaces *> char '{'))
                               (spaces *> char '}')
                               subExpressionParser
                          )
