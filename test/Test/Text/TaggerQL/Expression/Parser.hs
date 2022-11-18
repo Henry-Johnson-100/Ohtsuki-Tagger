@@ -29,6 +29,13 @@ parserTests =
                   , testCase "Pattern 6" (assertEqual "" (Right "\\") (parseP "\\\\"))
                   , testCase "Pattern 7" (assertBool "" (isLeft (parseP "a&a")))
                   , testCase "Pattern 8" (assertEqual "" (Right "a&a") (parseP "a\\&a"))
+                  , testCase
+                      "Pattern 9"
+                      ( assertEqual
+                          "Ignore trailing spaces"
+                          (Right "a")
+                          (parseP "a  ")
+                      )
                   ]
             )
         ]
