@@ -119,6 +119,41 @@ testTags =
     Tag 41 16 17 Nothing
   , Tag 42 16 18 (Just 41)
   , Tag 43 16 20 (Just 41)
+  , -- Pre-existing tags to test the tagging engine
+    -- file_17: 21{22}
+    Tag 44 17 21 Nothing
+  , Tag 45 17 22 (Just 44)
+  {-
+    Below are tags that are created during the tagging engine tests
+    The tags may not necessarily be in the correct order, but I think they should be
+    since the tagging engine works left-to-right on binary expressions.
+
+    Any new, destructive tests written on the database must happen after the pattern:
+      "Tagging Engine Tests"!
+
+    -- tag file_17 "21{22 23}" to yield new tags:
+    Tag 46 17 23 (Just 44)
+
+    -- tag file_17 "21{22{24 25} 23}" to yield new tags:
+    Tag 47 17 24 (Just 45)
+    Tag 48 17 25 (Just 45)
+
+    -- tag file_18 "26{27{28{29} 30} 31}" to yield new tags:
+    Tag 49 18 26 Nothing
+    Tag 50 18 27 (Just 49)
+    Tag 51 18 28 (Just 50)
+    Tag 52 18 29 (Just 51)
+    Tag 53 18 30 (Just 50)
+    Tag 54 18 31 (Just 49)
+
+    -- tag file_19 "32 33 34"
+    Tag 55 19 32 Nothing
+    Tag 56 19 33 Nothing
+    Tag 57 19 34 Nothing
+
+    -- tag file_19 "33{32}"
+    Tag 58 19 32 (Just 56)
+  -}
   ]
 
 toTagTriple ::
