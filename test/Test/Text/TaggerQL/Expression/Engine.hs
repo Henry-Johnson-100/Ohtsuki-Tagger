@@ -67,7 +67,7 @@ basicQueryFunctionality c =
         r <- c >>= runExpr (TagTermValue (MetaDescriptorTerm "descriptor_12"))
         assertEqual
           "Should match the case: \"TagTermValue Expression - MetaDescriptor\""
-          [File 8 "file_8", File 9 "file_9", File 10 "file_10"]
+          [file 8, file 9, file 10]
           r
     , testGroup
         "Binary Expressions"
@@ -82,7 +82,7 @@ basicQueryFunctionality c =
                   )
             assertEqual
               "Union wa union dayo"
-              [File 1 "file_1", File 2 "file_2"]
+              [file 1, file 2]
               r
         , testCase "Intersect - Simple Operands" $ do
             r <-
@@ -95,7 +95,7 @@ basicQueryFunctionality c =
                   )
             assertEqual
               ""
-              [File 4 "file_4", File 5 "file_5"]
+              [file 4, file 5]
               r
         , testCase "Intersect - Complex Operand" $ do
             r <-
@@ -112,7 +112,7 @@ basicQueryFunctionality c =
                   )
             assertEqual
               "Binary Operations should be nestable."
-              [File 3 "file_3", File 4 "file_4", File 5 "file_5"]
+              [file 3, file 4, file 5]
               r
         , testCase "Difference" $ do
             r <-
@@ -133,7 +133,7 @@ basicQueryFunctionality c =
                   )
             assertEqual
               "Difference wa difference dayo"
-              [File 1 "file_1", File 3 "file_3"]
+              [file 1, file 3]
               r
         ]
     , testGroup
@@ -148,7 +148,7 @@ basicQueryFunctionality c =
                   )
             assertEqual
               "Simple subtag 4{5} should find files with 4{5} tags."
-              [File 4 "file_4", File 5 "file_5"]
+              [file 4, file 5]
               r
         , testCase "Flat SubTag TagExpression" $ do
             r <-
@@ -160,7 +160,7 @@ basicQueryFunctionality c =
                   )
             assertEqual
               "SubTag queries are a flat operation."
-              [File 5 "file_5"]
+              [file 5]
               r
         , testCase "Complex Nested SubTag" $ do
             r <-
@@ -175,7 +175,7 @@ basicQueryFunctionality c =
                   )
             assertEqual
               "SubExpressions modify the supertag environment for lower depths."
-              [File 15 "file_15"]
+              [file 15]
               r
         , testCase "SubTag Expression - 1" $ do
             r <-
@@ -187,10 +187,10 @@ basicQueryFunctionality c =
                   )
             assertEqual
               "The LHS of the below test."
-              [ File 11 "file_11"
-              , File 13 "file_13"
-              , File 15 "file_15"
-              , File 16 "file_16"
+              [ file 11
+              , file 13
+              , file 15
+              , file 16
               ]
               r
         , testCase "SubExpression Tags - 0" $ do
@@ -244,11 +244,11 @@ basicQueryFunctionality c =
                 assertEqual
                   "SubUnion filters supertags if the supertag\
                   \ is subtagged by either one or the other subtag sets."
-                  [ File 11 "file_11"
-                  , File 12 "file_12"
-                  , File 13 "file_13"
-                  , File 15 "file_15"
-                  , File 16 "file_16"
+                  [ file 11
+                  , file 12
+                  , file 13
+                  , file 15
+                  , file 16
                   ]
                   r
             , testCase "Sub Intersection" $ do
@@ -266,7 +266,7 @@ basicQueryFunctionality c =
                 assertEqual
                   "SubUnion filters supertags if the supertag\
                   \ is a member of both subtag sets."
-                  [ File 13 "file_13"
+                  [ file 13
                   ]
                   r
             , testCase "Sub Difference" $ do
@@ -284,9 +284,9 @@ basicQueryFunctionality c =
                 assertEqual
                   "SubUnion filters supertags if the supertag\
                   \ is a member of the first and not the second subtag set."
-                  [ File 11 "file_11"
-                  , File 15 "file_15"
-                  , File 16 "file_16"
+                  [ file 11
+                  , file 15
+                  , file 16
                   ]
                   r
             ]
@@ -307,9 +307,9 @@ basicQueryFunctionality c =
                   )
             assertEqual
               ""
-              [ File 14 "file_14"
-              , File 15 "file_15"
-              -- , File 16 "file_16" This file is removed by difference
+              [ file 14
+              , file 15
+              -- , file 16 This file is removed by difference
               ]
               r
         ]
@@ -334,7 +334,7 @@ queryEdgeCases c =
                   )
             assertEqual
               ""
-              [File 6 "file_6"]
+              [file 6]
               r
         , testCase "Return A, B for a{b}" $ do
             r <-
@@ -346,7 +346,7 @@ queryEdgeCases c =
                   )
             assertEqual
               ""
-              [File 6 "file_6", File 7 "file_7"]
+              [file 6, file 7]
               r
         , testCase "Return A, B for b{c}" $ do
             r <-
@@ -358,7 +358,7 @@ queryEdgeCases c =
                   )
             assertEqual
               ""
-              [File 6 "file_6", File 7 "file_7"]
+              [file 6, file 7]
               r
         , testCase "Return B for d{b}" $ do
             r <-
@@ -370,7 +370,7 @@ queryEdgeCases c =
                   )
             assertEqual
               ""
-              [File 7 "file_7"]
+              [file 7]
               r
         ]
     , testGroup
@@ -389,7 +389,7 @@ queryEdgeCases c =
                   )
             assertEqual
               ""
-              [File 8 "file_8", File 9 "file_9"]
+              [file 8, file 9]
               r
         , testCase "Disjoint, single arity, relational subqueries are a superset" $ do
             r <-
