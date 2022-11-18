@@ -144,8 +144,9 @@ library tagger-lib
                       ,Text.TaggerQL
                       ,Text.TaggerQL.Parser.Internal
                       ,Text.TaggerQL.AST
-                      ,Text.TaggerQL.NewAST.AST
-                      ,Text.TaggerQL.NewAST.Parser
+                      ,Text.TaggerQL.Expression.AST
+                      ,Text.TaggerQL.Expression.Engine
+                      ,Text.TaggerQL.Expression.Parser
 
   other-modules:       Database.Tagger.Script
                       ,Database.Tagger.Type.Lens
@@ -194,8 +195,10 @@ test-suite tagger-test
   main-is:             Main.hs
 
   other-modules:
-    Database.Tagger.Main
-    ,NewAST.Main
+    Test.Database.Tagger.Main
+    ,Test.Text.TaggerQL.Expression.Engine
+    ,Test.Text.TaggerQL.Expression.Parser
+    ,Test.Resources
 
   build-depends:       tagger-lib
                       ,tasty
