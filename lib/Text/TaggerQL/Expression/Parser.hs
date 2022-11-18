@@ -70,16 +70,18 @@ expressionParser =
 lhsExprParser :: Parser Expression
 lhsExprParser =
   spaces
-    *> ( try untaggedConstParser <|> try fileTermValueParser
-          <|> ( tagTermParser
-                  <**> ( ( flip TagExpression
-                            <$> between
-                              (try (spaces *> char '{'))
-                              (spaces *> char '}')
-                              subExpressionParser
-                         )
-                          <|> pure TagTermValue
-                       )
+    *> ( between (char '(') (spaces *> char ')') expressionParser
+          <|> ( try untaggedConstParser <|> try fileTermValueParser
+                  <|> ( tagTermParser
+                          <**> ( ( flip TagExpression
+                                    <$> between
+                                      (try (spaces *> char '{'))
+                                      (spaces *> char '}')
+                                      subExpressionParser
+                                 )
+                                  <|> pure TagTermValue
+                               )
+                      )
               )
        )
 
