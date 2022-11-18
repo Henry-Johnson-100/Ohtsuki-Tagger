@@ -297,16 +297,16 @@ basicQueryFunctionality c =
               c
                 >>= runExpr
                   ( TagExpression
-                      (DescriptorTerm "%") -- yields tags 35, 36, 37 among others (for file 14)
+                      (DescriptorTerm "%")
                       ( SubBinary
-                          (SubTag (DescriptorTerm "descriptor_20")) -- yields tag 35
+                          (SubTag (DescriptorTerm "descriptor_20"))
                           Difference
-                          (SubTag (DescriptorTerm "descriptor_18")) -- yields []
+                          (SubTag (DescriptorTerm "descriptor_18"))
                       )
                   )
             assertEqual
               ""
-              [ File 14 "file_14" -- this file is not appearing in the actual results for some reason
+              [ File 14 "file_14"
               , File 15 "file_15"
               -- , File 16 "file_16" This file is removed by difference
               ]

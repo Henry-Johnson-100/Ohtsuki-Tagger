@@ -5,7 +5,6 @@
 import Data.List.NonEmpty
 import Data.Tagger
 import qualified Data.Text as T
-import Test.Database.Tagger.Main
 import Test.Resources
 import Test.Tasty
 import Test.Tasty.HUnit
