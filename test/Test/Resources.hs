@@ -49,13 +49,18 @@ testDescriptors = newDescriptors <> defaultDescriptors
 
 testTags :: [Tag]
 testTags =
-  [ Tag 1 1 4 Nothing
-  , Tag 2 2 5 Nothing
-  , Tag 3 3 6 Nothing
+  [ -- File_1: Descriptors_ 4
+    Tag 1 1 4 Nothing
+  , -- File_2: Descriptors_ 5
+    Tag 2 2 5 Nothing
+  , -- File_3: Descriptors_ 6 7
+    Tag 3 3 6 Nothing
   , Tag 4 3 7 Nothing
-  , Tag 5 4 5 Nothing
+  , -- File_4: Descriptors_ 5{6}
+    Tag 5 4 5 Nothing
   , Tag 6 4 6 (Just 5)
-  , Tag 7 5 5 Nothing
+  , -- File_5: Descriptors_ 5{6{7}}
+    Tag 7 5 5 Nothing
   , Tag 8 5 6 (Just 7)
   , Tag 9 5 7 (Just 8)
   , {-
