@@ -416,15 +416,38 @@ parserTests =
                             )
                             (parseSE "a\nb")
                         )
-                  , testCase
-                        "SubExpression ignores newline - 2"
-                        ( assertEqual
-                            ""
-                            ( Right
-                                ( SubBinary
+                  , testGroup
+                        "SubExpression ignores newline tests"
+                        [ testCase
+                            "SubExpression ignores newline - 2"
+                            ( assertEqual
+                                ""
+                                ( Right
                                     ( SubBinary
-                                        (SubTag (MetaDescriptorTerm "a"))
+                                        ( SubBinary
+                                            (SubTag (MetaDescriptorTerm "a"))
+                                            Intersect
+                                            ( SubExpression
+                                                (MetaDescriptorTerm "b")
+                                                ( SubBinary
+                                                    (SubTag (MetaDescriptorTerm "c"))
+                                                    Intersect
+                                                    (SubTag (MetaDescriptorTerm "d"))
+                                                )
+                                            )
+                                        )
                                         Intersect
+                                        (SubTag (MetaDescriptorTerm "e"))
+                                    )
+                                )
+                                (parseSE "a b {\n c d\n}\ne")
+                            )
+                        , testCase
+                            "RHS ignores newline"
+                            ( assertEqual
+                                ""
+                                ( Right
+                                    ( SubBinary
                                         ( SubExpression
                                             (MetaDescriptorTerm "b")
                                             ( SubBinary
@@ -433,13 +456,13 @@ parserTests =
                                                 (SubTag (MetaDescriptorTerm "d"))
                                             )
                                         )
+                                        Intersect
+                                        (SubTag (MetaDescriptorTerm "e"))
                                     )
-                                    Intersect
-                                    (SubTag (MetaDescriptorTerm "e"))
                                 )
+                                (parseSE "b {\n c d\n}\ne")
                             )
-                            (parseSE "a b {\n c d\n}\ne")
-                        )
+                        ]
                   ]
             )
         ]
