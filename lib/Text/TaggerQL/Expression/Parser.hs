@@ -40,7 +40,6 @@ import Text.Parsec (
   many1,
   noneOf,
   parse,
-  space,
   spaces,
   try,
   (<|>),
@@ -63,7 +62,11 @@ parseTagExpr = parse subExpressionParser "TaggerQL"
 expressionParser :: Parser Expression
 expressionParser =
   spaces
-    *> ( try (chainl1 lhsExprParser (flip Binary <$> setOpParser))
+    *> ( try
+          ( chainl1
+              lhsExprParser
+              (flip Binary <$> (spaces *> setOpParser))
+          )
           <|> lhsExprParser
        )
  where
@@ -102,7 +105,7 @@ subExpressionParser =
     *> ( try
           ( chainl1
               lhsSubExpressionParser
-              (flip SubBinary <$> setOpParser)
+              (flip SubBinary <$> (spaces *> setOpParser))
           )
           <|> lhsSubExpressionParser
        )
@@ -150,9 +153,7 @@ notRestricted :: Parser Char
 notRestricted = noneOf restrictedChars
 
 setOpParser :: Parser SetOp
-setOpParser =
-  try (spaces *> explicitSetOpParser)
-    <|> (space $> Intersect) -- #FIXME This parser right here seems to cause problems with the newlines
+setOpParser = explicitSetOpParser <|> pure Intersect
 
 explicitSetOpParser :: Parser SetOp
 explicitSetOpParser = unionParser <|> intersectParser <|> differenceParser
