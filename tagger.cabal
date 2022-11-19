@@ -142,8 +142,6 @@ library tagger-lib
                       ,Data.Tagger
                       ,Tagger.Info
                       ,Text.TaggerQL
-                      ,Text.TaggerQL.Parser.Internal
-                      ,Text.TaggerQL.AST
                       ,Text.TaggerQL.Expression.AST
                       ,Text.TaggerQL.Expression.Engine
                       ,Text.TaggerQL.Expression.Parser
@@ -158,8 +156,6 @@ library tagger-lib
                       ,Data.OccurrenceHashMap.Internal
                       ,Data.OccurrenceMap.Internal
                       ,Tagger.Util
-                      ,Text.TaggerQL.Engine.QueryEngine
-                      ,Text.TaggerQL.Engine.QueryEngine.Query
 
   other-extensions:    DeriveGeneric
                       ,DeriveAnyClass
@@ -195,8 +191,7 @@ test-suite tagger-test
   main-is:             Main.hs
 
   other-modules:
-    Test.Database.Tagger.Main
-    ,Test.Text.TaggerQL.Expression.Engine
+    Test.Text.TaggerQL.Expression.Engine
     ,Test.Text.TaggerQL.Expression.Parser
     ,Test.Resources
 
