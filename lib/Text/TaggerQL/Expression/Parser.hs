@@ -33,12 +33,14 @@ import qualified Data.Text as T
 import Text.Parsec (
   ParseError,
   Parsec,
+  ParsecT,
+  Stream,
   anyChar,
   between,
-  chainl1,
   char,
   many1,
   noneOf,
+  optionMaybe,
   parse,
   spaces,
   try,
@@ -63,9 +65,10 @@ expressionParser :: Parser Expression
 expressionParser =
   spaces
     *> ( try
-          ( chainl1
+          ( myChainl1
               lhsExprParser
               (flip Binary <$> (spaces *> setOpParser))
+              pure
           )
           <|> lhsExprParser
        )
@@ -103,9 +106,10 @@ subExpressionParser :: Parser SubExpression
 subExpressionParser =
   spaces
     *> ( try
-          ( chainl1
+          ( myChainl1
               lhsSubExpressionParser
               (flip SubBinary <$> (spaces *> setOpParser))
+              pure
           )
           <|> lhsSubExpressionParser
        )
@@ -132,6 +136,38 @@ subExpressionParser =
           (try (spaces *> char '{'))
           (spaces *> char '}')
           subExpressionParser
+
+{-# INLINEABLE myChainl1 #-}
+
+{- |
+ @myChainl1 p op defP@ defines a left associative application of the @op@ operator parser
+  to values of @p@.
+
+  If the right hand side of an application fails to parse, 
+    then @defP@ is applied to a value of type @p@, 
+    to produce a parser for just that value.
+
+  This parse is used for left-associative operations whose left-hand-side may or may not
+  be applied to a right-hand-side and where the operator may be implicit, making
+  lookahead prohibitive.
+-}
+myChainl1 ::
+  Stream s m t =>
+  ParsecT s u m a ->
+  ParsecT s u m (a -> a -> a) ->
+  (a -> ParsecT s u m a) ->
+  ParsecT s u m a
+myChainl1 p op defP = do
+  x <- p
+  rest x
+ where
+  rest x =
+    ( do
+        f <- op
+        y <- try . optionMaybe $ p
+        maybe (defP x) (rest . f x) y
+    )
+      <|> return x
 
 fileTermParser :: Parser FileTerm
 fileTermParser = ichar 'p' *> char '.' *> patternParser <&> FileTerm
