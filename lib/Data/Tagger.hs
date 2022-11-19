@@ -13,7 +13,6 @@ of tagger.
 -}
 module Data.Tagger (
   CyclicEnum (..),
-  QueryCriteria (..),
   SetOp (..),
 ) where
 
@@ -28,21 +27,6 @@ class (Bounded e, Ord e, Enum e) => CyclicEnum e where
   next x = if x >= maxBound then minBound else succ x
   prev :: e -> e
   prev x = if x <= minBound then maxBound else pred x
-
-{- |
- Type detailing how what criteria a query is meant to search on.
--}
-data QueryCriteria
-  = -- | Search for files that are tagged with 'Descriptor`s matching a given pattern.
-    DescriptorCriteria
-  | -- | Search for files that are tagged with an inclusive set of all
-    --infra-related 'Descriptor`s matching a given pattern.
-    MetaDescriptorCriteria
-  | -- | Search for files that have a file path matching a given pattern.
-    FilePatternCriteria
-  | -- | Search for files that are untagged.
-    UntaggedCriteria
-  deriving (Show, Eq, Bounded, Enum, Ord, CyclicEnum)
 
 {- |
  A type detailing how set-like collections are to be combined.
