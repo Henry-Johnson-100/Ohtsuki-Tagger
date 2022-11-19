@@ -152,7 +152,7 @@ notRestricted = noneOf restrictedChars
 setOpParser :: Parser SetOp
 setOpParser =
   try (spaces *> explicitSetOpParser)
-    <|> (space $> Intersect)
+    <|> (space $> Intersect) -- #FIXME This parser right here seems to cause problems with the newlines
 
 explicitSetOpParser :: Parser SetOp
 explicitSetOpParser = unionParser <|> intersectParser <|> differenceParser
