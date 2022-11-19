@@ -240,6 +240,35 @@ parserTests =
                     )
                     (parseExpr "a b{\nc d\n}\ne")
                 )
+            , testGroup
+                "Expression ignores trailing whitespace"
+                [ testCase
+                    "for binary expr"
+                    ( assertEqual
+                        ""
+                        ( Right
+                            ( Binary
+                                (TagTermValue (MetaDescriptorTerm "a"))
+                                Intersect
+                                (TagTermValue (MetaDescriptorTerm "b"))
+                            )
+                        )
+                        (parseExpr "a b ")
+                    )
+                , testCase
+                    "for binary expr - explicit set op"
+                    ( assertEqual
+                        ""
+                        ( Right
+                            ( Binary
+                                (TagTermValue (MetaDescriptorTerm "a"))
+                                Union
+                                (TagTermValue (MetaDescriptorTerm "b"))
+                            )
+                        )
+                        (parseExpr "a | b ")
+                    )
+                ]
             ]
         , testGroup
             "SubExpression Parser Tests"
@@ -419,6 +448,32 @@ parserTests =
                   , testGroup
                         "SubExpression ignores newline tests"
                         [ testCase
+                            "Sub expression ignores trailing whitespace"
+                            ( assertEqual
+                                ""
+                                ( Right
+                                    ( SubBinary
+                                        (SubTag (MetaDescriptorTerm "a"))
+                                        Intersect
+                                        (SubTag (MetaDescriptorTerm "b"))
+                                    )
+                                )
+                                (parseSE "a b ")
+                            )
+                        , testCase
+                            "Sub expression ignores trailing whitespace - explicit set op"
+                            ( assertEqual
+                                ""
+                                ( Right
+                                    ( SubBinary
+                                        (SubTag (MetaDescriptorTerm "a"))
+                                        Union
+                                        (SubTag (MetaDescriptorTerm "b"))
+                                    )
+                                )
+                                (parseSE "a | b ")
+                            )
+                        , testCase
                             "SubExpression ignores newline - 2"
                             ( assertEqual
                                 ""
