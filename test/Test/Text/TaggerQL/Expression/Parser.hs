@@ -443,6 +443,30 @@ parserTests =
                                 (parseSE "a b {\n c d\n}\ne")
                             )
                         , testCase
+                            "SubExpression works with no newlines"
+                            ( assertEqual
+                                ""
+                                ( Right
+                                    ( SubBinary
+                                        ( SubBinary
+                                            (SubTag (MetaDescriptorTerm "a"))
+                                            Intersect
+                                            ( SubExpression
+                                                (MetaDescriptorTerm "b")
+                                                ( SubBinary
+                                                    (SubTag (MetaDescriptorTerm "c"))
+                                                    Intersect
+                                                    (SubTag (MetaDescriptorTerm "d"))
+                                                )
+                                            )
+                                        )
+                                        Intersect
+                                        (SubTag (MetaDescriptorTerm "e"))
+                                    )
+                                )
+                                (parseSE "a b { c d } e")
+                            )
+                        , testCase
                             "RHS ignores newline"
                             ( assertEqual
                                 ""
