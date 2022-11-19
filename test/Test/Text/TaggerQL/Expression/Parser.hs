@@ -443,6 +443,30 @@ parserTests =
                                 (parseSE "a b {\n c d\n}\ne")
                             )
                         , testCase
+                            "SubExpression ignores newline - 2 - Explicit Set Ops"
+                            ( assertEqual
+                                ""
+                                ( Right
+                                    ( SubBinary
+                                        ( SubBinary
+                                            (SubTag (MetaDescriptorTerm "a"))
+                                            Intersect
+                                            ( SubExpression
+                                                (MetaDescriptorTerm "b")
+                                                ( SubBinary
+                                                    (SubTag (MetaDescriptorTerm "c"))
+                                                    Intersect
+                                                    (SubTag (MetaDescriptorTerm "d"))
+                                                )
+                                            )
+                                        )
+                                        Intersect
+                                        (SubTag (MetaDescriptorTerm "e"))
+                                    )
+                                )
+                                (parseSE "a&b{\nc&d\n}\n&e")
+                            )
+                        , testCase
                             "SubExpression works with no newlines"
                             ( assertEqual
                                 ""
@@ -485,6 +509,26 @@ parserTests =
                                     )
                                 )
                                 (parseSE "b {\n c d\n}\ne")
+                            )
+                        , testCase
+                            "RHS ignores newline - explicit set ops"
+                            ( assertEqual
+                                ""
+                                ( Right
+                                    ( SubBinary
+                                        ( SubExpression
+                                            (MetaDescriptorTerm "b")
+                                            ( SubBinary
+                                                (SubTag (MetaDescriptorTerm "c"))
+                                                Intersect
+                                                (SubTag (MetaDescriptorTerm "d"))
+                                            )
+                                        )
+                                        Intersect
+                                        (SubTag (MetaDescriptorTerm "e"))
+                                    )
+                                )
+                                (parseSE "b{\n c&d\n}\n&e")
                             )
                         ]
                   ]
