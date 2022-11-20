@@ -5,6 +5,7 @@
 import Control.Lens ((^.))
 import Control.Monad (void, when, (<=<))
 import Control.Monad.IO.Class (MonadIO (liftIO))
+import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask)
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HS
@@ -36,7 +37,7 @@ import System.Directory (
 import System.FilePath (makeRelative, takeDirectory)
 import System.IO (stderr)
 import Tagger.Info (taggerVersion)
-import Text.TaggerQL (TaggerQLQuery (TaggerQLQuery), taggerQL)
+import Text.TaggerQL
 
 main :: IO ()
 main = do
@@ -62,28 +63,33 @@ runTaggerEx
       void . flip runReaderT conn $ do
         when (getAny a) mainReportAudit
         when (getAny s) showStats
-        maybe (pure ()) runQuery qc
+        maybe (pure ()) runCLIQuery qc
       setCurrentDirectory curDir
    where
-    runQuery :: TaggerQueryCommand -> ReaderT TaggedConnection IO ()
-    runQuery (TaggerQueryCommand q (Any rel)) = do
+    runCLIQuery :: TaggerQueryCommand -> ReaderT TaggedConnection IO ()
+    runCLIQuery (TaggerQueryCommand q (Any rel)) = do
       tc <- ask
       let (T.unpack -> connPath) = tc ^. connName
       liftIO $ do
-        queryResults <- taggerQL (TaggerQLQuery q) tc
-        if HS.null queryResults
-          then T.IO.hPutStrLn stderr "No Results."
-          else
-            mapM_
-              ( ( T.IO.putStrLn . T.pack
-                    <=< if rel
-                      then pure
-                      else makeAbsolute
-                )
-                  . makeRelative connPath
-                  . T.unpack
-                  . filePath
-              )
-              . sortOn filePath
-              . F.toList
-              $ queryResults
+        eQueryResults <- runExceptT $ runQuery tc q
+        either
+          (mapM_ T.IO.putStrLn)
+          ( \queryResults ->
+              if HS.null queryResults
+                then T.IO.hPutStrLn stderr "No Results."
+                else
+                  mapM_
+                    ( ( T.IO.putStrLn . T.pack
+                          <=< if rel
+                            then pure
+                            else makeAbsolute
+                      )
+                        . makeRelative connPath
+                        . T.unpack
+                        . filePath
+                    )
+                    . sortOn filePath
+                    . F.toList
+                    $ queryResults
+          )
+          eQueryResults

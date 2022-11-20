@@ -8,13 +8,65 @@
 
 # Planned
 
-* A Query builder element in the query widget section.
+## Front-end Changes
 * Filter tags showing up in the results pane by pattern and meta-descriptor.
+* Organize the detail pane so that tags with subtags always appear above tags without
+subtags, ordered alphabetically
+* Add some feedback when adding files to the database so the user knows then the process
+is complete, optionally how many files were added.
+* A Query builder element in the query widget section.
+* Add option to rescan known folders.
+* Sort nested tags
+* Bug Fixes
+  * Ensure that shell processes spawned via GUI are non-blocking in the GUI
+
+## CLI changes
+* Add option to add files. -A or --add or something.
+
+## Major Library Changes
+* A macro system for storing queries and expanding them as text in a query.
+  * Will be a library change, so will contribute to a major version.
+* Multi-plex databases.
+  * Connect to more than one database at a time.
+  * Join tags and descriptors on virtual tables.
+  * Dispatch new tagging queries to the appropriate database 
+  with the appropriate descriptor.
+
+------
+
+# 2.0.0.0 -- ????-??-??
+
+## Breaking Changes:
+- TaggerQL Syntax and Interpreter Implementation
+  - Specifics of these changes can be seen here: ????.md
+  - TaggerQL was rebuilt from the ground-up as an expression-based query language.
+    Its syntax is very similar in structure but there are some key differences:
+    - Set Operations have been changed from "`U|, I|, and D|`" 
+    to "`|, &, and !`" respectively.
+    - All Set Operations are strongly left-associative.
+    - Sub-expressions (the part of a query between "{" and "}"), now accept
+    Set Operations!
+  - Text.TaggerQL exports two functions, where the text parameter is a 
+  TaggerQL Query.
+    - `runQuery :: TaggedConnection -> Text -> ExceptT [Text] IO (HashSet File)`
+    - `tagFile :: RecordKey File -> TaggedConnection -> Text -> IO (Maybe Text)`
+  - Deleted modules
+    - Text.TaggerQL.Parser.Internal
+    - Text.TaggerQL.AST
+    - All members of the module hierarchy Text.TaggerQL.Engine
+  - Replaced with, respectively,
+    - Text.TaggerQL.Expression.Parser
+    - Text.TaggerQL.Expression.AST
+    - Text.TaggerQL.Expression.Engine
+  - Removed the sum type `QueryCriteria` from the Data.Tagger module.
+    - These criteria are now encoded in the AST of TaggerQL, found in Text.TaggerQL.Expression.AST
+
+------
 
 ### 1.0.2.1 -- 2021-10-04
 
 * Limited CLI functionality.
-Exposed through the `taggercli` program.
+  Exposed through the `taggercli` program.
   * Querying
   * Report stats or audit results
 
@@ -246,7 +298,7 @@ Some restrictions:
 * Draggable tag association.
   * In the Image details pane, for tags on a single image only, each tag is draggable.
     * A new zone has been designated `untag` for these tags. When a tag is drag-and-dropped into that zone,
-    that specific tag will be deleted.
+      that specific tag will be deleted.
       * Untagging can still be done via the Tag text field but is less precise and may end up deleting more than you wanted to.
   * New subtags can be made from existing tags by dragging one tag on top of another, this will place the dragged tag as a 
   sub tag of the target.
@@ -328,9 +380,9 @@ The buffer will not flush but rather be unioned, intersected, or diffed appropri
 ### 0.1.2.0 -- 2022-04-26
 
 * Adjusted the Cmd so that, if Solo Tagging Mode is enabled, the shell cmd
-will take the file currently previewed as the command's only argument.
-If Solo Tagging Mode is not enabled or there is no file previewed then all files in the
-selection are arguments to the shell cmd.
+  will take the file currently previewed as the command's only argument.
+  If Solo Tagging Mode is not enabled or there is no file previewed then all files in the
+  selection are arguments to the shell cmd.
   * The argument substitution keyword is still '`%file`'
 
 ------

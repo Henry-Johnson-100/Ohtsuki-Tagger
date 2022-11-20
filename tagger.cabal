@@ -1,7 +1,7 @@
 cabal-version:       2.4
 
 name:                tagger
-version:             1.0.2.1
+version:             2.0.0.0
 synopsis:            A file/image tagger that connects to or initializes sqlite databases.
 -- description:
 -- bug-reports:
@@ -142,8 +142,9 @@ library tagger-lib
                       ,Data.Tagger
                       ,Tagger.Info
                       ,Text.TaggerQL
-                      ,Text.TaggerQL.Parser.Internal
-                      ,Text.TaggerQL.AST
+                      ,Text.TaggerQL.Expression.AST
+                      ,Text.TaggerQL.Expression.Engine
+                      ,Text.TaggerQL.Expression.Parser
 
   other-modules:       Database.Tagger.Script
                       ,Database.Tagger.Type.Lens
@@ -155,8 +156,6 @@ library tagger-lib
                       ,Data.OccurrenceHashMap.Internal
                       ,Data.OccurrenceMap.Internal
                       ,Tagger.Util
-                      ,Text.TaggerQL.Engine.QueryEngine
-                      ,Text.TaggerQL.Engine.QueryEngine.Query
 
   other-extensions:    DeriveGeneric
                       ,DeriveAnyClass
@@ -190,6 +189,11 @@ test-suite tagger-test
   type:                exitcode-stdio-1.0
 
   main-is:             Main.hs
+
+  other-modules:
+    Test.Text.TaggerQL.Expression.Engine
+    ,Test.Text.TaggerQL.Expression.Parser
+    ,Test.Resources
 
   build-depends:       tagger-lib
                       ,tasty

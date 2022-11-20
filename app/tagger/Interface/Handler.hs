@@ -30,6 +30,7 @@ import qualified Data.Sequence as Seq
 import Data.Tagger
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.IO as T.IO
 import Data.Version (showVersion)
 import Database.Tagger
 import Interface.Handler.Internal
@@ -271,11 +272,14 @@ fileSelectionEventHandler
         ]
       Query ->
         [ Task
-            ( DoFileSelectionEvent
-                . PutFiles
-                <$> taggerQL
-                  (TaggerQLQuery . T.strip $ model ^. fileSelectionModel . queryText)
-                  conn
+            ( do
+                r <-
+                  runExceptT $
+                    runQuery conn (T.strip $ model ^. fileSelectionModel . queryText)
+                either
+                  (mapM_ T.IO.putStrLn >=> (pure . IOEvent))
+                  (return . DoFileSelectionEvent . PutFiles)
+                  r
             )
         , Model $
             model & fileSelectionModel . queryHistory
@@ -480,14 +484,15 @@ focusedFileEventHandler
         ]
       CommitTagText ->
         anonymousTask $ do
-          taggerQLTag
-            ( fileId . concreteTaggedFile $
-                model ^. focusedFileModel . focusedFile
-            )
-            ( TaggerQLTagStmnt . T.strip $
-                model ^. focusedFileModel . tagText
-            )
-            conn
+          _ <-
+            tagFile
+              ( fileId . concreteTaggedFile $
+                  model ^. focusedFileModel . focusedFile
+              )
+              conn
+              ( T.strip $
+                  model ^. focusedFileModel . tagText
+              )
           callback
             [ Model $
                 model
