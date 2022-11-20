@@ -31,11 +31,6 @@ is complete, optionally how many files were added.
   * Join tags and descriptors on virtual tables.
   * Dispatch new tagging queries to the appropriate database 
   with the appropriate descriptor.
-* Easier additive queries.
-
-## Minor Library Changes
-* Reorganize tagging engine code to be like the query engine.
-* Remove TaggerQL newtype.
 
 ------
 
