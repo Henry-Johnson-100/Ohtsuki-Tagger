@@ -39,7 +39,32 @@ is complete, optionally how many files were added.
 
 ------
 
-### 1.0.2.2 -- ????-??-??
+# 2.0.0.0 -- ????-??-??
+
+## Breaking Changes:
+- TaggerQL Syntax and Interpreter Implementation
+  - Specifics of these changes can be seen here: ????.md
+  - TaggerQL was rebuilt from the ground-up as an expression-based query language.
+    Its syntax is very similar in structure but there are some key differences:
+    - Set Operations have been changed from "`U|, I|, and D|`" 
+    to "`|, &, and !`" respectively.
+    - All Set Operations are strongly left-associative.
+    - Sub-expressions (the part of a query between "{" and "}"), now accept
+    Set Operations!
+  - Text.TaggerQL exports two functions, where the text parameter is a 
+  TaggerQL Query.
+    - `runQuery :: TaggedConnection -> Text -> ExceptT [Text] IO (HashSet File)`
+    - `tagFile :: RecordKey File -> TaggedConnection -> Text -> IO (Maybe Text)`
+  - Deleted modules
+    - Text.TaggerQL.Parser.Internal
+    - Text.TaggerQL.AST
+    - All members of the module hierarchy Text.TaggerQL.Engine
+  - Replaced with, respectively,
+    - Text.TaggerQL.Expression.Parser
+    - Text.TaggerQL.Expression.AST
+    - Text.TaggerQL.Expression.Engine
+  - Removed the sum type `QueryCriteria` from the Data.Tagger module.
+    - These criteria are now encoded in the AST of TaggerQL, found in Text.TaggerQL.Expression.AST
 
 ------
 

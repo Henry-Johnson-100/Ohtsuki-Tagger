@@ -1,7 +1,7 @@
 cabal-version:       2.4
 
 name:                tagger
-version:             1.0.2.2
+version:             2.0.0.0
 synopsis:            A file/image tagger that connects to or initializes sqlite databases.
 -- description:
 -- bug-reports:
