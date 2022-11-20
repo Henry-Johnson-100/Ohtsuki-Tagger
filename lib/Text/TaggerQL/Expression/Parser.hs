@@ -2,6 +2,13 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
+{- |
+Module      : Text.TaggerQL.Expression.Parser
+Description : Parsers for the expression-based TaggerQL query language.
+
+License     : GPL-3
+Maintainer  : monawasensei@gmail.com
+-}
 module Text.TaggerQL.Expression.Parser (
   parseExpr,
   parseTagExpr,
@@ -143,11 +150,11 @@ subExpressionParser =
  @myChainl1 p op defP@ defines a left associative application of the @op@ operator parser
   to values of @p@.
 
-  If the right hand side of an application fails to parse, 
-    then @defP@ is applied to a value of type @p@, 
+  If the right hand side of an application fails to parse,
+    then @defP@ is applied to a value of type @p@,
     to produce a parser for just that value.
 
-  This parse is used for left-associative operations whose left-hand-side may or may not
+  This parser is used for left-associative operations whose left-hand-side may or may not
   be applied to a right-hand-side and where the operator may be implicit, making
   lookahead prohibitive.
 -}

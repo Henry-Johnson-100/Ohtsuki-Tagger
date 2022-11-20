@@ -6,7 +6,18 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# OPTIONS_HADDOCK prune #-}
 
+{- |
+Module      : Text.TaggerQL.Expression.Engine
+Description : The interpreter for the TaggerQL query language.
+
+License     : GPL-3
+Maintainer  : monawasensei@gmail.com
+
+Contains functions that interprets the TaggerQL query language to either run queries
+  or tag a file with a certain expression.
+-}
 module Text.TaggerQL.Expression.Engine (
   runQuery,
   tagFile,
@@ -201,7 +212,7 @@ queryTags tt c =
 -- Tagging Engine
 
 {- |
- Run a subset of the TaggerQL to tag a file with Descriptors
+ Run a sub-expression, a subset of the TaggerQL, to tag a file with Descriptors
  matching the given patterns.
 
  Returns Just error messages if parsing fails. Otherwise Nothing.
