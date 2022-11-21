@@ -35,6 +35,11 @@ CREATE TABLE IF NOT EXISTS "TaggerDBInfo" (
   lastClean TEXT,
   CONSTRAINT uniqueInfo UNIQUE(_tagger) ON CONFLICT REPLACE
 );
+
+-- Default values required for Tagger
+--
+-- Note, these are run before triggers are created. Triggers also rely on
+-- the presence of these default values.
 INSERT INTO Descriptor (descriptor) VALUES ('#ALL#'), ('#META#'),  ('#UNRELATED#');
 -- relate #META# and #UNRELATED# to #ALL#
 INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId)
@@ -43,5 +48,27 @@ INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId)
     id
   FROM Descriptor
   WHERE descriptor IN ('#META#','#UNRELATED#');
+
+ -- Triggers controlling inserting and updating Meta relations
+ --
+ -- Note that the number of rows in the MetaDescriptor table must always be equal
+ -- to the number of Descriptors in the database. These two triggers are meant to ensure
+ -- that by automatically creating default relations for new Descriptors made and for
+ -- deleting old references when a new one is inserted.
+ --
+ -- An INSERT on MetaDescriptor is the same as an UPDATE, and it is recommended that
+ -- NO UPDATE clause is allowed to run on MetaDescriptor!
+ --
+ -- This is important to preserve a continuous tree structure, and to ensure that
+ -- the number of rows stays constant.
+CREATE TRIGGER IF NOT EXISTS DefaultMetaDescriptorRelation AFTER INSERT ON Descriptor
+	BEGIN
+		INSERT INTO MetaDescriptor
+			SELECT
+				(SELECT id FROM Descriptor WHERE descriptor = '#UNRELATED#' LIMIT 1),
+				NEW.id;
+	END
+;
+
 INSERT INTO TaggerDBInfo (_tagger, version, lastAccessed)
   VALUES (0, '0.3.2.0', datetime());
