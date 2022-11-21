@@ -18,6 +18,10 @@ Maintainer  : monawasensei@gmail.com
 
 Contains basic queries such as searching for files by file pattern or searching for
 Descriptor by Relation.
+
+Some other modules may contain SELECT queries that are specific to them, 
+but NO modules other than this contain commands that may modify the contents 
+of any of the tables outside of the 'TaggerDBInfo` table.
 -}
 module Database.Tagger.Query (
   -- * Queries
