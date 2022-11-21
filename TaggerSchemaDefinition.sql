@@ -62,13 +62,12 @@ INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId)
  -- This is important to preserve a continuous tree structure, and to ensure that
  -- the number of rows stays constant.
 CREATE TRIGGER IF NOT EXISTS DefaultMetaDescriptorRelation AFTER INSERT ON Descriptor
-	BEGIN
-		INSERT INTO MetaDescriptor
-			SELECT
-				(SELECT id FROM Descriptor WHERE descriptor = '#UNRELATED#' LIMIT 1),
-				NEW.id;
-	END
+  BEGIN
+    INSERT INTO MetaDescriptor
+      SELECT
+        (SELECT id FROM Descriptor WHERE descriptor = '#UNRELATED#' LIMIT 1),
+        NEW.id;
+  END
 ;
-
 INSERT INTO TaggerDBInfo (_tagger, version, lastAccessed)
   VALUES (0, '0.3.2.0', datetime());
