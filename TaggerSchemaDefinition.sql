@@ -69,5 +69,25 @@ CREATE TRIGGER IF NOT EXISTS DefaultMetaDescriptorRelation AFTER INSERT ON Descr
         NEW.id;
   END
 ;
+CREATE TRIGGER IF NOT EXISTS NoSelfRelation AFTER INSERT ON MetaDescriptor
+  WHEN NEW.metaDescriptorId = NEW.infraDescriptorId
+    AND NEW.metaDescriptorId NOT IN
+      (SELECT id FROM Descriptor WHERE descriptor = '#UNRELATED#' LIMIT 1)
+  BEGIN
+    UPDATE MetaDescriptor
+      SET metaDescriptorId = (SELECT id FROM Descriptor WHERE descriptor = '#UNRELATED#' LIMIT 1)
+      WHERE metaDescriptorId = NEW.metaDescriptorId
+    ;
+  END
+;
+CREATE TRIGGER IF NOT EXISTS UnrelatedIsRelatedToAll AFTER INSERT ON MetaDescriptor
+  WHEN NEW.infraDescriptorId = (SELECT id FROM Descriptor WHERE descriptor = '#UNRELATED#' LIMIT 1)
+  BEGIN
+    UPDATE MetaDescriptor
+      SET metaDescriptorId = (SELECT id FROM Descriptor WHERE descriptor = '#ALL#' LIMIT 1)
+      WHERE infraDescriptorId = NEW.infraDescriptorId
+    ;
+  END
+;
 INSERT INTO TaggerDBInfo (_tagger, version, lastAccessed)
   VALUES (0, '0.3.2.0', datetime());
