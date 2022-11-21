@@ -13,8 +13,12 @@ CREATE TABLE IF NOT EXISTS  "MetaDescriptor" (
   "metaDescriptorId" INTEGER NOT NULL,
   "infraDescriptorId" INTEGER NOT NULL,
   CONSTRAINT "InfraRelationUnique" UNIQUE ("infraDescriptorId") ON CONFLICT REPLACE,
-  FOREIGN KEY("metaDescriptorId") REFERENCES "Descriptor"("id") ON DELETE CASCADE,
-  FOREIGN KEY("infraDescriptorId") REFERENCES "Descriptor"("id") ON DELETE CASCADE
+  FOREIGN KEY("metaDescriptorId") REFERENCES "Descriptor"("id") 
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+  FOREIGN KEY("infraDescriptorId") REFERENCES "Descriptor"("id") 
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
 );
 CREATE TABLE IF NOT EXISTS  "Tag" (
   "id" INTEGER PRIMARY KEY NOT NULL,
@@ -37,7 +41,7 @@ CREATE TABLE IF NOT EXISTS "TaggerDBInfo" (
 );
 
 -- Default values required for Tagger
---
+
 -- Note, these are run before triggers are created. Triggers also rely on
 -- the presence of these default values.
 INSERT INTO Descriptor (descriptor) VALUES ('#ALL#'), ('#META#'),  ('#UNRELATED#');
@@ -49,18 +53,21 @@ INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId)
   FROM Descriptor
   WHERE descriptor IN ('#META#','#UNRELATED#');
 
- -- Triggers controlling inserting and updating Meta relations
- --
- -- Note that the number of rows in the MetaDescriptor table must always be equal
- -- to the number of Descriptors in the database. These two triggers are meant to ensure
- -- that by automatically creating default relations for new Descriptors made and for
- -- deleting old references when a new one is inserted.
- --
- -- An INSERT on MetaDescriptor is the same as an UPDATE, and it is recommended that
- -- NO UPDATE clause is allowed to run on MetaDescriptor!
- --
- -- This is important to preserve a continuous tree structure, and to ensure that
- -- the number of rows stays constant.
+-- Triggers
+
+-- -- Descriptor triggers
+CREATE TRIGGER IF NOT EXISTS IgnorePrincipleDescriptorDeletions BEFORE DELETE ON Descriptor
+  WHEN OLD.descriptor IN ('#ALL#', '#UNRELATED#', '#META#')
+    BEGIN
+      SELECT RAISE(IGNORE);
+    END
+;
+CREATE TRIGGER IF NOT EXISTS IgnorePrincipleDescriptorUpdates BEFORE UPDATE OF id, descriptor ON Descriptor
+  WHEN OLD.descriptor IN ('#ALL#', '#META#', '#UNRELATED#')
+    BEGIN
+      SELECT RAISE(IGNORE);
+    END
+;
 CREATE TRIGGER IF NOT EXISTS DefaultMetaDescriptorRelation AFTER INSERT ON Descriptor
   BEGIN
     INSERT INTO MetaDescriptor
@@ -69,24 +76,49 @@ CREATE TRIGGER IF NOT EXISTS DefaultMetaDescriptorRelation AFTER INSERT ON Descr
         NEW.id;
   END
 ;
-CREATE TRIGGER IF NOT EXISTS NoSelfRelation AFTER INSERT ON MetaDescriptor
-  WHEN NEW.metaDescriptorId = NEW.infraDescriptorId
-    AND NEW.metaDescriptorId NOT IN
-      (SELECT id FROM Descriptor WHERE descriptor = '#UNRELATED#' LIMIT 1)
+CREATE TRIGGER IF NOT EXISTS CascadeDescriptorDeletionToRelations AFTER DELETE ON Descriptor
   BEGIN
-    UPDATE MetaDescriptor
-      SET metaDescriptorId = (SELECT id FROM Descriptor WHERE descriptor = '#UNRELATED#' LIMIT 1)
-      WHERE metaDescriptorId = NEW.metaDescriptorId
-    ;
+    INSERT INTO MetaDescriptor
+      SELECT
+        (SELECT id FROM Descriptor WHERE descriptor = '#UNRELATED#' LIMIT 1),
+        id
+      FROM Descriptor
+      WHERE id NOT IN (SELECT infraDescriptorId FROM MetaDescriptor);
   END
 ;
-CREATE TRIGGER IF NOT EXISTS UnrelatedIsRelatedToAll AFTER INSERT ON MetaDescriptor
-  WHEN NEW.infraDescriptorId = (SELECT id FROM Descriptor WHERE descriptor = '#UNRELATED#' LIMIT 1)
+
+-- -- MetaDescriptor triggers
+CREATE TRIGGER IF NOT EXISTS IgnorePrincipleInfraInsert BEFORE INSERT ON MetaDescriptor
+  WHEN NEW.infraDescriptorId IN (SELECT id FROM Descriptor WHERE descriptor IN ('#ALL#', '#META#', '#UNRELATED#'))
+    BEGIN
+      SELECT RAISE(IGNORE);
+    END
+;
+-- This one may be controversial. Absolutely NO updates are allowed on this table.
+-- INSERT must be used to change a relationship.
+CREATE TRIGGER IF NOT EXISTS NoUpdateOfMetaDescriptor BEFORE UPDATE OF metaDescriptorId, infraDescriptorId ON MetaDescriptor
   BEGIN
-    UPDATE MetaDescriptor
-      SET metaDescriptorId = (SELECT id FROM Descriptor WHERE descriptor = '#ALL#' LIMIT 1)
-      WHERE infraDescriptorId = NEW.infraDescriptorId
-    ;
+    SELECT RAISE(IGNORE);
+  END
+;
+CREATE TRIGGER IF NOT EXISTS BreakRecursiveInsert AFTER INSERT ON MetaDescriptor
+  WHEN NEW.infraDescriptorId NOT IN (
+    WITH RECURSIVE allTree(id) AS (
+      SELECT metaDescriptorId
+      FROM MetaDescriptor
+      WHERE metaDescriptorId IN (SELECT id FROM Descriptor WHERE descriptor = '#ALL#')
+      UNION ALL
+      SELECT md.infraDescriptorId
+      FROM allTree t
+      JOIN MetaDescriptor md ON t.id = md.metaDescriptorId
+    )
+    SELECT id FROM allTree
+  )
+  BEGIN
+    INSERT INTO MetaDescriptor 
+      SELECT 
+        (SELECT id FROM Descriptor WHERE descriptor = '#UNRELATED#' LIMIT 1), 
+        NEW.infraDescriptorId;
   END
 ;
 INSERT INTO TaggerDBInfo (_tagger, version, lastAccessed)
