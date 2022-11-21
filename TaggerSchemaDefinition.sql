@@ -27,7 +27,9 @@ CREATE TABLE IF NOT EXISTS  "Tag" (
   "subTagOfId" INTEGER,
   CONSTRAINT "TagUnique" UNIQUE (fileId, descriptorId, subTagOfId) ON CONFLICT IGNORE,
   FOREIGN KEY("fileId") REFERENCES "File"("id") ON DELETE CASCADE,
-  FOREIGN KEY("descriptorId") REFERENCES "Descriptor"("id") ON DELETE CASCADE,
+  FOREIGN KEY("descriptorId") REFERENCES "Descriptor"("id")
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
   FOREIGN KEY ("subTagOfId") REFERENCES "Tag"("id") ON DELETE CASCADE
 );
 CREATE TABLE IF NOT EXISTS "TaggerDBInfo" (

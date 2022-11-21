@@ -100,7 +100,6 @@ module Database.Tagger.Query (
   insertDescriptors,
   deleteDescriptors,
   updateDescriptors,
-  updateDescriptors',
 
   -- ** 'Relation` Operations
   insertDescriptorRelation,
@@ -119,7 +118,7 @@ module Database.Tagger.Query (
 import Control.Monad (guard, join)
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT, throwE)
-import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
+import Control.Monad.Trans.Maybe (MaybeT)
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
 import qualified Data.HierarchyMap as HAM
@@ -146,7 +145,7 @@ import Database.Tagger.Connection (
 import Database.Tagger.Type (
   ConcreteTag (ConcreteTag),
   ConcreteTaggedFile (ConcreteTaggedFile),
-  Descriptor (Descriptor, descriptor, descriptorId),
+  Descriptor (Descriptor),
   File,
   RecordKey,
   Tag (Tag, tagSubtagOfId),
@@ -473,39 +472,9 @@ deleteDescriptors dks tc = do
 
 {- |
  Given a tuple of 'Text` and a 'Descriptor`'s primary key, relabel that 'Descriptor`.
-
- Does not update immutable 'Descriptor`s, I.E. infixed by '#'.
- Use 'updateDescriptors'' if this is desired.
 -}
 updateDescriptors :: [(T.Text, RecordKey Descriptor)] -> TaggedConnection -> IO ()
-updateDescriptors updates tc = do
-  corrDkTuples <-
-    catMaybes
-      <$> mapM
-        (runMaybeT . secondM (flip queryForSingleDescriptorByDescriptorId tc))
-        updates
-  let mutDTuples =
-        second descriptorId
-          <$> filter
-            ( \(descriptor . snd -> dp) ->
-                not
-                  ( "#" `T.isPrefixOf` dp
-                      && "#" `T.isSuffixOf` dp
-                  )
-            )
-            corrDkTuples
-  updateDescriptors' mutDTuples tc
- where
-  second f (x, y) = (x, f y)
-  secondM fm (x, y) = do
-    y' <- fm y
-    return (x, y')
-
-{- |
- Given a tuple of 'Text` and a 'Descriptor`'s primary key, relabel that 'Descriptor`.
--}
-updateDescriptors' :: [(T.Text, RecordKey Descriptor)] -> TaggedConnection -> IO ()
-updateDescriptors' updates tc =
+updateDescriptors updates tc =
   executeMany tc q updates
  where
   q =
