@@ -43,18 +43,29 @@ module Database.Tagger.Connection (
   Simple.NamedParam (..),
 ) where
 
-import Control.Monad (unless, when)
+import Control.Monad (guard, unless, when)
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Except (ExceptT, withExceptT)
 import Control.Monad.Trans.Maybe (MaybeT (..))
-import Control.Monad.Trans.State.Strict
-import Data.Maybe
+import Control.Monad.Trans.State.Strict (
+  StateT (runStateT),
+  get,
+  put,
+ )
+import Data.Maybe (isNothing, mapMaybe)
+import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time (getCurrentTime)
-import Data.Version
+import Data.Version (
+  Version,
+  makeVersion,
+  parseVersion,
+  showVersion,
+ )
 import qualified Database.SQLite.Simple as Simple
 import qualified Database.SQLite.Simple.ToField
 import qualified Database.SQLite3 as SQLite3
-import Database.Tagger.Query.Type
+import Database.Tagger.Query.Type (TaggerQuery (TaggerQuery))
 import Database.Tagger.Script (
   SQLiteScript (SQLiteScript),
   patch_2_0,
@@ -62,11 +73,17 @@ import Database.Tagger.Script (
   schemaTeardown,
   update0_3_4_0To0_3_4_2,
  )
-import Database.Tagger.Type
+import Database.Tagger.Type (
+  BareConnection,
+  RecordKey (..),
+  RowId,
+  TaggedConnection (TaggedConnection),
+ )
 import Database.Tagger.Type.Prim (BareConnection (..))
-import System.IO
+import System.Directory (doesFileExist)
+import System.IO (hPutStrLn, stderr)
 import Tagger.Info (taggerVersion)
-import Tagger.Util
+import Tagger.Util (head', last')
 import Text.ParserCombinators.ReadP (readP_to_S)
 
 {- |
@@ -85,9 +102,9 @@ newtype DatabaseInfoUpdate a = DatabaseInfoUpdate {runDatabaseInfoUpdate :: IO a
  If the db info table is not found then the database is initialized, if this is undesired,
   use 'open`
 
-  This is a potentially destructive function if run on any file 
-    that's not strictly intended to be a database. 
-  It is recommended to use 'open` rather than this. 
+  This is a potentially destructive function if run on any file
+    that's not strictly intended to be a database.
+  It is recommended to use 'open` rather than this.
     As 'open` does not attempt to initialize the database.
 -}
 openOrCreate :: FilePath -> IO TaggedConnection
@@ -104,19 +121,35 @@ openOrCreate p = do
   return conn
 
 {- |
- Like 'openOrCreate` but 
+ Like 'openOrCreate` but
   does NOT initialize the database if there is no TaggerDBInfo table.
 
   WILL attempt to patch the table if there is,
     as well as update the TaggerDBInfo.lastAccessed column.
+
+  Returns a Left value if the specified file does not exist or the table TaggerDBInfo
+    cannot be found in it.
 -}
-open :: FilePath -> IO TaggedConnection
+open :: FilePath -> ExceptT Text IO TaggedConnection
 open p = do
   let tagName = T.pack p
-  bc <- fmap BareConnection . Simple.open $ p
-  dbInfoTableExists <- taggerDBInfoTableExists bc
-  activateForeignKeyPragma bc
-  when dbInfoTableExists . runDatabaseInfoUpdate $ do
+  fileExists <- liftIO $ doesFileExist p
+  withExceptT
+    (const $ "File '" <> tagName <> "' does not exist.")
+    (guard fileExists :: ExceptT () IO ())
+  bc <- liftIO $ do
+    bc' <- BareConnection <$> Simple.open p
+    activateForeignKeyPragma bc'
+    return bc'
+  dbInfoTableExists <- liftIO $ taggerDBInfoTableExists bc
+  withExceptT
+    ( const $
+        "Could not find TaggerDBInfo table in '"
+          <> tagName
+          <> "'. Please reinitialize database."
+    )
+    (guard dbInfoTableExists :: ExceptT () IO ())
+  liftIO . runDatabaseInfoUpdate $ do
     patchDatabaseIfRequired bc
     updateTaggerDBInfoLastAccessed bc
   return $ TaggedConnection tagName bc

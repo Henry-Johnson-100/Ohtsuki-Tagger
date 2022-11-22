@@ -59,11 +59,12 @@ runTaggerEx
       curDir <- getCurrentDirectory
       let dbDir = takeDirectory dbPath
       setCurrentDirectory dbDir
-      conn <- open dbPath
-      void . flip runReaderT conn $ do
-        when (getAny a) mainReportAudit
-        when (getAny s) showStats
-        maybe (pure ()) runCLIQuery qc
+      eConn <- runExceptT $ open dbPath
+      flip (either (T.IO.hPutStrLn stderr)) eConn $ \conn ->
+        void . flip runReaderT conn $ do
+          when (getAny a) mainReportAudit
+          when (getAny s) showStats
+          maybe (pure ()) runCLIQuery qc
       setCurrentDirectory curDir
    where
     runCLIQuery :: TaggerQueryCommand -> ReaderT TaggedConnection IO ()
