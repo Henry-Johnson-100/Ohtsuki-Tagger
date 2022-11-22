@@ -39,29 +39,52 @@ import Data.Model.Core (
   focusedFileDefaultDataFile,
  )
 import qualified Data.OccurrenceMap as OM
-import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import Data.Version (showVersion)
-import Database.Tagger (Descriptor (..), File (..), allDescriptors, allFiles, allTags, close, connName, deleteFiles, getAllInfra, getTagOccurrencesByDescriptorKeys, insertFiles, mvFile, open, openOrCreate, queryForFileByPattern, rmFile)
+import Database.Tagger (
+  Descriptor (..),
+  File (..),
+  allDescriptors,
+  allFiles,
+  allTags,
+  close,
+  connName,
+  deleteFiles,
+  getAllInfra,
+  getTagOccurrencesByDescriptorKeys,
+  mvFile,
+  open,
+  openOrCreate,
+  queryForFileByPattern,
+  rmFile,
+ )
 import Database.Tagger.Type (TaggedConnection)
 import Interface (runTagger)
-import Options.Applicative
-import Paths_tagger (getDataFileName)
-import System.Console.GetOpt (
-  ArgDescr (NoArg, ReqArg),
-  ArgOrder (ReturnInOrder),
-  OptDescr (..),
+import Options.Applicative (
+  Alternative (some, (<|>)),
+  ParserInfo,
+  argument,
+  execParser,
+  flag',
+  help,
+  helper,
+  idm,
+  info,
+  long,
+  metavar,
+  short,
+  str,
+  switch,
  )
+import Paths_tagger (getDataFileName)
 import System.Directory (
-  doesDirectoryExist,
   doesFileExist,
   getCurrentDirectory,
-  listDirectory,
   makeAbsolute,
   setCurrentDirectory,
  )
-import System.FilePath (makeRelative, takeDirectory, (</>))
+import System.FilePath (makeRelative, takeDirectory)
 import System.IO (hPutStrLn, stderr)
 import Tagger.Info (taggerVersion)
 import Text.TaggerQL (runQuery, tagFile)
@@ -71,11 +94,6 @@ main :: IO ()
 main = do
   args <- execParser programParser
   mainProgram args
-
-data ProgArg
-  = ProgVersion
-  | ProgDBPath FilePath
-  deriving (Show, Eq)
 
 programParser :: ParserInfo Program
 programParser = info (helper <*> (versionParser <|> withDBParser)) idm
@@ -177,6 +195,9 @@ mainProgram (WithDB dbPath Create) = do
   c <- openOrCreate dbPath
   close c
 mainProgram (WithDB dbPath cm) = do
+  curDir <- getCurrentDirectory
+  dbDir <- makeAbsolute . takeDirectory $ dbPath
+  setCurrentDirectory dbDir
   ec <- runExceptT $ open dbPath
   flip (either (T.IO.hPutStrLn stderr)) ec $ \c -> do
     case cm of
@@ -238,6 +259,7 @@ mainProgram (WithDB dbPath cm) = do
         mapM_ ((\fk -> tagFile fk c tExpr) . fileId) fs
       Info _ -> error "not implemented yet"
       _alreadHandled -> pure ()
+  setCurrentDirectory curDir
 
 showStats :: ReaderT TaggedConnection IO ()
 showStats = do
@@ -348,48 +370,3 @@ mainReportAudit = do
                     tc
                 )
           when (infraOccurrences <= 0) (modify (HS.insert d))
-
-options :: [OptDescr ProgArg]
-options =
-  [ Option
-      "vV"
-      ["version"]
-      (NoArg ProgVersion)
-      "Show the version."
-  , Option
-      "pP"
-      ["path"]
-      (ReqArg ProgDBPath "PATH")
-      "The path to the tagger database."
-  ]
-
-argOrder :: ArgOrder ProgArg
-argOrder = ReturnInOrder ProgDBPath
-
-withDBPath :: ProgArg -> IO ()
-withDBPath (ProgDBPath p) = do
-  workingDir <- getCurrentDirectory
-  dbDir <- makeAbsolute . takeDirectory $ p
-  setCurrentDirectory dbDir
-  runProgram p
-  setCurrentDirectory workingDir
-withDBPath _ =
-  hPutStrLn
-    stderr
-    "Something went wrong with the given database path option."
-
-{- |
- Entry point for running the monomer program.
--}
-runProgram :: FilePath -> IO ()
-runProgram p = do
-  edb <- runExceptT $ open p
-  flip (either (T.IO.hPutStrLn stderr)) edb $ \db -> do
-    defaultFile <- T.pack <$> getDataFileName focusedFileDefaultDataFile
-    runTagger
-      ( createTaggerModel
-          db
-          (Descriptor (-1) "fake descriptor")
-          (Descriptor (-2) "fake #UNRELATED#")
-          defaultFile
-      )
