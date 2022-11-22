@@ -60,6 +60,16 @@ is complete, optionally how many files were added.
     - Text.TaggerQL.Expression.Engine
   - Removed the sum type `QueryCriteria` from the Data.Tagger module.
     - These criteria are now encoded in the AST of TaggerQL, found in Text.TaggerQL.Expression.AST
+- Database Changes
+  - Added new constraint conflict handlers to Tag and MetaDescriptor table.
+  - Added many new triggers to encode some of Tagger's behavior into the table itself.
+    This will make interacting with the database outside of Tagger's library
+    much more safe, though this is still not, nor will ever be, a recommended use case.
+  - Removed some database functions:
+    - `deleteDescriptors'` and `updateDescriptors'`.
+  - None of the database changes thus far have any impact on the actual usage of
+    any official component of Tagger. But the changes are not backwards compatible and
+    an update script is required.
 
 ------
 
