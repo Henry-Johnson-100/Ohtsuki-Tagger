@@ -1,71 +1,16 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module CLI.Data (
-  TaggerDBAudit (..),
-  TaggerDBStats (..),
-  TaggerCommand (..),
-  TaggerQueryCommand (..),
-  TaggerDBCommand (..),
-  TaggerEx (..),
-) where
+module CLI.Data where
 
-import Data.Monoid (Any)
-import Data.Text (Text)
 import Database.Tagger (Descriptor, File)
-
-data TaggerEx
-  = TaggerExVersion
-  | TaggerExDB FilePath TaggerDBCommand
-  deriving (Show, Eq)
-
-data TaggerDBCommand = TaggerDBCommand
-  { _tdbcAudit :: Any
-  , _tdbcStats :: Any
-  , _tdbcTaggerCommand :: TaggerCommand
-  }
-  deriving (Show, Eq)
-
-instance Semigroup TaggerDBCommand where
-  (<>) :: TaggerDBCommand -> TaggerDBCommand -> TaggerDBCommand
-  (TaggerDBCommand a s c) <> (TaggerDBCommand a' s' c') =
-    TaggerDBCommand (a <> a') (s <> s') (c <> c')
-
-instance Monoid TaggerDBCommand where
-  mempty :: TaggerDBCommand
-  mempty = TaggerDBCommand mempty mempty mempty
-
-data TaggerCommand = TaggerCommand
-  { _tcQueryCommand :: Maybe TaggerQueryCommand
-  }
-  deriving (Show, Eq)
-
-instance Semigroup TaggerCommand where
-  (<>) :: TaggerCommand -> TaggerCommand -> TaggerCommand
-  (TaggerCommand q) <> (TaggerCommand q') = TaggerCommand (q <> q')
-
-instance Monoid TaggerCommand where
-  mempty :: TaggerCommand
-  mempty =
-    TaggerCommand mempty
-
-data TaggerQueryCommand = TaggerQueryCommand
-  { _tqcQuery :: Text
-  , _tqcRelative :: Any
-  }
-  deriving (Show, Eq)
-
-instance Semigroup TaggerQueryCommand where
-  (<>) :: TaggerQueryCommand -> TaggerQueryCommand -> TaggerQueryCommand
-  (TaggerQueryCommand q r) <> (TaggerQueryCommand q' r') =
-    TaggerQueryCommand (q <> q') (r <> r')
-
-instance Monoid TaggerQueryCommand where
-  mempty :: TaggerQueryCommand
-  mempty = TaggerQueryCommand mempty mempty
+import Control.Lens (abbreviatedFields, makeLensesWith)
 
 data TaggerDBStats = TaggerDBStats
   { _taggerdbstatsNumberOfFiles :: Int
@@ -108,3 +53,7 @@ instance Semigroup TaggerDBAudit where
 instance Monoid TaggerDBAudit where
   mempty :: TaggerDBAudit
   mempty = emptyAudit
+
+makeLensesWith abbreviatedFields ''TaggerDBAudit
+
+makeLensesWith abbreviatedFields ''TaggerDBStats

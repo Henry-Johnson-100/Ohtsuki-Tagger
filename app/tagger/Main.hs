@@ -6,11 +6,7 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-import CLI.Data (TaggerDBAudit, TaggerDBStats (..))
-import CLI.Data.Lens (
-  HasMissingFiles (missingFiles),
-  HasUnusedDescriptorTrees (unusedDescriptorTrees),
- )
+import CLI.Data
 import Control.Lens ((&), (.~), (^.))
 import Control.Monad (filterM, void, when, (<=<))
 import Control.Monad.IO.Class (liftIO)
@@ -274,11 +270,11 @@ showStats = do
   getStats :: ReaderT TaggedConnection IO TaggerDBStats
   getStats = do
     tc <- ask
-    liftIO $ do
-      !numberOfFiles <- length <$> allFiles tc
-      !numberOfDescriptors <- length <$> allDescriptors tc
-      !numberOfTags <- length <$> allTags tc
-      return (TaggerDBStats numberOfFiles numberOfDescriptors numberOfTags)
+    liftIO $
+      TaggerDBStats
+        <$> (length <$> allFiles tc)
+        <*> (length <$> allDescriptors tc)
+        <*> (length <$> allTags tc)
 
 mainReportAudit :: ReaderT TaggedConnection IO ()
 mainReportAudit = do

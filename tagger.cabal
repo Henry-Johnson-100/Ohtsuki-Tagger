@@ -55,7 +55,6 @@ executable tagger
 
   other-modules:       Config
                       ,CLI.Data
-                      ,CLI.Data.Lens
                       ,Data.Event
                       ,Data.Model
                       ,Data.Model.Core
