@@ -124,4 +124,4 @@ CREATE TRIGGER IF NOT EXISTS BreakRecursiveInsert AFTER INSERT ON MetaDescriptor
   END
 ;
 INSERT INTO TaggerDBInfo (_tagger, version, lastAccessed)
-  VALUES (0, '0.3.2.0', datetime());
+  VALUES (0, '2.0.0.0', datetime());

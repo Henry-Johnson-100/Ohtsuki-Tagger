@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
@@ -69,10 +70,11 @@ import Tagger.Util
 import Text.ParserCombinators.ReadP (readP_to_S)
 
 {- |
- refinement type, denoting that a TaggedConnection has the TaggerDBInfo table
- and that updates to that table are actively happening.
+ refinement type wrapper for running IO actions in an environment where
+  the TaggerDBInfo table exists and can be, or is being, updated.
 -}
-newtype DatabaseInfoUpdate = DatabaseInfoUpdate TaggedConnection
+newtype DatabaseInfoUpdate a = DatabaseInfoUpdate {runDatabaseInfoUpdate :: IO a}
+  deriving (Functor, Applicative, Monad)
 
 {- |
  Open a new 'TaggedConnection` with the database at the given path.
@@ -92,9 +94,10 @@ open p = do
   dbInfoTableExists <- taggerDBInfoTableExists bc
   activateForeignKeyPragma bc
   let conn = TaggedConnection tagName bc
-  unless dbInfoTableExists (initializeDatabase conn)
-  patchDatabaseIfRequired bc
-  updateTaggerDBInfoLastAccessed bc
+  unless dbInfoTableExists . runDatabaseInfoUpdate . initializeDatabase $ conn
+  runDatabaseInfoUpdate $ do
+    patchDatabaseIfRequired bc
+    updateTaggerDBInfoLastAccessed bc
   return conn
 
 {- |
@@ -107,9 +110,11 @@ open' :: FilePath -> IO TaggedConnection
 open' p = do
   let tagName = T.pack p
   bc <- fmap BareConnection . Simple.open $ p
+  dbInfoTableExists <- taggerDBInfoTableExists bc
   activateForeignKeyPragma bc
-  patchDatabaseIfRequired bc
-  updateTaggerDBInfoLastAccessed bc
+  when dbInfoTableExists . runDatabaseInfoUpdate $ do
+    patchDatabaseIfRequired bc
+    updateTaggerDBInfoLastAccessed bc
   return $ TaggedConnection tagName bc
 
 {- |
@@ -219,8 +224,8 @@ lastInsertRowId = withBareConnection bareLastInsertRowId
  Should ideally not do anything on a database that is already up-to-date with the current
  schema definition, but it would be best to avoid doing that anyways.
 -}
-initializeDatabase :: TaggedConnection -> IO ()
-initializeDatabase tc = do
+initializeDatabase :: TaggedConnection -> DatabaseInfoUpdate ()
+initializeDatabase tc = DatabaseInfoUpdate $ do
   initScript <- schemaDefinition
   withBareConnection
     ( withConnection
@@ -278,19 +283,17 @@ taggerDBInfoTableExists c = do
       IO [Simple.Only Int]
   return . all ((> 0) . (\(Simple.Only n) -> n)) $ r
 
-updateTaggerDBInfoLastAccessed :: BareConnection -> IO ()
-updateTaggerDBInfoLastAccessed bc = do
-  dbInfoTableExists <- taggerDBInfoTableExists bc
-  when dbInfoTableExists $ do
-    currentTime <- getCurrentTime
-    withConnection
-      ( \c ->
-          Simple.execute
-            c
-            "UPDATE TaggerDBInfo SET lastAccessed = ?"
-            [currentTime]
-      )
-      bc
+updateTaggerDBInfoLastAccessed :: BareConnection -> DatabaseInfoUpdate ()
+updateTaggerDBInfoLastAccessed bc = DatabaseInfoUpdate $ do
+  currentTime <- getCurrentTime
+  withConnection
+    ( \c ->
+        Simple.execute
+          c
+          "UPDATE TaggerDBInfo SET lastAccessed = ?"
+          [currentTime]
+    )
+    bc
 
 {- |
  Attempts to read the version number from the TaggerDBInfo table.
@@ -302,35 +305,31 @@ updateTaggerDBInfoLastAccessed bc = do
 
  If patches are run, then the version number is updated in the table.
 -}
-patchDatabaseIfRequired :: BareConnection -> IO ()
-patchDatabaseIfRequired bc = do
-  dbInfoTableExists <- taggerDBInfoTableExists bc
-  if dbInfoTableExists
-    then do
-      runPatchesAndUpdateVersion <- runMaybeT $ do
-        currentVersion <-
-          MaybeT $
-            head'
-              . mapMaybe
-                (last' . map fst . readP_to_S parseVersion . (\(Simple.Only x) -> x))
-              <$> bareQuery_ bc "SELECT version FROM TaggerDBInfo LIMIT 1"
-        unless (currentVersion == taggerVersion) . liftIO $ do
-          (_, newVersion) <- runStateT (patchDatabase bc) currentVersion
-          withConnection
-            ( \c ->
-                Simple.execute
-                  c
-                  "UPDATE TaggerDBInfo SET version = ?"
-                  [showVersion newVersion]
-            )
-            bc
-      when
-        (isNothing runPatchesAndUpdateVersion)
-        ( hPutStrLn
-            stderr
-            "Could not determine the version of the database, some operations may fail."
+patchDatabaseIfRequired :: BareConnection -> DatabaseInfoUpdate ()
+patchDatabaseIfRequired bc = DatabaseInfoUpdate $ do
+  runPatchesAndUpdateVersion <- runMaybeT $ do
+    currentVersion <-
+      MaybeT $
+        head'
+          . mapMaybe
+            (last' . map fst . readP_to_S parseVersion . (\(Simple.Only x) -> x))
+          <$> bareQuery_ bc "SELECT version FROM TaggerDBInfo LIMIT 1"
+    unless (currentVersion == taggerVersion) . liftIO $ do
+      (_, newVersion) <- runStateT (patchDatabase bc) currentVersion
+      withConnection
+        ( \c ->
+            Simple.execute
+              c
+              "UPDATE TaggerDBInfo SET version = ?"
+              [showVersion newVersion]
         )
-    else hPutStrLn stderr "TaggerDBInfo table not found, some operations may fail."
+        bc
+  when
+    (isNothing runPatchesAndUpdateVersion)
+    ( hPutStrLn
+        stderr
+        "Could not determine the version of the database, some operations may fail."
+    )
 
 patchDatabase :: BareConnection -> StateT Version IO ()
 patchDatabase bc = do

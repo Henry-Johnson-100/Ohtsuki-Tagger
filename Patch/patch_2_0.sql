@@ -1,5 +1,5 @@
 PRAGMA foreign_keys=OFF;
-BEGIN TRANSACTION
+BEGIN TRANSACTION;
   CREATE TABLE IF NOT EXISTS  "new_MetaDescriptor" (
     "metaDescriptorId" INTEGER NOT NULL,
     "infraDescriptorId" INTEGER NOT NULL,
@@ -109,6 +109,5 @@ BEGIN TRANSACTION
           NEW.infraDescriptorId;
     END
   ;
-END TRANSACTION
-;
+END TRANSACTION;
 PRAGMA foreign_keys=ON;
