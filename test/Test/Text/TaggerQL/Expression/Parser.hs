@@ -107,9 +107,6 @@ parserTests =
                     (parseExpr "d.hello")
                 )
             , testCase
-                "untagged const"
-                (assertEqual "" (Right UntaggedConst) (parseExpr "u."))
-            , testCase
                 "file term value"
                 (assertEqual "" (Right (FileTermValue "hello")) (parseExpr "p.hello"))
             , testCase

@@ -29,8 +29,7 @@ data SubExpression
   deriving (Show, Eq)
 
 data Expression
-  = UntaggedConst
-  | FileTermValue FileTerm
+  = FileTermValue FileTerm
   | TagTermValue TagTerm
   | TagExpression TagTerm SubExpression
   | Binary Expression SetOp Expression

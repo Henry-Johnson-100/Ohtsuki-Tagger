@@ -84,8 +84,7 @@ expressionParser =
   lhsExprParser =
     spaces
       *> ( precedentExpressionParser
-            <|> ( try untaggedConstParser
-                    <|> try fileTermValueParser
+            <|> ( try fileTermValueParser
                     <|> ( tagTermParser
                             <**> ( tagExpressionLookAhead
                                     <|> pure TagTermValue
@@ -102,9 +101,6 @@ expressionParser =
           (try (spaces *> char '{'))
           (spaces *> char '}')
           subExpressionParser
-
-untaggedConstParser :: Parser Expression
-untaggedConstParser = ichar 'u' *> char '.' $> UntaggedConst
 
 fileTermValueParser :: Parser Expression
 fileTermValueParser = FileTermValue <$> fileTermParser
