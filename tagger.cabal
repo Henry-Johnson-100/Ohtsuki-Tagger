@@ -54,6 +54,10 @@ executable tagger
   main-is:             Main.hs
 
   other-modules:       Config
+                      ,CLI.Data
+                      ,CLI.Data.Lens
+                      ,CLI.Parser
+                      ,CLI.Opt
                       ,Data.Event
                       ,Data.Model
                       ,Data.Model.Core
@@ -89,6 +93,7 @@ executable tagger
                       ,random
                       ,process
                       ,tomland
+                      ,optparse-applicative                      
 
   hs-source-dirs:      app/tagger
 
