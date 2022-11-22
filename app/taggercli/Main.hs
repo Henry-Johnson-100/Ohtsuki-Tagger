@@ -18,7 +18,7 @@ import Database.Tagger (
   File (filePath),
   HasConnName (connName),
   TaggedConnection,
-  open',
+  open,
  )
 import Opt (mainReportAudit, showStats)
 import Opt.Data (
@@ -59,7 +59,7 @@ runTaggerEx
       curDir <- getCurrentDirectory
       let dbDir = takeDirectory dbPath
       setCurrentDirectory dbDir
-      conn <- open' dbPath
+      conn <- open dbPath
       void . flip runReaderT conn $ do
         when (getAny a) mainReportAudit
         when (getAny s) showStats

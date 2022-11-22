@@ -11,8 +11,8 @@ Maintainer  : monawasensei@gmail.com
 -}
 module Database.Tagger.Connection (
   -- * Wrapped types
+  openOrCreate,
   open,
-  open',
   close,
   query,
   queryNamed,
@@ -83,12 +83,15 @@ newtype DatabaseInfoUpdate a = DatabaseInfoUpdate {runDatabaseInfoUpdate :: IO a
  is updated.
 
  If the db info table is not found then the database is initialized, if this is undesired,
-  use open'
+  use 'open`
 
- Most Tagger connections should be made with this function.
+  This is a potentially destructive function if run on any file 
+    that's not strictly intended to be a database. 
+  It is recommended to use 'open` rather than this. 
+    As 'open` does not attempt to initialize the database.
 -}
-open :: FilePath -> IO TaggedConnection
-open p = do
+openOrCreate :: FilePath -> IO TaggedConnection
+openOrCreate p = do
   let tagName = T.pack p
   bc <- fmap BareConnection . Simple.open $ p
   dbInfoTableExists <- taggerDBInfoTableExists bc
@@ -101,13 +104,14 @@ open p = do
   return conn
 
 {- |
- Like 'open` but does NOT initialize the database if there is no TaggerDBInfo table.
+ Like 'openOrCreate` but 
+  does NOT initialize the database if there is no TaggerDBInfo table.
 
   WILL attempt to patch the table if there is,
     as well as update the TaggerDBInfo.lastAccessed column.
 -}
-open' :: FilePath -> IO TaggedConnection
-open' p = do
+open :: FilePath -> IO TaggedConnection
+open p = do
   let tagName = T.pack p
   bc <- fmap BareConnection . Simple.open $ p
   dbInfoTableExists <- taggerDBInfoTableExists bc

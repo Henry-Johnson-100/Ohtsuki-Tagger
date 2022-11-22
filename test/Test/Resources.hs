@@ -12,7 +12,7 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 secureResource :: IO TaggedConnection
-secureResource = open "integrated_testing_database.db"
+secureResource = openOrCreate "integrated_testing_database.db"
 
 {- |
  doesn't delete the file but drops all of its contents.
