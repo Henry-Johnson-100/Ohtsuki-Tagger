@@ -65,6 +65,7 @@ import System.FilePath (makeRelative, takeDirectory, (</>))
 import System.IO (hPutStrLn, stderr)
 import Tagger.Info (taggerVersion)
 import Text.TaggerQL (runQuery, tagFile)
+import Util (addFiles)
 
 main :: IO ()
 main = do
@@ -237,32 +238,6 @@ mainProgram (WithDB dbPath cm) = do
         mapM_ ((\fk -> tagFile fk c tExpr) . fileId) fs
       Info _ -> error "not implemented yet"
       _alreadHandled -> pure ()
-
-{- |
- Add all files recursively beginning at the given filepath to the database.
-
- The given path is made relative to the current working directory, then
-  subsequent nested paths are made relative to that.
--}
-addFiles :: TaggedConnection -> Text -> IO ()
-addFiles c (T.unpack -> givenPath) = do
-  curDir <- getCurrentDirectory
-  let fpRelativeToCurDir = makeRelative curDir givenPath
-  getPathsToAdd [] fpRelativeToCurDir >>= flip insertFiles c
- where
-  getPathsToAdd :: [FilePath] -> FilePath -> IO [FilePath]
-  getPathsToAdd acc fp = do
-    pathIsDir <- doesDirectoryExist fp
-    if pathIsDir
-      then do
-        dirContents <- listDirectory fp
-        addedContents <- concat <$> mapM (\dp -> getPathsToAdd [] (fp </> dp)) dirContents
-        return $ addedContents ++ acc
-      else do
-        pathIsFile <- doesFileExist fp
-        if pathIsFile
-          then return (fp : acc)
-          else return acc
 
 showStats :: ReaderT TaggedConnection IO ()
 showStats = do

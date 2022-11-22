@@ -27,7 +27,7 @@ import System.Process (
   waitForProcess,
  )
 import System.Random (Random (random), StdGen, initStdGen)
-import Tagger.Shared (addFiles)
+import Util (addFiles)
 
 runShellCmd :: Text -> [FilePath] -> IO ()
 runShellCmd cmdString files =
