@@ -15,6 +15,7 @@ import Data.Model.Core (
   focusedFileDefaultDataFile,
  )
 import qualified Data.Text as T
+import qualified Data.Text.IO as T.IO
 import Data.Version (showVersion)
 import Database.Tagger (Descriptor (Descriptor), open)
 import Interface (runTagger)
@@ -107,12 +108,13 @@ withDBPath _ =
 -}
 runProgram :: FilePath -> IO ()
 runProgram p = do
-  db <- open p
-  defaultFile <- T.pack <$> getDataFileName focusedFileDefaultDataFile
-  runTagger
-    ( createTaggerModel
-        db
-        (Descriptor (-1) "fake descriptor")
-        (Descriptor (-2) "fake #UNRELATED#")
-        defaultFile
-    )
+  edb <- runExceptT $ open p
+  flip (either (T.IO.hPutStrLn stderr)) edb $ \db -> do
+    defaultFile <- T.pack <$> getDataFileName focusedFileDefaultDataFile
+    runTagger
+      ( createTaggerModel
+          db
+          (Descriptor (-1) "fake descriptor")
+          (Descriptor (-2) "fake #UNRELATED#")
+          defaultFile
+      )

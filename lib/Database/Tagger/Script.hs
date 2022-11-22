@@ -14,12 +14,18 @@ module Database.Tagger.Script (
   schemaDefinition,
   schemaTeardown,
   update0_3_4_0To0_3_4_2,
+  patch_2_0,
 ) where
 
 import Data.String (IsString (..))
 import Data.Text (Text)
-import Paths_tagger
-import System.IO
+import Paths_tagger (getDataFileName)
+import System.IO (
+  IOMode (ReadMode),
+  hClose,
+  hGetContents,
+  openFile,
+ )
 import Text.RawString.QQ (r)
 
 newtype SQLiteScript = SQLiteScript Text deriving (Show, Eq)
@@ -47,6 +53,9 @@ update0_3_4_0To0_3_4_2 =
     $ [r|
     DROP TABLE IF EXISTS Representative;
     |]
+
+patch_2_0 :: IO SQLiteScript
+patch_2_0 = getScriptContents "Patch/patch_2_0.sql"
 
 getScriptContents :: FilePath -> IO SQLiteScript
 getScriptContents p = do
