@@ -69,6 +69,12 @@ import Tagger.Util
 import Text.ParserCombinators.ReadP (readP_to_S)
 
 {- |
+ refinement type, denoting that a TaggedConnection has the TaggerDBInfo table
+ and that updates to that table are actively happening.
+-}
+newtype DatabaseInfoUpdate = DatabaseInfoUpdate TaggedConnection
+
+{- |
  Open a new 'TaggedConnection` with the database at the given path.
 
  The connection's label is set to the path and the lastAccessed time and database version
@@ -87,20 +93,23 @@ open p = do
   activateForeignKeyPragma bc
   let conn = TaggedConnection tagName bc
   unless dbInfoTableExists (initializeDatabase conn)
-  updateTaggerDBInfoVersion bc
+  patchDatabaseIfRequired bc
   updateTaggerDBInfoLastAccessed bc
   return conn
 
 {- |
- Like 'open` but does NOT update the table with lastAccessedDateTime or the table version.
+ Like 'open` but does NOT initialize the database if there is no TaggerDBInfo table.
 
- Also does not attempt to initialize the database if there is no db info table.
+  WILL attempt to patch the table if there is,
+    as well as update the TaggerDBInfo.lastAccessed column.
 -}
 open' :: FilePath -> IO TaggedConnection
 open' p = do
   let tagName = T.pack p
   bc <- fmap BareConnection . Simple.open $ p
   activateForeignKeyPragma bc
+  patchDatabaseIfRequired bc
+  updateTaggerDBInfoLastAccessed bc
   return $ TaggedConnection tagName bc
 
 {- |
@@ -283,8 +292,18 @@ updateTaggerDBInfoLastAccessed bc = do
       )
       bc
 
-updateTaggerDBInfoVersion :: BareConnection -> IO ()
-updateTaggerDBInfoVersion bc = do
+{- |
+ Attempts to read the version number from the TaggerDBInfo table.
+ If the table does not exist then no operation is performed.
+
+ If it does, the version contained in the \"version\" column is parseable,
+ then it checks if patches are required.
+ If they are required, then are run automatically.
+
+ If patches are run, then the version number is updated in the table.
+-}
+patchDatabaseIfRequired :: BareConnection -> IO ()
+patchDatabaseIfRequired bc = do
   dbInfoTableExists <- taggerDBInfoTableExists bc
   if dbInfoTableExists
     then do
