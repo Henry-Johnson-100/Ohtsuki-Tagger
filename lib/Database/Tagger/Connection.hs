@@ -43,6 +43,9 @@ module Database.Tagger.Connection (
 ) where
 
 import Control.Monad (unless, when)
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Maybe (MaybeT (..))
+import Control.Monad.Trans.State.Strict
 import Data.Maybe
 import qualified Data.Text as T
 import Data.Time (getCurrentTime)
@@ -53,6 +56,7 @@ import qualified Database.SQLite3 as SQLite3
 import Database.Tagger.Query.Type
 import Database.Tagger.Script (
   SQLiteScript (SQLiteScript),
+  patch_2_0,
   schemaDefinition,
   schemaTeardown,
   update0_3_4_0To0_3_4_2,
@@ -282,44 +286,54 @@ updateTaggerDBInfoLastAccessed bc = do
 updateTaggerDBInfoVersion :: BareConnection -> IO ()
 updateTaggerDBInfoVersion bc = do
   dbInfoTableExists <- taggerDBInfoTableExists bc
-  maybeCurrentVersion <-
-    head'
-      . mapMaybe (readVersion . (\(Simple.Only x) -> x))
-      <$> bareQuery_ bc "SELECT version FROM TaggerDBInfo LIMIT 1"
-  patchDatabase maybeCurrentVersion
-  when
-    (dbInfoTableExists && isJust maybeCurrentVersion)
-    ( withConnection
-        ( \c ->
-            Simple.execute
-              c
-              "UPDATE TaggerDBInfo SET version = ?"
-              [showVersion taggerVersion]
+  if dbInfoTableExists
+    then do
+      runPatchesAndUpdateVersion <- runMaybeT $ do
+        currentVersion <-
+          MaybeT $
+            head'
+              . mapMaybe
+                (last' . map fst . readP_to_S parseVersion . (\(Simple.Only x) -> x))
+              <$> bareQuery_ bc "SELECT version FROM TaggerDBInfo LIMIT 1"
+        unless (currentVersion == taggerVersion) . liftIO $ do
+          (_, newVersion) <- runStateT (patchDatabase bc) currentVersion
+          withConnection
+            ( \c ->
+                Simple.execute
+                  c
+                  "UPDATE TaggerDBInfo SET version = ?"
+                  [showVersion newVersion]
+            )
+            bc
+      when
+        (isNothing runPatchesAndUpdateVersion)
+        ( hPutStrLn
+            stderr
+            "Could not determine the version of the database, some operations may fail."
         )
-        bc
+    else hPutStrLn stderr "TaggerDBInfo table not found, some operations may fail."
+
+patchDatabase :: BareConnection -> StateT Version IO ()
+patchDatabase bc = do
+  _0_3_4_0_to_0_3_4_2 <- do
+    v <- get
+    when (makeVersion [0, 3, 4, 0] <= v && v < makeVersion [0, 3, 4, 2]) $ do
+      liftIO (update0_3_4_0To0_3_4_2 >>= runPatch bc)
+      put (makeVersion [0, 3, 4, 2])
+  _1_0_2_1_to_2_0 <- do
+    v <- get
+    when (makeVersion [0, 3, 4, 2] <= v && v < makeVersion [2, 0, 0, 0]) $ do
+      liftIO (patch_2_0 >>= runPatch bc)
+      put (makeVersion [2, 0, 0, 0])
+  pure ()
+
+runPatch :: BareConnection -> SQLiteScript -> IO ()
+runPatch bc p =
+  withConnection
+    ( withConnectionHandle
+        (`SQLite3.exec` (\(SQLiteScript s) -> s) p)
     )
- where
-  readVersion :: String -> Maybe Version
-  readVersion = last' . map fst . readP_to_S parseVersion
-  patchDatabase :: Maybe Version -> IO ()
-  patchDatabase Nothing =
-    hPutStrLn stderr "Unable to determine database version, some operations may fail."
-  patchDatabase (Just v) =
-    if v /= taggerVersion
-      then do
-        when
-          (makeVersion [0, 3, 4, 0] <= v && v < makeVersion [0, 3, 4, 2])
-          v0_3_4_0_v_0_3_4_2
-      else pure ()
-   where
-    v0_3_4_0_v_0_3_4_2 =
-      runPatch =<< update0_3_4_0To0_3_4_2
-    runPatch p =
-      withConnection
-        ( withConnectionHandle
-            (`SQLite3.exec` (\(SQLiteScript s) -> s) p)
-        )
-        bc
+    bc
 
 bareQuery ::
   (Simple.ToRow q, Simple.FromRow r) =>

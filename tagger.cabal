@@ -19,6 +19,7 @@ data-files:          Yui_signature_SS.bmp
                     ,iosevka_bold.ttf
                     ,TaggerSchemaDefinition.sql
                     ,TaggerSchemaTeardown.sql
+                    ,Patch/
                      
 common haskell-common
   default-language:    Haskell2010
