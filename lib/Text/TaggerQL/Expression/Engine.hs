@@ -56,7 +56,6 @@ import Database.Tagger.Query (
   flatQueryForFileOnMetaRelationPattern,
   queryForFileByPattern,
   queryForTagBySubTagTriple,
-  queryForUntaggedFiles,
  )
 import Database.Tagger.Type (
   File,
@@ -94,7 +93,6 @@ runExpr expr = runReaderT (evalExpr expr)
 
 evalExpr :: Expression -> ReaderT TaggedConnection IO (HashSet File)
 evalExpr expr = case expr of
-  UntaggedConst -> ask >>= liftIO . fmap HS.fromList . queryForUntaggedFiles
   FileTermValue (FileTerm txt) ->
     ask >>= liftIO . fmap HS.fromList . queryForFileByPattern txt
   TagTermValue tt ->
