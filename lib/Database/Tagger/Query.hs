@@ -18,6 +18,10 @@ Maintainer  : monawasensei@gmail.com
 
 Contains basic queries such as searching for files by file pattern or searching for
 Descriptor by Relation.
+
+Some other modules may contain SELECT queries that are specific to them, 
+but NO modules other than this contain commands that may modify the contents 
+of any of the tables outside of the 'TaggerDBInfo` table.
 -}
 module Database.Tagger.Query (
   -- * Queries
@@ -99,9 +103,7 @@ module Database.Tagger.Query (
   -- ** 'Descriptor` Operations
   insertDescriptors,
   deleteDescriptors,
-  deleteDescriptors',
   updateDescriptors,
-  updateDescriptors',
 
   -- ** 'Relation` Operations
   insertDescriptorRelation,
@@ -120,7 +122,7 @@ module Database.Tagger.Query (
 import Control.Monad (guard, join)
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT, throwE)
-import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
+import Control.Monad.Trans.Maybe (MaybeT)
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
 import qualified Data.HierarchyMap as HAM
@@ -139,17 +141,15 @@ import Database.Tagger.Connection (
   execute,
   executeMany,
   executeNamed,
-  execute_,
   lastInsertRowId,
   query,
   queryNamed,
   query_,
  )
-import Database.Tagger.Query.Type (TaggerQuery)
 import Database.Tagger.Type (
   ConcreteTag (ConcreteTag),
   ConcreteTaggedFile (ConcreteTaggedFile),
-  Descriptor (Descriptor, descriptor, descriptorId),
+  Descriptor (Descriptor),
   File,
   RecordKey,
   Tag (Tag, tagSubtagOfId),
@@ -447,16 +447,12 @@ updateFilePaths updates tc =
 {- |
  Given a list of labels, create new 'Descriptor` rows in the database.
 
- The new 'Descriptor`s will automatically be related to \#UNRELATED\#.
-
- This should be the only way that new 'Descriptor`s are added to a Tagger database.
- Doing so manually is not really a good idea unless care is taken to also manually relate
- new 'Descriptor`s to \#UNRELATED\#.
+ The new 'Descriptor`s will automatically be related to \#UNRELATED\# via
+  a trigger that fires on @INSERT ON Descriptor@.
 -}
 insertDescriptors :: [T.Text] -> TaggedConnection -> IO ()
 insertDescriptors ps tc = do
   executeMany tc q (Only <$> ps)
-  execute_ tc unrelateUnrelatedTaggerQuery
  where
   q =
     [r|
@@ -465,91 +461,24 @@ insertDescriptors ps tc = do
 
 {- |
  Delete a list of 'Descriptor`s from the database.
- Does not delete any immutable 'Descriptor`s, I.E. 'Descriptor`s infixed by '#'
- Use 'deleteDescriptors'' if this is desired.
 
- Also runs a maintenance execution on the db, inserting all 'Descriptor`s that are not
+ Triggers a maintenance execution on the db, inserting all 'Descriptor`s that are not
  infra to anything as infra to \#UNRELATED\#.
 -}
 deleteDescriptors :: [RecordKey Descriptor] -> TaggedConnection -> IO ()
 deleteDescriptors dks tc = do
-  corrDks <-
-    catMaybes
-      <$> mapM (runMaybeT . flip queryForSingleDescriptorByDescriptorId tc) dks
-  let mutDs =
-        filter
-          ( \(descriptor -> dp) ->
-              not
-                ( "#" `T.isPrefixOf` dp
-                    && "#" `T.isSuffixOf` dp
-                )
-          )
-          corrDks
-  deleteDescriptors' (descriptorId <$> mutDs) tc
-
-{- |
- Delete a list of 'Descriptor`s from the database.
-
- Also runs a maintenance execution on the db, inserting all 'Descriptor`s that are not
- infra to anything as infra to \#UNRELATED\#.
--}
-deleteDescriptors' :: [RecordKey Descriptor] -> TaggedConnection -> IO ()
-deleteDescriptors' ps tc = do
-  executeMany tc q (Only <$> ps)
-  execute_ tc unrelateUnrelatedTaggerQuery
+  executeMany tc q (Only <$> dks)
  where
   q =
     [r|
-    DELETE FROM Descriptor WHERE id = ?
-    |]
-
-unrelateUnrelatedTaggerQuery :: TaggerQuery
-unrelateUnrelatedTaggerQuery =
-  [r|
-    INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId)
-      SELECT
-        (SELECT id FROM Descriptor WHERE descriptor = '#UNRELATED#')
-        ,id
-      FROM Descriptor
-      WHERE id NOT IN (SELECT infraDescriptorId FROM MetaDescriptor)
-        AND id <> (SELECT id FROM Descriptor WHERE descriptor = '#ALL#')
-    |]
+      DELETE FROM Descriptor WHERE id = ?
+      |]
 
 {- |
  Given a tuple of 'Text` and a 'Descriptor`'s primary key, relabel that 'Descriptor`.
-
- Does not update immutable 'Descriptor`s, I.E. infixed by '#'.
- Use 'updateDescriptors'' if this is desired.
 -}
 updateDescriptors :: [(T.Text, RecordKey Descriptor)] -> TaggedConnection -> IO ()
-updateDescriptors updates tc = do
-  corrDkTuples <-
-    catMaybes
-      <$> mapM
-        (runMaybeT . secondM (flip queryForSingleDescriptorByDescriptorId tc))
-        updates
-  let mutDTuples =
-        second descriptorId
-          <$> filter
-            ( \(descriptor . snd -> dp) ->
-                not
-                  ( "#" `T.isPrefixOf` dp
-                      && "#" `T.isSuffixOf` dp
-                  )
-            )
-            corrDkTuples
-  updateDescriptors' mutDTuples tc
- where
-  second f (x, y) = (x, f y)
-  secondM fm (x, y) = do
-    y' <- fm y
-    return (x, y')
-
-{- |
- Given a tuple of 'Text` and a 'Descriptor`'s primary key, relabel that 'Descriptor`.
--}
-updateDescriptors' :: [(T.Text, RecordKey Descriptor)] -> TaggedConnection -> IO ()
-updateDescriptors' updates tc =
+updateDescriptors updates tc =
   executeMany tc q updates
  where
   q =
