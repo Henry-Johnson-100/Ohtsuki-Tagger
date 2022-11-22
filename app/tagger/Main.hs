@@ -123,25 +123,30 @@ programParser = info (helper <*> (versionParser <|> withDBParser)) idm
                       Move
                       ( long "move"
                           <> help
-                            "Rename or move a file, \
-                            \both in the database and in the filesystem."
+                            "Rename or move a file that matches the given pattern, \
+                            \both in the database and in the filesystem.\
+                            \ Does nothing if the pattern matches 0 or many files."
                       )
                       <*> argument str (metavar "FROM")
                       <*> argument str (metavar "TO")
                   )
               <|> ( flag'
                       Remove
-                      ( long "remove"
-                          <> help "Remove file(s) from the database."
+                      ( long "REMOVE"
+                          <> help
+                            "Remove file(s) matching the given pattern\
+                            \ from the database."
                       )
-                      <*> some (argument str (metavar "PATHS"))
+                      <*> some (argument str (metavar "PATTERN"))
                   )
               <|> ( flag'
                       Delete
                       ( long "DELETE"
-                          <> help "Deletes file(s) from the database AND filesystem!"
+                          <> help
+                            "Deletes file(s) matching the given pattern\
+                            \ from the database AND filesystem!"
                       )
-                      <*> some (argument str (metavar "PATHS"))
+                      <*> some (argument str (metavar "PATTERN"))
                   )
               <|> pure Default
           )
