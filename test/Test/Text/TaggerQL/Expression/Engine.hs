@@ -38,7 +38,14 @@ basicQueryFunctionality c =
           (HS.fromList a)
           r
     , testCase "Untagged Files" $ do
-        r <- c >>= runExpr UntaggedConst
+        r <-
+          c
+            >>= runExpr
+              ( Binary
+                  (FileTermValue "%")
+                  Difference
+                  (TagTermValue (DescriptorTerm "%"))
+              )
         a <- c >>= queryForUntaggedFiles
         assertEqual
           "Untagged Constant"
