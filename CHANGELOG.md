@@ -46,6 +46,10 @@ is complete, optionally how many files were added.
     - All Set Operations are strongly left-associative.
     - Sub-expressions (the part of a query between "{" and "}"), now accept
     Set Operations!
+  - Removed the syntactic token "`U.`" from the language.
+    - Previously corresponded to a query that finds all untagged files in the database.
+      This is a redundant token because that same set can be found trivially with a
+      difference: "`p.% ! d.%`".
   - Text.TaggerQL exports two functions, where the text parameter is a 
   TaggerQL Query.
     - `runQuery :: TaggedConnection -> Text -> ExceptT [Text] IO (HashSet File)`
