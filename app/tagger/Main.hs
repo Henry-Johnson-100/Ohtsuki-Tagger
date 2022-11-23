@@ -43,7 +43,7 @@ import qualified Data.OccurrenceMap as OM
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import Data.Version (showVersion)
-import Database.Tagger (ConcreteTag (ConcreteTag), ConcreteTaggedFile (ConcreteTaggedFile), Descriptor (..), File (..), RecordKey, allDescriptors, allFiles, allTags, close, concreteTagDescriptor, connName, deleteFiles, getAllInfra, getTagOccurrencesByDescriptorKeys, mvFile, open, openOrCreate, queryForConcreteTaggedFileWithFileId, queryForFileByPattern, rmFile)
+import Database.Tagger (ConcreteTag (ConcreteTag), ConcreteTaggedFile (ConcreteTaggedFile), Descriptor (..), File (..), RecordKey, allDescriptors, allFiles, allTags, close, concreteTagDescriptor, connName, deleteFiles, getAllInfra, getInfraChildren, getTagOccurrencesByDescriptorKeys, mvFile, open, openOrCreate, queryForConcreteTaggedFileWithFileId, queryForDescriptorByPattern, queryForFileByPattern, rmFile)
 import Database.Tagger.Type (TaggedConnection)
 import Interface (runTagger)
 import Options.Applicative (
@@ -192,9 +192,9 @@ mainProgram (WithDB dbPath Create) = do
   close c
 mainProgram (WithDB dbPath cm) = do
   curDir <- getCurrentDirectory
-  dbDir <- makeAbsolute . takeDirectory $ dbPath
-  setCurrentDirectory dbDir
-  ec <- runExceptT $ open dbPath
+  absDbPath <- makeAbsolute dbPath
+  setCurrentDirectory . takeDirectory $ absDbPath
+  ec <- runExceptT $ open absDbPath
   flip (either (T.IO.hPutStrLn stderr)) ec $ \c -> do
     case cm of
       Default -> do
@@ -253,11 +253,12 @@ mainProgram (WithDB dbPath cm) = do
       Tag s (T.pack -> tExpr) -> do
         fs <- queryForFileByPattern (T.pack s) c
         mapM_ ((\fk -> tagFile fk c tExpr) . fileId) fs
-      Describe ss -> do
-        fs <- concat <$> mapM ((`queryForFileByPattern` c) . T.pack) ss
-        case fs of
-          [] -> pure ()
-          _notNull -> mapM_ (describeFile c) (fileId <$> fs)
+      Describe ss ->
+        case ss of
+          [] -> describeDatabaseDescriptors c
+          _notNull -> do
+            fs <- concat <$> mapM ((`queryForFileByPattern` c) . T.pack) ss
+            mapM_ (describeFile c) (fileId <$> fs)
       _alreadHandled -> pure ()
   setCurrentDirectory curDir
 
@@ -277,6 +278,7 @@ describeFile tc fk = do
         . filter (\x -> not (HRM.metaMember x hm) && not (HRM.infraMember x hm))
         . HRM.keys
         $ hm
+      putStrLn ""
     Nothing -> pure ()
  where
   printMetaLeaf depth hm ct@(ConcreteTag _ (Descriptor _ dp) _) =
@@ -290,6 +292,16 @@ describeFile tc fk = do
             T.IO.putStrLn $ T.replicate (2 * depth) " " <> dp <> " {"
             mapM_ (printMetaLeaf (depth + 1) hm) subtags
             T.IO.putStrLn $ T.replicate (2 * depth) " " <> "}"
+
+describeDatabaseDescriptors :: TaggedConnection -> IO ()
+describeDatabaseDescriptors tc = do
+  allD <- queryForDescriptorByPattern "#ALL#" tc
+  mapM_ (describe' (0 :: Int)) allD
+ where
+  describe' depth (Descriptor dk dp) = do
+    T.IO.putStrLn $ T.replicate (depth * 4) " " <> dp
+    infra <- getInfraChildren dk tc
+    mapM_ (describe' (depth + 1)) infra
 
 showStats :: ReaderT TaggedConnection IO ()
 showStats = do
