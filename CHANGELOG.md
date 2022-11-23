@@ -51,7 +51,7 @@ is complete, optionally how many files were added.
       This is a redundant token because that same set can be found trivially with a
       difference: "`p.% ! d.%`".
   - Text.TaggerQL exports two functions, where the text parameter is a 
-  TaggerQL Query.
+    TaggerQL Query.
     - `runQuery :: TaggedConnection -> Text -> ExceptT [Text] IO (HashSet File)`
     - `tagFile :: RecordKey File -> TaggedConnection -> Text -> IO (Maybe Text)`
   - Deleted modules
@@ -62,18 +62,29 @@ is complete, optionally how many files were added.
     - Text.TaggerQL.Expression.Parser
     - Text.TaggerQL.Expression.AST
     - Text.TaggerQL.Expression.Engine
-  - Removed the sum type `QueryCriteria` from the Data.Tagger module.
-    - These criteria are now encoded in the AST of TaggerQL, found in Text.TaggerQL.Expression.AST
+  - Removed the sum type `QueryCriteria` from the `Data.Tagger` module.
+    - These criteria are now encoded in the AST of TaggerQL, found in `Text.TaggerQL.Expression.AST`
 - Database Changes
-  - Added new constraint conflict handlers to Tag and MetaDescriptor table.
+  - The database will be automatically patched and upgraded from version `1.0.2.1` to `2.0.0.0` when it is opened by Tagger.
+  - Added new constraint conflict handlers to `Tag` and `MetaDescriptor` table.
   - Added many new triggers to encode some of Tagger's behavior into the table itself.
     This will make interacting with the database outside of Tagger's library
     much more safe, though this is still not, nor will ever be, a recommended use case.
   - Removed some database functions:
     - `deleteDescriptors'` and `updateDescriptors'`.
-  - None of the database changes thus far have any impact on the actual usage of
-    any official component of Tagger. But the changes are not backwards compatible and
-    an update script is required.
+  - Replaced the database connection functions, `open` and `open'` with, respectively:
+    - `openOrCreate`
+      - Opens a file, or creates one if it does not exist, then attempts to read the version from the `TaggerDBInfo` table. If this table does not exist, then a database is initialized.
+      - This is a potentially destructive function! Prefer using `open` whenever possible.
+    - `open`
+      - Attempts to open a database file. If the file does not exist or the `TaggerDBInfo` table does not exist, then exit with an error.
+    - Both functions above will update a time-stamp field in the database as well as attempt to automatically patch the database if they determine it is out of date.
+
+- Executable Changes
+  - Removed the `taggercli` executable.
+    - Its functionality has been merged with the normal executable, `tagger`
+      - Added operations for adding files, tagging a file, removing files from the database, and deleting files from the database and file system.
+
 
 ------
 
