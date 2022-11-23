@@ -6,6 +6,8 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
+{-# HLINT ignore "Redundant if" #-}
+
 import CLI.Data
 import Control.Lens ((&), (.~), (^.))
 import Control.Monad (filterM, void, when, (<=<))
@@ -14,6 +16,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (
   runExceptT,
  )
+import Control.Monad.Trans.Maybe (runMaybeT)
 import Control.Monad.Trans.Reader (
   ReaderT (runReaderT),
   ask,
@@ -28,8 +31,10 @@ import qualified Data.Foldable as F
 import Data.Functor (($>))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
+import qualified Data.HierarchyMap as HRM
 import qualified Data.IntMap as IM
 import Data.List (sortOn)
+import qualified Data.List as L
 import Data.Model.Core (
   createTaggerModel,
   focusedFileDefaultDataFile,
@@ -38,23 +43,7 @@ import qualified Data.OccurrenceMap as OM
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import Data.Version (showVersion)
-import Database.Tagger (
-  Descriptor (..),
-  File (..),
-  allDescriptors,
-  allFiles,
-  allTags,
-  close,
-  connName,
-  deleteFiles,
-  getAllInfra,
-  getTagOccurrencesByDescriptorKeys,
-  mvFile,
-  open,
-  openOrCreate,
-  queryForFileByPattern,
-  rmFile,
- )
+import Database.Tagger (ConcreteTag (ConcreteTag), ConcreteTaggedFile (ConcreteTaggedFile), Descriptor (..), File (..), RecordKey, allDescriptors, allFiles, allTags, close, concreteTagDescriptor, connName, deleteFiles, getAllInfra, getTagOccurrencesByDescriptorKeys, mvFile, open, openOrCreate, queryForConcreteTaggedFileWithFileId, queryForFileByPattern, rmFile)
 import Database.Tagger.Type (TaggedConnection)
 import Interface (runTagger)
 import Options.Applicative (
@@ -68,6 +57,7 @@ import Options.Applicative (
   idm,
   info,
   long,
+  many,
   metavar,
   short,
   str,
@@ -117,6 +107,16 @@ programParser = info (helper <*> (versionParser <|> withDBParser)) idm
               <|> flag' Stats (long "stats" <> help "Show stats for the given database.")
               <|> flag' Audit (long "audit" <> help "Run audit on the given database.")
               <|> ( flag'
+                      Describe
+                      ( long "describe"
+                          <> help
+                            "Show the tags applied to an image, \
+                            \or display all of the Descriptors in the database \
+                            \if no patterns are specified."
+                      )
+                      <*> many (argument str (metavar "PATTERNS"))
+                  )
+              <|> ( flag'
                       Add
                       ( short 'a'
                           <> long "add"
@@ -131,7 +131,7 @@ programParser = info (helper <*> (versionParser <|> withDBParser)) idm
                             "Run a tagging expression on the file \
                             \matching the given pattern."
                       )
-                      <*> argument str (metavar "PATH_PATTERN")
+                      <*> argument str (metavar "PATTERN")
                       <*> argument str (metavar "EXPR")
                   )
               <|> ( flag'
@@ -182,7 +182,7 @@ data Command
   | Audit
   | Query String Bool
   | Tag FilePath String
-  | Info [FilePath]
+  | Describe [FilePath]
   deriving (Show, Eq)
 
 mainProgram :: Program -> IO ()
@@ -253,9 +253,43 @@ mainProgram (WithDB dbPath cm) = do
       Tag s (T.pack -> tExpr) -> do
         fs <- queryForFileByPattern (T.pack s) c
         mapM_ ((\fk -> tagFile fk c tExpr) . fileId) fs
-      Info _ -> error "not implemented yet"
+      Describe ss -> do
+        fs <- concat <$> mapM ((`queryForFileByPattern` c) . T.pack) ss
+        case fs of
+          [] -> pure ()
+          _notNull -> mapM_ (describeFile c) (fileId <$> fs)
       _alreadHandled -> pure ()
   setCurrentDirectory curDir
+
+describeFile :: TaggedConnection -> RecordKey File -> IO ()
+describeFile tc fk = do
+  ctf <- runMaybeT $ queryForConcreteTaggedFileWithFileId fk tc
+  case ctf of
+    Just (ConcreteTaggedFile f hm) -> do
+      T.IO.putStrLn . filePath $ f
+      mapM_ (printMetaLeaf (0 :: Int) hm)
+        . L.sortOn (descriptor . concreteTagDescriptor)
+        . filter (\x -> HRM.metaMember x hm && not (HRM.infraMember x hm))
+        . HRM.keys
+        $ hm
+      mapM_ (\(ConcreteTag _ (Descriptor _ dp) _) -> T.IO.putStrLn dp)
+        . L.sortOn (descriptor . concreteTagDescriptor)
+        . filter (\x -> not (HRM.metaMember x hm) && not (HRM.infraMember x hm))
+        . HRM.keys
+        $ hm
+    Nothing -> pure ()
+ where
+  printMetaLeaf depth hm ct@(ConcreteTag _ (Descriptor _ dp) _) =
+    let subtags =
+          L.sortOn (descriptor . concreteTagDescriptor)
+            . HS.toList
+            $ HRM.find ct hm
+     in if null subtags
+          then T.IO.putStrLn $ T.replicate (2 * depth) " " <> dp
+          else do
+            T.IO.putStrLn $ T.replicate (2 * depth) " " <> dp <> " {"
+            mapM_ (printMetaLeaf (depth + 1) hm) subtags
+            T.IO.putStrLn $ T.replicate (2 * depth) " " <> "}"
 
 showStats :: ReaderT TaggedConnection IO ()
 showStats = do
