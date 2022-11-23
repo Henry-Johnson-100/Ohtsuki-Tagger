@@ -52,13 +52,14 @@ import Options.Applicative (
   argument,
   execParser,
   flag',
+  header,
   help,
   helper,
-  idm,
   info,
   long,
   many,
   metavar,
+  progDesc,
   short,
   str,
   switch,
@@ -82,7 +83,17 @@ main = do
   mainProgram args
 
 programParser :: ParserInfo Program
-programParser = info (helper <*> (versionParser <|> withDBParser)) idm
+programParser =
+  info
+    (helper <*> (versionParser <|> withDBParser))
+    ( header
+        "TAGGER: A GUI image-tagging program with a unique sub-tagging \
+        \system and proprietary query language, TaggerQL."
+        <> progDesc
+          "Tagger is, first and foremost, a GUI program.\
+          \ Run tagger with a path to a database and no other arguments to start the GUI.\
+          \ Additionally, there are some limited CLI operations exposed for convenience."
+    )
  where
   versionParser =
     switch (short 'v' <> long "version" <> help "Show the version.")
