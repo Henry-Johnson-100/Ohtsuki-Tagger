@@ -26,7 +26,7 @@ import Data.Text (Text)
  Data structure representing search terms over the set of 'Descriptor`.
 -}
 data TagTerm
-  = -- | Corresponds to the set of 'Descirptor` that matches the given 'Text`
+  = -- | Corresponds to the set of `Descriptor' that matches the given 'Text`
     DescriptorTerm Text
   | -- | Corresponds to the set of 'Descriptor` that are infra to the 'Descriptor`
     -- matching the given 'Text`, including the matches themselves.
@@ -45,14 +45,18 @@ newtype FileTerm
  subset of the set of all 'Tag` in the database.
 
  A 'SubExpression` is then used:
+
   * as an operand in another 'SubExpression`
   * to compute a set of 'File` in an 'Expression`
   * to tag a single 'File` with the set of 'Tag` that the 'SubExpression` represents.
 -}
 data SubExpression
-  = SubTag TagTerm
+  = -- | A search term for a set of 'Tag` that are subtags in the current environment.
+    SubTag TagTerm
   | SubBinary SubExpression SetOp SubExpression
-  | SubExpression TagTerm SubExpression
+  | -- | Extends the current 'Tag` environment through the given 'TagTerm`
+    -- to define a more constrained set with the given 'SubExpression`.
+    SubExpression TagTerm SubExpression
   deriving (Show, Eq)
 
 {- |
@@ -70,6 +74,5 @@ data Expression
     -- Essentially, defines the set of 'File` where 'SubExpression` are subtags
     -- of any 'Tag` appearing in the set defined by the 'TagTerm`.
     TagExpression TagTerm SubExpression
-  | -- | A binary operation over two 'Expression`
-    Binary Expression SetOp Expression
+  | Binary Expression SetOp Expression
   deriving (Show, Eq)
