@@ -62,9 +62,17 @@ import Text.TaggerQL.Expression.AST (
 
 type Parser a = Parsec Text () a
 
+{- |
+ Parse an 'Expression` from a TaggerQL query.
+-}
 parseExpr :: Text -> Either ParseError Expression
 parseExpr = parse expressionParser "TaggerQL"
 
+{- |
+ Parse a 'SubExpression` from a TaggerQL query.
+
+ Used to parse expressions that tag images, rather than query.
+-}
 parseTagExpr :: Text -> Either ParseError SubExpression
 parseTagExpr = parse subExpressionParser "TaggerQL"
 

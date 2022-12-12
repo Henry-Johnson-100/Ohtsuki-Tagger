@@ -85,8 +85,6 @@ runQuery c t =
 
 {- |
  Query an 'Expression`
-
- thin wrapper for 'evalExpr`
 -}
 runExpr :: Expression -> TaggedConnection -> IO (HashSet File)
 runExpr expr = runReaderT (evalExpr expr)
@@ -114,8 +112,14 @@ evalExpr expr = case expr of
       <$> evalExpr lhs
       <*> evalExpr rhs
 
+{- |
+ Given a 'SubExpression` and a set of 'Tag`, compute the set of 'Tag` that
+ is defined by the 'SubExpression` and filter the argument by those that are subtags.
+-}
 evalSubExpression ::
   SubExpression ->
+  -- | The current 'Tag` environment. Any set of 'Tag` computed by this function
+  -- will be a subset of this argument.
   HashSet Tag ->
   ReaderT
     TaggedConnection

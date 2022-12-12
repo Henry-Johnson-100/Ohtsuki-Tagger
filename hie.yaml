@@ -6,6 +6,9 @@ cradle:
     - path: "app/tagger/Config.hs"
       component: "tagger:exe:tagger"
 
+    - path: "app/tagger/CLI/Data.hs"
+      component: "tagger:exe:tagger"
+
     - path: "app/tagger/Data/Event.hs"
       component: "tagger:exe:tagger"
 
@@ -68,24 +71,6 @@ cradle:
 
     - path: "app/tagger/Util.hs"
       component: "tagger:exe:tagger"
-
-    - path: "app/taggercli/Main.hs"
-      component: "tagger:exe:taggercli"
-
-    - path: "app/taggercli/Opt.hs"
-      component: "tagger:exe:taggercli"
-
-    - path: "app/taggercli/Opt/Data.hs"
-      component: "tagger:exe:taggercli"
-
-    - path: "app/taggercli/Opt/Data/Lens.hs"
-      component: "tagger:exe:taggercli"
-
-    - path: "app/taggercli/Opt/Parser.hs"
-      component: "tagger:exe:taggercli"
-
-    - path: "lib/tagger-exe-internal"
-      component: "tagger:lib:tagger-exe-internal"
 
     - path: "lib"
       component: "tagger:lib:tagger-lib"

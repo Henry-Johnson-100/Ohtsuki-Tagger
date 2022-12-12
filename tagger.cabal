@@ -19,6 +19,7 @@ data-files:          Yui_signature_SS.bmp
                     ,iosevka_bold.ttf
                     ,TaggerSchemaDefinition.sql
                     ,TaggerSchemaTeardown.sql
+                    ,Patch/
                      
 common haskell-common
   default-language:    Haskell2010
@@ -53,6 +54,7 @@ executable tagger
   main-is:             Main.hs
 
   other-modules:       Config
+                      ,CLI.Data
                       ,Data.Event
                       ,Data.Model
                       ,Data.Model.Core
@@ -81,54 +83,16 @@ executable tagger
   -- ghc-options:
 
   build-depends:      tagger-lib
-                      ,tagger-exe-internal
                       ,monomer == 1.4.1.0
                       ,directory == 1.3.6.0
                       ,filepath == 1.4.2.1
                       ,random
                       ,process
                       ,tomland
+                      ,optparse-applicative                      
 
   hs-source-dirs:      app/tagger
 
-executable taggercli
-  import:              haskell-common
-                      ,tagger-common
-
-  main-is:             Main.hs
-
-  other-modules:       Opt
-                      ,Opt.Data
-                      ,Opt.Data.Lens
-                      ,Opt.Parser
-
-  -- other-extensions:
-
-  -- ghc-options:
-
-  build-depends:       tagger-lib
-                      ,tagger-exe-internal
-                      ,optparse-applicative
-                      ,directory
-                      ,filepath
-
-  hs-source-dirs:      app/taggercli
-
-library tagger-exe-internal
-  import:
-    haskell-common
-    ,tagger-common
-
-  exposed-modules:
-    Tagger.Shared
-
-  build-depends:
-    tagger-lib
-    ,directory
-    ,filepath
-  
-  hs-source-dirs:
-    lib/tagger-exe-internal
 
 library tagger-lib
   import:              haskell-common
