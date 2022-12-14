@@ -41,7 +41,7 @@ useAsCStringLen' bs f = useAsCStringLen bs ((\(ptr,len) -> return (castPtr ptr,f
 
 -- | Wrapper around 'useAsCStringLen'' that discards the length
 useAsPtr :: ByteString -> (Ptr CUChar -> IO a) -> IO a
-useAsPtr bs f = useAsCStringLen' bs (f . fst)
+useAsPtr bs f = useAsCStringLen bs (f . castPtr . fst)
 
 -- | Marshalling helper for a constant one
 one :: Num a => (a -> b) -> b
