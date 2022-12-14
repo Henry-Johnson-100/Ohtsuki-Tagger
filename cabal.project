@@ -1,3 +1,4 @@
 packages: tagger.cabal
+          ,./nanovg-hs
 optimization: 0
 haddock-hyperlink-source: True
