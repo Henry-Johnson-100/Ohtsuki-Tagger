@@ -281,13 +281,11 @@ describeFile tc fk = do
       T.IO.putStrLn . filePath $ f
       mapM_ (printMetaLeaf (0 :: Int) hm)
         . L.sortOn (descriptor . concreteTagDescriptor)
-        . filter (\x -> HRM.metaMember x hm && not (HRM.infraMember x hm))
-        . HRM.keys
+        . HRM.topMeta
         $ hm
       mapM_ (\(ConcreteTag _ (Descriptor _ dp) _) -> T.IO.putStrLn dp)
         . L.sortOn (descriptor . concreteTagDescriptor)
-        . filter (\x -> not (HRM.metaMember x hm) && not (HRM.infraMember x hm))
-        . HRM.keys
+        . HRM.notMetaOrInfra
         $ hm
       putStrLn ""
     Nothing -> pure ()

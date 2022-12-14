@@ -128,23 +128,13 @@ detailPaneTagsWidget
                   [ metaLeaves
                       hm
                       ( L.sortOn (descriptor . concreteTagDescriptor)
-                          . filter
-                            ( \x ->
-                                HM.metaMember x hm
-                                  && not (HM.infraMember x hm)
-                            )
-                          . HM.keys
+                          . HM.topMeta
                           $ hm
                       )
                   , spacer_ [resizeFactor (-1)]
                   , nullMemberLeaves
                       ( L.sortOn (descriptor . concreteTagDescriptor)
-                          . filter
-                            ( \x ->
-                                not (HM.metaMember x hm)
-                                  && not (HM.infraMember x hm)
-                            )
-                          . HM.keys
+                          . HM.notMetaOrInfra
                           $ hm
                       )
                   ]
