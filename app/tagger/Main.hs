@@ -86,9 +86,8 @@ import Options.Applicative (
 import Paths_tagger (getDataFileName)
 import System.Directory (
   doesFileExist,
-  getCurrentDirectory,
   makeAbsolute,
-  setCurrentDirectory,
+  withCurrentDirectory,
  )
 import System.FilePath (makeRelative, takeDirectory)
 import System.IO (hPutStrLn, stderr)
@@ -198,21 +197,21 @@ programParser =
 
 data Program
   = Version
-  | WithDB FilePath Command
+  | WithDB !FilePath !Command
   deriving (Show, Eq)
 
 data Command
   = Default
   | Create
-  | Add [FilePath]
-  | Move FilePath FilePath
-  | Remove [FilePath]
-  | Delete [FilePath]
+  | Add ![FilePath]
+  | Move !FilePath !FilePath
+  | Remove ![String]
+  | Delete ![String]
   | Stats
   | Audit
-  | Query String Bool
-  | Tag FilePath String
-  | Describe [FilePath]
+  | Query !String !Bool
+  | Tag !String !String
+  | Describe ![String]
   deriving (Show, Eq)
 
 mainProgram :: Program -> IO ()
@@ -221,76 +220,74 @@ mainProgram (WithDB dbPath Create) = do
   c <- openOrCreate dbPath
   close c
 mainProgram (WithDB dbPath cm) = do
-  curDir <- getCurrentDirectory
   absDbPath <- makeAbsolute dbPath
-  setCurrentDirectory . takeDirectory $ absDbPath
-  ec <- runExceptT $ open absDbPath
-  flip (either (T.IO.hPutStrLn stderr)) ec $ \c -> do
-    case cm of
-      Default -> do
-        defaultFile <- T.pack <$> getDataFileName focusedFileDefaultDataFile
-        runTagger
-          ( createTaggerModel
-              c
-              (Descriptor (-1) "fake descriptor")
-              (Descriptor (-2) "fake #UNRELATED#")
-              defaultFile
-          )
-      Add ss -> mapM_ (addFiles c . T.pack) ss
-      Move s toN -> do
-        fs <- queryForFileByPattern (T.pack s) c
-        case fs of
-          [f] -> do
-            mvFile c (fileId f) (T.pack toN)
-          [] -> hPutStrLn stderr $ "No files in database matching: '" <> s <> "'"
-          _tooManyResults ->
-            hPutStrLn stderr $
-              "Too many files matching '"
-                <> s
-                <> "' only one file rename is permitted at a time."
-      Remove ss -> do
-        fs <- concat <$> mapM ((`queryForFileByPattern` c) . T.pack) ss
-        deleteFiles (fileId <$> fs) c
-      Delete ss -> do
-        fs <- concat <$> mapM ((`queryForFileByPattern` c) . T.pack) ss
-        mapM_ (rmFile c . fileId) fs
-      Stats -> runReaderT showStats c
-      Audit -> runReaderT mainReportAudit c
-      Query (T.pack -> q) rel -> do
-        let (T.unpack -> connPath) = c ^. connName
-        eQueryResults <- runExceptT $ runQuery c q
-        either
-          (mapM_ T.IO.putStrLn)
-          ( \queryResults ->
-              if HS.null queryResults
-                then T.IO.hPutStrLn stderr "No Results."
-                else
-                  mapM_
-                    ( ( T.IO.putStrLn . T.pack
-                          <=< if rel
-                            then pure
-                            else makeAbsolute
+  withCurrentDirectory (takeDirectory absDbPath) $ do
+    ec <- runExceptT $ open absDbPath
+    flip (either (T.IO.hPutStrLn stderr)) ec $ \c -> do
+      case cm of
+        Default -> do
+          defaultFile <- T.pack <$> getDataFileName focusedFileDefaultDataFile
+          runTagger
+            ( createTaggerModel
+                c
+                (Descriptor (-1) "fake descriptor")
+                (Descriptor (-2) "fake #UNRELATED#")
+                defaultFile
+            )
+        Add ss -> mapM_ (addFiles c . T.pack) ss
+        Move s toN -> do
+          fs <- queryForFileByPattern (T.pack s) c
+          case fs of
+            [f] -> do
+              mvFile c (fileId f) (T.pack toN)
+            [] -> hPutStrLn stderr $ "No files in database matching: '" <> s <> "'"
+            _tooManyResults ->
+              hPutStrLn stderr $
+                "Too many files matching '"
+                  <> s
+                  <> "' only one file rename is permitted at a time."
+        Remove ss -> do
+          fs <- concat <$> mapM ((`queryForFileByPattern` c) . T.pack) ss
+          deleteFiles (fileId <$> fs) c
+        Delete ss -> do
+          fs <- concat <$> mapM ((`queryForFileByPattern` c) . T.pack) ss
+          mapM_ (rmFile c . fileId) fs
+        Stats -> runReaderT showStats c
+        Audit -> runReaderT mainReportAudit c
+        Query (T.pack -> q) rel -> do
+          let (T.unpack -> connPath) = c ^. connName
+          eQueryResults <- runExceptT $ runQuery c q
+          either
+            (mapM_ T.IO.putStrLn)
+            ( \queryResults ->
+                if HS.null queryResults
+                  then T.IO.hPutStrLn stderr "No Results."
+                  else
+                    mapM_
+                      ( ( T.IO.putStrLn . T.pack
+                            <=< if rel
+                              then pure
+                              else makeAbsolute
+                        )
+                          . makeRelative connPath
+                          . T.unpack
+                          . filePath
                       )
-                        . makeRelative connPath
-                        . T.unpack
-                        . filePath
-                    )
-                    . sortOn filePath
-                    . F.toList
-                    $ queryResults
-          )
-          eQueryResults
-      Main.Tag s (T.pack -> tExpr) -> do
-        fs <- queryForFileByPattern (T.pack s) c
-        mapM_ ((\fk -> tagFile fk c tExpr) . fileId) fs
-      Describe ss ->
-        case ss of
-          [] -> describeDatabaseDescriptors c
-          _notNull -> do
-            fs <- concat <$> mapM ((`queryForFileByPattern` c) . T.pack) ss
-            mapM_ (describeFile c) (fileId <$> fs)
-      _alreadHandled -> pure ()
-  setCurrentDirectory curDir
+                      . sortOn filePath
+                      . F.toList
+                      $ queryResults
+            )
+            eQueryResults
+        Main.Tag s (T.pack -> tExpr) -> do
+          fs <- queryForFileByPattern (T.pack s) c
+          mapM_ ((\fk -> tagFile fk c tExpr) . fileId) fs
+        Describe ss ->
+          case ss of
+            [] -> describeDatabaseDescriptors c
+            _notNull -> do
+              fs <- concat <$> mapM ((`queryForFileByPattern` c) . T.pack) ss
+              mapM_ (describeFile c) (fileId <$> fs)
+        _alreadHandled -> pure ()
 
 describeFile :: TaggedConnection -> RecordKey File -> IO ()
 describeFile tc fk = do
