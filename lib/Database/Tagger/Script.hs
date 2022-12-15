@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_HADDOCK prune #-}
 
@@ -17,15 +16,10 @@ module Database.Tagger.Script (
   patch_2_0,
 ) where
 
+import Control.Monad ((<=<))
 import Data.String (IsString (..))
 import Data.Text (Text)
 import Paths_tagger (getDataFileName)
-import System.IO (
-  IOMode (ReadMode),
-  hClose,
-  hGetContents,
-  openFile,
- )
 import Text.RawString.QQ (r)
 
 newtype SQLiteScript = SQLiteScript Text deriving (Show, Eq)
@@ -58,10 +52,4 @@ patch_2_0 :: IO SQLiteScript
 patch_2_0 = getScriptContents "Patch/patch_2_0.sql"
 
 getScriptContents :: FilePath -> IO SQLiteScript
-getScriptContents p = do
-  scriptFile <- getDataFileName p
-  scriptHandle <- openFile scriptFile ReadMode
-  scriptContents <- hGetContents scriptHandle
-  let !script = SQLiteScript . fromString $ scriptContents
-  hClose scriptHandle
-  return script
+getScriptContents = fmap (SQLiteScript . fromString) . readFile <=< getDataFileName
