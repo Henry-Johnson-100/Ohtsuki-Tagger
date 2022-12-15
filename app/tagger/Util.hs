@@ -4,11 +4,14 @@ module Util (
   head',
   both,
   addFiles,
+  compareConcreteTags,
 ) where
 
+import Data.HierarchyMap (HierarchyMap)
+import qualified Data.HierarchyMap as HRM
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger (TaggedConnection, insertFiles)
+import Database.Tagger (ConcreteTag (..), Descriptor (..), TaggedConnection, insertFiles)
 import System.Directory (
   doesDirectoryExist,
   doesFileExist,
@@ -16,6 +19,26 @@ import System.Directory (
   listDirectory,
  )
 import System.FilePath (makeRelative, (</>))
+
+{- |
+ Compares concrete tags based on if they have any infra children in the given map.
+
+ tags with infra children are always GT tags without, if both have some or both have none
+ then the text of the 'Descriptor` is used to compare them.
+-}
+compareConcreteTags ::
+  HierarchyMap ConcreteTag ->
+  ConcreteTag ->
+  ConcreteTag ->
+  Ordering
+compareConcreteTags hm x y =
+  case (HRM.metaMember x hm, HRM.metaMember y hm) of
+    (False, True) -> LT
+    (True, False) -> GT
+    _equal ->
+      compare
+        (descriptor . concreteTagDescriptor $ x)
+        (descriptor . concreteTagDescriptor $ y)
 
 head' :: [a] -> Maybe a
 head' [] = Nothing

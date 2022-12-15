@@ -69,7 +69,6 @@ import Monomer (
   CmbAlignTop (alignTop),
   CmbBgColor (bgColor),
   CmbBorder (border),
-  CmbBorderB (borderB),
   CmbMaxHeight (maxHeight),
   CmbOnChange (onChange),
   CmbPaddingR (paddingR),
@@ -78,8 +77,6 @@ import Monomer (
   CmbTextColor (textColor),
   CmbWheelRate (wheelRate),
   CmbWidth (width),
-  WidgetNode,
-  black,
   box_,
   buttonD_,
   draggable,
@@ -125,19 +122,9 @@ detailPaneTagsWidget
         , vstack
             [ vscroll_ [wheelRate 50] $
                 vstack
-                  [ metaLeaves
-                      hm
-                      ( L.sortOn (descriptor . concreteTagDescriptor)
-                          . HM.topMeta
-                          $ hm
-                      )
-                  , spacer_ [resizeFactor (-1)]
-                  , nullMemberLeaves
-                      ( L.sortOn (descriptor . concreteTagDescriptor)
-                          . HM.notMetaOrInfra
-                          $ hm
-                      )
-                  ]
+                  . map (leaf hm)
+                  . L.sortBy (compareConcreteTags hm)
+                  $ HM.topMeta hm ++ HM.notMetaOrInfra hm
             , tagTextField
             , deleteTagZone
             ]
@@ -205,42 +192,19 @@ isFileRenameMode m =
     `hasVis` VisibilityLabel fileRenameModeVis
 {-# INLINE isFileRenameMode #-}
 
-nullMemberLeaves ::
-  Traversable t =>
-  t ConcreteTag ->
-  WidgetNode TaggerModel TaggerEvent
-nullMemberLeaves members =
-  withStyleBasic [borderB 1 black]
-    . vstack_ []
-    $ ( \ct@(ConcreteTag tk (Descriptor _ dp) _) ->
-          subTagDropTarget tk
-            . box_ [alignLeft, alignTop]
-            . draggable ct
-            $ label dp
-      )
-      <$> members
-
-metaLeaves ::
+leaf ::
   HierarchyMap ConcreteTag ->
-  [ConcreteTag] ->
-  WidgetNode TaggerModel TaggerEvent
-metaLeaves hm members =
-  vstack_ [] . L.intersperse spacer $
-    (flip metaLeaf hm <$> members)
-
-metaLeaf ::
   ConcreteTag ->
-  HierarchyMap ConcreteTag ->
   TaggerWidget
-metaLeaf l@(ConcreteTag tk (Descriptor _ dp) _) hmap =
+leaf hm ct@(ConcreteTag tk (Descriptor _ dp) _) =
   let subtags =
-        L.sortOn (descriptor . concreteTagDescriptor)
+        L.sortBy (compareConcreteTags hm)
           . HS.toList
-          $ HM.find l hmap
+          $ HM.find ct hm
    in if null subtags
         then
           subTagDropTarget tk . box_ [alignLeft, alignTop]
-            . draggable l
+            . draggable ct
             $ label dp
         else
           vstack_
@@ -249,7 +213,7 @@ metaLeaf l@(ConcreteTag tk (Descriptor _ dp) _) hmap =
                 []
                 [ subTagDropTarget tk
                     . box_ [alignLeft, alignTop]
-                    . draggable l
+                    . draggable ct
                     . withStyleBasic [textColor yuiBlue]
                     $ label dp
                 , spacer
@@ -260,12 +224,26 @@ metaLeaf l@(ConcreteTag tk (Descriptor _ dp) _) hmap =
                 [ metaTagLeafSpacer
                 , box_ [alignLeft, alignTop] $
                     vstack
-                      ( flip metaLeaf hmap
+                      ( leaf hm
                           <$> subtags
                       )
                 ]
             , label "}"
             ]
+
+compareConcreteTags ::
+  HierarchyMap ConcreteTag ->
+  ConcreteTag ->
+  ConcreteTag ->
+  Ordering
+compareConcreteTags hm' x y =
+  case (HM.metaMember x hm', HM.metaMember y hm') of
+    (False, True) -> LT
+    (True, False) -> GT
+    _equal ->
+      compare
+        (descriptor . concreteTagDescriptor $ x)
+        (descriptor . concreteTagDescriptor $ y)
 
 metaTagLeafSpacer :: TaggerWidget
 metaTagLeafSpacer = spacer_ [width 20]
