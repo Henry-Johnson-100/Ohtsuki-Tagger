@@ -85,6 +85,15 @@ is complete, optionally how many files were added.
     - Its functionality has been merged with the normal executable, `tagger`
       - Added operations for adding files, tagging a file, removing files from the database, and deleting files from the database and file system.
 
+## Non-Breaking Changes
+- Changed how tags ordered when using the --describe CLI command
+  or when they are viewed in the image detail pane.
+  - Tags are ordered in two groups:
+    - Tags that have no subtags
+    - Tags that do
+  - In both of these groups, they are ordered alphabetically.
+- Added some additional helper functions to `HierarchyMap` to make traversals
+  a little bit less painful.
 
 ------
 

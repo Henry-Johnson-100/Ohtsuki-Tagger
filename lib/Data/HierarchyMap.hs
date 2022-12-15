@@ -54,9 +54,7 @@ module Data.HierarchyMap (
   keys,
 
   -- * Useful traversal functions
-  -- $Traversing
-  notMetaOrInfra,
-  topMeta,
+  parentNodes,
 ) where
 
 import qualified Data.Foldable as F
@@ -188,34 +186,13 @@ getAllInfraTo x hm =
 keys :: HierarchyMap k -> [k]
 keys (HierarchyMap m) = HashMap.keys m
 
-{- $Traversing
- There are two important subsets of any given 'HierarchyMap`:
-
-  - members that are not meta or infra to anything.
-  - members that are meta to other members but not infra to anything.
-
-  two helper functions below provide easy ways to expose these subsets to write
-  traversals over the rest of the members of the map.
--}
-
 {- |
- Gets the values in the 'HierarchyMap` that are not meta or infra to anything.
--}
-notMetaOrInfra :: Hashable a => HierarchyMap a -> [a]
-notMetaOrInfra hm =
-  filter (\x -> not (metaMember x hm) && not (infraMember x hm))
-    . keys
-    $ hm
+ Entrypoint for a recursive traversal of the map.
 
-{- |
- Gets all top-level meta values.
+ retrieves all values in the map that are not infra to anything.
+ Each element of the resultant list is the parent node of its hierarchical tree.
 
- The list produced from this function is an entry point for recursively traversing
- the rest of the map. Where each member of this result has 0 or more members infra to it
- that are retrieved via 'find`
+ Further nodes that are children to any given element are retrieved with 'find`.
 -}
-topMeta :: Hashable a => HierarchyMap a -> [a]
-topMeta hm =
-  filter (\x -> metaMember x hm && not (infraMember x hm))
-    . keys
-    $ hm
+parentNodes :: Hashable a => HierarchyMap a -> [a]
+parentNodes hm = filter (not . flip infraMember hm) . keys $ hm

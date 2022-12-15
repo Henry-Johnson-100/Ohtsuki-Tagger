@@ -299,7 +299,8 @@ describeFile tc fk = do
       T.IO.putStrLn . filePath $ f
       F.traverse_ (printMetaLeaf 0 hm)
         . L.sortBy (compareConcreteTags hm)
-        $ HRM.topMeta hm ++ HRM.notMetaOrInfra hm
+        . HRM.parentNodes
+        $ hm
       putStrLn ""
     Nothing -> pure ()
  where

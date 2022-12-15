@@ -96,6 +96,7 @@ import Monomer (
   vstack_,
   zstack_,
  )
+import Util (compareConcreteTags)
 
 widget :: TaggerModel -> TaggerWidget
 widget m = detailPane m
@@ -124,7 +125,8 @@ detailPaneTagsWidget
                 vstack
                   . map (leaf hm)
                   . L.sortBy (compareConcreteTags hm)
-                  $ HM.topMeta hm ++ HM.notMetaOrInfra hm
+                  . HM.parentNodes
+                  $ hm
             , tagTextField
             , deleteTagZone
             ]
@@ -230,20 +232,6 @@ leaf hm ct@(ConcreteTag tk (Descriptor _ dp) _) =
                 ]
             , label "}"
             ]
-
-compareConcreteTags ::
-  HierarchyMap ConcreteTag ->
-  ConcreteTag ->
-  ConcreteTag ->
-  Ordering
-compareConcreteTags hm' x y =
-  case (HM.metaMember x hm', HM.metaMember y hm') of
-    (False, True) -> LT
-    (True, False) -> GT
-    _equal ->
-      compare
-        (descriptor . concreteTagDescriptor $ x)
-        (descriptor . concreteTagDescriptor $ y)
 
 metaTagLeafSpacer :: TaggerWidget
 metaTagLeafSpacer = spacer_ [width 20]
