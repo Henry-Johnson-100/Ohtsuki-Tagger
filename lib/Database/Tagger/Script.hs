@@ -1,5 +1,5 @@
 {-# LANGUAGE QuasiQuotes #-}
-{-# OPTIONS_HADDOCK prune #-}
+{-# OPTIONS_HADDOCK hide #-}
 
 {- |
 Module      : Database.Tagger.Script

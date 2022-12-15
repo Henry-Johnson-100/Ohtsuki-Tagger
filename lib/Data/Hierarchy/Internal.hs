@@ -1,3 +1,4 @@
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE StrictData #-}
 {-# OPTIONS_HADDOCK hide #-}
 
@@ -15,11 +16,12 @@ import Data.Hashable (Hashable)
  A \"meta\" relation means that some key
  'a` has a non-null HashSet of 'a` as it's value.
 
- An \"infra\" relation means that some key 'a` has a 'null` 'HashSet` of values.
+ An \"infra\" relation means that some key 'a`
+ is contained in the hashset of some other key in the map.
 
  Both types of relations are accessable on one level of the 'HashMap`.
 
- Relations can be nested arbitrarily deep or defined circularly
+ Relations can be nested arbitrarily deep
  but are still represented
  as a single flat 'HashMap` in the underlying implementation.
 -}
@@ -31,9 +33,11 @@ newtype HierarchyMap a
  'union` two 'HierarchyMap a`
 -}
 instance Hashable a => Semigroup (HierarchyMap a) where
+  (<>) :: Hashable a => HierarchyMap a -> HierarchyMap a -> HierarchyMap a
   (<>) = unionWith HashSet.union
 
 instance Hashable a => Monoid (HierarchyMap a) where
+  mempty :: Hashable a => HierarchyMap a
   mempty = empty
 
 {- |
@@ -46,7 +50,7 @@ instance Hashable a => Monoid (HierarchyMap a) where
  Care should be taken that data inserted into the 'HierarchyMap` is not circularly related
  ex:
 
- > insert 1 [1,2] empty
+ > insert 1 (fromList [1,2]) empty
 
  will create a map [(1, [1,2]), (2, [])] where 1 is circularly related to itself.
  This would cause an infinite hang if ever called.
