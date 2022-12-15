@@ -1,9 +1,5 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# HLINT ignore "Use lambda-case" #-}
-{-# HLINT ignore "Use lambda-case" #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Redundant if" #-}
@@ -43,8 +39,31 @@ import qualified Data.OccurrenceMap as OM
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import Data.Version (showVersion)
-import Database.Tagger (ConcreteTag (ConcreteTag), ConcreteTaggedFile (ConcreteTaggedFile), Descriptor (..), File (..), RecordKey, allDescriptors, allFiles, allTags, close, concreteTagDescriptor, connName, deleteFiles, getAllInfra, getInfraChildren, getTagOccurrencesByDescriptorKeys, mvFile, open, openOrCreate, queryForConcreteTaggedFileWithFileId, queryForDescriptorByPattern, queryForFileByPattern, rmFile)
-import Database.Tagger.Type (TaggedConnection)
+import Database.Tagger (
+  ConcreteTag (ConcreteTag),
+  ConcreteTaggedFile (ConcreteTaggedFile),
+  Descriptor (..),
+  File (fileId, filePath),
+  HasConnName (connName),
+  RecordKey,
+  TaggedConnection,
+  allDescriptors,
+  allFiles,
+  allTags,
+  close,
+  concreteTagDescriptor,
+  deleteFiles,
+  getAllInfra,
+  getInfraChildren,
+  getTagOccurrencesByDescriptorKeys,
+  mvFile,
+  open,
+  openOrCreate,
+  queryForConcreteTaggedFileWithFileId,
+  queryForDescriptorByPattern,
+  queryForFileByPattern,
+  rmFile,
+ )
 import Interface (runTagger)
 import Options.Applicative (
   Alternative (some, (<|>)),
@@ -75,7 +94,7 @@ import System.FilePath (makeRelative, takeDirectory)
 import System.IO (hPutStrLn, stderr)
 import Tagger.Info (taggerVersion)
 import Text.TaggerQL (runQuery, tagFile)
-import Util (addFiles)
+import Util (addFiles, compareConcreteTags)
 
 main :: IO ()
 main = do
@@ -136,7 +155,7 @@ programParser =
                       <*> some (argument str (metavar "PATHS"))
                   )
               <|> ( flag'
-                      Tag
+                      Main.Tag
                       ( long "tag"
                           <> help
                             "Run a tagging expression on the file \
@@ -261,7 +280,7 @@ mainProgram (WithDB dbPath cm) = do
                     $ queryResults
           )
           eQueryResults
-      Tag s (T.pack -> tExpr) -> do
+      Main.Tag s (T.pack -> tExpr) -> do
         fs <- queryForFileByPattern (T.pack s) c
         mapM_ ((\fk -> tagFile fk c tExpr) . fileId) fs
       Describe ss ->
@@ -279,30 +298,24 @@ describeFile tc fk = do
   case ctf of
     Just (ConcreteTaggedFile f hm) -> do
       T.IO.putStrLn . filePath $ f
-      mapM_ (printMetaLeaf (0 :: Int) hm)
-        . L.sortOn (descriptor . concreteTagDescriptor)
-        . filter (\x -> HRM.metaMember x hm && not (HRM.infraMember x hm))
-        . HRM.keys
-        $ hm
-      mapM_ (\(ConcreteTag _ (Descriptor _ dp) _) -> T.IO.putStrLn dp)
-        . L.sortOn (descriptor . concreteTagDescriptor)
-        . filter (\x -> not (HRM.metaMember x hm) && not (HRM.infraMember x hm))
-        . HRM.keys
-        $ hm
+      sequence_ $
+        HRM.traverseHierarchyMap
+          0
+          (+ 1)
+          ( \depth (ConcreteTag _ (Descriptor _ dp) _) children -> do
+              T.IO.putStrLn $ T.replicate (2 * depth) " " <> dp <> " {"
+              sequence_ children
+              T.IO.putStrLn $ T.replicate (2 * depth) " " <> "}"
+          )
+          ( \depth ct ->
+              T.IO.putStrLn $
+                T.replicate (2 * depth) " "
+                  <> (descriptor . concreteTagDescriptor $ ct)
+          )
+          (L.sortBy (compareConcreteTags hm))
+          hm
       putStrLn ""
     Nothing -> pure ()
- where
-  printMetaLeaf depth hm ct@(ConcreteTag _ (Descriptor _ dp) _) =
-    let subtags =
-          L.sortOn (descriptor . concreteTagDescriptor)
-            . HS.toList
-            $ HRM.find ct hm
-     in if null subtags
-          then T.IO.putStrLn $ T.replicate (2 * depth) " " <> dp
-          else do
-            T.IO.putStrLn $ T.replicate (2 * depth) " " <> dp <> " {"
-            mapM_ (printMetaLeaf (depth + 1) hm) subtags
-            T.IO.putStrLn $ T.replicate (2 * depth) " " <> "}"
 
 describeDatabaseDescriptors :: TaggedConnection -> IO ()
 describeDatabaseDescriptors tc = do
