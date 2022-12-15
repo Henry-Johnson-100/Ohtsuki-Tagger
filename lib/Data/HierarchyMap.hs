@@ -225,9 +225,9 @@ keys (HierarchyMap m) = HashMap.keys m
 -}
 traverseHierarchyMap ::
   Hashable a =>
-  -- | Depth of the traversal
+  -- | Incremental state of the traversal
   t ->
-  -- | Successor function for the traversal depth
+  -- | Successor function for the traversal state
   (t -> t) ->
   -- | Function called on nodes that have nodes infra to them
   (t -> a -> [b] -> b) ->
@@ -239,14 +239,18 @@ traverseHierarchyMap ::
   -- | The map to traverse
   HierarchyMap a ->
   [b]
-traverseHierarchyMap depthMarker depthSucc onHasInfra onNoInfra sortF hm =
-  map (go depthMarker) . sortF . parentNodes $ hm
+traverseHierarchyMap initSt incrSt onBranch onLeaf transform hm =
+  map (go initSt) . transform . parentNodes $ hm
  where
-  go d' p' =
-    let children = sortF . HashSet.toList $ find p' hm
-     in if Prelude.null children
-          then onNoInfra d' p'
-          else onHasInfra d' p' (map (go (depthSucc d')) children)
+  go st node =
+    let children = find node hm
+     in if HashSet.null children
+          then onLeaf st node
+          else
+            onBranch st node . map (go (incrSt st))
+              . transform
+              . HashSet.toList
+              $ children
 
 {- |
  Entrypoint for a recursive traversal of the map.
