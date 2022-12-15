@@ -56,12 +56,12 @@ import System.Directory (makeAbsolute)
 
 themeConfig :: IO [AppConfig TaggerEvent]
 themeConfig = do
-  defaultThinFont <- T.pack <$> (makeAbsolute =<< PT.getDataFileName "iosevka_thin.ttf")
+  defaultThinFont <- T.pack <$> (makeAbsolute =<< PT.getDataFileName "resources/iosevka_thin.ttf")
   defaultRegularFont <-
     T.pack
-      <$> (makeAbsolute =<< PT.getDataFileName "iosevka_regular.ttf")
-  defaultBoldFont <- T.pack <$> (makeAbsolute =<< PT.getDataFileName "iosevka_bold.ttf")
-  dataIcon <- T.pack <$> (makeAbsolute =<< PT.getDataFileName "Yui_signature_SS.bmp")
+      <$> (makeAbsolute =<< PT.getDataFileName "resources/iosevka_regular.ttf")
+  defaultBoldFont <- T.pack <$> (makeAbsolute =<< PT.getDataFileName "resources/iosevka_bold.ttf")
+  dataIcon <- T.pack <$> (makeAbsolute =<< PT.getDataFileName "resources/Yui_signature_SS.bmp")
   maybeDefaultScaleFactor <- join <$> runMaybeT (taggerConfigScaleFactor <$> getOptConf)
   return
     [ appWindowTitle "Tagger"

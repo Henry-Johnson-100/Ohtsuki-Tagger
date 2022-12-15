@@ -176,7 +176,7 @@ createFocusedFileModel fp =
     }
 
 focusedFileDefaultDataFile :: FilePath
-focusedFileDefaultDataFile = "Yui_signature_SS.png"
+focusedFileDefaultDataFile = "resources/Yui_signature_SS.png"
 
 {- |
  placeholder file id for a default file.
