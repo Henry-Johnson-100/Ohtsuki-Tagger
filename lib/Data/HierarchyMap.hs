@@ -190,7 +190,7 @@ keys (HierarchyMap m) = HashMap.keys m
 
 {- $Traversing
  There are two important subsets of any given 'HierarchyMap`:
- 
+
   - members that are not meta or infra to anything.
   - members that are meta to other members but not infra to anything.
 
