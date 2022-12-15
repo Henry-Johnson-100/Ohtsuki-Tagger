@@ -1,8 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Eta reduce" #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Interface.Widget.Internal.FileDetail (
   widget,
@@ -25,7 +25,6 @@ import Data.Event (
   ),
   TaggerEvent (DoFileSelectionEvent, DoFocusedFileEvent, IOEvent),
  )
-import qualified Data.HashSet as HS
 import Data.HierarchyMap (HierarchyMap)
 import qualified Data.HierarchyMap as HM
 import qualified Data.List as L
@@ -82,6 +81,7 @@ import Monomer (
   draggable,
   dropTargetStyle,
   dropTarget_,
+  hstack,
   hstack_,
   keystroke_,
   label,
@@ -121,16 +121,46 @@ detailPaneTagsWidget
         [ filePathWidget m
         , separatorLine
         , vstack
-            [ vscroll_ [wheelRate 50] $
-                vstack
-                  . map (leaf hm)
-                  . L.sortBy (compareConcreteTags hm)
-                  . HM.parentNodes
-                  $ hm
+            [ imageTagsWidget hm
             , tagTextField
             , deleteTagZone
             ]
         ]
+
+imageTagsWidget ::
+  HierarchyMap ConcreteTag ->
+  TaggerWidget
+imageTagsWidget hm =
+  vscroll_ [wheelRate 50]
+    . vstack
+    . HM.traverseHierarchyMap
+      ()
+      id
+      ( \_ ct@(ConcreteTag tk (Descriptor _ dp) _) children ->
+          vstack
+            [ hstack
+                [ subTagDropTarget tk . box_ [alignLeft, alignTop]
+                    . draggable ct
+                    . withStyleBasic [textColor yuiBlue]
+                    $ label dp
+                , spacer
+                , label "{"
+                ]
+            , hstack
+                [ metaTagLeafSpacer
+                , box_ [alignLeft, alignTop] . vstack $ children
+                ]
+            , label "}"
+            ]
+      )
+      ( \_ ct@(ConcreteTag tk (Descriptor _ dp) _) ->
+          subTagDropTarget tk
+            . box_ [alignLeft, alignTop]
+            . draggable ct
+            $ label dp
+      )
+      (L.sortBy (compareConcreteTags hm))
+    $ hm
 
 filePathWidget :: TaggerModel -> TaggerWidget
 filePathWidget m =
@@ -193,45 +223,6 @@ isFileRenameMode m =
   (m ^. focusedFileModel . focusedFileVis)
     `hasVis` VisibilityLabel fileRenameModeVis
 {-# INLINE isFileRenameMode #-}
-
-leaf ::
-  HierarchyMap ConcreteTag ->
-  ConcreteTag ->
-  TaggerWidget
-leaf hm ct@(ConcreteTag tk (Descriptor _ dp) _) =
-  let subtags =
-        L.sortBy (compareConcreteTags hm)
-          . HS.toList
-          $ HM.find ct hm
-   in if null subtags
-        then
-          subTagDropTarget tk . box_ [alignLeft, alignTop]
-            . draggable ct
-            $ label dp
-        else
-          vstack_
-            []
-            [ hstack_
-                []
-                [ subTagDropTarget tk
-                    . box_ [alignLeft, alignTop]
-                    . draggable ct
-                    . withStyleBasic [textColor yuiBlue]
-                    $ label dp
-                , spacer
-                , label "{"
-                ]
-            , hstack_
-                []
-                [ metaTagLeafSpacer
-                , box_ [alignLeft, alignTop] $
-                    vstack
-                      ( leaf hm
-                          <$> subtags
-                      )
-                ]
-            , label "}"
-            ]
 
 metaTagLeafSpacer :: TaggerWidget
 metaTagLeafSpacer = spacer_ [width 20]

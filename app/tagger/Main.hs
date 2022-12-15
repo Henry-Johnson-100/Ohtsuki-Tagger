@@ -51,6 +51,7 @@ import Database.Tagger (
   allFiles,
   allTags,
   close,
+  concreteTagDescriptor,
   deleteFiles,
   getAllInfra,
   getInfraChildren,
@@ -297,25 +298,24 @@ describeFile tc fk = do
   case ctf of
     Just (ConcreteTaggedFile f hm) -> do
       T.IO.putStrLn . filePath $ f
-      F.traverse_ (printMetaLeaf 0 hm)
-        . L.sortBy (compareConcreteTags hm)
-        . HRM.parentNodes
-        $ hm
+      sequence_ $
+        HRM.traverseHierarchyMap
+          0
+          (+ 1)
+          ( \depth (ConcreteTag _ (Descriptor _ dp) _) children -> do
+              T.IO.putStrLn $ T.replicate (2 * depth) " " <> dp <> " {"
+              sequence_ children
+              T.IO.putStrLn $ T.replicate (2 * depth) " " <> "}"
+          )
+          ( \depth ct ->
+              T.IO.putStrLn $
+                T.replicate (2 * depth) " "
+                  <> (descriptor . concreteTagDescriptor $ ct)
+          )
+          (L.sortBy (compareConcreteTags hm))
+          hm
       putStrLn ""
     Nothing -> pure ()
- where
-  printMetaLeaf depth hm ct@(ConcreteTag _ (Descriptor _ dp) _) =
-    let subtags =
-          L.sortBy
-            (compareConcreteTags hm)
-            . HS.toList
-            $ HRM.find ct hm
-     in if null subtags
-          then T.IO.putStrLn $ T.replicate (2 * depth) " " <> dp
-          else do
-            T.IO.putStrLn $ T.replicate (2 * depth) " " <> dp <> " {"
-            mapM_ (printMetaLeaf (depth + 1) hm) subtags
-            T.IO.putStrLn $ T.replicate (2 * depth) " " <> "}"
 
 describeDatabaseDescriptors :: TaggedConnection -> IO ()
 describeDatabaseDescriptors tc = do

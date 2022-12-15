@@ -54,7 +54,8 @@ module Data.HierarchyMap (
   keys,
 
   -- * Useful traversal functions
-  parentNodes,
+  -- $Mapping
+  traverseHierarchyMap,
 ) where
 
 import qualified Data.Foldable as F
@@ -185,6 +186,67 @@ getAllInfraTo x hm =
 -}
 keys :: HierarchyMap k -> [k]
 keys (HierarchyMap m) = HashMap.keys m
+
+{- $Mapping
+
+ The function 'traverseHierarchyMap` can be used to transform a 'HierarchyMap` to
+ a list of some arbitrary type by traversing each tree in the map starting from
+ its parent node.
+
+ An example function that pretty prints a map:
+
+ @
+  printMap :: (Show a, Ord a) =>
+    HierarchyMap a -> IO ()
+  printMap =
+    sequence_
+    . traverseHierarchyMap
+        0
+        succ
+        (\\depth x mChildren -> do
+          putStrLn $ replicate (2 * depth) " " ++ show x ++ " {"
+          sequence_ mChildren
+          putStrLn "}"
+          )
+        (\\depth x -> putStrLn $ replicate (2 * depth) " " ++ show x)
+        sort
+ @
+-}
+
+{- |
+ Traverses a 'HierarchyMap` and maps each element to some action.
+
+ For example:
+
+ - Pretty-printing a map, mapping each element to some @IO ()@
+ - Building a UI component out of a map, mapping each element to some @Widget s e@
+ - flatten a map to an ordered list of its components
+ - transform each tree in a map to some arbitrary structure starting with its parent node
+-}
+traverseHierarchyMap ::
+  Hashable a =>
+  -- | Depth of the traversal
+  t ->
+  -- | Successor function for the traversal depth
+  (t -> t) ->
+  -- | Function called on nodes that have nodes infra to them
+  (t -> a -> [b] -> b) ->
+  -- | Function called only on nodes that have no nodes infra to them
+  (t -> a -> b) ->
+  -- | Some sort of transformation that takes place each time the children of a node
+  -- are found from the map, this is usually just a sorting function
+  ([a] -> [a]) ->
+  -- | The map to traverse
+  HierarchyMap a ->
+  [b]
+traverseHierarchyMap depthMarker depthSucc onHasInfra onNoInfra sortF hm =
+  map (go depthMarker) . sortF . parentNodes $ hm
+ where
+  go d' p' =
+    let children = sortF . HashSet.toList $ find p' hm
+     in if Prelude.null children
+          then onNoInfra d' p'
+          else onHasInfra d' p' (map (go (depthSucc d')) children)
 
 {- |
  Entrypoint for a recursive traversal of the map.
