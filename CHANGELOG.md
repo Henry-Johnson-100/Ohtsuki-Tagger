@@ -10,18 +10,12 @@
 
 ## Front-end Changes
 * Filter tags showing up in the results pane by pattern and meta-descriptor.
-* Organize the detail pane so that tags with subtags always appear above tags without
-subtags, ordered alphabetically
 * Add some feedback when adding files to the database so the user knows then the process
 is complete, optionally how many files were added.
 * A Query builder element in the query widget section.
 * Add option to rescan known folders.
-* Sort nested tags
 * Bug Fixes
   * Ensure that shell processes spawned via GUI are non-blocking in the GUI
-
-## CLI changes
-* Add option to add files. -A or --add or something.
 
 ## Major Library Changes
 * A macro system for storing queries and expanding them as text in a query.
@@ -79,7 +73,6 @@ is complete, optionally how many files were added.
     - `open`
       - Attempts to open a database file. If the file does not exist or the `TaggerDBInfo` table does not exist, then exit with an error.
     - Both functions above will update a time-stamp field in the database as well as attempt to automatically patch the database if they determine it is out of date.
-
 - Executable Changes
   - Removed the `taggercli` executable.
     - Its functionality has been merged with the normal executable, `tagger`
