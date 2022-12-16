@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# HLINT ignore "Use ||" #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -201,7 +200,7 @@ tagListWidget m =
       ]
   sortedOccurrenceMapList =
     let (OrderBy ordCrit ordDir) = m ^. fileSelectionModel . tagOrdering
-        !occurrenceMapList = OHM.toList $ m ^. fileSelectionModel . tagOccurrences
+        occurrenceMapList = OHM.toList $ m ^. fileSelectionModel . tagOccurrences
      in case (ordCrit, ordDir) of
           (Alphabetic, Asc) -> L.sortOn (descriptor . fst) occurrenceMapList
           (Alphabetic, Desc) -> L.sortOn (O.Down . descriptor . fst) occurrenceMapList
