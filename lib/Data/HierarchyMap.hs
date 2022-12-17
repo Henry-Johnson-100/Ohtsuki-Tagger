@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE StrictData #-}
 
 {- |
@@ -72,10 +73,15 @@ import Data.Maybe (fromMaybe)
 
 {- |
  Map over all elements in the hierarchy.
+
+ This function is safe if and only if:
+
+  - The given function is injective
+  - The given map is not already circular
 -}
-mapHierarchyMap :: Hashable a => (k1 -> a) -> HierarchyMap k1 -> HierarchyMap a
+mapHierarchyMap :: Hashable b => (a -> b) -> HierarchyMap a -> HierarchyMap b
 mapHierarchyMap f (HierarchyMap m) =
-  HierarchyMap . HashMap.mapKeys f . HashMap.map (HashSet.map f) $ m
+  HashMap.foldlWithKey' (\acc k v -> insert (f k) (HashSet.map f v) acc) empty m
 
 {- |
  Union two 'HierarchyMap a` together. Combining the infra relations
