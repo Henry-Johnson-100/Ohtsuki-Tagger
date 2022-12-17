@@ -33,6 +33,8 @@ makeLensesWith abbreviatedFields ''DescriptorInfo
 
 makeLensesWith abbreviatedFields ''FileSelectionModel
 
+makeLensesWith abbreviatedFields ''FileSelectionTagListModel
+
 makeLensesWith abbreviatedFields ''FileInfo
 
 makeLensesWith abbreviatedFields ''TaggerInfoModel

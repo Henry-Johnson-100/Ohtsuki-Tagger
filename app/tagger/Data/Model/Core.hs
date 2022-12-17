@@ -13,6 +13,7 @@ module Data.Model.Core (
   createFileSelectionModel,
   getSelectionChunk,
   selectionChunkLength,
+  FileSelectionTagListModel (..),
   FileInfo (..),
   createFileInfo,
   constructFileInfo,
@@ -81,12 +82,11 @@ createTaggerModel tc d unRelatedD defaultFilePath =
     }
 
 data FileSelectionModel = FileSelectionModel
-  { _fileselectionSelection :: Seq File
+  { _fileselectionTagList :: FileSelectionTagListModel
+  , _fileselectionSelection :: Seq File
   , _fileselectionCurrentChunk :: Int
   , _fileselectionChunkSize :: Int
   , _fileselectionChunkSequence :: Seq Int
-  , _fileselectionTagOccurrences :: OccurrenceHashMap Descriptor
-  , _fileselectionTagOrdering :: OrderBy
   , _fileselectionFileSelectionInfoMap :: IntMap FileInfo
   , _fileselectionSetOp :: SetOp
   , _fileselectionQueryText :: Text
@@ -101,12 +101,11 @@ data FileSelectionModel = FileSelectionModel
 createFileSelectionModel :: FileSelectionModel
 createFileSelectionModel =
   FileSelectionModel
-    { _fileselectionSelection = S.empty
+    { _fileselectionTagList = createFileSelectionTagListModel
+    , _fileselectionSelection = S.empty
     , _fileselectionCurrentChunk = 0
     , _fileselectionChunkSize = 50
     , _fileselectionChunkSequence = S.singleton 0
-    , _fileselectionTagOccurrences = OHM.empty
-    , _fileselectionTagOrdering = OrderBy Numeric Desc
     , _fileselectionFileSelectionInfoMap = IntMap.empty
     , _fileselectionSetOp = Union
     , _fileselectionQueryText = mempty
@@ -115,6 +114,21 @@ createFileSelectionModel =
     , _fileselectionAddFileText = mempty
     , _fileselectionAddFileHistory = createHistory 30
     , _fileselectionIsMassOpMode = False
+    }
+
+data FileSelectionTagListModel = FileSelectionTagListModel
+  { _fileselectiontaglistOccurrences :: OccurrenceHashMap Descriptor
+  , _fileselectiontaglistOrdering :: OrderBy
+  , _fileselectiontaglistFilter :: Text
+  }
+  deriving (Show, Eq)
+
+createFileSelectionTagListModel :: FileSelectionTagListModel
+createFileSelectionTagListModel =
+  FileSelectionTagListModel
+    { _fileselectiontaglistOccurrences = OHM.empty
+    , _fileselectiontaglistOrdering = OrderBy Numeric Desc
+    , _fileselectiontaglistFilter = mempty
     }
 
 data FileInfo = FileInfo

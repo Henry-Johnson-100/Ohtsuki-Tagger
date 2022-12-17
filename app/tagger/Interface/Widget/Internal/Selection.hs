@@ -46,11 +46,12 @@ import Data.Model.Lens (
   HasFileSelectionModel (fileSelectionModel),
   HasFileSelectionVis (fileSelectionVis),
   HasIsMassOpMode (isMassOpMode),
+  HasOccurrences (occurrences),
+  HasOrdering (ordering),
   HasSelection (selection),
   HasSetOp (setOp),
   HasShellText (shellText),
-  HasTagOccurrences (tagOccurrences),
-  HasTagOrdering (tagOrdering),
+  HasTagList (tagList),
   fileInfoAt,
  )
 import Data.Model.Shared.Core (
@@ -183,8 +184,10 @@ tagListWidget m =
           , alignCenter
           , mergeRequired
               ( \_ m1 m2 ->
-                  let neq l = m1 ^. fileSelectionModel . l /= m2 ^. fileSelectionModel . l
-                   in or [neq tagOccurrences, neq tagOrdering]
+                  let neq l =
+                        m1 ^. fileSelectionModel . tagList . l
+                          /= m2 ^. fileSelectionModel . tagList . l
+                   in or [neq occurrences, neq ordering]
               )
           ]
         $ vstack_ [] (tagListLeaf <$> sortedOccurrenceMapList)
@@ -199,15 +202,15 @@ tagListWidget m =
       , tagListOrderDirCycleButton
       ]
   sortedOccurrenceMapList =
-    let (OrderBy ordCrit ordDir) = m ^. fileSelectionModel . tagOrdering
-        occurrenceMapList = OHM.toList $ m ^. fileSelectionModel . tagOccurrences
+    let (OrderBy ordCrit ordDir) = m ^. fileSelectionModel . tagList . ordering
+        occurrenceMapList = OHM.toList $ m ^. fileSelectionModel . tagList . occurrences
      in case (ordCrit, ordDir) of
           (Alphabetic, Asc) -> L.sortOn (descriptor . fst) occurrenceMapList
           (Alphabetic, Desc) -> L.sortOn (O.Down . descriptor . fst) occurrenceMapList
           (Numeric, Asc) -> L.sortOn snd occurrenceMapList
           (Numeric, Desc) -> L.sortOn (O.Down . snd) occurrenceMapList
   tagListOrderCritCycleButton =
-    let (OrderBy ordCrit _) = m ^. fileSelectionModel . tagOrdering
+    let (OrderBy ordCrit _) = m ^. fileSelectionModel . tagList . ordering
         btnText =
           case ordCrit of
             Alphabetic -> "ABC"
@@ -217,7 +220,7 @@ tagListWidget m =
           btnText
           (DoFileSelectionEvent CycleTagOrderCriteria)
   tagListOrderDirCycleButton =
-    let (OrderBy _ ordDir) = m ^. fileSelectionModel . tagOrdering
+    let (OrderBy _ ordDir) = m ^. fileSelectionModel . tagList . ordering
      in styledButton_
           [resizeFactor (-1)]
           (T.pack . show $ ordDir)
