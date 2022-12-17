@@ -55,9 +55,10 @@ data TaggerModel = TaggerModel
   , _taggermodelPositioningModel :: PositioningModel
   , _taggermodelVisibilityModel :: Visibility
   , _taggermodelConnection :: TaggedConnection
-  , _taggermodelIsTagMode :: Bool
-  , _taggerMassTagText :: Text
-  , _taggerShellText :: Text
+  , -- Is a part of the FileSelectionWidget but is logically connected with
+    -- the FocusedFile and FileSelection models. I am not willing to combine those two
+    -- so this will stay here for now.
+    _taggerShellText :: Text
   }
   deriving (Show, Eq)
 
@@ -76,8 +77,6 @@ createTaggerModel tc d unRelatedD defaultFilePath =
     , _taggermodelPositioningModel = createPositioningModel
     , _taggermodelVisibilityModel = VisibilityMain
     , _taggermodelConnection = tc
-    , _taggermodelIsTagMode = True
-    , _taggerMassTagText = ""
     , _taggerShellText = ""
     }
 

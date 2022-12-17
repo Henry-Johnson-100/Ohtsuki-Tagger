@@ -94,7 +94,6 @@ taggerEventHandler
         ]
       ToggleMainVisibility t ->
         [Model $ model & visibilityModel %~ (flip togglePaneVis . VisibilityLabel $ t)]
-      ToggleTagMode -> [Model $ model & isTagMode %~ not]
       CloseConnection -> [Task (IOEvent <$> close conn)]
       IOEvent _ -> []
       AnonymousEvent (fmap (\(TaggerAnonymousEvent e) -> e) -> es) -> es

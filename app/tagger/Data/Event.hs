@@ -31,7 +31,6 @@ data TaggerEvent
   | TaggerInit
   | RefreshUI
   | ToggleMainVisibility Text
-  | ToggleTagMode
   | CloseConnection
   | IOEvent ()
   | -- | A constructor for producing nested lists of tasks in other tasks.
