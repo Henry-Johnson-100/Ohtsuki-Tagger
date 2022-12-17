@@ -19,8 +19,8 @@ Maintainer  : monawasensei@gmail.com
 Contains basic queries such as searching for files by file pattern or searching for
 Descriptor by Relation.
 
-Some other modules may contain SELECT queries that are specific to them, 
-but NO modules other than this contain commands that may modify the contents 
+Some other modules may contain SELECT queries that are specific to them,
+but NO modules other than this contain commands that may modify the contents
 of any of the tables outside of the 'TaggerDBInfo` table.
 -}
 module Database.Tagger.Query (
@@ -47,9 +47,10 @@ module Database.Tagger.Query (
   flatQueryForFileOnMetaRelationPattern,
 
   -- ** 'TaggedFile` and 'ConcreteTaggedFile` Queries
-
+  derefTag,
   -- | Fairly costly compared to most other queries, so should be used sparingly.
   queryForTaggedFileWithFileId,
+  queryForFileTagHierarchyMapByFileId,
   queryForConcreteTaggedFileWithFileId,
 
   -- ** 'Descriptor` Queries
@@ -123,8 +124,10 @@ import Control.Monad (guard, join)
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT, throwE)
 import Control.Monad.Trans.Maybe (MaybeT)
+import Data.Bifunctor (second)
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
+import Data.HierarchyMap (HierarchyMap)
 import qualified Data.HierarchyMap as HAM
 import Data.Maybe (catMaybes, fromMaybe, isNothing)
 import Data.OccurrenceHashMap.Internal (OccurrenceHashMap)
@@ -308,6 +311,28 @@ flatQueryForFileByTagDescriptorPattern p tc = query tc q [p]
     |]
 
 {- |
+ Dereference a 'Tag` to a 'ConcreteTag` from its ID.
+-}
+derefTag :: RecordKey Tag -> TaggedConnection -> MaybeT IO ConcreteTag
+derefTag tid tc = do
+  results <- lift $ query tc q [tid]
+  hoistMaybe . fmap uncurryConcreteTag . head' $ results
+ where
+  uncurryConcreteTag (tid', did, dp, mstid) = ConcreteTag tid' (Descriptor did dp) mstid
+  q =
+    [r|
+    SELECT
+      t.id
+      ,d.id
+      ,d.descriptor
+      ,t.subTagOfId
+    FROM Tag t
+    JOIN Descriptor d
+      ON t.descriptorId = d.id
+    WHERE t.id = ?
+    |]
+
+{- |
  Given a 'File` ID, return the corresponding 'TaggedFile` if it exists.
 -}
 queryForTaggedFileWithFileId :: RecordKey File -> TaggedConnection -> MaybeT IO TaggedFile
@@ -315,6 +340,31 @@ queryForTaggedFileWithFileId rk tc = do
   guard =<< lift (doesFileExist rk tc)
   fileTags <- fmap HashSet.fromList . lift $ queryForFileTagsByFileId rk tc
   return $ TaggedFile rk fileTags
+
+{- |
+ Given a 'File` ID, return a 'HierarchyMap` of its 'Tag`s.
+
+ The map is empty if the 'File` does not exist or if it has no 'Tag`s.
+-}
+queryForFileTagHierarchyMapByFileId ::
+  RecordKey File ->
+  TaggedConnection ->
+  IO (HierarchyMap ConcreteTag)
+queryForFileTagHierarchyMapByFileId fk tc = do
+  fileTags <- queryForFileTagsByFileId fk tc
+  concreteTagRelationTuples <- catMaybeTM (derefRelationTuple . relationTuple) fileTags
+  return . HAM.fromList . map (second HashSet.fromList) $ concreteTagRelationTuples
+ where
+  relationTuple :: Tag -> (RecordKey Tag, [RecordKey Tag])
+  relationTuple (Tag t _ _ ms) =
+    maybe (t, []) (,[t]) ms
+  derefRelationTuple ::
+    (RecordKey Tag, [RecordKey Tag]) ->
+    MaybeT IO (ConcreteTag, [ConcreteTag])
+  derefRelationTuple (x, xs) =
+    (,)
+      <$> derefTag x tc
+      <*> (lift . catMaybeTM (`derefTag` tc) $ xs)
 
 {- |
  Given a 'File` ID, return the corresponding 'ConcreteTaggedFile` if it exists.
@@ -326,44 +376,10 @@ queryForConcreteTaggedFileWithFileId ::
   RecordKey File ->
   TaggedConnection ->
   MaybeT IO ConcreteTaggedFile
-queryForConcreteTaggedFileWithFileId rk tc = do
-  file <- queryForSingleFileByFileId rk tc
-  fileTags <- lift $ queryForFileTagsByFileId rk tc
-  let tagRelationTuples = getRelationTuple <$> fileTags
-  concreteTagRelationTuples <-
-    map (second HashSet.fromList)
-      <$> mapM traverseRelationTuple tagRelationTuples
-  return $ ConcreteTaggedFile file (HAM.fromList concreteTagRelationTuples)
- where
-  getRelationTuple (Tag t _ _ ms) =
-    maybe (t, []) (,[t]) ms
-  traverseRelationTuple (x, xs) = do
-    md <- derefTag x
-    ids <-
-      lift
-        . catMaybeTM derefTag
-        $ xs
-    return (md, ids)
-  second f (x, y) = (x, f y)
-  derefTag :: RecordKey Tag -> MaybeT IO ConcreteTag
-  derefTag tid = do
-    results <- lift $ query tc q [tid]
-    let result = head' results
-    hoistMaybe (toConcreteTag <$> result)
-   where
-    toConcreteTag (tid', did, dp, mstid) = ConcreteTag tid' (Descriptor did dp) mstid
-    q =
-      [r|
-      SELECT
-        t.id
-        ,d.id
-        ,d.descriptor
-        ,t.subTagOfId
-      FROM Tag t
-      JOIN Descriptor d
-        ON t.descriptorId = d.id
-      WHERE t.id = ?
-      |]
+queryForConcreteTaggedFileWithFileId rk tc =
+  ConcreteTaggedFile
+    <$> queryForSingleFileByFileId rk tc
+    <*> lift (queryForFileTagHierarchyMapByFileId rk tc)
 
 {- |
  Query for 'File`s without tags.
