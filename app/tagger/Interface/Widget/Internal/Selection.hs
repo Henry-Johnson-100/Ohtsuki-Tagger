@@ -412,10 +412,10 @@ fileSelectionFileList m =
         `hasVis` VisibilityLabel editFileMode
 
 shellCommandWidget :: TaggerModel -> TaggerWidget
-shellCommandWidget ((^. isMassOpMode) -> isMassOpModeIsTrue) =
+shellCommandWidget ((^. fileSelectionModel . isMassOpMode) -> isMassOpModeIsTrue) =
   box_ [sizeReqUpdater (both (& fixed .~ 0))] $
     hstack
-      [ toggleButton_ "MassOp" isMassOpMode []
+      [ toggleButton_ "MassOp" (fileSelectionModel . isMassOpMode) []
       , keystroke_
           [
             ( "Enter"

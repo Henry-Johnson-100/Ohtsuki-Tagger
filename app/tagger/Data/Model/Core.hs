@@ -56,7 +56,6 @@ data TaggerModel = TaggerModel
   , _taggermodelConnection :: TaggedConnection
   , _taggermodelIsTagMode :: Bool
   , _taggerMassTagText :: Text
-  , _taggerIsMassOpMode :: Bool
   , _taggerShellText :: Text
   }
   deriving (Show, Eq)
@@ -78,7 +77,6 @@ createTaggerModel tc d unRelatedD defaultFilePath =
     , _taggermodelConnection = tc
     , _taggermodelIsTagMode = True
     , _taggerMassTagText = ""
-    , _taggerIsMassOpMode = False
     , _taggerShellText = ""
     }
 
@@ -96,6 +94,7 @@ data FileSelectionModel = FileSelectionModel
   , _fileselectionFileSelectionVis :: Visibility
   , _fileselectionAddFileText :: Text
   , _fileselectionAddFileHistory :: TextHistory
+  , _fileselectionIsMassOpMode :: Bool
   }
   deriving (Show, Eq)
 
@@ -115,6 +114,7 @@ createFileSelectionModel =
     , _fileselectionFileSelectionVis = VisibilityMain
     , _fileselectionAddFileText = mempty
     , _fileselectionAddFileHistory = createHistory 30
+    , _fileselectionIsMassOpMode = False
     }
 
 data FileInfo = FileInfo
