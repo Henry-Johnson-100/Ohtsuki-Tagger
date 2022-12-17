@@ -243,14 +243,10 @@ traverseHierarchyMap initSt incrSt onBranch onLeaf transform hm =
   map (go initSt) . transform . parentNodes $ hm
  where
   go st node =
-    let children = find node hm
-     in if HashSet.null children
+    let children = transform . HashSet.toList $ find node hm
+     in if Prelude.null children
           then onLeaf st node
-          else
-            onBranch st node . map (go (incrSt st))
-              . transform
-              . HashSet.toList
-              $ children
+          else onBranch st node . map (go (incrSt st)) $ children
 
 {- |
  Entrypoint for a recursive traversal of the map.
