@@ -51,8 +51,8 @@ import Data.Model.Lens (
   HasSelection (selection),
   HasSetOp (setOp),
   HasShellText (shellText),
-  HasTagList (tagList),
   fileInfoAt,
+  fileSelectionTagListModel,
  )
 import Data.Model.Shared.Core (
   OrderBy (OrderBy),
@@ -185,8 +185,8 @@ tagListWidget m =
           , mergeRequired
               ( \_ m1 m2 ->
                   let neq l =
-                        m1 ^. fileSelectionModel . tagList . l
-                          /= m2 ^. fileSelectionModel . tagList . l
+                        m1 ^. fileSelectionTagListModel . l
+                          /= m2 ^. fileSelectionTagListModel . l
                    in or [neq occurrences, neq ordering]
               )
           ]
@@ -202,15 +202,15 @@ tagListWidget m =
       , tagListOrderDirCycleButton
       ]
   sortedOccurrenceMapList =
-    let (OrderBy ordCrit ordDir) = m ^. fileSelectionModel . tagList . ordering
-        occurrenceMapList = OHM.toList $ m ^. fileSelectionModel . tagList . occurrences
+    let (OrderBy ordCrit ordDir) = m ^. fileSelectionTagListModel . ordering
+        occurrenceMapList = OHM.toList $ m ^. fileSelectionTagListModel . occurrences
      in case (ordCrit, ordDir) of
           (Alphabetic, Asc) -> L.sortOn (descriptor . fst) occurrenceMapList
           (Alphabetic, Desc) -> L.sortOn (O.Down . descriptor . fst) occurrenceMapList
           (Numeric, Asc) -> L.sortOn snd occurrenceMapList
           (Numeric, Desc) -> L.sortOn (O.Down . snd) occurrenceMapList
   tagListOrderCritCycleButton =
-    let (OrderBy ordCrit _) = m ^. fileSelectionModel . tagList . ordering
+    let (OrderBy ordCrit _) = m ^. fileSelectionTagListModel . ordering
         btnText =
           case ordCrit of
             Alphabetic -> "ABC"
@@ -220,7 +220,7 @@ tagListWidget m =
           btnText
           (DoFileSelectionEvent CycleTagOrderCriteria)
   tagListOrderDirCycleButton =
-    let (OrderBy _ ordDir) = m ^. fileSelectionModel . tagList . ordering
+    let (OrderBy _ ordDir) = m ^. fileSelectionTagListModel . ordering
      in styledButton_
           [resizeFactor (-1)]
           (T.pack . show $ ordDir)

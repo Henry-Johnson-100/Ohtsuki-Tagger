@@ -37,6 +37,7 @@ common tagger-common
                       ,FunctionalDependencies
                       ,StrictData
                       ,ViewPatterns
+                      ,InstanceSigs
 
   other-modules:       Paths_tagger
 

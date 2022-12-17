@@ -136,7 +136,7 @@ fileSelectionEventHandler
       ClearSelection ->
         [ Model $
             model & fileSelectionModel . selection .~ Seq.empty
-              & fileSelectionModel . tagList . occurrences .~ OHM.empty
+              & fileSelectionTagListModel . occurrences .~ OHM.empty
               & fileSelectionModel . fileSelectionInfoMap .~ IntMap.empty
               & fileSelectionModel . fileSelectionVis .~ VisibilityMain
         ]
@@ -160,12 +160,12 @@ fileSelectionEventHandler
       CyclePrevSetOp -> [Model $ model & fileSelectionModel . setOp %~ prev]
       CycleTagOrderCriteria ->
         [ Model $
-            model & fileSelectionModel . tagList . ordering
+            model & fileSelectionTagListModel . ordering
               %~ cycleOrderCriteria
         ]
       CycleTagOrderDirection ->
         [ Model $
-            model & fileSelectionModel . tagList . ordering
+            model & fileSelectionTagListModel . ordering
               %~ cycleOrderDir
         ]
       DeleteFileFromFileSystem fk ->
@@ -268,7 +268,7 @@ fileSelectionEventHandler
       PutTagOccurrenceHashMap_ m ->
         [ Model $
             model
-              & fileSelectionModel . tagList . occurrences .~ m
+              & fileSelectionTagListModel . occurrences .~ m
         ]
       Query ->
         [ Task
