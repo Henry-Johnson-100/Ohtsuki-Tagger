@@ -11,3 +11,5 @@ import Control.Lens
 import Data.Model.Shared.Core
 
 makeLensesWith abbreviatedFields ''TextHistory
+
+makeLensesWith abbreviatedFields ''OrderBy

@@ -98,7 +98,9 @@ taggerEventHandler
       CloseConnection -> [Task (IOEvent <$> close conn)]
       IOEvent _ -> []
       AnonymousEvent (fmap (\(TaggerAnonymousEvent e) -> e) -> es) -> es
-      ClearTextField (TaggerLens l) -> [Model $ model & l .~ mempty]
+      Mempty (TaggerLens l) -> [Model $ model & l .~ mempty]
+      NextCyclicEnum (TaggerLens l) -> [Model $ model & l %~ next]
+      PrevCyclicEnum (TaggerLens l) -> [Model $ model & l %~ prev]
 
 fileSelectionEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -118,7 +120,7 @@ fileSelectionEventHandler
             , Model $
                 model & fileSelectionModel . addFileHistory
                   %~ putHist (T.strip currentAddFileText)
-            , Event . ClearTextField $ TaggerLens (fileSelectionModel . addFileText)
+            , Event . Mempty $ TaggerLens (fileSelectionModel . addFileText)
             ]
       AppendQueryText t ->
         [ Model $
@@ -149,7 +151,6 @@ fileSelectionEventHandler
             [ Event . DoFocusedFileEvent . PutFile $ f
             , Model $ model & fileSelectionModel . selection .~ (f <| (fs |> f'))
             ]
-      CycleNextSetOp -> [Model $ model & fileSelectionModel . setOp %~ next]
       CyclePrevFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []
@@ -158,17 +159,6 @@ fileSelectionEventHandler
             [ Event . DoFocusedFileEvent . PutFile $ f
             , Model $ model & fileSelectionModel . selection .~ (f <| (f' <| fs))
             ]
-      CyclePrevSetOp -> [Model $ model & fileSelectionModel . setOp %~ prev]
-      CycleTagOrderCriteria ->
-        [ Model $
-            model & fileSelectionTagListModel . ordering
-              %~ cycleOrderCriteria
-        ]
-      CycleTagOrderDirection ->
-        [ Model $
-            model & fileSelectionTagListModel . ordering
-              %~ cycleOrderDir
-        ]
       DeleteFileFromFileSystem fk ->
         [ Task (IOEvent <$> rmFile conn fk)
         , Event . DoFileSelectionEvent . RemoveFileFromSelection $ fk
@@ -285,8 +275,8 @@ fileSelectionEventHandler
         , Model $
             model & fileSelectionModel . queryHistory
               %~ putHist (T.strip $ model ^. fileSelectionModel . queryText)
-        , Event (ClearTextField (TaggerLens (fileSelectionModel . queryText)))
-        , Event (DoFileSelectionEvent ResetQueryHistIndex)
+        , Event . Mempty $ TaggerLens (fileSelectionModel . queryText)
+        , Event . DoFileSelectionEvent $ ResetQueryHistIndex
         ]
       RefreshSpecificFile fk ->
         [ Task
@@ -501,7 +491,7 @@ focusedFileEventHandler
                     %~ putHist
                       (T.strip $ model ^. focusedFileModel . tagText)
             , Event
-                . ClearTextField
+                . Mempty
                 $ TaggerLens (focusedFileModel . tagText)
             , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
             ]
@@ -732,7 +722,7 @@ descriptorTreeEventHandler
                 unless (null newDesText) (insertDescriptors newDesText conn)
             )
         , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
-        , Event . ClearTextField $ TaggerLens (descriptorTreeModel . newDescriptorText)
+        , Event . Mempty $ TaggerLens (descriptorTreeModel . newDescriptorText)
         ]
       PutFocusedTree_ nodeName ds desInfoMap ->
         [ Model $

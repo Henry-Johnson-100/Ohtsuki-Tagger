@@ -80,6 +80,7 @@ executable tagger
 
   other-extensions:   RankNTypes
                      ,MultiWayIf
+                     ,ExistentialQuantification
 
   -- ghc-options:
 

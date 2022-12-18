@@ -89,7 +89,11 @@ data OrderCriteria = Alphabetic | Numeric
   deriving
     (Show, Eq, Ord, Enum, Bounded, CyclicEnum)
 
-data OrderBy = OrderBy OrderCriteria OrderDirection deriving (Show, Eq)
+data OrderBy = OrderBy
+  { _orderbyOrderCriteria :: OrderCriteria
+  , _orderbyOrderDirection :: OrderDirection
+  }
+  deriving (Show, Eq)
 
 cycleOrderCriteria :: OrderBy -> OrderBy
 cycleOrderCriteria (OrderBy c d) = OrderBy (next c) d

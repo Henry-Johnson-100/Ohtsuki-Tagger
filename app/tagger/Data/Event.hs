@@ -1,3 +1,5 @@
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# LANGUAGE StrictData #-}
@@ -14,13 +16,22 @@ module Data.Event (
   TaggerInfoEvent (..),
 ) where
 
-import Data.HashSet
+import Data.HashSet (HashSet)
 import Data.IntMap.Strict (IntMap)
-import Data.Model
+import Data.Model.Core (DescriptorInfo, TaggerModel)
+import Data.Model.Lens (TaggerLens)
 import Data.OccurrenceHashMap (OccurrenceHashMap)
 import Data.Sequence (Seq)
+import Data.Tagger (CyclicEnum)
 import Data.Text (Text)
-import Database.Tagger.Type
+import Database.Tagger.Type (
+  ConcreteTag,
+  ConcreteTaggedFile,
+  Descriptor,
+  File,
+  RecordKey,
+  Tag,
+ )
 import Monomer (AppEventResponse)
 
 data TaggerEvent
@@ -37,8 +48,15 @@ data TaggerEvent
     -- a slightly more flexible way of calling 'Event` that should be easier to use
     -- in either a 'Task` or normal 'Event` context
     AnonymousEvent [TaggerAnonymousEvent]
-  | ClearTextField (TaggerLens TaggerModel Text)
-  deriving (Show, Eq)
+  | -- | Existentially quantified event that replaces the given lens
+    --  with a Monoid instance with its identity
+    forall m. Monoid m => Mempty (TaggerLens TaggerModel m)
+  | -- | Existentially quantified event that advances a lens with a 'CyclicEnum` instance
+    -- with 'next`
+    forall c. (CyclicEnum c) => NextCyclicEnum (TaggerLens TaggerModel c)
+  | -- | Existentially quantified event that advances a lens with a 'CyclicEnum` instance
+    -- with 'prev`
+    forall c. (CyclicEnum c) => PrevCyclicEnum (TaggerLens TaggerModel c)
 
 anonymousEvent :: [AppEventResponse TaggerModel TaggerEvent] -> TaggerEvent
 anonymousEvent = AnonymousEvent . fmap TaggerAnonymousEvent
@@ -47,9 +65,11 @@ newtype TaggerAnonymousEvent
   = TaggerAnonymousEvent (AppEventResponse TaggerModel TaggerEvent)
 
 instance Eq TaggerAnonymousEvent where
+  (==) :: TaggerAnonymousEvent -> TaggerAnonymousEvent -> Bool
   _ == _ = False
 
 instance Show TaggerAnonymousEvent where
+  show :: TaggerAnonymousEvent -> String
   show _ = "TaggerAnonymousEvent"
 
 data FileSelectionEvent
@@ -57,11 +77,7 @@ data FileSelectionEvent
   | AppendQueryText Text
   | ClearSelection
   | CycleNextFile
-  | CycleNextSetOp
   | CyclePrevFile
-  | CyclePrevSetOp
-  | CycleTagOrderCriteria
-  | CycleTagOrderDirection
   | DeleteFileFromFileSystem (RecordKey File)
   | DoFileSelectionWidgetEvent FileSelectionWidgetEvent
   | MakeFileSelectionInfoMap (Seq File)

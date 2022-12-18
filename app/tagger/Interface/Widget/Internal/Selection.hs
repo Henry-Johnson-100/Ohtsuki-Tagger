@@ -13,8 +13,6 @@ import Data.Event (
   FileSelectionEvent (
     AddFiles,
     ClearSelection,
-    CycleTagOrderCriteria,
-    CycleTagOrderDirection,
     DeleteFileFromFileSystem,
     DoFileSelectionWidgetEvent,
     NextAddFileHist,
@@ -31,7 +29,7 @@ import Data.Event (
   ),
   FileSelectionWidgetEvent (CycleNextChunk, CyclePrevChunk),
   FocusedFileEvent (RunFocusedFileShellCommand),
-  TaggerEvent (DoFileSelectionEvent, DoFocusedFileEvent, IOEvent),
+  TaggerEvent (DoFileSelectionEvent, DoFocusedFileEvent, IOEvent, NextCyclicEnum),
  )
 import qualified Data.List as L
 import Data.Model.Core (TaggerModel, getSelectionChunk)
@@ -51,6 +49,7 @@ import Data.Model.Lens (
   HasSelection (selection),
   HasSetOp (setOp),
   HasShellText (shellText),
+  TaggerLens (TaggerLens),
   fileInfoAt,
   fileSelectionTagListModel,
  )
@@ -61,6 +60,7 @@ import Data.Model.Shared.Core (
   Visibility (VisibilityAlt, VisibilityLabel),
   hasVis,
  )
+import Data.Model.Shared.Lens (HasOrderCriteria (..), HasOrderDirection (orderDirection))
 import qualified Data.OccurrenceHashMap as OHM
 import qualified Data.Ord as O
 import Data.Sequence ((|>))
@@ -218,13 +218,17 @@ tagListWidget m =
      in styledButton_
           [resizeFactor (-1)]
           btnText
-          (DoFileSelectionEvent CycleTagOrderCriteria)
+          ( NextCyclicEnum $
+              TaggerLens (fileSelectionTagListModel . ordering . orderCriteria)
+          )
   tagListOrderDirCycleButton =
     let (OrderBy _ ordDir) = m ^. fileSelectionTagListModel . ordering
      in styledButton_
           [resizeFactor (-1)]
           (T.pack . show $ ordDir)
-          (DoFileSelectionEvent CycleTagOrderDirection)
+          ( NextCyclicEnum $
+              TaggerLens (fileSelectionTagListModel . ordering . orderDirection)
+          )
   tagListLeaf (d, n) =
     hgrid_
       [childSpacing_ 0]
