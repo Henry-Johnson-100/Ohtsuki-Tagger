@@ -59,7 +59,13 @@ import Data.Model.Shared.Core (
   Visibility (VisibilityAlt, VisibilityLabel),
   hasVis,
  )
-import Data.Model.Shared.Lens (HasHistory (..), HasHistoryIndex (historyIndex), HasOrderCriteria (..), HasOrderDirection (orderDirection), HasText (text))
+import Data.Model.Shared.Lens (
+  HasHistory (history),
+  HasHistoryIndex (historyIndex),
+  HasOrderCriteria (orderCriteria),
+  HasOrderDirection (orderDirection),
+  HasText (text),
+ )
 import qualified Data.OccurrenceHashMap as OHM
 import qualified Data.Ord as O
 import Data.Sequence ((|>))

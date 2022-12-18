@@ -27,7 +27,8 @@ import Data.Event (
 import Data.HierarchyMap (HierarchyMap)
 import qualified Data.HierarchyMap as HM
 import qualified Data.List as L
-import Data.Model (
+import Data.Model.Core (TaggerModel, focusedFileDefaultRecordKey)
+import Data.Model.Lens (
   HasFileInfoRenameText (fileInfoRenameText),
   HasFileSelectionInfoMap (fileSelectionInfoMap),
   HasFileSelectionModel (fileSelectionModel),
@@ -35,12 +36,18 @@ import Data.Model (
   HasFocusedFileModel (focusedFileModel),
   HasFocusedFileVis (focusedFileVis),
   TaggerLens (TaggerLens),
-  TaggerModel,
   fileInfoAt,
-  focusedFileDefaultRecordKey,
   tagInput,
  )
-import Data.Model.Shared (HasHistoryIndex (historyIndex), Visibility (VisibilityLabel), hasVis, history, text)
+import Data.Model.Shared.Core (
+  Visibility (VisibilityLabel),
+  hasVis,
+ )
+import Data.Model.Shared.Lens (
+  HasHistoryIndex (historyIndex),
+  history,
+  text,
+ )
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger (
