@@ -115,21 +115,22 @@ fileSelectionEventHandler
   event =
     case event of
       AddFiles ->
-        let !currentAddFileText = model ^. fileSelectionModel . addFileText
+        let !currentAddFileText = model ^. fileSelectionModel . addFileInput . text
          in [ Task (IOEvent <$> addFiles conn currentAddFileText)
             , Model $
-                model & fileSelectionModel . addFileHistory
+                model & fileSelectionModel . addFileInput . history
                   %~ putHist (T.strip currentAddFileText)
-            , Event . Mempty $ TaggerLens (fileSelectionModel . addFileText)
+            , Event . Mempty $ TaggerLens (fileSelectionModel . addFileInput . text)
             ]
       AppendQueryText t ->
         [ Model $
             model
               & fileSelectionModel
-                . queryText
+                . queryInput
+                . text
               %~ flip
                 T.append
-                ( ( if T.null (model ^. fileSelectionModel . queryText)
+                ( ( if T.null (model ^. fileSelectionModel . queryInput . text)
                       then ""
                       else " "
                   )
@@ -176,34 +177,38 @@ fileSelectionEventHandler
       NextAddFileHist ->
         [ Model $
             model
-              & fileSelectionModel . addFileText
+              & fileSelectionModel . addFileInput . text
                 .~ ( fromMaybe "" . getHist $
-                      (model ^. fileSelectionModel . addFileHistory)
+                      (model ^. fileSelectionModel . addFileInput . history)
                    )
-              & fileSelectionModel . addFileHistory %~ nextHist
+              & fileSelectionModel . addFileInput . history %~ nextHist
         ]
       NextQueryHist ->
         [ Model $
             model
-              & fileSelectionModel . queryText
-                .~ (fromMaybe "" . getHist $ (model ^. fileSelectionModel . queryHistory))
-              & fileSelectionModel . queryHistory %~ nextHist
+              & fileSelectionModel . queryInput . text
+                .~ ( fromMaybe "" . getHist $
+                      (model ^. fileSelectionModel . queryInput . history)
+                   )
+              & fileSelectionModel . queryInput . history %~ nextHist
         ]
       PrevAddFileHist ->
         [ Model $
             model
-              & fileSelectionModel . addFileText
+              & fileSelectionModel . addFileInput . text
                 .~ ( fromMaybe "" . getHist $
-                      (model ^. fileSelectionModel . addFileHistory)
+                      (model ^. fileSelectionModel . addFileInput . history)
                    )
-              & fileSelectionModel . addFileHistory %~ prevHist
+              & fileSelectionModel . addFileInput . history %~ prevHist
         ]
       PrevQueryHist ->
         [ Model $
             model
-              & fileSelectionModel . queryText
-                .~ (fromMaybe "" . getHist $ (model ^. fileSelectionModel . queryHistory))
-              & fileSelectionModel . queryHistory %~ prevHist
+              & fileSelectionModel . queryInput . text
+                .~ ( fromMaybe "" . getHist $
+                      (model ^. fileSelectionModel . queryInput . history)
+                   )
+              & fileSelectionModel . queryInput . history %~ prevHist
         ]
       PutChunkSequence ->
         [ Model $
@@ -266,17 +271,20 @@ fileSelectionEventHandler
             ( do
                 r <-
                   runExceptT $
-                    runQuery conn (T.strip $ model ^. fileSelectionModel . queryText)
+                    runQuery
+                      conn
+                      (T.strip $ model ^. fileSelectionModel . queryInput . text)
                 either
                   (mapM_ T.IO.putStrLn >=> (pure . IOEvent))
                   (return . DoFileSelectionEvent . PutFiles)
                   r
             )
         , Model $
-            model & fileSelectionModel . queryHistory
-              %~ putHist (T.strip $ model ^. fileSelectionModel . queryText)
-        , Event . Mempty $ TaggerLens (fileSelectionModel . queryText)
-        , Event . Mempty $ TaggerLens (fileSelectionModel . queryHistory . historyIndex)
+            model & fileSelectionModel . queryInput . history
+              %~ putHist (T.strip $ model ^. fileSelectionModel . queryInput . text)
+        , Event . Mempty $ TaggerLens (fileSelectionModel . queryInput . text)
+        , Event . Mempty $
+            TaggerLens (fileSelectionModel . queryInput . history . historyIndex)
         ]
       RefreshSpecificFile fk ->
         [ Task
@@ -453,10 +461,11 @@ focusedFileEventHandler
         [ Model $
             model
               & focusedFileModel
-                . tagText
+                . tagInput
+                . text
               %~ flip
                 T.append
-                ( ( if T.null (model ^. focusedFileModel . tagText)
+                ( ( if T.null (model ^. focusedFileModel . tagInput . text)
                       then ""
                       else " "
                   )
@@ -472,17 +481,17 @@ focusedFileEventHandler
               )
               conn
               ( T.strip $
-                  model ^. focusedFileModel . tagText
+                  model ^. focusedFileModel . tagInput . text
               )
           callback
             [ Model $
                 model
-                  & focusedFileModel . tagHistory
+                  & focusedFileModel . tagInput . history
                     %~ putHist
-                      (T.strip $ model ^. focusedFileModel . tagText)
+                      (T.strip $ model ^. focusedFileModel . tagInput . text)
             , Event
                 . Mempty
-                $ TaggerLens (focusedFileModel . tagText)
+                $ TaggerLens (focusedFileModel . tagInput . text)
             , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
             ]
       DeleteTag t ->
@@ -554,16 +563,20 @@ focusedFileEventHandler
       NextTagHist ->
         [ Model $
             model
-              & focusedFileModel . tagText
-                .~ (fromMaybe "" . getHist $ (model ^. focusedFileModel . tagHistory))
-              & focusedFileModel . tagHistory %~ nextHist
+              & focusedFileModel . tagInput . text
+                .~ ( fromMaybe "" . getHist $
+                      (model ^. focusedFileModel . tagInput . history)
+                   )
+              & focusedFileModel . tagInput . history %~ nextHist
         ]
       PrevTagHist ->
         [ Model $
             model
-              & focusedFileModel . tagText
-                .~ (fromMaybe "" . getHist $ (model ^. focusedFileModel . tagHistory))
-              & focusedFileModel . tagHistory %~ prevHist
+              & focusedFileModel . tagInput . text
+                .~ ( fromMaybe "" . getHist $
+                      (model ^. focusedFileModel . tagInput . history)
+                   )
+              & focusedFileModel . tagInput . history %~ prevHist
         ]
       PutConcreteFile_ cf@(ConcreteTaggedFile (File _ fp) _) ->
         [ Model $

@@ -13,7 +13,7 @@ module Interface.Widget.Internal.Query (
 import Control.Lens
 import Data.Event
 import Data.Model
-import Data.Model.Shared (HasHistoryIndex (historyIndex))
+import Data.Model.Shared (HasHistoryIndex (historyIndex), history, text)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger
@@ -48,11 +48,18 @@ queryTextField =
     . withNodeKey queryTextFieldKey
     . withStyleBasic [bgColor (yuiLightPeach & a .~ defaultElementOpacity)]
     $ textField_
-      (fileSelectionModel . queryText)
+      (fileSelectionModel . queryInput . text)
       [ onChange
           ( \t ->
               if T.null . T.strip $ t
-                then Mempty $ TaggerLens (fileSelectionModel . queryHistory . historyIndex)
+                then
+                  Mempty $
+                    TaggerLens
+                      ( fileSelectionModel
+                          . queryInput
+                          . history
+                          . historyIndex
+                      )
                 else IOEvent ()
           )
       ]

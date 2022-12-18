@@ -33,8 +33,6 @@ import Data.Event (
 import qualified Data.List as L
 import Data.Model.Core (TaggerModel, getSelectionChunk)
 import Data.Model.Lens (
-  HasAddFileHistory (addFileHistory),
-  HasAddFileText (addFileText),
   HasChunkSequence (chunkSequence),
   HasChunkSize (chunkSize),
   HasCurrentChunk (currentChunk),
@@ -50,6 +48,7 @@ import Data.Model.Lens (
   HasSetOp (setOp),
   HasShellText (shellText),
   TaggerLens (TaggerLens),
+  addFileInput,
   fileInfoAt,
   fileSelectionTagListModel,
  )
@@ -60,7 +59,7 @@ import Data.Model.Shared.Core (
   Visibility (VisibilityAlt, VisibilityLabel),
   hasVis,
  )
-import Data.Model.Shared.Lens (HasHistoryIndex (historyIndex), HasOrderCriteria (..), HasOrderDirection (orderDirection))
+import Data.Model.Shared.Lens (HasHistory (..), HasHistoryIndex (historyIndex), HasOrderCriteria (..), HasOrderDirection (orderDirection), HasText (text))
 import qualified Data.OccurrenceHashMap as OHM
 import qualified Data.Ord as O
 import Data.Sequence ((|>))
@@ -314,7 +313,7 @@ fileSelectionFileList m =
                   , neq chunkSequence
                   , neq chunkSize
                   , neq fileSelectionVis
-                  , neq addFileText
+                  , neq (addFileInput . text)
                   ]
         )
   renderedChunks =
@@ -467,13 +466,18 @@ addFilesWidget =
       []
       [ styledButton_ [resizeFactor (-1)] "Add" (DoFileSelectionEvent AddFiles)
       , textField_
-          (fileSelectionModel . addFileText)
+          (fileSelectionModel . addFileInput . text)
           [ onChange
               ( \t ->
                   if T.null t
                     then
                       Mempty $
-                        TaggerLens (fileSelectionModel . addFileHistory . historyIndex)
+                        TaggerLens
+                          ( fileSelectionModel
+                              . addFileInput
+                              . history
+                              . historyIndex
+                          )
                     else IOEvent ()
               )
           ]

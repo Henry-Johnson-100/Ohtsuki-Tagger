@@ -34,14 +34,13 @@ import Data.Model (
   HasFocusedFile (focusedFile),
   HasFocusedFileModel (focusedFileModel),
   HasFocusedFileVis (focusedFileVis),
-  HasTagHistory (tagHistory),
-  HasTagText (tagText),
   TaggerLens (TaggerLens),
   TaggerModel,
   fileInfoAt,
   focusedFileDefaultRecordKey,
+  tagInput,
  )
-import Data.Model.Shared (HasHistoryIndex (historyIndex), Visibility (VisibilityLabel), hasVis)
+import Data.Model.Shared (HasHistoryIndex (historyIndex), Visibility (VisibilityLabel), hasVis, history, text)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger (
@@ -288,11 +287,18 @@ tagTextField =
       , maxHeight 250
       ]
     $ textArea_
-      (focusedFileModel . tagText)
+      (focusedFileModel . tagInput . text)
       [ onChange
           ( \t ->
               if T.null . T.strip $ t
-                then Mempty $ TaggerLens (focusedFileModel . tagHistory . historyIndex)
+                then
+                  Mempty $
+                    TaggerLens
+                      ( focusedFileModel
+                          . tagInput
+                          . history
+                          . historyIndex
+                      )
                 else IOEvent ()
           )
       , acceptTab

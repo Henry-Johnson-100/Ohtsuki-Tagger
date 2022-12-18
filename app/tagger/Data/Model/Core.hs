@@ -86,11 +86,9 @@ data FileSelectionModel = FileSelectionModel
   , _fileselectionChunkSequence :: Seq Int
   , _fileselectionFileSelectionInfoMap :: IntMap FileInfo
   , _fileselectionSetOp :: SetOp
-  , _fileselectionQueryText :: Text
-  , _fileselectionQueryHistory :: TextHistory
+  , _fileselectionQueryInput :: TextInput
   , _fileselectionFileSelectionVis :: Visibility
-  , _fileselectionAddFileText :: Text
-  , _fileselectionAddFileHistory :: TextHistory
+  , _fileselectionAddFileInput :: TextInput
   , _fileselectionIsMassOpMode :: Bool
   }
   deriving (Show, Eq)
@@ -105,11 +103,9 @@ createFileSelectionModel =
     , _fileselectionChunkSequence = S.singleton 0
     , _fileselectionFileSelectionInfoMap = IntMap.empty
     , _fileselectionSetOp = Union
-    , _fileselectionQueryText = mempty
-    , _fileselectionQueryHistory = createHistory 10
+    , _fileselectionQueryInput = createTextInput 10
     , _fileselectionFileSelectionVis = VisibilityMain
-    , _fileselectionAddFileText = mempty
-    , _fileselectionAddFileHistory = createHistory 30
+    , _fileselectionAddFileInput = createTextInput 10
     , _fileselectionIsMassOpMode = False
     }
 
@@ -141,7 +137,11 @@ constructFileInfo :: Text -> FileInfo
 constructFileInfo t = FileInfo t False
 
 selectionChunkLength :: TaggerModel -> Int
-selectionChunkLength m = 1 + ((Seq.length . _fileselectionSelection . _taggermodelFileSelectionModel $ m) `div` (_fileselectionChunkSize . _taggermodelFileSelectionModel $ m))
+selectionChunkLength m =
+  1
+    + ( (Seq.length . _fileselectionSelection . _taggermodelFileSelectionModel $ m)
+          `div` (_fileselectionChunkSize . _taggermodelFileSelectionModel $ m)
+      )
 
 getSelectionChunk :: TaggerModel -> Seq File
 getSelectionChunk m =
@@ -170,8 +170,7 @@ data FocusedFileModel = FocusedFileModel
   { _focusedfilemodelFocusedFile :: ConcreteTaggedFile
   , _focusedfilemodelRenderability :: Renderability
   , _focusedfilemodelFocusedFileVis :: Visibility
-  , _focusedfilemodelTagText :: Text
-  , _focusedfilemodelTagHistory :: TextHistory
+  , _focusedfilemodelTagInput :: TextInput
   }
   deriving (Show, Eq)
 
@@ -182,8 +181,7 @@ createFocusedFileModel fp =
         ConcreteTaggedFile (File focusedFileDefaultRecordKey fp) empty
     , _focusedfilemodelRenderability = RenderingNotSupported
     , _focusedfilemodelFocusedFileVis = VisibilityMain
-    , _focusedfilemodelTagText = mempty
-    , _focusedfilemodelTagHistory = createHistory 10
+    , _focusedfilemodelTagInput = createTextInput 10
     }
 
 focusedFileDefaultDataFile :: FilePath

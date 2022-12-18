@@ -15,6 +15,8 @@ module Data.Model.Shared.Core (
   OrderBy (..),
   cycleOrderCriteria,
   cycleOrderDir,
+  TextInput (..),
+  createTextInput,
   TextHistory (..),
   createHistory,
   nextHist,
@@ -102,6 +104,21 @@ cycleOrderCriteria (OrderBy c d) = OrderBy (next c) d
 
 cycleOrderDir :: OrderBy -> OrderBy
 cycleOrderDir (OrderBy c d) = OrderBy c (next d)
+
+{- |
+ Data type that has Text and a TextHistory
+-}
+data TextInput = TextInput
+  { _textinputText :: Text
+  , _textinputHistory :: TextHistory
+  }
+  deriving (Show, Eq)
+
+{- |
+ Where the Int is the size of the history.
+-}
+createTextInput :: Int -> TextInput
+createTextInput = TextInput mempty . createHistory
 
 data TextHistory = TextHistory
   { _textHistorySize :: Int
