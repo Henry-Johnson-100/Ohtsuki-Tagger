@@ -310,6 +310,7 @@ fileSelectionFileList m =
                   , neq chunkSequence
                   , neq chunkSize
                   , neq fileSelectionVis
+                  , neq addFileText
                   ]
         )
   renderedChunks =

@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# HLINT ignore "Use list comprehension" #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# HLINT ignore "Use const" #-}
@@ -89,7 +90,7 @@ taggerEventHandler
         , SetFocusOnKey . WidgetKey $ queryTextFieldKey
         ]
       RefreshUI ->
-        [ Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
+        [ Event . DoDescriptorTreeEvent $ RefreshBothDescriptorTrees
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
       ToggleMainVisibility t ->
@@ -97,7 +98,7 @@ taggerEventHandler
       CloseConnection -> [Task (IOEvent <$> close conn)]
       IOEvent _ -> []
       AnonymousEvent (fmap (\(TaggerAnonymousEvent e) -> e) -> es) -> es
-      ClearTextField (TaggerLens l) -> [Model $ model & l .~ ""]
+      ClearTextField (TaggerLens l) -> [Model $ model & l .~ mempty]
 
 fileSelectionEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -112,12 +113,13 @@ fileSelectionEventHandler
   event =
     case event of
       AddFiles ->
-        [ Task (IOEvent <$> addFiles conn (model ^. fileSelectionModel . addFileText))
-        , Model $
-            model & fileSelectionModel . addFileHistory
-              %~ putHist (T.strip $ model ^. fileSelectionModel . addFileText)
-        , Event (ClearTextField (TaggerLens (fileSelectionModel . addFileText)))
-        ]
+        let !currentAddFileText = model ^. fileSelectionModel . addFileText
+         in [ Task (IOEvent <$> addFiles conn currentAddFileText)
+            , Model $
+                model & fileSelectionModel . addFileHistory
+                  %~ putHist (T.strip currentAddFileText)
+            , Event . ClearTextField $ TaggerLens (fileSelectionModel . addFileText)
+            ]
       AppendQueryText t ->
         [ Model $
             model
