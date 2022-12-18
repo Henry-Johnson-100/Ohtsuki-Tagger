@@ -17,12 +17,17 @@ import Data.Event (
     CommitTagText,
     DeleteTag,
     MoveTag,
-    NextTagHist,
-    PrevTagHist,
     TagFile,
     ToggleFocusedFilePaneVisibility
   ),
-  TaggerEvent (DoFileSelectionEvent, DoFocusedFileEvent, IOEvent, Mempty),
+  TaggerEvent (
+    DoFileSelectionEvent,
+    DoFocusedFileEvent,
+    IOEvent,
+    Mempty,
+    NextHistory,
+    PrevHistory
+  ),
  )
 import Data.HierarchyMap (HierarchyMap)
 import qualified Data.HierarchyMap as HM
@@ -275,8 +280,8 @@ tagTextField :: TaggerWidget
 tagTextField =
   keystroke_
     [ ("Shift-Enter", DoFocusedFileEvent CommitTagText)
-    , ("Shift-Up", DoFocusedFileEvent NextTagHist)
-    , ("Shift-Down", DoFocusedFileEvent PrevTagHist)
+    , ("Shift-Up", NextHistory $ TaggerLens (focusedFileModel . tagInput))
+    , ("Shift-Down", PrevHistory $ TaggerLens (focusedFileModel . tagInput))
     ]
     []
     . dropTarget_

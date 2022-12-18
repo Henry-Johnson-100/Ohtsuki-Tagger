@@ -15,8 +15,6 @@ import Data.Event (
     ClearSelection,
     DeleteFileFromFileSystem,
     DoFileSelectionWidgetEvent,
-    NextAddFileHist,
-    PrevAddFileHist,
     RefreshFileSelection,
     RemoveFileFromDatabase,
     RemoveFileFromSelection,
@@ -28,7 +26,15 @@ import Data.Event (
   ),
   FileSelectionWidgetEvent (CycleNextChunk, CyclePrevChunk),
   FocusedFileEvent (RunFocusedFileShellCommand),
-  TaggerEvent (DoFileSelectionEvent, DoFocusedFileEvent, IOEvent, Mempty, NextCyclicEnum),
+  TaggerEvent (
+    DoFileSelectionEvent,
+    DoFocusedFileEvent,
+    IOEvent,
+    Mempty,
+    NextCyclicEnum,
+    NextHistory,
+    PrevHistory
+  ),
  )
 import qualified Data.List as L
 import Data.Model.Core (TaggerModel, getSelectionChunk)
@@ -465,8 +471,8 @@ addFilesWidget :: TaggerWidget
 addFilesWidget =
   keystroke
     [ ("Enter", DoFileSelectionEvent AddFiles)
-    , ("Up", DoFileSelectionEvent NextAddFileHist)
-    , ("Down", DoFileSelectionEvent PrevAddFileHist)
+    , ("Up", NextHistory $ TaggerLens (fileSelectionModel . addFileInput))
+    , ("Down", PrevHistory $ TaggerLens (fileSelectionModel . addFileInput))
     ]
     $ hstack_
       []

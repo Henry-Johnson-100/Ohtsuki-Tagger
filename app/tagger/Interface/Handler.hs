@@ -101,6 +101,18 @@ taggerEventHandler
       Mempty (TaggerLens l) -> [Model $ model & l .~ mempty]
       NextCyclicEnum (TaggerLens l) -> [Model $ model & l %~ next]
       PrevCyclicEnum (TaggerLens l) -> [Model $ model & l %~ prev]
+      NextHistory (TaggerLens l) ->
+        [ Model $
+            model
+              & l . text .~ (fromMaybe "" . getHist $ model ^. l . history)
+              & l . history %~ nextHist
+        ]
+      PrevHistory (TaggerLens l) ->
+        [ Model $
+            model
+              & l . text .~ (fromMaybe "" . getHist $ model ^. l . history)
+              & l . history %~ prevHist
+        ]
 
 fileSelectionEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -173,42 +185,6 @@ fileSelectionEventHandler
                   & fileSelectionModel
                     . fileSelectionInfoMap
                   .~ IntMap.fromList m
-        ]
-      NextAddFileHist ->
-        [ Model $
-            model
-              & fileSelectionModel . addFileInput . text
-                .~ ( fromMaybe "" . getHist $
-                      (model ^. fileSelectionModel . addFileInput . history)
-                   )
-              & fileSelectionModel . addFileInput . history %~ nextHist
-        ]
-      NextQueryHist ->
-        [ Model $
-            model
-              & fileSelectionModel . queryInput . text
-                .~ ( fromMaybe "" . getHist $
-                      (model ^. fileSelectionModel . queryInput . history)
-                   )
-              & fileSelectionModel . queryInput . history %~ nextHist
-        ]
-      PrevAddFileHist ->
-        [ Model $
-            model
-              & fileSelectionModel . addFileInput . text
-                .~ ( fromMaybe "" . getHist $
-                      (model ^. fileSelectionModel . addFileInput . history)
-                   )
-              & fileSelectionModel . addFileInput . history %~ prevHist
-        ]
-      PrevQueryHist ->
-        [ Model $
-            model
-              & fileSelectionModel . queryInput . text
-                .~ ( fromMaybe "" . getHist $
-                      (model ^. fileSelectionModel . queryInput . history)
-                   )
-              & fileSelectionModel . queryInput . history %~ prevHist
         ]
       PutChunkSequence ->
         [ Model $
@@ -560,24 +536,6 @@ focusedFileEventHandler
                 lift $ moveSubTags ((oldTagKey,) <$> newTags) conn
                 lift $ deleteTags [oldTagKey] conn
             either (hPutStrLn stderr) return result
-      NextTagHist ->
-        [ Model $
-            model
-              & focusedFileModel . tagInput . text
-                .~ ( fromMaybe "" . getHist $
-                      (model ^. focusedFileModel . tagInput . history)
-                   )
-              & focusedFileModel . tagInput . history %~ nextHist
-        ]
-      PrevTagHist ->
-        [ Model $
-            model
-              & focusedFileModel . tagInput . text
-                .~ ( fromMaybe "" . getHist $
-                      (model ^. focusedFileModel . tagInput . history)
-                   )
-              & focusedFileModel . tagInput . history %~ prevHist
-        ]
       PutConcreteFile_ cf@(ConcreteTaggedFile (File _ fp) _) ->
         [ Model $
             model

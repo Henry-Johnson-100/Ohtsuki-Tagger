@@ -20,6 +20,7 @@ import Data.HashSet (HashSet)
 import Data.IntMap.Strict (IntMap)
 import Data.Model.Core (DescriptorInfo, TaggerModel)
 import Data.Model.Lens (TaggerLens)
+import Data.Model.Shared.Core (TextInput)
 import Data.OccurrenceHashMap (OccurrenceHashMap)
 import Data.Sequence (Seq)
 import Data.Tagger (CyclicEnum)
@@ -57,6 +58,8 @@ data TaggerEvent
   | -- | Existentially quantified event that advances a lens with a 'CyclicEnum` instance
     -- with 'prev`
     forall c. (CyclicEnum c) => PrevCyclicEnum (TaggerLens TaggerModel c)
+  | NextHistory (TaggerLens TaggerModel TextInput)
+  | PrevHistory (TaggerLens TaggerModel TextInput)
 
 anonymousEvent :: [AppEventResponse TaggerModel TaggerEvent] -> TaggerEvent
 anonymousEvent = AnonymousEvent . fmap TaggerAnonymousEvent
@@ -81,10 +84,6 @@ data FileSelectionEvent
   | DeleteFileFromFileSystem (RecordKey File)
   | DoFileSelectionWidgetEvent FileSelectionWidgetEvent
   | MakeFileSelectionInfoMap (Seq File)
-  | NextAddFileHist
-  | NextQueryHist
-  | PrevAddFileHist
-  | PrevQueryHist
   | PutChunkSequence
   | PutFiles (HashSet File)
   | PutFilesNoCombine (Seq File)
@@ -118,8 +117,6 @@ data FocusedFileEvent
   | CommitTagText
   | DeleteTag (RecordKey Tag)
   | MoveTag ConcreteTag (Maybe (RecordKey Tag))
-  | NextTagHist
-  | PrevTagHist
   | PutConcreteFile_ ConcreteTaggedFile
   | PutFile File
   | RefreshFocusedFileAndSelection

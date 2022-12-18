@@ -13,11 +13,15 @@ import Control.Lens ((&), (.~))
 import Data.Event (
   FileSelectionEvent (
     AppendQueryText,
-    NextQueryHist,
-    PrevQueryHist,
     Query
   ),
-  TaggerEvent (DoFileSelectionEvent, IOEvent, Mempty),
+  TaggerEvent (
+    DoFileSelectionEvent,
+    IOEvent,
+    Mempty,
+    NextHistory,
+    PrevHistory
+  ),
  )
 import Data.Model.Core (TaggerModel)
 import Data.Model.Lens (
@@ -75,8 +79,8 @@ queryTextField :: TaggerWidget
 queryTextField =
   keystroke_
     [ ("Enter", DoFileSelectionEvent Query)
-    , ("Up", DoFileSelectionEvent NextQueryHist)
-    , ("Down", DoFileSelectionEvent PrevQueryHist)
+    , ("Up", NextHistory $ TaggerLens (fileSelectionModel . queryInput))
+    , ("Down", PrevHistory $ TaggerLens (fileSelectionModel . queryInput))
     ]
     []
     . dropTarget_
