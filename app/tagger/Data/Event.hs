@@ -20,6 +20,7 @@ import Data.HashSet (HashSet)
 import Data.IntMap.Strict (IntMap)
 import Data.Model.Core (DescriptorInfo, TaggerModel)
 import Data.Model.Lens (TaggerLens)
+import Data.Model.Shared (Visibility)
 import Data.Model.Shared.Core (TextInput)
 import Data.OccurrenceHashMap (OccurrenceHashMap)
 import Data.Sequence (Seq)
@@ -42,7 +43,6 @@ data TaggerEvent
   | DoTaggerInfoEvent TaggerInfoEvent
   | TaggerInit
   | RefreshUI
-  | ToggleMainVisibility Text
   | CloseConnection
   | IOEvent ()
   | -- | A constructor for producing nested lists of tasks in other tasks.
@@ -60,6 +60,7 @@ data TaggerEvent
     forall c. (CyclicEnum c) => PrevCyclicEnum (TaggerLens TaggerModel c)
   | NextHistory (TaggerLens TaggerModel TextInput)
   | PrevHistory (TaggerLens TaggerModel TextInput)
+  | ToggleVisibilityLabel (TaggerLens TaggerModel Visibility) Text
 
 anonymousEvent :: [AppEventResponse TaggerModel TaggerEvent] -> TaggerEvent
 anonymousEvent = AnonymousEvent . fmap TaggerAnonymousEvent
@@ -102,7 +103,6 @@ data FileSelectionEvent
   | RunSelectionShellCommand
   | ShuffleSelection
   | ToggleSelectionView
-  | TogglePaneVisibility Text
   deriving (Show, Eq)
 
 data FileSelectionWidgetEvent
@@ -122,7 +122,6 @@ data FocusedFileEvent
   | RefreshFocusedFileAndSelection
   | RunFocusedFileShellCommand
   | TagFile (RecordKey Descriptor) (Maybe (RecordKey Tag))
-  | ToggleFocusedFilePaneVisibility Text
   | UnSubTag (RecordKey Tag)
   deriving (Show, Eq)
 
@@ -139,7 +138,6 @@ data DescriptorTreeEvent
   | RefreshUnrelated
   | RequestFocusedNode Text
   | RequestFocusedNodeParent
-  | ToggleDescriptorTreeVisibility Text
   | UpdateDescriptor (RecordKey Descriptor)
   deriving (Show, Eq)
 

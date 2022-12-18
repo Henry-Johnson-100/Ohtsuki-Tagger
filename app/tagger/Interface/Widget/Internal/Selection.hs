@@ -21,7 +21,6 @@ import Data.Event (
     RenameFile,
     RunSelectionShellCommand,
     ShuffleSelection,
-    TogglePaneVisibility,
     ToggleSelectionView
   ),
   FileSelectionWidgetEvent (CycleNextChunk, CyclePrevChunk),
@@ -33,7 +32,8 @@ import Data.Event (
     Mempty,
     NextCyclicEnum,
     NextHistory,
-    PrevHistory
+    PrevHistory,
+    ToggleVisibilityLabel
   ),
  )
 import qualified Data.List as L
@@ -500,7 +500,10 @@ toggleFileEditMode =
   styledButton_
     [resizeFactor (-1)]
     "Edit"
-    (DoFileSelectionEvent (TogglePaneVisibility editFileMode))
+    ( ToggleVisibilityLabel
+        (TaggerLens $ fileSelectionModel . fileSelectionVis)
+        editFileMode
+    )
 
 editFileMode :: Text
 editFileMode = "edit-file"

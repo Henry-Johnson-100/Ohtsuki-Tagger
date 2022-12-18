@@ -17,7 +17,7 @@ import Data.Event (
     NextCyclicEnum,
     PrevCyclicEnum,
     RefreshUI,
-    ToggleMainVisibility
+    ToggleVisibilityLabel
   ),
   anonymousEvent,
  )
@@ -172,7 +172,10 @@ globalKeystrokes m =
       , anonymousEvent $
           if (m ^. visibilityModel) `hasVis` VisibilityLabel fileDetailDescriptorTreeHide
             then
-              [ Event . ToggleMainVisibility $ fileDetailDescriptorTreeHide
+              [ Event $
+                  ToggleVisibilityLabel
+                    (TaggerLens visibilityModel)
+                    fileDetailDescriptorTreeHide
               , SetFocusOnKey . WidgetKey $ FileDetail.tagTextNodeKey
               ]
             else [SetFocusOnKey . WidgetKey $ FileDetail.tagTextNodeKey]
@@ -182,7 +185,10 @@ globalKeystrokes m =
       , anonymousEvent $
           if (m ^. visibilityModel) `hasVis` VisibilityLabel selectionQueryHideLabel
             then
-              [ Event . ToggleMainVisibility $ selectionQueryHideLabel
+              [ Event $
+                  ToggleVisibilityLabel
+                    (TaggerLens visibilityModel)
+                    selectionQueryHideLabel
               , SetFocusOnKey . WidgetKey $ Query.queryTextFieldKey
               ]
             else [SetFocusOnKey . WidgetKey $ Query.queryTextFieldKey]
@@ -194,7 +200,10 @@ globalKeystrokes m =
       ( "Ctrl-h"
       , anonymousEvent
           [ Model $ m & positioningModel .~ createPositioningModel
-          , Event . ToggleMainVisibility $ globalWidgetHideLabel
+          , Event $
+              ToggleVisibilityLabel
+                (TaggerLens visibilityModel)
+                globalWidgetHideLabel
           ]
       )
     ,
@@ -203,7 +212,10 @@ globalKeystrokes m =
           [ Model $
               m & positioningModel
                 %~ defaultSelectionAndQueryPositioningModel
-          , Event . ToggleMainVisibility $ selectionQueryHideLabel
+          , Event $
+              ToggleVisibilityLabel
+                (TaggerLens visibilityModel)
+                selectionQueryHideLabel
           ]
       )
     ,
@@ -212,7 +224,10 @@ globalKeystrokes m =
           [ Model $
               m & positioningModel
                 %~ defaultFileDetailAndDescriptorTreePositioningModel
-          , Event . ToggleMainVisibility $ fileDetailDescriptorTreeHide
+          , Event $
+              ToggleVisibilityLabel
+                (TaggerLens visibilityModel)
+                fileDetailDescriptorTreeHide
           ]
       )
     ]

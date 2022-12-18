@@ -93,8 +93,6 @@ taggerEventHandler
         [ Event . DoDescriptorTreeEvent $ RefreshBothDescriptorTrees
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
-      ToggleMainVisibility t ->
-        [Model $ model & visibilityModel %~ (flip togglePaneVis . VisibilityLabel $ t)]
       CloseConnection -> [Task (IOEvent <$> close conn)]
       IOEvent _ -> []
       AnonymousEvent (fmap (\(TaggerAnonymousEvent e) -> e) -> es) -> es
@@ -113,6 +111,8 @@ taggerEventHandler
               & l . text .~ (fromMaybe "" . getHist $ model ^. l . history)
               & l . history %~ prevHist
         ]
+      ToggleVisibilityLabel (TaggerLens l) t ->
+        [Model $ model & l %~ flip togglePaneVis (VisibilityLabel t)]
 
 fileSelectionEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -366,11 +366,6 @@ fileSelectionEventHandler
                 <$> shuffleSequence (model ^. fileSelectionModel . selection)
             )
         ]
-      TogglePaneVisibility t ->
-        [ Model $
-            model & fileSelectionModel . fileSelectionVis
-              %~ flip togglePaneVis (VisibilityLabel t)
-        ]
       ToggleSelectionView ->
         [ Model $
             model
@@ -598,11 +593,6 @@ focusedFileEventHandler
                 )
             , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
             ]
-      ToggleFocusedFilePaneVisibility t ->
-        [ Model $
-            model & focusedFileModel . focusedFileVis
-              %~ flip togglePaneVis (VisibilityLabel t)
-        ]
       UnSubTag tk ->
         [ Task (IOEvent <$> unSubTags [tk] conn)
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
@@ -747,11 +737,6 @@ descriptorTreeEventHandler
                   (pure . DoDescriptorTreeEvent . RequestFocusedNode . descriptor)
                   pd
             )
-        ]
-      ToggleDescriptorTreeVisibility l ->
-        [ Model $
-            model & descriptorTreeModel . descriptorTreeVis
-              %~ flip togglePaneVis (VisibilityLabel l)
         ]
       UpdateDescriptor rkd@(RecordKey (fromIntegral -> dk)) ->
         let updateText =

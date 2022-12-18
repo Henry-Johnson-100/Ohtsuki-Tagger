@@ -17,8 +17,7 @@ import Data.Event (
     CommitTagText,
     DeleteTag,
     MoveTag,
-    TagFile,
-    ToggleFocusedFilePaneVisibility
+    TagFile
   ),
   TaggerEvent (
     DoFileSelectionEvent,
@@ -26,7 +25,8 @@ import Data.Event (
     IOEvent,
     Mempty,
     NextHistory,
-    PrevHistory
+    PrevHistory,
+    ToggleVisibilityLabel
   ),
  )
 import Data.HierarchyMap (HierarchyMap)
@@ -185,8 +185,9 @@ filePathWidget m =
         $ styledButton_
           [resizeFactor (-1)]
           "Rename"
-          ( DoFocusedFileEvent
-              (ToggleFocusedFilePaneVisibility fileRenameModeVis)
+          ( ToggleVisibilityLabel
+              (TaggerLens $ focusedFileModel . focusedFileVis)
+              fileRenameModeVis
           )
     , zstack_
         []
