@@ -100,8 +100,6 @@ data FileSelectionEvent
   | RemoveFileFromDatabase (RecordKey File)
   | RemoveFileFromSelection (RecordKey File)
   | RenameFile (RecordKey File)
-  | ResetAddFileHistIndex
-  | ResetQueryHistIndex
   | RunSelectionShellCommand
   | ShuffleSelection
   | ToggleSelectionView
@@ -125,7 +123,6 @@ data FocusedFileEvent
   | PutConcreteFile_ ConcreteTaggedFile
   | PutFile File
   | RefreshFocusedFileAndSelection
-  | ResetTagHistIndex
   | RunFocusedFileShellCommand
   | TagFile (RecordKey Descriptor) (Maybe (RecordKey Tag))
   | ToggleFocusedFilePaneVisibility Text

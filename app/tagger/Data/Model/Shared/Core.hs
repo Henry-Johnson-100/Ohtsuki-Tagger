@@ -1,5 +1,6 @@
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Data.Model.Shared.Core (
@@ -22,6 +23,7 @@ module Data.Model.Shared.Core (
   getHist,
 ) where
 
+import Data.Monoid (Sum (..))
 import Data.Sequence (Seq ((:<|)), (<|))
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
@@ -103,7 +105,7 @@ cycleOrderDir (OrderBy c d) = OrderBy c (next d)
 
 data TextHistory = TextHistory
   { _textHistorySize :: Int
-  , _textHistoryIndex :: Int
+  , _textHistoryIndex :: Sum Int
   , _textHistoryContents :: Seq Text
   }
   deriving (Show, Eq)
@@ -112,17 +114,17 @@ createHistory :: Int -> TextHistory
 createHistory n = TextHistory n 0 Seq.empty
 
 getHist :: TextHistory -> Maybe Text
-getHist (TextHistory _ ix h) = Seq.lookup ix h
+getHist (TextHistory _ (getSum -> ix) h) = Seq.lookup ix h
 
 nextHist :: TextHistory -> TextHistory
 nextHist (TextHistory n ix h) =
   TextHistory
     n
-    ( if ix >= n
-        then n
+    ( if getSum ix >= n
+        then Sum n
         else
           let histSize = Seq.length h - 1
-           in if ix >= histSize then histSize else ix + 1
+           in if getSum ix >= histSize then Sum histSize else ix + 1
     )
     h
 

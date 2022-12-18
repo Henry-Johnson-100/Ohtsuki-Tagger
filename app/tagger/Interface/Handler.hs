@@ -276,7 +276,7 @@ fileSelectionEventHandler
             model & fileSelectionModel . queryHistory
               %~ putHist (T.strip $ model ^. fileSelectionModel . queryText)
         , Event . Mempty $ TaggerLens (fileSelectionModel . queryText)
-        , Event . DoFileSelectionEvent $ ResetQueryHistIndex
+        , Event . Mempty $ TaggerLens (fileSelectionModel . queryHistory . historyIndex)
         ]
       RefreshSpecificFile fk ->
         [ Task
@@ -356,16 +356,6 @@ fileSelectionEventHandler
                       result
                 )
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
-        ]
-      ResetAddFileHistIndex ->
-        [ Model $
-            model
-              & fileSelectionModel . addFileHistory . historyIndex .~ 0
-        ]
-      ResetQueryHistIndex ->
-        [ Model $
-            model
-              & fileSelectionModel . queryHistory . historyIndex .~ 0
         ]
       RunSelectionShellCommand ->
         [ Task
@@ -607,11 +597,6 @@ focusedFileEventHandler
             . concreteTaggedFile
             $ model ^. focusedFileModel . focusedFile
         , Event . DoFileSelectionEvent $ RefreshFileSelection
-        ]
-      ResetTagHistIndex ->
-        [ Model $
-            model
-              & focusedFileModel . tagHistory . historyIndex .~ 0
         ]
       RunFocusedFileShellCommand ->
         [ Task

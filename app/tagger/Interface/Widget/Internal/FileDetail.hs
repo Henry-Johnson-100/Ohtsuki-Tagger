@@ -19,11 +19,10 @@ import Data.Event (
     MoveTag,
     NextTagHist,
     PrevTagHist,
-    ResetTagHistIndex,
     TagFile,
     ToggleFocusedFilePaneVisibility
   ),
-  TaggerEvent (DoFileSelectionEvent, DoFocusedFileEvent, IOEvent),
+  TaggerEvent (DoFileSelectionEvent, DoFocusedFileEvent, IOEvent, Mempty),
  )
 import Data.HierarchyMap (HierarchyMap)
 import qualified Data.HierarchyMap as HM
@@ -35,12 +34,14 @@ import Data.Model (
   HasFocusedFile (focusedFile),
   HasFocusedFileModel (focusedFileModel),
   HasFocusedFileVis (focusedFileVis),
+  HasTagHistory (tagHistory),
   HasTagText (tagText),
+  TaggerLens (TaggerLens),
   TaggerModel,
   fileInfoAt,
   focusedFileDefaultRecordKey,
  )
-import Data.Model.Shared (Visibility (VisibilityLabel), hasVis)
+import Data.Model.Shared (HasHistoryIndex (historyIndex), Visibility (VisibilityLabel), hasVis)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger (
@@ -291,10 +292,8 @@ tagTextField =
       [ onChange
           ( \t ->
               if T.null . T.strip $ t
-                then DoFocusedFileEvent ResetTagHistIndex
-                else
-                  IOEvent
-                    ()
+                then Mempty $ TaggerLens (focusedFileModel . tagHistory . historyIndex)
+                else IOEvent ()
           )
       , acceptTab
       ]

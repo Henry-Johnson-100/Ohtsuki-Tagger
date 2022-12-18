@@ -21,7 +21,6 @@ import Data.Event (
     RemoveFileFromDatabase,
     RemoveFileFromSelection,
     RenameFile,
-    ResetAddFileHistIndex,
     RunSelectionShellCommand,
     ShuffleSelection,
     TogglePaneVisibility,
@@ -29,11 +28,12 @@ import Data.Event (
   ),
   FileSelectionWidgetEvent (CycleNextChunk, CyclePrevChunk),
   FocusedFileEvent (RunFocusedFileShellCommand),
-  TaggerEvent (DoFileSelectionEvent, DoFocusedFileEvent, IOEvent, NextCyclicEnum),
+  TaggerEvent (DoFileSelectionEvent, DoFocusedFileEvent, IOEvent, Mempty, NextCyclicEnum),
  )
 import qualified Data.List as L
 import Data.Model.Core (TaggerModel, getSelectionChunk)
 import Data.Model.Lens (
+  HasAddFileHistory (addFileHistory),
   HasAddFileText (addFileText),
   HasChunkSequence (chunkSequence),
   HasChunkSize (chunkSize),
@@ -60,7 +60,7 @@ import Data.Model.Shared.Core (
   Visibility (VisibilityAlt, VisibilityLabel),
   hasVis,
  )
-import Data.Model.Shared.Lens (HasOrderCriteria (..), HasOrderDirection (orderDirection))
+import Data.Model.Shared.Lens (HasHistoryIndex (historyIndex), HasOrderCriteria (..), HasOrderDirection (orderDirection))
 import qualified Data.OccurrenceHashMap as OHM
 import qualified Data.Ord as O
 import Data.Sequence ((|>))
@@ -471,7 +471,9 @@ addFilesWidget =
           [ onChange
               ( \t ->
                   if T.null t
-                    then DoFileSelectionEvent ResetAddFileHistIndex
+                    then
+                      Mempty $
+                        TaggerLens (fileSelectionModel . addFileHistory . historyIndex)
                     else IOEvent ()
               )
           ]

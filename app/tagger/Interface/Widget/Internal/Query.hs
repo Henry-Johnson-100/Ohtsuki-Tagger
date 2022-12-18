@@ -13,6 +13,7 @@ module Interface.Widget.Internal.Query (
 import Control.Lens
 import Data.Event
 import Data.Model
+import Data.Model.Shared (HasHistoryIndex (historyIndex))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger
@@ -51,7 +52,7 @@ queryTextField =
       [ onChange
           ( \t ->
               if T.null . T.strip $ t
-                then DoFileSelectionEvent ResetQueryHistIndex
+                then Mempty $ TaggerLens (fileSelectionModel . queryHistory . historyIndex)
                 else IOEvent ()
           )
       ]
