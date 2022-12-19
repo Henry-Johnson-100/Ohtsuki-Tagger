@@ -207,7 +207,18 @@ tagListWidget m =
                    in or [neq occurrences, neq ordering, neq include]
               )
           ]
-        $ vstack_ [] (tagListLeaf <$> sortedOccurrenceMapList)
+        $ vstack_
+          []
+          ( let includeSet = m ^. fileSelectionTagListModel . include
+             in if HS.null includeSet
+                  then map tagListLeaf sortedOccurrenceMapList
+                  else
+                    [ tagListLeaf x
+                    | x <-
+                        sortedOccurrenceMapList
+                    , HS.member (descriptorId . fst $ x) includeSet
+                    ]
+          )
     ]
  where
   tagListHeader =
@@ -248,18 +259,14 @@ tagListWidget m =
               TaggerLens (fileSelectionTagListModel . ordering . orderDirection)
           )
   tagListLeaf (d, n) =
-    withNodeVisible
-      ( let includeSet = m ^. fileSelectionTagListModel . include
-         in HS.null includeSet || (flip HS.member includeSet . descriptorId $ d)
-      )
-      . hgrid_
-        [childSpacing_ 0]
-      $ [ draggable d . withStyleBasic [textRight, paddingR 1.5]
-            . flip label_ []
-            . descriptor
-            $ d
-        , withStyleBasic [paddingL 1.5, borderL 1 black] . label . T.pack . show $ n
-        ]
+    hgrid_
+      [childSpacing_ 0]
+      [ draggable d . withStyleBasic [textRight, paddingR 1.5]
+          . flip label_ []
+          . descriptor
+          $ d
+      , withStyleBasic [paddingL 1.5, borderL 1 black] . label . T.pack . show $ n
+      ]
 
 toggleViewSelectionButton :: TaggerWidget
 toggleViewSelectionButton =
