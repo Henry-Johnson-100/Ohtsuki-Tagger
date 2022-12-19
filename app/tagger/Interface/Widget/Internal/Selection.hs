@@ -454,7 +454,12 @@ shellCommandWidget :: TaggerModel -> TaggerWidget
 shellCommandWidget ((^. fileSelectionModel . isMassOpMode) -> isMassOpModeIsTrue) =
   box_ [sizeReqUpdater (both (& fixed .~ 0))] $
     hstack
-      [ toggleButton_ "MassOp" (fileSelectionModel . isMassOpMode) []
+      [ withStyleBasic [bgColor yuiLightPeach]
+          . tooltip_
+            "If toggled, \
+            \uses the entire selection as arguments to the given shell command."
+            [tooltipDelay 1000]
+          $ toggleButton_ "MassOp" (fileSelectionModel . isMassOpMode) []
       , keystroke_
           [
             ( "Enter"
@@ -464,6 +469,10 @@ shellCommandWidget ((^. fileSelectionModel . isMassOpMode) -> isMassOpModeIsTrue
             )
           ]
           [ignoreChildrenEvts]
+          . withStyleBasic [bgColor yuiLightPeach]
+          . tooltip_
+            "Run a shell command with the file(s) as arguments."
+            [tooltipDelay 1000]
           . withStyleBasic
             [ minWidth 80
             , bgColor (yuiLightPeach & a .~ defaultElementOpacity)
@@ -474,6 +483,10 @@ shellCommandWidget ((^. fileSelectionModel . isMassOpMode) -> isMassOpModeIsTrue
 tagListFilterTextField :: TaggerWidget
 tagListFilterTextField =
   box_ [mergeRequired (\_ _ _ -> False)]
+    . withStyleBasic [bgColor yuiLightPeach]
+    . tooltip_
+      "Filter the list of tag occurrences by a MetaDescriptor pattern"
+      [tooltipDelay 1000]
     . withStyleBasic [bgColor (yuiLightPeach & a .~ defaultElementOpacity)]
     $ textFieldV
       mempty
