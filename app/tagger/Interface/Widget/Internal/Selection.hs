@@ -86,6 +86,7 @@ import qualified Data.Text as T
 import Database.Tagger (Descriptor (descriptor), File (File), descriptorId)
 import Interface.Theme (yuiLightPeach, yuiRed)
 import Interface.Widget.Internal.Core (
+  defaultElementOpacity,
   styledButton_,
   withNodeKey,
   withNodeVisible,
@@ -141,6 +142,7 @@ import Monomer (
   zstack_,
  )
 import Monomer.Core.Lens (fixed)
+import Monomer.Graphics.Lens (a)
 import Util (both)
 
 widget :: TaggerModel -> TaggerWidget
@@ -462,14 +464,18 @@ shellCommandWidget ((^. fileSelectionModel . isMassOpMode) -> isMassOpModeIsTrue
             )
           ]
           [ignoreChildrenEvts]
-          . withStyleBasic [minWidth 80]
+          . withStyleBasic
+            [ minWidth 80
+            , bgColor (yuiLightPeach & a .~ defaultElementOpacity)
+            ]
           $ textField_ shellText []
       ]
 
 tagListFilterTextField :: TaggerWidget
 tagListFilterTextField =
-  box_ [mergeRequired (\_ _ _ -> False)] $
-    textFieldV
+  box_ [mergeRequired (\_ _ _ -> False)]
+    . withStyleBasic [bgColor (yuiLightPeach & a .~ defaultElementOpacity)]
+    $ textFieldV
       mempty
       ( \t ->
           anonymousEvent
