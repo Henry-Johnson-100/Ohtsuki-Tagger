@@ -177,7 +177,7 @@ fileSelectionEventHandler
         , Event . DoFileSelectionEvent . RemoveFileFromSelection $ fk
         ]
       DoFileSelectionWidgetEvent e -> fileSelectionWidgetEventHandler wenv node model e
-      ExcludeTagListInfraToPattern t -> anonymousTask $ do
+      IncludeTagListInfraToPattern t -> anonymousTask $ do
         !infraDs <-
           fmap (HS.fromList . map descriptorId . concat)
             . mapM (flip getAllInfra conn . descriptorId)

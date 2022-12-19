@@ -15,7 +15,7 @@ import Data.Event (
     ClearSelection,
     DeleteFileFromFileSystem,
     DoFileSelectionWidgetEvent,
-    ExcludeTagListInfraToPattern,
+    IncludeTagListInfraToPattern,
     RefreshFileSelection,
     RemoveFileFromDatabase,
     RemoveFileFromSelection,
@@ -492,7 +492,7 @@ tagListFilterTextField =
       mempty
       ( \t ->
           anonymousEvent
-            [Event . DoFileSelectionEvent . ExcludeTagListInfraToPattern $ t]
+            [Event . DoFileSelectionEvent . IncludeTagListInfraToPattern $ t]
       )
 
 fileSelectionChunkSizeNumField :: TaggerWidget
