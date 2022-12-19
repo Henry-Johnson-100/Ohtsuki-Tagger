@@ -22,6 +22,7 @@ import Data.Model.Core (DescriptorInfo, TaggerModel)
 import Data.Model.Lens (TaggerLens)
 import Data.Model.Shared (Visibility)
 import Data.Model.Shared.Core (TextInput)
+import Data.OccurrenceHashMap (OccurrenceHashMap)
 import Data.Sequence (Seq)
 import Data.Tagger (CyclicEnum)
 import Data.Text (Text)
@@ -87,6 +88,7 @@ data FileSelectionEvent
   | PutChunkSequence
   | PutFiles (HashSet File)
   | PutFilesNoCombine (Seq File)
+  | PutTagOccurrenceHashMap_ (OccurrenceHashMap Descriptor)
   | Query
   | RefreshFileSelection
   | RefreshSpecificFile (RecordKey File)
