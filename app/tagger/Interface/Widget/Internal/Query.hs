@@ -12,15 +12,15 @@ module Interface.Widget.Internal.Query (
 import Control.Lens ((&), (.~))
 import Data.Event (
   FileSelectionEvent (
-    AppendQueryText,
     Query
   ),
   TaggerEvent (
+    AppendText,
     DoFileSelectionEvent,
-    Unit,
     Mempty,
     NextHistory,
-    PrevHistory
+    PrevHistory,
+    Unit
   ),
  )
 import Data.Model.Core (TaggerModel)
@@ -84,13 +84,16 @@ queryTextField =
     ]
     []
     . dropTarget_
-      (DoFileSelectionEvent . AppendQueryText . descriptor . concreteTagDescriptor)
+      ( AppendText (TaggerLens $ fileSelectionModel . queryInput . text)
+          . descriptor
+          . concreteTagDescriptor
+      )
       [dropTargetStyle [border 1 yuiRed]]
     . dropTarget_
-      (DoFileSelectionEvent . AppendQueryText . filePath)
+      (AppendText (TaggerLens $ fileSelectionModel . queryInput . text) . filePath)
       [dropTargetStyle [border 1 yuiOrange]]
     . dropTarget_
-      (DoFileSelectionEvent . AppendQueryText . descriptor)
+      (AppendText (TaggerLens $ fileSelectionModel . queryInput . text) . descriptor)
       [dropTargetStyle [border 1 yuiBlue]]
     . withNodeKey queryTextFieldKey
     . withStyleBasic [bgColor (yuiLightPeach & a .~ defaultElementOpacity)]

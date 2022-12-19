@@ -113,6 +113,19 @@ taggerEventHandler
         ]
       ToggleVisibilityLabel (TaggerLens l) t ->
         [Model $ model & l %~ flip togglePaneVis (VisibilityLabel t)]
+      AppendText (TaggerLens l) t ->
+        [ let currentText = model ^. l
+           in Model $
+                model & l
+                  %~ flip
+                    (<>)
+                    ( ( if currentText == ""
+                          then ""
+                          else " "
+                      )
+                        <> t
+                    )
+        ]
 
 fileSelectionEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -134,21 +147,6 @@ fileSelectionEventHandler
                   %~ putHist (T.strip currentAddFileText)
             , Event . Mempty $ TaggerLens (fileSelectionModel . addFileInput . text)
             ]
-      AppendQueryText t ->
-        [ Model $
-            model
-              & fileSelectionModel
-                . queryInput
-                . text
-              %~ flip
-                T.append
-                ( ( if T.null (model ^. fileSelectionModel . queryInput . text)
-                      then ""
-                      else " "
-                  )
-                    <> t
-                )
-        ]
       ClearSelection ->
         [ Model $
             model & fileSelectionModel . selection .~ Seq.empty
@@ -442,21 +440,6 @@ focusedFileEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
-      AppendTagText t ->
-        [ Model $
-            model
-              & focusedFileModel
-                . tagInput
-                . text
-              %~ flip
-                T.append
-                ( ( if T.null (model ^. focusedFileModel . tagInput . text)
-                      then ""
-                      else " "
-                  )
-                    <> t
-                )
-        ]
       CommitTagText ->
         anonymousTask $ do
           _ <-

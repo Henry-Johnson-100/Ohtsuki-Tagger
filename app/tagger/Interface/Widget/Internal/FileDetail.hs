@@ -13,20 +13,20 @@ import Control.Lens ((^.))
 import Data.Event (
   FileSelectionEvent (RenameFile),
   FocusedFileEvent (
-    AppendTagText,
     CommitTagText,
     DeleteTag,
     MoveTag,
     TagFile
   ),
   TaggerEvent (
+    AppendText,
     DoFileSelectionEvent,
     DoFocusedFileEvent,
-    Unit,
     Mempty,
     NextHistory,
     PrevHistory,
-    ToggleVisibilityLabel
+    ToggleVisibilityLabel,
+    Unit
   ),
  )
 import Data.HierarchyMap (HierarchyMap)
@@ -286,10 +286,13 @@ tagTextField =
     ]
     []
     . dropTarget_
-      (DoFocusedFileEvent . AppendTagText . descriptor . concreteTagDescriptor)
+      ( AppendText (TaggerLens $ focusedFileModel . tagInput . text)
+          . descriptor
+          . concreteTagDescriptor
+      )
       [dropTargetStyle [border 1 yuiRed]]
     . dropTarget_
-      (DoFocusedFileEvent . AppendTagText . descriptor)
+      (AppendText (TaggerLens $ focusedFileModel . tagInput . text) . descriptor)
       [dropTargetStyle [border 1 yuiBlue]]
     . withNodeKey tagTextNodeKey
     . withStyleBasic

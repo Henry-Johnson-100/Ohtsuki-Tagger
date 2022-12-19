@@ -16,6 +16,7 @@ module Data.Event (
   TaggerInfoEvent (..),
 ) where
 
+import Data.HashMap.Strict (HashMap)
 import Data.HashSet (HashSet)
 import Data.IntMap.Strict (IntMap)
 import Data.Model.Core (DescriptorInfo, TaggerModel)
@@ -23,6 +24,7 @@ import Data.Model.Lens (TaggerLens)
 import Data.Model.Shared (Visibility)
 import Data.Model.Shared.Core (TextInput)
 import Data.Sequence (Seq)
+import Data.String (IsString)
 import Data.Tagger (CyclicEnum)
 import Data.Text (Text)
 import Database.Tagger.Type (
@@ -34,7 +36,6 @@ import Database.Tagger.Type (
   Tag,
  )
 import Monomer (AppEventResponse)
-import Data.HashMap.Strict (HashMap)
 
 data TaggerEvent
   = DoFocusedFileEvent FocusedFileEvent
@@ -61,6 +62,8 @@ data TaggerEvent
   | NextHistory (TaggerLens TaggerModel TextInput)
   | PrevHistory (TaggerLens TaggerModel TextInput)
   | ToggleVisibilityLabel (TaggerLens TaggerModel Visibility) Text
+  | -- | Existentially quantified event for appending a string to a string lens.
+    forall t. (IsString t, Semigroup t, Eq t) => AppendText (TaggerLens TaggerModel t) t
 
 anonymousEvent :: [AppEventResponse TaggerModel TaggerEvent] -> TaggerEvent
 anonymousEvent = AnonymousEvent . fmap TaggerAnonymousEvent
@@ -78,7 +81,6 @@ instance Show TaggerAnonymousEvent where
 
 data FileSelectionEvent
   = AddFiles
-  | AppendQueryText Text
   | ClearSelection
   | CycleNextFile
   | CyclePrevFile
@@ -114,8 +116,7 @@ data FileSelectionWidgetEvent
   deriving (Show, Eq)
 
 data FocusedFileEvent
-  = AppendTagText Text
-  | CommitTagText
+  = CommitTagText
   | DeleteTag (RecordKey Tag)
   | MoveTag ConcreteTag (Maybe (RecordKey Tag))
   | PutConcreteFile ConcreteTaggedFile
