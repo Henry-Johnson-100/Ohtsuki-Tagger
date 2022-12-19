@@ -9,7 +9,6 @@
 # Planned
 
 ## Front-end Changes
-* Filter tags showing up in the results pane by pattern and meta-descriptor.
 * Add some feedback when adding files to the database so the user knows then the process
 is complete, optionally how many files were added.
 * A Query builder element in the query widget section.
