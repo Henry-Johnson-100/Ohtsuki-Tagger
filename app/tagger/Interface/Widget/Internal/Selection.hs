@@ -28,14 +28,15 @@ import Data.Event (
   TaggerEvent (
     DoFileSelectionEvent,
     DoFocusedFileEvent,
-    Unit,
     Mempty,
     NextCyclicEnum,
     NextHistory,
     PrevHistory,
-    ToggleVisibilityLabel
+    ToggleVisibilityLabel,
+    Unit
   ),
  )
+import qualified Data.HashMap.Strict as HM
 import qualified Data.List as L
 import Data.Model.Core (TaggerModel, getSelectionChunk)
 import Data.Model.Lens (
@@ -72,7 +73,6 @@ import Data.Model.Shared.Lens (
   HasOrderDirection (orderDirection),
   HasText (text),
  )
-import qualified Data.OccurrenceHashMap as OHM
 import qualified Data.Ord as O
 import Data.Sequence ((|>))
 import qualified Data.Sequence as Seq
@@ -214,7 +214,7 @@ tagListWidget m =
       ]
   sortedOccurrenceMapList =
     let (OrderBy ordCrit ordDir) = m ^. fileSelectionTagListModel . ordering
-        occurrenceMapList = OHM.toList $ m ^. fileSelectionTagListModel . occurrences
+        occurrenceMapList = HM.toList $ m ^. fileSelectionTagListModel . occurrences
      in case (ordCrit, ordDir) of
           (Alphabetic, Asc) -> L.sortOn (descriptor . fst) occurrenceMapList
           (Alphabetic, Desc) -> L.sortOn (O.Down . descriptor . fst) occurrenceMapList

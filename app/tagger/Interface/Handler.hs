@@ -18,6 +18,7 @@ import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import Data.Event
 import qualified Data.Foldable as F
+import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import Data.HierarchyMap (empty)
 import qualified Data.HierarchyMap as HAM
@@ -25,7 +26,6 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.Maybe
 import Data.Model
 import Data.Model.Shared
-import qualified Data.OccurrenceHashMap as OHM
 import Data.Sequence (Seq ((:<|), (:|>)))
 import qualified Data.Sequence as Seq
 import Data.Tagger
@@ -152,7 +152,7 @@ fileSelectionEventHandler
       ClearSelection ->
         [ Model $
             model & fileSelectionModel . selection .~ Seq.empty
-              & fileSelectionTagListModel . occurrences .~ OHM.empty
+              & fileSelectionTagListModel . occurrences .~ HM.empty
               & fileSelectionModel . fileSelectionInfoMap .~ IntMap.empty
               & fileSelectionModel . fileSelectionVis .~ VisibilityMain
         ]
@@ -352,17 +352,17 @@ fileSelectionEventHandler
             ( DoFileSelectionEvent . PutTagOccurrenceHashMap_
                 <$> foldM
                   ( \acc fk ->
-                      OHM.union acc
+                      HM.unionWith (+) acc
                         . F.foldl'
                           ( \acc' d ->
-                              if OHM.get d acc' == 0
-                                then OHM.occur d acc'
+                              if not (HM.member d acc')
+                                then HM.insert d 1 acc'
                                 else acc'
                           )
-                          OHM.empty
+                          HM.empty
                         <$> queryForDescriptorByFileId fk conn
                   )
-                  OHM.empty
+                  HM.empty
                   fks
             )
         ]

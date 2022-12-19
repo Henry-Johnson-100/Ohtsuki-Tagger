@@ -31,13 +31,13 @@ module Data.Model.Core (
   defaultFileDetailAndDescriptorTreePositioningModel,
 ) where
 
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HM
 import Data.HierarchyMap (empty)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Maybe
 import Data.Model.Shared
-import Data.OccurrenceHashMap (OccurrenceHashMap)
-import qualified Data.OccurrenceHashMap as OHM
 import Data.Sequence (Seq)
 import qualified Data.Sequence as S
 import qualified Data.Sequence as Seq
@@ -110,7 +110,7 @@ createFileSelectionModel =
     }
 
 data FileSelectionTagListModel = FileSelectionTagListModel
-  { _fileselectiontaglistOccurrences :: OccurrenceHashMap Descriptor
+  { _fileselectiontaglistOccurrences :: HashMap Descriptor Int
   , _fileselectiontaglistOrdering :: OrderBy
   , _fileselectiontaglistFilter :: Text
   }
@@ -119,7 +119,7 @@ data FileSelectionTagListModel = FileSelectionTagListModel
 createFileSelectionTagListModel :: FileSelectionTagListModel
 createFileSelectionTagListModel =
   FileSelectionTagListModel
-    { _fileselectiontaglistOccurrences = OHM.empty
+    { _fileselectiontaglistOccurrences = HM.empty
     , _fileselectiontaglistOrdering = OrderBy Numeric Desc
     , _fileselectiontaglistFilter = mempty
     }

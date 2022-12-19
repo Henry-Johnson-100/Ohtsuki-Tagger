@@ -22,7 +22,6 @@ import Data.Model.Core (DescriptorInfo, TaggerModel)
 import Data.Model.Lens (TaggerLens)
 import Data.Model.Shared (Visibility)
 import Data.Model.Shared.Core (TextInput)
-import Data.OccurrenceHashMap (OccurrenceHashMap)
 import Data.Sequence (Seq)
 import Data.Tagger (CyclicEnum)
 import Data.Text (Text)
@@ -35,6 +34,7 @@ import Database.Tagger.Type (
   Tag,
  )
 import Monomer (AppEventResponse)
+import Data.HashMap.Strict (HashMap)
 
 data TaggerEvent
   = DoFocusedFileEvent FocusedFileEvent
@@ -88,13 +88,13 @@ data FileSelectionEvent
   | PutChunkSequence
   | PutFiles (HashSet File)
   | PutFilesNoCombine (Seq File)
-  | PutTagOccurrenceHashMap_ (OccurrenceHashMap Descriptor)
+  | PutTagOccurrenceHashMap_ (HashMap Descriptor Int)
   | Query
   | RefreshFileSelection
   | RefreshSpecificFile (RecordKey File)
   | RefreshSpecificFile_ File
   | RefreshTagOccurrences
-  | -- | Given a Traversable of File keys, fetch an OccurrenceHashMap. Saves having to
+  | -- | Given a Traversable of File keys, fetch (HashMap Descriptor Int). Saves having to
     -- call toList on the selection Seq in RefreshTagOccurrences.
     RefreshTagOccurrencesWith (Seq (RecordKey File))
   | RemoveFileFromDatabase (RecordKey File)
