@@ -163,16 +163,21 @@ widget m =
     hstack_
       []
       [ selectionSizeLabel m
-      , setOpDrowpdown
+      , setOpDropdown
       ]
 
-setOpDrowpdown :: TaggerWidget
-setOpDrowpdown =
-  dropdown
-    (fileSelectionModel . setOp)
-    [Union, Intersect, Difference]
-    (flip label_ [resizeFactor (-1)] . T.pack . show)
-    (flip label_ [resizeFactor (-1)] . T.pack . show)
+setOpDropdown :: TaggerWidget
+setOpDropdown =
+  withStyleBasic [bgColor yuiLightPeach]
+    . tooltip_
+      "Choose how to combine the current selection with subsequent queries."
+      [tooltipDelay 1000]
+    . withStyleBasic [bgColor (yuiLightPeach & a .~ defaultElementOpacity)]
+    $ dropdown
+      (fileSelectionModel . setOp)
+      [Union, Intersect, Difference]
+      (flip label_ [resizeFactor (-1)] . T.pack . show)
+      (flip label_ [resizeFactor (-1)] . T.pack . show)
 
 clearSelectionButton :: TaggerWidget
 clearSelectionButton =
