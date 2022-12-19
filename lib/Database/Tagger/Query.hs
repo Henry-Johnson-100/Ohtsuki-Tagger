@@ -69,6 +69,9 @@ module Database.Tagger.Query (
   -- *** On 'Tag`
   queryForSingleDescriptorByTagId,
 
+  -- *** On 'File`
+  queryForDescriptorByFileId,
+
   -- ** 'Tag` Queries
 
   -- | Queries that return 'Tag`s.
@@ -89,7 +92,6 @@ module Database.Tagger.Query (
   -- ** Misc.
   hasInfraRelations,
   getTagOccurrencesByDescriptorKeys,
-  getTagOccurrencesByFileKey,
   getLastAccessed,
   getLastSaved,
 
@@ -125,16 +127,10 @@ import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT, throwE)
 import Control.Monad.Trans.Maybe (MaybeT)
 import Data.Bifunctor (second)
-import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
 import Data.HierarchyMap (HierarchyMap)
 import qualified Data.HierarchyMap as HAM
 import Data.Maybe (catMaybes, fromMaybe, isNothing)
-import Data.OccurrenceHashMap.Internal (OccurrenceHashMap)
-import qualified Data.OccurrenceHashMap.Internal as OHM (
-  fromList,
-  unions,
- )
 import qualified Data.OccurrenceMap.Internal as OM
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -664,6 +660,24 @@ getMetaParent rk tc = do
     |]
 
 {- |
+ Get all 'Descriptor`s that are tagged to the given 'File`.
+
+ Can contain duplicates.
+-}
+queryForDescriptorByFileId :: RecordKey File -> TaggedConnection -> IO [Descriptor]
+queryForDescriptorByFileId fk tc = query tc q [fk]
+ where
+  q =
+    [r|
+    SELECT
+      d.id
+      ,d.descriptor
+    FROM Tag t
+    JOIN Descriptor d ON t.descriptorId = d.id
+    WHERE t.fileId = ?
+    |]
+
+{- |
  Return 'True` if the given 'Descriptor` is Meta related to anything.
 -}
 hasInfraRelations :: RecordKey Descriptor -> TaggedConnection -> IO Bool
@@ -700,38 +714,6 @@ getTagOccurrencesByDescriptorKeys ds tc = do
         FROM Tag
         WHERE descriptorId = ?
         |]
-
-{- |
- Returns an 'OccurrenceHashMap` with occurrences of each 'Descriptor` that are
- taggond on the 'File`s provided.
--}
-getTagOccurrencesByFileKey ::
-  Traversable t =>
-  t (RecordKey File) ->
-  TaggedConnection ->
-  IO (OccurrenceHashMap Descriptor)
-getTagOccurrencesByFileKey fks tc = do
-  results <-
-    F.toList
-      <$> mapM
-        ( query tc q . Only :: RecordKey File -> IO [(RecordKey Descriptor, Text, Int)]
-        )
-        fks
-  let constructFromTuple (dk, dp, o) = (Descriptor dk dp, o)
-  return . OHM.unions $ OHM.fromList . map constructFromTuple <$> results
- where
-  q =
-    [r|
-    SELECT
-      d.id
-      ,d.descriptor
-      ,COUNT(*)
-    FROM Tag t
-    JOIN Descriptor d
-      ON t.descriptorId = d.id
-    WHERE fileId = ?
-    GROUP BY descriptorId
-    |]
 
 {- |
  Retrieve the first timestamp from the column lastAccessed in the db info table.

@@ -17,7 +17,7 @@ import Data.Event (
   ),
   TaggerEvent (
     DoFileSelectionEvent,
-    IOEvent,
+    Unit,
     Mempty,
     NextHistory,
     PrevHistory
@@ -107,7 +107,7 @@ queryTextField =
                           . history
                           . historyIndex
                       )
-                else IOEvent ()
+                else Unit ()
           )
       ]
 
