@@ -95,6 +95,15 @@ is complete, optionally how many files were added.
     - Tags that have no subtags
     - Tags that do
   - In both of these groups, they are ordered alphabetically.
+- Added a new text field when viewing the tag list of the selection.
+It can be used to filter the tag list by MetaDescriptor patterns.
+Intended to just be a more helpful way to view the current selection or as an aid
+to querying.
+- Changed the tag list to report only the number of files that have a given descriptor
+applied. Not how many times the descriptor is applied.
+  - I think both cases are valid but the intention behind the latter was less helpful
+  and less than intuitive than the former.
+- Added some tooltips to the tag list filter and the shell command text field and button.
 - Added some additional helper functions to `HierarchyMap` to make traversals
   a little bit less painful.
 
