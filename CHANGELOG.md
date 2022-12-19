@@ -77,6 +77,16 @@ is complete, optionally how many files were added.
   - Removed the `taggercli` executable.
     - Its functionality has been merged with the normal executable, `tagger`
       - Added operations for adding files, tagging a file, removing files from the database, and deleting files from the database and file system.
+- Library Changes
+  - Queries
+    - Added
+      - `queryForDescriptorByFileId`
+        - Returns all `Descriptors` that are tagged to the given file. Most likely contains duplicates.
+    - Removed
+      - `getTagOccurrencesByFileKey`
+        - It was only used in one place and I found I didn't care for it.
+  - Removed the `OccurrenceHashMap` data type.
+    - It can be easily replaced with a plain old `HashMap a Int`.
 
 ## Non-Breaking Changes
 - Changed how tags ordered when using the --describe CLI command
