@@ -237,11 +237,6 @@ fileSelectionEventHandler
                   Seq.Empty -> []
                   (f :<| _) -> [Event . DoFocusedFileEvent . PutFile $ f]
                )
-      PutTagOccurrenceHashMap_ m ->
-        [ Model $
-            model
-              & fileSelectionTagListModel . occurrences .~ m
-        ]
       Query ->
         [ Task
             ( do
@@ -351,11 +346,23 @@ fileSelectionEventHandler
             )
         ]
       RefreshTagOccurrencesWith fks ->
-        [ Task
-            ( DoFileSelectionEvent . PutTagOccurrenceHashMap_
-                <$> getTagOccurrencesByFileKey fks conn
-            )
-        ]
+        anonymousTask $ do
+          ohm <-
+            foldM
+              ( \acc fk ->
+                  OHM.union acc
+                    . F.foldl'
+                      ( \acc' d ->
+                          if OHM.get d acc' == 0
+                            then OHM.occur d acc'
+                            else acc'
+                      )
+                      OHM.empty
+                    <$> queryForDescriptorByFileId fk conn
+              )
+              OHM.empty
+              fks
+          callback [Model $ model & fileSelectionTagListModel . occurrences .~ ohm]
       ShuffleSelection ->
         [ Task
             ( DoFileSelectionEvent . PutFilesNoCombine
