@@ -44,6 +44,7 @@ import qualified Data.Sequence as Seq
 import Data.Tagger
 import Data.Text (Text)
 import Database.Tagger.Type
+import Data.HashSet (HashSet)
 
 data TaggerModel = TaggerModel
   { _taggermodelDescriptorTreeModel :: DescriptorTreeModel
@@ -112,7 +113,8 @@ createFileSelectionModel =
 data FileSelectionTagListModel = FileSelectionTagListModel
   { _fileselectiontaglistOccurrences :: OccurrenceHashMap Descriptor
   , _fileselectiontaglistOrdering :: OrderBy
-  , _fileselectiontaglistFilter :: Text
+  , _fileselectiontaglistFilter :: HashSet (RecordKey Descriptor)
+  , _fileselectiontaglistFilterText :: Text
   }
   deriving (Show, Eq)
 
@@ -122,6 +124,7 @@ createFileSelectionTagListModel =
     { _fileselectiontaglistOccurrences = OHM.empty
     , _fileselectiontaglistOrdering = OrderBy Numeric Desc
     , _fileselectiontaglistFilter = mempty
+    , _fileselectiontaglistFilterText = "#ALL#"
     }
 
 data FileInfo = FileInfo

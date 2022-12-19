@@ -88,6 +88,7 @@ data FileSelectionEvent
   | PutChunkSequence
   | PutFiles (HashSet File)
   | PutFilesNoCombine (Seq File)
+  | PutTagListFilter
   | PutTagOccurrenceHashMap_ (OccurrenceHashMap Descriptor)
   | Query
   | RefreshFileSelection

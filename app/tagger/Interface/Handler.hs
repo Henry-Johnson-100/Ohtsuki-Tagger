@@ -237,6 +237,23 @@ fileSelectionEventHandler
                   Seq.Empty -> []
                   (f :<| _) -> [Event . DoFocusedFileEvent . PutFile $ f]
                )
+      PutTagListFilter ->
+        anonymousTask $ do
+          dks <-
+            map descriptorId
+              <$> queryForDescriptorByPattern
+                ("%" <> (model ^. fileSelectionModel . tagList . filterText) <> "%")
+                conn
+          infraDs <-
+            fmap
+              ( HS.fromList
+                  . map descriptorId
+                  . concat
+              )
+              . mapM (`getAllInfra` conn)
+              $ dks
+          callback
+            [Model $ model & fileSelectionModel . tagList . Data.Model.filter .~ infraDs]
       PutTagOccurrenceHashMap_ m ->
         [ Model $
             model
