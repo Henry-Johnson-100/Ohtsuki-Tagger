@@ -84,6 +84,7 @@ data FileSelectionEvent
   | CyclePrevFile
   | DeleteFileFromFileSystem (RecordKey File)
   | DoFileSelectionWidgetEvent FileSelectionWidgetEvent
+  | ExcludeTagListInfraToPattern Text
   | MakeFileSelectionInfoMap (Seq File)
   | PutChunkSequence
   | PutFiles (HashSet File)

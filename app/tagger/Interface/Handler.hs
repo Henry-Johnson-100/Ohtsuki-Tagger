@@ -177,6 +177,14 @@ fileSelectionEventHandler
         , Event . DoFileSelectionEvent . RemoveFileFromSelection $ fk
         ]
       DoFileSelectionWidgetEvent e -> fileSelectionWidgetEventHandler wenv node model e
+      ExcludeTagListInfraToPattern t -> anonymousTask $ do
+        !infraDs <-
+          fmap (HS.fromList . map descriptorId . concat)
+            . mapM (flip getAllInfra conn . descriptorId)
+            <=< flip queryForDescriptorByPattern conn
+            $ t
+        callback
+          [Model $! model & fileSelectionTagListModel . include .~ infraDs]
       MakeFileSelectionInfoMap fseq ->
         [ let fiTuple (File fk fp) = (fromIntegral fk, constructFileInfo fp)
               m = F.toList $ fiTuple <$> fseq

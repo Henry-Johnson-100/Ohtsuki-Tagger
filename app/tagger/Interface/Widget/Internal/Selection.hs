@@ -15,6 +15,7 @@ import Data.Event (
     ClearSelection,
     DeleteFileFromFileSystem,
     DoFileSelectionWidgetEvent,
+    ExcludeTagListInfraToPattern,
     RefreshFileSelection,
     RemoveFileFromDatabase,
     RemoveFileFromSelection,
@@ -35,8 +36,10 @@ import Data.Event (
     ToggleVisibilityLabel,
     Unit
   ),
+  anonymousEvent,
  )
 import qualified Data.HashMap.Strict as HM
+import qualified Data.HashSet as HS
 import qualified Data.List as L
 import Data.Model.Core (TaggerModel, getSelectionChunk)
 import Data.Model.Lens (
@@ -58,6 +61,7 @@ import Data.Model.Lens (
   addFileInput,
   fileInfoAt,
   fileSelectionTagListModel,
+  include,
  )
 import Data.Model.Shared.Core (
   OrderBy (OrderBy),
@@ -79,7 +83,7 @@ import qualified Data.Sequence as Seq
 import Data.Tagger (SetOp (Difference, Intersect, Union))
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger (Descriptor (descriptor), File (File))
+import Database.Tagger (Descriptor (descriptor), File (File), descriptorId)
 import Interface.Theme (yuiLightPeach, yuiRed)
 import Interface.Widget.Internal.Core (
   styledButton_,
@@ -111,6 +115,7 @@ import Monomer (
   CmbTextLeft (textLeft),
   CmbTextRight (textRight),
   CmbWheelRate (wheelRate),
+  EventResponse (..),
   black,
   box_,
   draggable,
@@ -124,6 +129,7 @@ import Monomer (
   label_,
   numericField_,
   separatorLine,
+  textFieldV,
   textField_,
   toggleButton_,
   tooltipDelay,
@@ -198,7 +204,7 @@ tagListWidget m =
                   let neq l =
                         m1 ^. fileSelectionTagListModel . l
                           /= m2 ^. fileSelectionTagListModel . l
-                   in or [neq occurrences, neq ordering]
+                   in or [neq occurrences, neq ordering, neq include]
               )
           ]
         $ vstack_ [] (tagListLeaf <$> sortedOccurrenceMapList)
@@ -211,6 +217,7 @@ tagListWidget m =
       , clearSelectionButton
       , tagListOrderCritCycleButton
       , tagListOrderDirCycleButton
+      , tagListFilterTextField
       ]
   sortedOccurrenceMapList =
     let (OrderBy ordCrit ordDir) = m ^. fileSelectionTagListModel . ordering
@@ -241,14 +248,18 @@ tagListWidget m =
               TaggerLens (fileSelectionTagListModel . ordering . orderDirection)
           )
   tagListLeaf (d, n) =
-    hgrid_
-      [childSpacing_ 0]
-      [ draggable d . withStyleBasic [textRight, paddingR 1.5]
-          . flip label_ []
-          . descriptor
-          $ d
-      , withStyleBasic [paddingL 1.5, borderL 1 black] . label . T.pack . show $ n
-      ]
+    withNodeVisible
+      ( let includeSet = m ^. fileSelectionTagListModel . include
+         in HS.null includeSet || (flip HS.member includeSet . descriptorId $ d)
+      )
+      . hgrid_
+        [childSpacing_ 0]
+      $ [ draggable d . withStyleBasic [textRight, paddingR 1.5]
+            . flip label_ []
+            . descriptor
+            $ d
+        , withStyleBasic [paddingL 1.5, borderL 1 black] . label . T.pack . show $ n
+        ]
 
 toggleViewSelectionButton :: TaggerWidget
 toggleViewSelectionButton =
@@ -447,6 +458,16 @@ shellCommandWidget ((^. fileSelectionModel . isMassOpMode) -> isMassOpModeIsTrue
           . withStyleBasic [minWidth 80]
           $ textField_ shellText []
       ]
+
+tagListFilterTextField :: TaggerWidget
+tagListFilterTextField =
+  box_ [mergeRequired (\_ _ _ -> False)] $
+    textFieldV
+      mempty
+      ( \t ->
+          anonymousEvent
+            [Event . DoFileSelectionEvent . ExcludeTagListInfraToPattern $ t]
+      )
 
 fileSelectionChunkSizeNumField :: TaggerWidget
 fileSelectionChunkSizeNumField =

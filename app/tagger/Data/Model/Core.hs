@@ -33,6 +33,8 @@ module Data.Model.Core (
 
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
+import Data.HashSet (HashSet)
+import qualified Data.HashSet as HS
 import Data.HierarchyMap (empty)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
@@ -112,7 +114,7 @@ createFileSelectionModel =
 data FileSelectionTagListModel = FileSelectionTagListModel
   { _fileselectiontaglistOccurrences :: HashMap Descriptor Int
   , _fileselectiontaglistOrdering :: OrderBy
-  , _fileselectiontaglistFilter :: Text
+  , _fileselectiontaglistInclude :: HashSet (RecordKey Descriptor)
   }
   deriving (Show, Eq)
 
@@ -121,7 +123,7 @@ createFileSelectionTagListModel =
   FileSelectionTagListModel
     { _fileselectiontaglistOccurrences = HM.empty
     , _fileselectiontaglistOrdering = OrderBy Numeric Desc
-    , _fileselectiontaglistFilter = mempty
+    , _fileselectiontaglistInclude = HS.empty
     }
 
 data FileInfo = FileInfo
