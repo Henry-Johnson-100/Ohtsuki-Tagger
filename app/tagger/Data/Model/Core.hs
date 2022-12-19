@@ -29,6 +29,7 @@ module Data.Model.Core (
   createPositioningModel,
   defaultSelectionAndQueryPositioningModel,
   defaultFileDetailAndDescriptorTreePositioningModel,
+  QueryBuilderModel (..),
 ) where
 
 import Data.HashMap.Strict (HashMap)
@@ -46,6 +47,7 @@ import qualified Data.Sequence as Seq
 import Data.Tagger
 import Data.Text (Text)
 import Database.Tagger.Type
+import Text.TaggerQL.Expression.AST (Expression, universe)
 
 data TaggerModel = TaggerModel
   { _taggermodelDescriptorTreeModel :: DescriptorTreeModel
@@ -53,6 +55,7 @@ data TaggerModel = TaggerModel
   , _taggermodelFileSelectionModel :: FileSelectionModel
   , _taggermodelTaggerInfoModel :: TaggerInfoModel
   , _taggermodelPositioningModel :: PositioningModel
+  , _taggermodelQueryBuilderModel :: QueryBuilderModel
   , _taggermodelVisibilityModel :: Visibility
   , _taggermodelConnection :: TaggedConnection
   , -- Is a part of the FileSelectionWidget but is logically connected with
@@ -75,6 +78,7 @@ createTaggerModel tc d unRelatedD defaultFilePath =
     , _taggermodelFileSelectionModel = createFileSelectionModel
     , _taggermodelTaggerInfoModel = createTaggerInfoModel
     , _taggermodelPositioningModel = createPositioningModel
+    , _taggermodelQueryBuilderModel = createQueryBuilderModel
     , _taggermodelVisibilityModel = VisibilityMain
     , _taggermodelConnection = tc
     , _taggerShellText = ""
@@ -292,3 +296,16 @@ defaultFileDetailAndDescriptorTreePositioningModel :: PositioningModel -> Positi
 defaultFileDetailAndDescriptorTreePositioningModel (PositioningModel ov oh _ _) =
   let (PositioningModel _ _ v h) = createPositioningModel
    in PositioningModel ov oh v h
+
+data QueryBuilderModel = QueryBuilderModel
+  { _querybuilderInput :: TextInput
+  , _querybuilderExpression :: Expression
+  }
+  deriving (Show, Eq)
+
+createQueryBuilderModel :: QueryBuilderModel
+createQueryBuilderModel =
+  QueryBuilderModel
+    { _querybuilderInput = createTextInput 10
+    , _querybuilderExpression = universe
+    }

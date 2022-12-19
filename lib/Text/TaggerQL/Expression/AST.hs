@@ -16,11 +16,16 @@ module Text.TaggerQL.Expression.AST (
   FileTerm (..),
   SubExpression (..),
   Expression (..),
+
+  -- * Constants
+  zero,
+  universe,
 ) where
 
 import Data.String (IsString)
-import Data.Tagger (SetOp)
+import Data.Tagger (SetOp (Difference, Intersect))
 import Data.Text (Text)
+import qualified Data.Text as T
 
 {- |
  Data structure representing search terms over the set of 'Descriptor`.
@@ -76,3 +81,29 @@ data Expression
     TagExpression TagTerm SubExpression
   | Binary Expression SetOp Expression
   deriving (Show, Eq)
+
+{-# INLINE zero #-}
+
+{- |
+ This 'Expression` will always evaluate to an empty set.
+
+ It is the intersection of tagged and untagged files.
+-}
+zero :: Expression
+zero =
+  Binary
+    ( Binary
+        (FileTermValue . FileTerm . T.pack $ "%")
+        Difference
+        (TagTermValue . DescriptorTerm . T.pack $ "%")
+    )
+    Intersect
+    (TagTermValue . DescriptorTerm . T.pack $ "%")
+
+{-# INLINE universe #-}
+
+{- |
+ This 'Expression` will always evaluate to all files in the database.
+-}
+universe :: Expression
+universe = FileTermValue . FileTerm . T.pack $ "%"
