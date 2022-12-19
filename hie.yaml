@@ -1,5 +1,11 @@
 cradle:
   cabal:
+    - path: "./nanovg-hs/src"
+      component: "lib:nanovg"
+
+    - path: "./nanovg-hs/test"
+      component: "nanovg:test:nanovg-test"
+
     - path: "app/tagger/Main.hs"
       component: "tagger:exe:tagger"
 
