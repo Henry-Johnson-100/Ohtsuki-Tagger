@@ -297,12 +297,8 @@ fileSelectionEventHandler
         , Event . DoFileSelectionEvent $ PutChunkSequence
         ]
       RefreshTagOccurrences ->
-        [ Task
-            ( DoFileSelectionEvent . PutTagOccurrenceHashMap_
-                <$> getTagOccurrencesByFileKey
-                  (map fileId . F.toList $ model ^. fileSelectionModel . selection)
-                  conn
-            )
+        [ Event . DoFileSelectionEvent . RefreshTagOccurrencesWith . fmap fileId $
+            model ^. fileSelectionModel . selection
         ]
       RemoveFileFromDatabase fk ->
         [ Task (IOEvent <$> deleteFiles [fk] conn)
