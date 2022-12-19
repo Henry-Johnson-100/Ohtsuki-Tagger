@@ -69,6 +69,9 @@ module Database.Tagger.Query (
   -- *** On 'Tag`
   queryForSingleDescriptorByTagId,
 
+  -- *** On 'File`
+  queryForDescriptorByFileId,
+
   -- ** 'Tag` Queries
 
   -- | Queries that return 'Tag`s.
@@ -661,6 +664,24 @@ getMetaParent rk tc = do
       md.metaDescriptorId = d.id
     WHERE
       md.infraDescriptorId = ?
+    |]
+
+{- |
+ Get all 'Descriptor`s that are tagged to the given 'File`.
+
+ Can contain duplicates.
+-}
+queryForDescriptorByFileId :: RecordKey File -> TaggedConnection -> IO [Descriptor]
+queryForDescriptorByFileId fk tc = query tc q [fk]
+ where
+  q =
+    [r|
+    SELECT
+      d.id
+      ,d.descriptor
+    FROM Tag t
+    JOIN Descriptor d ON t.descriptorId = d.id
+    WHERE t.fileId = ?
     |]
 
 {- |
