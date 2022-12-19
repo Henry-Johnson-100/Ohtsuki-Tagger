@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -9,18 +10,25 @@ module Data.Model.Lens (
   module Data.Model.Lens,
 ) where
 
-import Control.Lens
+import Control.Lens (
+  Lens',
+  abbreviatedFields,
+  lens,
+  makeLensesWith,
+ )
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
-import Data.Maybe
+import Data.Maybe (fromMaybe)
 import Data.Model.Core
 
 newtype TaggerLens a b = TaggerLens {taggerLens :: Lens' a b}
 
 instance Show (TaggerLens a b) where
+  show :: TaggerLens a b -> String
   show _ = "Tagger Lens'"
 
 instance Eq (TaggerLens a b) where
+  (==) :: TaggerLens a b -> TaggerLens a b -> Bool
   _ == _ = True
 
 makeLensesWith abbreviatedFields ''TaggerModel
@@ -33,20 +41,47 @@ makeLensesWith abbreviatedFields ''DescriptorInfo
 
 makeLensesWith abbreviatedFields ''FileSelectionModel
 
+makeLensesWith abbreviatedFields ''FileSelectionTagListModel
+
 makeLensesWith abbreviatedFields ''FileInfo
 
 makeLensesWith abbreviatedFields ''TaggerInfoModel
 
 makeLensesWith abbreviatedFields ''PositioningModel
 
+{-# INLINE fileInfoAt #-}
+
+{- |
+ Derived lens for retrieving a 'FileInfo` from an IntMap at the given key.
+
+ If a FileInfo does not exist there, return a default FileInfo
+-}
 fileInfoAt :: Int -> Lens' (IntMap FileInfo) FileInfo
 fileInfoAt n =
   lens
     (fromMaybe createFileInfo . IntMap.lookup n)
     (flip (IntMap.insert n))
 
+{-# INLINE descriptorInfoAt #-}
+
+{- |
+ Derived lens for retrieving a 'DescriptorInfo` from an IntMap at the given key
+
+ If one does not exist at that key, return a default DescriptorInfo
+-}
 descriptorInfoAt :: Int -> Lens' (IntMap DescriptorInfo) DescriptorInfo
 descriptorInfoAt n =
   lens
     (fromMaybe createDescriptorInfo . IntMap.lookup n)
     (flip (IntMap.insert n))
+
+{-# INLINE fileSelectionTagListModel #-}
+
+{- |
+ Derived lens for retrieving the 'FileSelectionTagListModel` from the
+ base 'TaggerModel`
+
+ >fileSelectionModel . tagList
+-}
+fileSelectionTagListModel :: Lens' TaggerModel FileSelectionTagListModel
+fileSelectionTagListModel = fileSelectionModel . tagList

@@ -10,20 +10,27 @@ import Data.Event (
   FileSelectionEvent (
     ClearSelection,
     CycleNextFile,
-    CycleNextSetOp,
-    CyclePrevFile,
-    CyclePrevSetOp
+    CyclePrevFile
   ),
-  TaggerEvent (DoFileSelectionEvent, RefreshUI, ToggleMainVisibility),
+  TaggerEvent (
+    DoFileSelectionEvent,
+    NextCyclicEnum,
+    PrevCyclicEnum,
+    RefreshUI,
+    ToggleVisibilityLabel
+  ),
   anonymousEvent,
  )
 import Data.Model (
   HasFileDetailAndDescriptorTreePosH (fileDetailAndDescriptorTreePosH),
   HasFileDetailAndDescriptorTreePosV (fileDetailAndDescriptorTreePosV),
+  HasFileSelectionModel (fileSelectionModel),
   HasPositioningModel (positioningModel),
   HasSelectionAndQueryPosH (selectionAndQueryPosH),
   HasSelectionAndQueryPosV (selectionAndQueryPosV),
+  HasSetOp (setOp),
   HasVisibilityModel (visibilityModel),
+  TaggerLens (TaggerLens),
   TaggerModel,
   createPositioningModel,
   defaultFileDetailAndDescriptorTreePositioningModel,
@@ -34,7 +41,7 @@ import Data.Model.Shared.Core (
   hasVis,
  )
 import Data.Text (Text)
-import Interface.Theme
+import Interface.Theme (yuiLightPeach)
 import Interface.Widget.Internal.Core (
   defaultElementOpacity,
   withNodeHidden,
@@ -165,7 +172,10 @@ globalKeystrokes m =
       , anonymousEvent $
           if (m ^. visibilityModel) `hasVis` VisibilityLabel fileDetailDescriptorTreeHide
             then
-              [ Event . ToggleMainVisibility $ fileDetailDescriptorTreeHide
+              [ Event $
+                  ToggleVisibilityLabel
+                    (TaggerLens visibilityModel)
+                    fileDetailDescriptorTreeHide
               , SetFocusOnKey . WidgetKey $ FileDetail.tagTextNodeKey
               ]
             else [SetFocusOnKey . WidgetKey $ FileDetail.tagTextNodeKey]
@@ -175,19 +185,25 @@ globalKeystrokes m =
       , anonymousEvent $
           if (m ^. visibilityModel) `hasVis` VisibilityLabel selectionQueryHideLabel
             then
-              [ Event . ToggleMainVisibility $ selectionQueryHideLabel
+              [ Event $
+                  ToggleVisibilityLabel
+                    (TaggerLens visibilityModel)
+                    selectionQueryHideLabel
               , SetFocusOnKey . WidgetKey $ Query.queryTextFieldKey
               ]
             else [SetFocusOnKey . WidgetKey $ Query.queryTextFieldKey]
       )
-    , ("Ctrl-g", DoFileSelectionEvent CycleNextSetOp)
-    , ("Ctrl-Shift-g", DoFileSelectionEvent CyclePrevSetOp)
+    , ("Ctrl-g", NextCyclicEnum $ TaggerLens (fileSelectionModel . setOp))
+    , ("Ctrl-Shift-g", PrevCyclicEnum $ TaggerLens (fileSelectionModel . setOp))
     , ("Ctrl-u", DoFileSelectionEvent ClearSelection)
     ,
       ( "Ctrl-h"
       , anonymousEvent
           [ Model $ m & positioningModel .~ createPositioningModel
-          , Event . ToggleMainVisibility $ globalWidgetHideLabel
+          , Event $
+              ToggleVisibilityLabel
+                (TaggerLens visibilityModel)
+                globalWidgetHideLabel
           ]
       )
     ,
@@ -196,7 +212,10 @@ globalKeystrokes m =
           [ Model $
               m & positioningModel
                 %~ defaultSelectionAndQueryPositioningModel
-          , Event . ToggleMainVisibility $ selectionQueryHideLabel
+          , Event $
+              ToggleVisibilityLabel
+                (TaggerLens visibilityModel)
+                selectionQueryHideLabel
           ]
       )
     ,
@@ -205,7 +224,10 @@ globalKeystrokes m =
           [ Model $
               m & positioningModel
                 %~ defaultFileDetailAndDescriptorTreePositioningModel
-          , Event . ToggleMainVisibility $ fileDetailDescriptorTreeHide
+          , Event $
+              ToggleVisibilityLabel
+                (TaggerLens visibilityModel)
+                fileDetailDescriptorTreeHide
           ]
       )
     ]

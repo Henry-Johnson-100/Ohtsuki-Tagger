@@ -17,30 +17,42 @@ import Data.Event (
     CommitTagText,
     DeleteTag,
     MoveTag,
-    NextTagHist,
-    PrevTagHist,
-    ResetTagHistIndex,
-    TagFile,
-    ToggleFocusedFilePaneVisibility
+    TagFile
   ),
-  TaggerEvent (DoFileSelectionEvent, DoFocusedFileEvent, IOEvent),
+  TaggerEvent (
+    DoFileSelectionEvent,
+    DoFocusedFileEvent,
+    Unit,
+    Mempty,
+    NextHistory,
+    PrevHistory,
+    ToggleVisibilityLabel
+  ),
  )
 import Data.HierarchyMap (HierarchyMap)
 import qualified Data.HierarchyMap as HM
 import qualified Data.List as L
-import Data.Model (
+import Data.Model.Core (TaggerModel, focusedFileDefaultRecordKey)
+import Data.Model.Lens (
   HasFileInfoRenameText (fileInfoRenameText),
   HasFileSelectionInfoMap (fileSelectionInfoMap),
   HasFileSelectionModel (fileSelectionModel),
   HasFocusedFile (focusedFile),
   HasFocusedFileModel (focusedFileModel),
   HasFocusedFileVis (focusedFileVis),
-  HasTagText (tagText),
-  TaggerModel,
+  TaggerLens (TaggerLens),
   fileInfoAt,
-  focusedFileDefaultRecordKey,
+  tagInput,
  )
-import Data.Model.Shared (Visibility (VisibilityLabel), hasVis)
+import Data.Model.Shared.Core (
+  Visibility (VisibilityLabel),
+  hasVis,
+ )
+import Data.Model.Shared.Lens (
+  HasHistoryIndex (historyIndex),
+  history,
+  text,
+ )
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger (
@@ -173,8 +185,9 @@ filePathWidget m =
         $ styledButton_
           [resizeFactor (-1)]
           "Rename"
-          ( DoFocusedFileEvent
-              (ToggleFocusedFilePaneVisibility fileRenameModeVis)
+          ( ToggleVisibilityLabel
+              (TaggerLens $ focusedFileModel . focusedFileVis)
+              fileRenameModeVis
           )
     , zstack_
         []
@@ -268,8 +281,8 @@ tagTextField :: TaggerWidget
 tagTextField =
   keystroke_
     [ ("Shift-Enter", DoFocusedFileEvent CommitTagText)
-    , ("Shift-Up", DoFocusedFileEvent NextTagHist)
-    , ("Shift-Down", DoFocusedFileEvent PrevTagHist)
+    , ("Shift-Up", NextHistory $ TaggerLens (focusedFileModel . tagInput))
+    , ("Shift-Down", PrevHistory $ TaggerLens (focusedFileModel . tagInput))
     ]
     []
     . dropTarget_
@@ -287,14 +300,19 @@ tagTextField =
       , maxHeight 250
       ]
     $ textArea_
-      (focusedFileModel . tagText)
+      (focusedFileModel . tagInput . text)
       [ onChange
           ( \t ->
               if T.null . T.strip $ t
-                then DoFocusedFileEvent ResetTagHistIndex
-                else
-                  IOEvent
-                    ()
+                then
+                  Mempty $
+                    TaggerLens
+                      ( focusedFileModel
+                          . tagInput
+                          . history
+                          . historyIndex
+                      )
+                else Unit ()
           )
       , acceptTab
       ]

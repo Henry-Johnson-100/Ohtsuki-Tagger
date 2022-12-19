@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Eta reduce" #-}
@@ -10,17 +9,66 @@ module Interface.Widget.Internal.Query (
   widget,
 ) where
 
-import Control.Lens
-import Data.Event
-import Data.Model
+import Control.Lens ((&), (.~))
+import Data.Event (
+  FileSelectionEvent (
+    AppendQueryText,
+    Query
+  ),
+  TaggerEvent (
+    DoFileSelectionEvent,
+    Unit,
+    Mempty,
+    NextHistory,
+    PrevHistory
+  ),
+ )
+import Data.Model.Core (TaggerModel)
+import Data.Model.Lens (
+  HasFileSelectionModel (fileSelectionModel),
+  HasQueryInput (queryInput),
+  TaggerLens (TaggerLens),
+ )
+import Data.Model.Shared.Lens (
+  HasHistoryIndex (historyIndex),
+  history,
+  text,
+ )
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger
-import Interface.Theme
-import Interface.Widget.Internal.Core
+import Database.Tagger (
+  ConcreteTag (concreteTagDescriptor),
+  Descriptor (descriptor),
+  File (filePath),
+ )
+import Interface.Theme (
+  yuiBlue,
+  yuiLightPeach,
+  yuiOrange,
+  yuiRed,
+ )
+import Interface.Widget.Internal.Core (
+  defaultElementOpacity,
+  withNodeKey,
+  withStyleBasic,
+ )
 import Interface.Widget.Internal.Type (TaggerWidget)
-import Monomer
-import Monomer.Graphics.Lens
+import Monomer (
+  CmbAlignBottom (alignBottom),
+  CmbAlignLeft (alignLeft),
+  CmbBgColor (bgColor),
+  CmbBorder (border),
+  CmbIgnoreEmptyArea (ignoreEmptyArea),
+  CmbOnChange (onChange),
+  CmbPaddingL (paddingL),
+  CmbPaddingT (paddingT),
+  box_,
+  dropTargetStyle,
+  dropTarget_,
+  keystroke_,
+  textField_,
+ )
+import Monomer.Graphics.Lens (HasA (a))
 
 widget :: TaggerModel -> TaggerWidget
 widget _ =
@@ -31,8 +79,8 @@ queryTextField :: TaggerWidget
 queryTextField =
   keystroke_
     [ ("Enter", DoFileSelectionEvent Query)
-    , ("Up", DoFileSelectionEvent NextQueryHist)
-    , ("Down", DoFileSelectionEvent PrevQueryHist)
+    , ("Up", NextHistory $ TaggerLens (fileSelectionModel . queryInput))
+    , ("Down", PrevHistory $ TaggerLens (fileSelectionModel . queryInput))
     ]
     []
     . dropTarget_
@@ -47,12 +95,19 @@ queryTextField =
     . withNodeKey queryTextFieldKey
     . withStyleBasic [bgColor (yuiLightPeach & a .~ defaultElementOpacity)]
     $ textField_
-      (fileSelectionModel . queryText)
+      (fileSelectionModel . queryInput . text)
       [ onChange
           ( \t ->
               if T.null . T.strip $ t
-                then DoFileSelectionEvent ResetQueryHistIndex
-                else IOEvent ()
+                then
+                  Mempty $
+                    TaggerLens
+                      ( fileSelectionModel
+                          . queryInput
+                          . history
+                          . historyIndex
+                      )
+                else Unit ()
           )
       ]
 

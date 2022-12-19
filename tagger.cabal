@@ -19,7 +19,7 @@ data-files:          resources/Yui_signature_SS.bmp
                     ,resources/iosevka_bold.ttf
                     ,resources/TaggerSchemaDefinition.sql
                     ,resources/TaggerSchemaTeardown.sql
-                    ,resources/Patch/
+                    ,resources/Patch/patch_2_0.sql
                      
 common haskell-common
   default-language:    Haskell2010
@@ -37,8 +37,11 @@ common tagger-common
                       ,FunctionalDependencies
                       ,StrictData
                       ,ViewPatterns
+                      ,InstanceSigs
 
   other-modules:       Paths_tagger
+
+  autogen-modules:     Paths_tagger
 
   build-depends:       lens == 5.1
                       ,text == 1.2.4.0
@@ -79,6 +82,7 @@ executable tagger
 
   other-extensions:   RankNTypes
                      ,MultiWayIf
+                     ,ExistentialQuantification
 
   -- ghc-options:
 
@@ -101,7 +105,6 @@ library tagger-lib
   exposed-modules:     Database.Tagger
                       ,Database.Tagger.Type
                       ,Data.HierarchyMap
-                      ,Data.OccurrenceHashMap
                       ,Data.OccurrenceMap
                       ,Data.Tagger
                       ,Tagger.Info
@@ -117,7 +120,6 @@ library tagger-lib
                       ,Database.Tagger.Query.Type
                       ,Database.Tagger.Connection
                       ,Data.Hierarchy.Internal
-                      ,Data.OccurrenceHashMap.Internal
                       ,Data.OccurrenceMap.Internal
                       ,Tagger.Util
 

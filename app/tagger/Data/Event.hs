@@ -1,3 +1,5 @@
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# LANGUAGE StrictData #-}
@@ -14,14 +16,25 @@ module Data.Event (
   TaggerInfoEvent (..),
 ) where
 
-import Data.HashSet
+import Data.HashSet (HashSet)
 import Data.IntMap.Strict (IntMap)
-import Data.Model
-import Data.OccurrenceHashMap (OccurrenceHashMap)
+import Data.Model.Core (DescriptorInfo, TaggerModel)
+import Data.Model.Lens (TaggerLens)
+import Data.Model.Shared (Visibility)
+import Data.Model.Shared.Core (TextInput)
 import Data.Sequence (Seq)
+import Data.Tagger (CyclicEnum)
 import Data.Text (Text)
-import Database.Tagger.Type
+import Database.Tagger.Type (
+  ConcreteTag,
+  ConcreteTaggedFile,
+  Descriptor,
+  File,
+  RecordKey,
+  Tag,
+ )
 import Monomer (AppEventResponse)
+import Data.HashMap.Strict (HashMap)
 
 data TaggerEvent
   = DoFocusedFileEvent FocusedFileEvent
@@ -30,16 +43,24 @@ data TaggerEvent
   | DoTaggerInfoEvent TaggerInfoEvent
   | TaggerInit
   | RefreshUI
-  | ToggleMainVisibility Text
-  | ToggleTagMode
   | CloseConnection
-  | IOEvent ()
+  | Unit ()
   | -- | A constructor for producing nested lists of tasks in other tasks.
     -- a slightly more flexible way of calling 'Event` that should be easier to use
     -- in either a 'Task` or normal 'Event` context
     AnonymousEvent [TaggerAnonymousEvent]
-  | ClearTextField (TaggerLens TaggerModel Text)
-  deriving (Show, Eq)
+  | -- | Existentially quantified event that replaces the given lens
+    --  with a Monoid instance with its identity
+    forall m. Monoid m => Mempty (TaggerLens TaggerModel m)
+  | -- | Existentially quantified event that advances a lens with a 'CyclicEnum` instance
+    -- with 'next`
+    forall c. (CyclicEnum c) => NextCyclicEnum (TaggerLens TaggerModel c)
+  | -- | Existentially quantified event that advances a lens with a 'CyclicEnum` instance
+    -- with 'prev`
+    forall c. (CyclicEnum c) => PrevCyclicEnum (TaggerLens TaggerModel c)
+  | NextHistory (TaggerLens TaggerModel TextInput)
+  | PrevHistory (TaggerLens TaggerModel TextInput)
+  | ToggleVisibilityLabel (TaggerLens TaggerModel Visibility) Text
 
 anonymousEvent :: [AppEventResponse TaggerModel TaggerEvent] -> TaggerEvent
 anonymousEvent = AnonymousEvent . fmap TaggerAnonymousEvent
@@ -48,9 +69,11 @@ newtype TaggerAnonymousEvent
   = TaggerAnonymousEvent (AppEventResponse TaggerModel TaggerEvent)
 
 instance Eq TaggerAnonymousEvent where
+  (==) :: TaggerAnonymousEvent -> TaggerAnonymousEvent -> Bool
   _ == _ = False
 
 instance Show TaggerAnonymousEvent where
+  show :: TaggerAnonymousEvent -> String
   show _ = "TaggerAnonymousEvent"
 
 data FileSelectionEvent
@@ -58,39 +81,29 @@ data FileSelectionEvent
   | AppendQueryText Text
   | ClearSelection
   | CycleNextFile
-  | CycleNextSetOp
   | CyclePrevFile
-  | CyclePrevSetOp
-  | CycleTagOrderCriteria
-  | CycleTagOrderDirection
   | DeleteFileFromFileSystem (RecordKey File)
   | DoFileSelectionWidgetEvent FileSelectionWidgetEvent
+  | ExcludeTagListInfraToPattern Text
   | MakeFileSelectionInfoMap (Seq File)
-  | NextAddFileHist
-  | NextQueryHist
-  | PrevAddFileHist
-  | PrevQueryHist
   | PutChunkSequence
   | PutFiles (HashSet File)
   | PutFilesNoCombine (Seq File)
-  | PutTagOccurrenceHashMap_ (OccurrenceHashMap Descriptor)
+  | PutTagOccurrenceHashMap_ (HashMap Descriptor Int)
   | Query
   | RefreshFileSelection
   | RefreshSpecificFile (RecordKey File)
   | RefreshSpecificFile_ File
   | RefreshTagOccurrences
-  | -- | Given a Traversable of File keys, fetch an OccurrenceHashMap. Saves having to
+  | -- | Given a Traversable of File keys, fetch (HashMap Descriptor Int). Saves having to
     -- call toList on the selection Seq in RefreshTagOccurrences.
     RefreshTagOccurrencesWith (Seq (RecordKey File))
   | RemoveFileFromDatabase (RecordKey File)
   | RemoveFileFromSelection (RecordKey File)
   | RenameFile (RecordKey File)
-  | ResetAddFileHistIndex
-  | ResetQueryHistIndex
   | RunSelectionShellCommand
   | ShuffleSelection
   | ToggleSelectionView
-  | TogglePaneVisibility Text
   deriving (Show, Eq)
 
 data FileSelectionWidgetEvent
@@ -105,15 +118,11 @@ data FocusedFileEvent
   | CommitTagText
   | DeleteTag (RecordKey Tag)
   | MoveTag ConcreteTag (Maybe (RecordKey Tag))
-  | NextTagHist
-  | PrevTagHist
-  | PutConcreteFile_ ConcreteTaggedFile
+  | PutConcreteFile ConcreteTaggedFile
   | PutFile File
   | RefreshFocusedFileAndSelection
-  | ResetTagHistIndex
   | RunFocusedFileShellCommand
   | TagFile (RecordKey Descriptor) (Maybe (RecordKey Tag))
-  | ToggleFocusedFilePaneVisibility Text
   | UnSubTag (RecordKey Tag)
   deriving (Show, Eq)
 
@@ -130,7 +139,6 @@ data DescriptorTreeEvent
   | RefreshUnrelated
   | RequestFocusedNode Text
   | RequestFocusedNodeParent
-  | ToggleDescriptorTreeVisibility Text
   | UpdateDescriptor (RecordKey Descriptor)
   deriving (Show, Eq)
 

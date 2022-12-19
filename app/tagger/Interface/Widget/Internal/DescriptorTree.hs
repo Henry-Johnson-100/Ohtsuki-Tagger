@@ -16,10 +16,9 @@ import Data.Event (
     RefreshBothDescriptorTrees,
     RequestFocusedNode,
     RequestFocusedNodeParent,
-    ToggleDescriptorTreeVisibility,
     UpdateDescriptor
   ),
-  TaggerEvent (DoDescriptorTreeEvent),
+  TaggerEvent (DoDescriptorTreeEvent, ToggleVisibilityLabel),
  )
 import qualified Data.List as L
 import Data.Model (
@@ -33,6 +32,7 @@ import Data.Model (
   HasRenameText (renameText),
   HasUnrelated (unrelated),
   HasUnrelatedNode (unrelatedNode),
+  TaggerLens (TaggerLens),
   TaggerModel,
   descriptorInfoAt,
  )
@@ -364,7 +364,10 @@ descriptorManagementPane =
       styledButton_
         [resizeFactor (-1)]
         "Edit"
-        (DoDescriptorTreeEvent . ToggleDescriptorTreeVisibility $ editDescriptorVis)
+        ( ToggleVisibilityLabel
+            (TaggerLens $ descriptorTreeModel . descriptorTreeVis)
+            editDescriptorVis
+        )
     insertButton =
       styledButton_
         [resizeFactor (-1)]

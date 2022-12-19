@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# HLINT ignore "Use list comprehension" #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# HLINT ignore "Use const" #-}
@@ -17,6 +18,7 @@ import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import Data.Event
 import qualified Data.Foldable as F
+import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import Data.HierarchyMap (empty)
 import qualified Data.HierarchyMap as HAM
@@ -24,7 +26,6 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.Maybe
 import Data.Model
 import Data.Model.Shared
-import qualified Data.OccurrenceHashMap as OHM
 import Data.Sequence (Seq ((:<|), (:|>)))
 import qualified Data.Sequence as Seq
 import Data.Tagger
@@ -89,16 +90,29 @@ taggerEventHandler
         , SetFocusOnKey . WidgetKey $ queryTextFieldKey
         ]
       RefreshUI ->
-        [ Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
+        [ Event . DoDescriptorTreeEvent $ RefreshBothDescriptorTrees
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
-      ToggleMainVisibility t ->
-        [Model $ model & visibilityModel %~ (flip togglePaneVis . VisibilityLabel $ t)]
-      ToggleTagMode -> [Model $ model & isTagMode %~ not]
-      CloseConnection -> [Task (IOEvent <$> close conn)]
-      IOEvent _ -> []
+      CloseConnection -> [Task (Unit <$> close conn)]
+      Unit _ -> []
       AnonymousEvent (fmap (\(TaggerAnonymousEvent e) -> e) -> es) -> es
-      ClearTextField (TaggerLens l) -> [Model $ model & l .~ ""]
+      Mempty (TaggerLens l) -> [Model $ model & l .~ mempty]
+      NextCyclicEnum (TaggerLens l) -> [Model $ model & l %~ next]
+      PrevCyclicEnum (TaggerLens l) -> [Model $ model & l %~ prev]
+      NextHistory (TaggerLens l) ->
+        [ Model $
+            model
+              & l . text .~ (fromMaybe "" . getHist $ model ^. l . history)
+              & l . history %~ nextHist
+        ]
+      PrevHistory (TaggerLens l) ->
+        [ Model $
+            model
+              & l . text .~ (fromMaybe "" . getHist $ model ^. l . history)
+              & l . history %~ prevHist
+        ]
+      ToggleVisibilityLabel (TaggerLens l) t ->
+        [Model $ model & l %~ flip togglePaneVis (VisibilityLabel t)]
 
 fileSelectionEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -113,20 +127,22 @@ fileSelectionEventHandler
   event =
     case event of
       AddFiles ->
-        [ Task (IOEvent <$> addFiles conn (model ^. fileSelectionModel . addFileText))
-        , Model $
-            model & fileSelectionModel . addFileHistory
-              %~ putHist (T.strip $ model ^. fileSelectionModel . addFileText)
-        , Event (ClearTextField (TaggerLens (fileSelectionModel . addFileText)))
-        ]
+        let !currentAddFileText = model ^. fileSelectionModel . addFileInput . text
+         in [ Task (Unit <$> addFiles conn currentAddFileText)
+            , Model $
+                model & fileSelectionModel . addFileInput . history
+                  %~ putHist (T.strip currentAddFileText)
+            , Event . Mempty $ TaggerLens (fileSelectionModel . addFileInput . text)
+            ]
       AppendQueryText t ->
         [ Model $
             model
               & fileSelectionModel
-                . queryText
+                . queryInput
+                . text
               %~ flip
                 T.append
-                ( ( if T.null (model ^. fileSelectionModel . queryText)
+                ( ( if T.null (model ^. fileSelectionModel . queryInput . text)
                       then ""
                       else " "
                   )
@@ -136,7 +152,7 @@ fileSelectionEventHandler
       ClearSelection ->
         [ Model $
             model & fileSelectionModel . selection .~ Seq.empty
-              & fileSelectionModel . tagOccurrences .~ OHM.empty
+              & fileSelectionTagListModel . occurrences .~ HM.empty
               & fileSelectionModel . fileSelectionInfoMap .~ IntMap.empty
               & fileSelectionModel . fileSelectionVis .~ VisibilityMain
         ]
@@ -148,7 +164,6 @@ fileSelectionEventHandler
             [ Event . DoFocusedFileEvent . PutFile $ f
             , Model $ model & fileSelectionModel . selection .~ (f <| (fs |> f'))
             ]
-      CycleNextSetOp -> [Model $ model & fileSelectionModel . setOp %~ next]
       CyclePrevFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []
@@ -157,22 +172,19 @@ fileSelectionEventHandler
             [ Event . DoFocusedFileEvent . PutFile $ f
             , Model $ model & fileSelectionModel . selection .~ (f <| (f' <| fs))
             ]
-      CyclePrevSetOp -> [Model $ model & fileSelectionModel . setOp %~ prev]
-      CycleTagOrderCriteria ->
-        [ Model $
-            model & fileSelectionModel . tagOrdering
-              %~ cycleOrderCriteria
-        ]
-      CycleTagOrderDirection ->
-        [ Model $
-            model & fileSelectionModel . tagOrdering
-              %~ cycleOrderDir
-        ]
       DeleteFileFromFileSystem fk ->
-        [ Task (IOEvent <$> rmFile conn fk)
+        [ Task (Unit <$> rmFile conn fk)
         , Event . DoFileSelectionEvent . RemoveFileFromSelection $ fk
         ]
       DoFileSelectionWidgetEvent e -> fileSelectionWidgetEventHandler wenv node model e
+      ExcludeTagListInfraToPattern t -> anonymousTask $ do
+        !infraDs <-
+          fmap (HS.fromList . map descriptorId . concat)
+            . mapM (flip getAllInfra conn . descriptorId)
+            <=< flip queryForDescriptorByPattern conn
+            $ t
+        callback
+          [Model $! model & fileSelectionTagListModel . include .~ infraDs]
       MakeFileSelectionInfoMap fseq ->
         [ let fiTuple (File fk fp) = (fromIntegral fk, constructFileInfo fp)
               m = F.toList $ fiTuple <$> fseq
@@ -181,38 +193,6 @@ fileSelectionEventHandler
                   & fileSelectionModel
                     . fileSelectionInfoMap
                   .~ IntMap.fromList m
-        ]
-      NextAddFileHist ->
-        [ Model $
-            model
-              & fileSelectionModel . addFileText
-                .~ ( fromMaybe "" . getHist $
-                      (model ^. fileSelectionModel . addFileHistory)
-                   )
-              & fileSelectionModel . addFileHistory %~ nextHist
-        ]
-      NextQueryHist ->
-        [ Model $
-            model
-              & fileSelectionModel . queryText
-                .~ (fromMaybe "" . getHist $ (model ^. fileSelectionModel . queryHistory))
-              & fileSelectionModel . queryHistory %~ nextHist
-        ]
-      PrevAddFileHist ->
-        [ Model $
-            model
-              & fileSelectionModel . addFileText
-                .~ ( fromMaybe "" . getHist $
-                      (model ^. fileSelectionModel . addFileHistory)
-                   )
-              & fileSelectionModel . addFileHistory %~ prevHist
-        ]
-      PrevQueryHist ->
-        [ Model $
-            model
-              & fileSelectionModel . queryText
-                .~ (fromMaybe "" . getHist $ (model ^. fileSelectionModel . queryHistory))
-              & fileSelectionModel . queryHistory %~ prevHist
         ]
       PutChunkSequence ->
         [ Model $
@@ -265,34 +245,34 @@ fileSelectionEventHandler
                   Seq.Empty -> []
                   (f :<| _) -> [Event . DoFocusedFileEvent . PutFile $ f]
                )
-      PutTagOccurrenceHashMap_ m ->
-        [ Model $
-            model
-              & fileSelectionModel . tagOccurrences .~ m
-        ]
+      PutTagOccurrenceHashMap_ ohm ->
+        [Model $ model & fileSelectionTagListModel . occurrences .~ ohm]
       Query ->
         [ Task
             ( do
                 r <-
                   runExceptT $
-                    runQuery conn (T.strip $ model ^. fileSelectionModel . queryText)
+                    runQuery
+                      conn
+                      (T.strip $ model ^. fileSelectionModel . queryInput . text)
                 either
-                  (mapM_ T.IO.putStrLn >=> (pure . IOEvent))
+                  (mapM_ T.IO.putStrLn >=> (pure . Unit))
                   (return . DoFileSelectionEvent . PutFiles)
                   r
             )
         , Model $
-            model & fileSelectionModel . queryHistory
-              %~ putHist (T.strip $ model ^. fileSelectionModel . queryText)
-        , Event (ClearTextField (TaggerLens (fileSelectionModel . queryText)))
-        , Event (DoFileSelectionEvent ResetQueryHistIndex)
+            model & fileSelectionModel . queryInput . history
+              %~ putHist (T.strip $ model ^. fileSelectionModel . queryInput . text)
+        , Event . Mempty $ TaggerLens (fileSelectionModel . queryInput . text)
+        , Event . Mempty $
+            TaggerLens (fileSelectionModel . queryInput . history . historyIndex)
         ]
       RefreshSpecificFile fk ->
         [ Task
             ( do
                 f <- runMaybeT $ queryForSingleFileByFileId fk conn
                 maybe
-                  (return . IOEvent $ ())
+                  (return . Unit $ ())
                   (return . DoFileSelectionEvent . RefreshSpecificFile_)
                   f
             )
@@ -322,15 +302,11 @@ fileSelectionEventHandler
         , Event . DoFileSelectionEvent $ PutChunkSequence
         ]
       RefreshTagOccurrences ->
-        [ Task
-            ( DoFileSelectionEvent . PutTagOccurrenceHashMap_
-                <$> getTagOccurrencesByFileKey
-                  (map fileId . F.toList $ model ^. fileSelectionModel . selection)
-                  conn
-            )
+        [ Event . DoFileSelectionEvent . RefreshTagOccurrencesWith . fmap fileId $
+            model ^. fileSelectionModel . selection
         ]
       RemoveFileFromDatabase fk ->
-        [ Task (IOEvent <$> deleteFiles [fk] conn)
+        [ Task (Unit <$> deleteFiles [fk] conn)
         , Event . DoFileSelectionEvent . RemoveFileFromSelection $ fk
         ]
       RemoveFileFromSelection fk ->
@@ -360,25 +336,15 @@ fileSelectionEventHandler
                       lift $ mvFile conn fk newRenameText
                       queryForSingleFileByFileId fk conn
                     maybe
-                      (return $ IOEvent ())
+                      (return $ Unit ())
                       (return . DoFileSelectionEvent . RefreshSpecificFile_)
                       result
                 )
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
-      ResetAddFileHistIndex ->
-        [ Model $
-            model
-              & fileSelectionModel . addFileHistory . historyIndex .~ 0
-        ]
-      ResetQueryHistIndex ->
-        [ Model $
-            model
-              & fileSelectionModel . queryHistory . historyIndex .~ 0
-        ]
       RunSelectionShellCommand ->
         [ Task
-            ( IOEvent
+            ( Unit
                 <$> runShellCmd
                   (T.strip $ model ^. shellText)
                   ( F.toList
@@ -392,7 +358,20 @@ fileSelectionEventHandler
       RefreshTagOccurrencesWith fks ->
         [ Task
             ( DoFileSelectionEvent . PutTagOccurrenceHashMap_
-                <$> getTagOccurrencesByFileKey fks conn
+                <$> foldM
+                  ( \acc fk ->
+                      HM.unionWith (+) acc
+                        . F.foldl'
+                          ( \acc' d ->
+                              if not (HM.member d acc')
+                                then HM.insert d 1 acc'
+                                else acc'
+                          )
+                          HM.empty
+                        <$> queryForDescriptorByFileId fk conn
+                  )
+                  HM.empty
+                  fks
             )
         ]
       ShuffleSelection ->
@@ -400,11 +379,6 @@ fileSelectionEventHandler
             ( DoFileSelectionEvent . PutFilesNoCombine
                 <$> shuffleSequence (model ^. fileSelectionModel . selection)
             )
-        ]
-      TogglePaneVisibility t ->
-        [ Model $
-            model & fileSelectionModel . fileSelectionVis
-              %~ flip togglePaneVis (VisibilityLabel t)
         ]
       ToggleSelectionView ->
         [ Model $
@@ -472,10 +446,11 @@ focusedFileEventHandler
         [ Model $
             model
               & focusedFileModel
-                . tagText
+                . tagInput
+                . text
               %~ flip
                 T.append
-                ( ( if T.null (model ^. focusedFileModel . tagText)
+                ( ( if T.null (model ^. focusedFileModel . tagInput . text)
                       then ""
                       else " "
                   )
@@ -491,21 +466,21 @@ focusedFileEventHandler
               )
               conn
               ( T.strip $
-                  model ^. focusedFileModel . tagText
+                  model ^. focusedFileModel . tagInput . text
               )
           callback
             [ Model $
                 model
-                  & focusedFileModel . tagHistory
+                  & focusedFileModel . tagInput . history
                     %~ putHist
-                      (T.strip $ model ^. focusedFileModel . tagText)
+                      (T.strip $ model ^. focusedFileModel . tagInput . text)
             , Event
-                . ClearTextField
-                $ TaggerLens (focusedFileModel . tagText)
+                . Mempty
+                $ TaggerLens (focusedFileModel . tagInput . text)
             , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
             ]
       DeleteTag t ->
-        [ Task (IOEvent <$> deleteTags [t] conn)
+        [ Task (Unit <$> deleteTags [t] conn)
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
       MoveTag
@@ -570,21 +545,7 @@ focusedFileEventHandler
                 lift $ moveSubTags ((oldTagKey,) <$> newTags) conn
                 lift $ deleteTags [oldTagKey] conn
             either (hPutStrLn stderr) return result
-      NextTagHist ->
-        [ Model $
-            model
-              & focusedFileModel . tagText
-                .~ (fromMaybe "" . getHist $ (model ^. focusedFileModel . tagHistory))
-              & focusedFileModel . tagHistory %~ nextHist
-        ]
-      PrevTagHist ->
-        [ Model $
-            model
-              & focusedFileModel . tagText
-                .~ (fromMaybe "" . getHist $ (model ^. focusedFileModel . tagHistory))
-              & focusedFileModel . tagHistory %~ prevHist
-        ]
-      PutConcreteFile_ cf@(ConcreteTaggedFile (File _ fp) _) ->
+      PutConcreteFile cf@(ConcreteTaggedFile (File _ fp) _) ->
         [ Model $
             model
               & focusedFileModel . focusedFile .~ cf
@@ -595,7 +556,7 @@ focusedFileEventHandler
             ( do
                 cft <- runMaybeT $ queryForConcreteTaggedFileWithFileId fk conn
                 maybe
-                  ( DoFocusedFileEvent . PutConcreteFile_ <$> do
+                  ( DoFocusedFileEvent . PutConcreteFile <$> do
                       defaultFile <- T.pack <$> getDataFileName focusedFileDefaultDataFile
                       return $
                         ConcreteTaggedFile
@@ -605,7 +566,7 @@ focusedFileEventHandler
                           )
                           empty
                   )
-                  (return . DoFocusedFileEvent . PutConcreteFile_)
+                  (return . DoFocusedFileEvent . PutConcreteFile)
                   cft
             )
         ]
@@ -617,14 +578,9 @@ focusedFileEventHandler
             $ model ^. focusedFileModel . focusedFile
         , Event . DoFileSelectionEvent $ RefreshFileSelection
         ]
-      ResetTagHistIndex ->
-        [ Model $
-            model
-              & focusedFileModel . tagHistory . historyIndex .~ 0
-        ]
       RunFocusedFileShellCommand ->
         [ Task
-            ( IOEvent
+            ( Unit
                 <$> runShellCmd
                   (T.strip $ model ^. shellText)
                   [ T.unpack . filePath . concreteTaggedFile $
@@ -644,20 +600,15 @@ focusedFileEventHandler
                 model
                   ^. focusedFileModel . focusedFile
          in [ Task
-                ( IOEvent
+                ( Unit
                     <$> if or [fk == focusedFileDefaultRecordKey]
                       then hPutStrLn stderr "Cannot tag the default file."
                       else void $ insertTags [(fk, dk, mtk)] conn
                 )
             , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
             ]
-      ToggleFocusedFilePaneVisibility t ->
-        [ Model $
-            model & focusedFileModel . focusedFileVis
-              %~ flip togglePaneVis (VisibilityLabel t)
-        ]
       UnSubTag tk ->
-        [ Task (IOEvent <$> unSubTags [tk] conn)
+        [ Task (Unit <$> unSubTags [tk] conn)
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
 
@@ -700,13 +651,13 @@ descriptorTreeEventHandler
     case event of
       CreateRelation (Descriptor mk _) (Descriptor ik _) ->
         [ Task
-            ( IOEvent <$> do
+            ( Unit <$> do
                 insertDescriptorRelation mk ik conn
             )
         , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
         ]
       DeleteDescriptor (Descriptor dk _) ->
-        [ Task (IOEvent <$> deleteDescriptors [dk] conn)
+        [ Task (Unit <$> deleteDescriptors [dk] conn)
         , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
         ]
       DescriptorTreeInit ->
@@ -723,7 +674,7 @@ descriptorTreeEventHandler
         ]
       InsertDescriptor ->
         [ Task
-            ( IOEvent <$> do
+            ( Unit <$> do
                 let newDesText =
                       T.words
                         . T.strip
@@ -731,7 +682,7 @@ descriptorTreeEventHandler
                 unless (null newDesText) (insertDescriptors newDesText conn)
             )
         , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
-        , Event . ClearTextField $ TaggerLens (descriptorTreeModel . newDescriptorText)
+        , Event . Mempty $ TaggerLens (descriptorTreeModel . newDescriptorText)
         ]
       PutFocusedTree_ nodeName ds desInfoMap ->
         [ Model $
@@ -796,15 +747,10 @@ descriptorTreeEventHandler
                       (descriptorId $ model ^. descriptorTreeModel . focusedNode)
                       conn
                 maybe
-                  (pure (IOEvent ()))
+                  (pure (Unit ()))
                   (pure . DoDescriptorTreeEvent . RequestFocusedNode . descriptor)
                   pd
             )
-        ]
-      ToggleDescriptorTreeVisibility l ->
-        [ Model $
-            model & descriptorTreeModel . descriptorTreeVis
-              %~ flip togglePaneVis (VisibilityLabel l)
         ]
       UpdateDescriptor rkd@(RecordKey (fromIntegral -> dk)) ->
         let updateText =
@@ -818,7 +764,7 @@ descriptorTreeEventHandler
               then []
               else
                 [ Task
-                    ( IOEvent
+                    ( Unit
                         <$> updateDescriptors [(updateText, rkd)] conn
                     )
                 , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
