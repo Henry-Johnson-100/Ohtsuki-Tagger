@@ -44,7 +44,7 @@ data TaggerEvent
   | TaggerInit
   | RefreshUI
   | CloseConnection
-  | IOEvent ()
+  | Unit ()
   | -- | A constructor for producing nested lists of tasks in other tasks.
     -- a slightly more flexible way of calling 'Event` that should be easier to use
     -- in either a 'Task` or normal 'Event` context

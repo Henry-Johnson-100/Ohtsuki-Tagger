@@ -28,7 +28,7 @@ import Data.Event (
   TaggerEvent (
     DoFileSelectionEvent,
     DoFocusedFileEvent,
-    IOEvent,
+    Unit,
     Mempty,
     NextCyclicEnum,
     NextHistory,
@@ -490,7 +490,7 @@ addFilesWidget =
                               . history
                               . historyIndex
                           )
-                    else IOEvent ()
+                    else Unit ()
               )
           ]
       ]

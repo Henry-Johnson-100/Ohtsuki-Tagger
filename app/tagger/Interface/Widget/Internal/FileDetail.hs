@@ -22,7 +22,7 @@ import Data.Event (
   TaggerEvent (
     DoFileSelectionEvent,
     DoFocusedFileEvent,
-    IOEvent,
+    Unit,
     Mempty,
     NextHistory,
     PrevHistory,
@@ -312,7 +312,7 @@ tagTextField =
                           . history
                           . historyIndex
                       )
-                else IOEvent ()
+                else Unit ()
           )
       , acceptTab
       ]
