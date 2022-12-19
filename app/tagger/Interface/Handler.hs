@@ -534,7 +534,7 @@ focusedFileEventHandler
                 lift $ moveSubTags ((oldTagKey,) <$> newTags) conn
                 lift $ deleteTags [oldTagKey] conn
             either (hPutStrLn stderr) return result
-      PutConcreteFile_ cf@(ConcreteTaggedFile (File _ fp) _) ->
+      PutConcreteFile cf@(ConcreteTaggedFile (File _ fp) _) ->
         [ Model $
             model
               & focusedFileModel . focusedFile .~ cf
@@ -545,7 +545,7 @@ focusedFileEventHandler
             ( do
                 cft <- runMaybeT $ queryForConcreteTaggedFileWithFileId fk conn
                 maybe
-                  ( DoFocusedFileEvent . PutConcreteFile_ <$> do
+                  ( DoFocusedFileEvent . PutConcreteFile <$> do
                       defaultFile <- T.pack <$> getDataFileName focusedFileDefaultDataFile
                       return $
                         ConcreteTaggedFile
@@ -555,7 +555,7 @@ focusedFileEventHandler
                           )
                           empty
                   )
-                  (return . DoFocusedFileEvent . PutConcreteFile_)
+                  (return . DoFocusedFileEvent . PutConcreteFile)
                   cft
             )
         ]

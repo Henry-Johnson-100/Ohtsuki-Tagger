@@ -115,7 +115,7 @@ data FocusedFileEvent
   | CommitTagText
   | DeleteTag (RecordKey Tag)
   | MoveTag ConcreteTag (Maybe (RecordKey Tag))
-  | PutConcreteFile_ ConcreteTaggedFile
+  | PutConcreteFile ConcreteTaggedFile
   | PutFile File
   | RefreshFocusedFileAndSelection
   | RunFocusedFileShellCommand
