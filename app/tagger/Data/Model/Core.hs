@@ -32,6 +32,7 @@ module Data.Model.Core (
   QueryBuilderModel (..),
 ) where
 
+import Data.Functor.Identity (Identity)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import Data.HashSet (HashSet)
@@ -299,7 +300,7 @@ defaultFileDetailAndDescriptorTreePositioningModel (PositioningModel ov oh _ _) 
 
 data QueryBuilderModel = QueryBuilderModel
   { _querybuilderInput :: TextInput
-  , _querybuilderExpression :: Expression
+  , _querybuilderExpression :: Expression Identity
   }
   deriving (Show, Eq)
 

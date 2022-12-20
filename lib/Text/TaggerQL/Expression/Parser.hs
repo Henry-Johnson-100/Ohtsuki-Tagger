@@ -34,6 +34,7 @@ module Text.TaggerQL.Expression.Parser (
 import Control.Applicative ((<**>))
 import Data.Char (toLower, toUpper)
 import Data.Functor (($>), (<&>))
+import Data.Functor.Identity (Identity (Identity))
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -54,9 +55,11 @@ import Text.Parsec (
   (<|>),
  )
 import Text.TaggerQL.Expression.AST (
+  BinaryExpression (..),
   Expression (..),
   FileTerm (..),
   SubExpression (..),
+  TagExpression (..),
   TagTerm (..),
  )
 
@@ -65,7 +68,7 @@ type Parser a = Parsec Text () a
 {- |
  Parse an 'Expression` from a TaggerQL query.
 -}
-parseExpr :: Text -> Either ParseError Expression
+parseExpr :: Text -> Either ParseError (Expression Identity)
 parseExpr = parse expressionParser "TaggerQL"
 
 {- |
@@ -76,26 +79,33 @@ parseExpr = parse expressionParser "TaggerQL"
 parseTagExpr :: Text -> Either ParseError SubExpression
 parseTagExpr = parse subExpressionParser "TaggerQL"
 
-expressionParser :: Parser Expression
+expressionParser :: Parser (Expression Identity)
 expressionParser =
   spaces
     *> ( try
           ( myChainl1
               lhsExprParser
-              (flip Binary <$> (spaces *> setOpParser))
+              ( ( \so lhs rhs ->
+                    BinaryExpressionValue
+                      ( Identity
+                          (BinaryExpression lhs so rhs)
+                      )
+                )
+                  <$> (spaces *> setOpParser)
+              )
               pure
           )
           <|> lhsExprParser
        )
  where
-  lhsExprParser :: Parser Expression
+  lhsExprParser :: Parser (Expression Identity)
   lhsExprParser =
     spaces
       *> ( precedentExpressionParser
             <|> ( try fileTermValueParser
                     <|> ( tagTermParser
                             <**> ( tagExpressionLookAhead
-                                    <|> pure TagTermValue
+                                    <|> pure (TagTermValue . Identity)
                                  )
                         )
                 )
@@ -104,14 +114,14 @@ expressionParser =
     precedentExpressionParser =
       between (char '(') (spaces *> char ')') expressionParser
     tagExpressionLookAhead =
-      flip TagExpression
+      (\subExpr tt -> TagExpressionValue . Identity . TagExpression tt $ subExpr)
         <$> between
           (try (spaces *> char '{'))
           (spaces *> char '}')
           subExpressionParser
 
-fileTermValueParser :: Parser Expression
-fileTermValueParser = FileTermValue <$> fileTermParser
+fileTermValueParser :: Parser (Expression Identity)
+fileTermValueParser = FileTermValue . Identity <$> fileTermParser
 
 subExpressionParser :: Parser SubExpression
 subExpressionParser =
