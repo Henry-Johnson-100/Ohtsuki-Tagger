@@ -5,11 +5,11 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TupleSections #-}
+{-# HLINT ignore "Use lambda-case" #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use lambda-case" #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.AST
@@ -31,7 +31,9 @@ module Text.TaggerQL.Expression.AST (
   ExpressionIdentity (..),
 
   -- * Annotations
-  -- $Annotations
+  -- $Annotators
+  Annotator (..),
+  runAnnotator,
   annotate,
   annotateIndices,
 
@@ -40,7 +42,7 @@ module Text.TaggerQL.Expression.AST (
   universe,
 ) where
 
-import Control.Monad.Trans.State.Strict (evalState, get, modify)
+import Control.Monad.Trans.State.Strict (State, evalState, get, modify)
 import Data.Functor (($>))
 import Data.Functor.Identity (Identity (Identity))
 import Data.Ix (Ix)
@@ -157,42 +159,84 @@ instance ExpressionIdentity ((,) a) where
           so
           (expressionIdentity rhs)
 
+{- $Annotators
+ An 'Annotator` provides a generic way to describe an annotation of any
+ @ExpressionIdentity t => Expression t@.
+
+ It traverses the 'Expression` in order of evaluation, dispatching the appropriate
+ function.
+
+ Its first 3 functions, 'annotateUnion`, 'annotateIntersection`, and 'annotateDifference`
+ can be classified for any ring 'finalAnnotation a`
+ where union is addition, intersection is multiplication and difference
+ is the additive inverse.
+
+ But the provided implementation is generic, allowing flexible use for any context.
+ An example of this is the 'indexAnnotator` that provides an index for each 'Expression`
+ by order of its evaluation:
+
+ @
+indexAnnotator :: (Ix a, Num a) => Annotator (State a) a ((,) a) ((,) a)
+indexAnnotator =
+  Annotator
+    { annotateUnion = combGet
+    , annotateIntersection = combGet
+    , annotateDifference = combGet
+    , annotateBinaryExpression = (,)
+    , liftBinaryExpression = \\binExpr -> modify (+ 1) $> binExpr
+    , liftLeaf = \\leaf -> fmap (,leaf) get <* modify (+ 1)
+    }
+ where
+  combGet _ _ = get
+ @
+-}
+
 {- |
- Annotate each leaf of an 'Expression` in the order it gets evaluated.
-
- 0 indexed.
+ Data type that describes some generic behavior when annotating an 'Expression`.
 -}
-annotateIndices :: (Num a, Ix a) => Expression Identity -> Expression ((,) a)
-annotateIndices =
-  flip evalState 0
-    . annotate
-      (\_ _ -> get)
-      (\_ _ -> get)
-      (\_ _ -> get)
-      (,)
-      (\expr -> modify (+ 1) $> expr)
-      (\leaf -> fmap (ExpressionLeaf . (,leaf)) get <* modify (+ 1))
+data Annotator m setOpResult binaryIntermediate finalAnnotation = Annotator
+  { -- | Union operation
+    annotateUnion ::
+      Expression finalAnnotation ->
+      Expression finalAnnotation ->
+      m setOpResult
+  , -- | Intersection operation
+    annotateIntersection ::
+      Expression finalAnnotation ->
+      Expression finalAnnotation ->
+      m setOpResult
+  , -- | Difference operation
+    annotateDifference ::
+      Expression finalAnnotation ->
+      Expression finalAnnotation ->
+      m setOpResult
+  , -- | Function describing how to use the value provided by one of the
+    -- combination functions above to annotate the binary expression.
+    --
+    -- This function may result in an intermediate kind 'binaryIntermediate` that must
+    -- be finally resolved by the 'liftBinaryExpression` function.
+    --
+    -- But typically, the type of 'binaryIntermediate` and 'finalAnnotation` are the same.
+    annotateBinaryExpression ::
+      setOpResult ->
+      BinaryExpression finalAnnotation ->
+      binaryIntermediate (BinaryExpression binaryIntermediate)
+  , -- | Function describing how to lift an annotated binary
+    -- expression into the final context
+    liftBinaryExpression ::
+      binaryIntermediate (BinaryExpression binaryIntermediate) ->
+      m (finalAnnotation (BinaryExpression finalAnnotation))
+  , -- | Function describing how to annotate the terminal leaves of an 'Expression`
+    liftLeaf :: ExpressionLeaf -> m (finalAnnotation ExpressionLeaf)
+  }
 
-{- $Annotations
- Expression can be annotated using 'annotate` to supplement the leaf of each 'Expression`
- with some additional information. Below is an example showing how 'annotate` is used
- to create an index of each leaf of an expression in the order that it is evaluated.
-
- @
-annotateIndices :: (Num a, Ix a) => Expression Identity -> Expression ((,) a)
-annotateIndices =
-  flip evalState 0
-    . annotate
-      (\\_ _ -> get)
-      (\\_ _ -> get)
-      (\\_ _ -> get)
-      (,)
-      (\\expr -> modify (+ 1) $> expr)
-      (\\leaf -> fmap (ExpressionLeaf . (,leaf)) get <* modify (+ 1))
- @
-
-This function uses the 'StateT` monad to keep track of the current index.
--}
+runAnnotator ::
+  (ExpressionIdentity l, Monad m) =>
+  Annotator m k b t ->
+  Expression l ->
+  m (Expression t)
+runAnnotator (Annotator u i d ab lb ll) =
+  annotate u i d ab lb ll . expressionIdentity
 
 {- |
  Generalized traversal of an 'Expression Identity`.
@@ -211,9 +255,9 @@ annotate ::
   -- with some intermediate annotation
   (t2 -> BinaryExpression t1 -> t3 (BinaryExpression t3)) ->
   -- | lifts the above intermediate annotation to the context of the traversal
-  (Expression t3 -> m (Expression t1)) ->
+  (t3 (BinaryExpression t3) -> m (t1 (BinaryExpression t1))) ->
   -- | Annotate an 'ExpressionLeaf`
-  (ExpressionLeaf -> m (Expression t1)) ->
+  (ExpressionLeaf -> m (t1 ExpressionLeaf)) ->
   -- | The 'Expression` to annotate
   Expression Identity ->
   m (Expression t1)
@@ -226,15 +270,15 @@ annotate
   onLeaf
   expr =
     case expr of
-      ExpressionLeaf (Identity leaf) -> onLeaf leaf
+      ExpressionLeaf (Identity leaf) -> fmap ExpressionLeaf . onLeaf $ leaf
       BinaryExpressionValue (Identity (BinaryExpression lhs so rhs)) -> do
         lhsLifted <- annotate' lhs
         rhsLifted <- annotate' rhs
         combination <- lhsLifted `combFunc` rhsLifted
-        returnBinary
-          ( BinaryExpressionValue . liftBinaryExpressionWith combination $
-              BinaryExpression lhsLifted so rhsLifted
-          )
+        fmap BinaryExpressionValue
+          . returnBinary
+          . liftBinaryExpressionWith combination
+          $ BinaryExpression lhsLifted so rhsLifted
        where
         combFunc = case so of
           Union -> unionF
@@ -248,6 +292,27 @@ annotate
             liftBinaryExpressionWith
             returnBinary
             onLeaf
+
+{- |
+ Annotate each leaf of an 'Expression` in the order it gets evaluated.
+
+ 0 indexed.
+-}
+annotateIndices :: (Num a, Ix a) => Expression Identity -> Expression ((,) a)
+annotateIndices = flip evalState 0 . runAnnotator indexAnnotator
+
+indexAnnotator :: (Ix a, Num a) => Annotator (State a) a ((,) a) ((,) a)
+indexAnnotator =
+  Annotator
+    { annotateUnion = combGet
+    , annotateIntersection = combGet
+    , annotateDifference = combGet
+    , annotateBinaryExpression = (,)
+    , liftBinaryExpression = \binExpr -> modify (+ 1) $> binExpr
+    , liftLeaf = \leaf -> fmap (,leaf) get <* modify (+ 1)
+    }
+ where
+  combGet _ _ = get
 
 {-# INLINE zero #-}
 
