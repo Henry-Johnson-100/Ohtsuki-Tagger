@@ -32,7 +32,7 @@ basicQueryFunctionality c =
   testGroup
     "Query Engine AST Tests - Basic"
     [ testCase "Pattern Wildcard" $ do
-        r <- c >>= runExpr (FileTermValue "%")
+        r <- c >>= runExpr (ExpressionLeaf . Identity . FileTermValue $ "%")
         a <- c >>= allFiles
         assertEqual
           "FileTermValue \"%\" matches all files"
@@ -44,9 +44,9 @@ basicQueryFunctionality c =
             >>= runExpr
               ( BinaryExpressionValue . Identity $
                   BinaryExpression
-                    (FileTermValue "%")
+                    (ExpressionLeaf . Identity . FileTermValue $ "%")
                     Difference
-                    (TagTermValue . Identity $ DescriptorTerm "%")
+                    (ExpressionLeaf . Identity . TagTermValue $ DescriptorTerm "%")
               )
         a <- c >>= queryForUntaggedFiles
         assertEqual
@@ -54,28 +54,28 @@ basicQueryFunctionality c =
           (HS.fromList a)
           r
     , testCase "TagTermValue Expression - Descriptor" $ do
-        r <- c >>= runExpr (TagTermValue . Identity $ DescriptorTerm "descriptor_5")
+        r <- c >>= runExpr (ExpressionLeaf . Identity . TagTermValue $ DescriptorTerm "descriptor_5")
         a <- c >>= flatQueryForFileByTagDescriptorPattern "descriptor_5"
         assertEqual
           "A TagTermValue performs a flat query"
           (HS.fromList a)
           r
     , testCase "TagTermValue Expression - Descriptor - Flat Query" $ do
-        r <- c >>= runExpr (TagTermValue . Identity $ DescriptorTerm "descriptor_6")
+        r <- c >>= runExpr (ExpressionLeaf . Identity . TagTermValue $ DescriptorTerm "descriptor_6")
         a <- c >>= flatQueryForFileByTagDescriptorPattern "descriptor_6"
         assertEqual
           "A TagTermValue performs a flat query"
           (HS.fromList a)
           r
     , testCase "TagTermValue Expression - MetaDescriptor" $ do
-        r <- c >>= runExpr (TagTermValue . Identity $ MetaDescriptorTerm "descriptor_12")
+        r <- c >>= runExpr (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "descriptor_12")
         a <- c >>= flatQueryForFileOnMetaRelationPattern "descriptor_12"
         assertEqual
           "A TagTermValue performs a flat query"
           (HS.fromList a)
           r
     , testCase "TagTermValue Expression - MetaDescriptor - Manual" $ do
-        r <- c >>= runExpr (TagTermValue . Identity $ MetaDescriptorTerm "descriptor_12")
+        r <- c >>= runExpr (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "descriptor_12")
         assertEqual
           "Should match the case: \"TagTermValue Expression - MetaDescriptor\""
           [file 8, file 9, file 10]
@@ -88,9 +88,9 @@ basicQueryFunctionality c =
                 >>= runExpr
                   ( BinaryExpressionValue . Identity $
                       BinaryExpression
-                        (FileTermValue "file_1")
+                        (ExpressionLeaf . Identity . FileTermValue $ "file_1")
                         Union
-                        (FileTermValue "file_2")
+                        (ExpressionLeaf . Identity . FileTermValue $ "file_2")
                   )
             assertEqual
               "Union wa union dayo"
@@ -102,9 +102,9 @@ basicQueryFunctionality c =
                 >>= runExpr
                   ( BinaryExpressionValue . Identity $
                       BinaryExpression
-                        (TagTermValue . Identity $ DescriptorTerm "descriptor_5")
+                        (ExpressionLeaf . Identity . TagTermValue $ DescriptorTerm "descriptor_5")
                         Intersect
-                        (TagTermValue . Identity $ DescriptorTerm "descriptor_6")
+                        (ExpressionLeaf . Identity . TagTermValue $ DescriptorTerm "descriptor_6")
                   )
             assertEqual
               ""
@@ -118,12 +118,12 @@ basicQueryFunctionality c =
                       BinaryExpression
                         ( BinaryExpressionValue . Identity $
                             BinaryExpression
-                              (TagTermValue . Identity $ DescriptorTerm "descriptor_5")
+                              (ExpressionLeaf . Identity . TagTermValue $ DescriptorTerm "descriptor_5")
                               Union
-                              (FileTermValue "file_3")
+                              (ExpressionLeaf . Identity . FileTermValue $ "file_3")
                         )
                         Intersect
-                        (TagTermValue . Identity $ DescriptorTerm "descriptor_6")
+                        (ExpressionLeaf . Identity . TagTermValue $ DescriptorTerm "descriptor_6")
                   )
             assertEqual
               "Binary Operations should be nestable."
@@ -137,17 +137,17 @@ basicQueryFunctionality c =
                       BinaryExpression
                         ( BinaryExpressionValue . Identity $
                             BinaryExpression
-                              (TagTermValue . Identity $ DescriptorTerm "descriptor_4")
+                              (ExpressionLeaf . Identity . TagTermValue $ DescriptorTerm "descriptor_4")
                               Union
                               ( BinaryExpressionValue . Identity $
                                   BinaryExpression
-                                    (TagTermValue . Identity $ DescriptorTerm "descriptor_5")
+                                    (ExpressionLeaf . Identity . TagTermValue $ DescriptorTerm "descriptor_5")
                                     Union
-                                    (TagTermValue . Identity $ DescriptorTerm "descriptor_6")
+                                    (ExpressionLeaf . Identity . TagTermValue $ DescriptorTerm "descriptor_6")
                               )
                         )
                         Difference
-                        (TagTermValue . Identity $ DescriptorTerm "descriptor_5")
+                        (ExpressionLeaf . Identity . TagTermValue $ DescriptorTerm "descriptor_5")
                   )
             assertEqual
               "Difference wa difference dayo"
@@ -160,7 +160,7 @@ basicQueryFunctionality c =
             r <-
               c
                 >>= runExpr
-                  ( TagExpressionValue . Identity $
+                  ( ExpressionLeaf . Identity . TagExpressionValue $
                       TagExpression
                         (DescriptorTerm "descriptor_5")
                         (SubTag (DescriptorTerm "descriptor_6"))
@@ -173,7 +173,7 @@ basicQueryFunctionality c =
             r <-
               c
                 >>= runExpr
-                  ( TagExpressionValue . Identity $
+                  ( ExpressionLeaf . Identity . TagExpressionValue $
                       TagExpression
                         (DescriptorTerm "descriptor_6")
                         (SubTag (DescriptorTerm "descriptor_7"))
@@ -186,7 +186,7 @@ basicQueryFunctionality c =
             r <-
               c
                 >>= runExpr
-                  ( TagExpressionValue . Identity $
+                  ( ExpressionLeaf . Identity . TagExpressionValue $
                       TagExpression
                         (DescriptorTerm "descriptor_17")
                         ( SubExpression
@@ -202,7 +202,7 @@ basicQueryFunctionality c =
             r <-
               c
                 >>= runExpr
-                  ( TagExpressionValue . Identity $
+                  ( ExpressionLeaf . Identity . TagExpressionValue $
                       TagExpression
                         (DescriptorTerm "descriptor_17")
                         (SubTag (DescriptorTerm "descriptor_18"))
@@ -255,7 +255,7 @@ basicQueryFunctionality c =
                 r <-
                   c
                     >>= runExpr
-                      ( TagExpressionValue . Identity $
+                      ( ExpressionLeaf . Identity . TagExpressionValue $
                           TagExpression
                             (DescriptorTerm "descriptor_17")
                             ( SubBinary
@@ -278,7 +278,7 @@ basicQueryFunctionality c =
                 r <-
                   c
                     >>= runExpr
-                      ( TagExpressionValue . Identity $
+                      ( ExpressionLeaf . Identity . TagExpressionValue $
                           TagExpression
                             (DescriptorTerm "descriptor_17")
                             ( SubBinary
@@ -297,7 +297,7 @@ basicQueryFunctionality c =
                 r <-
                   c
                     >>= runExpr
-                      ( TagExpressionValue . Identity $
+                      ( ExpressionLeaf . Identity . TagExpressionValue $
                           TagExpression
                             (DescriptorTerm "descriptor_17")
                             ( SubBinary
@@ -322,7 +322,7 @@ basicQueryFunctionality c =
             r <-
               c
                 >>= runExpr
-                  ( TagExpressionValue . Identity $
+                  ( ExpressionLeaf . Identity . TagExpressionValue $
                       TagExpression
                         (DescriptorTerm "%")
                         ( SubBinary
@@ -351,7 +351,7 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( TagExpressionValue . Identity $
+                  ( ExpressionLeaf . Identity . TagExpressionValue $
                       TagExpression
                         (DescriptorTerm "descriptor_8")
                         ( SubExpression
@@ -367,7 +367,7 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( TagExpressionValue . Identity $
+                  ( ExpressionLeaf . Identity . TagExpressionValue $
                       TagExpression
                         (DescriptorTerm "descriptor_8")
                         (SubTag (DescriptorTerm "descriptor_9"))
@@ -380,7 +380,7 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( TagExpressionValue . Identity $
+                  ( ExpressionLeaf . Identity . TagExpressionValue $
                       TagExpression
                         (DescriptorTerm "descriptor_9")
                         (SubTag (DescriptorTerm "descriptor_10"))
@@ -393,7 +393,7 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( TagExpressionValue . Identity $
+                  ( ExpressionLeaf . Identity . TagExpressionValue $
                       TagExpression
                         (DescriptorTerm "descriptor_11")
                         (SubTag (DescriptorTerm "descriptor_9"))
@@ -409,7 +409,7 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( TagExpressionValue . Identity $
+                  ( ExpressionLeaf . Identity . TagExpressionValue $
                       TagExpression
                         (MetaDescriptorTerm "descriptor_12")
                         ( SubBinary
@@ -428,13 +428,13 @@ queryEdgeCases c =
                 >>= runExpr
                   ( BinaryExpressionValue . Identity $
                       BinaryExpression
-                        ( TagExpressionValue . Identity $
+                        ( ExpressionLeaf . Identity . TagExpressionValue $
                             TagExpression
                               (MetaDescriptorTerm "descriptor_12")
                               (SubTag (DescriptorTerm "descriptor_15"))
                         )
                         Intersect
-                        ( TagExpressionValue . Identity $
+                        ( ExpressionLeaf . Identity . TagExpressionValue $
                             TagExpression
                               (MetaDescriptorTerm "descriptor_12")
                               (SubTag (DescriptorTerm "descriptor_16"))
@@ -448,7 +448,7 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( TagExpressionValue . Identity $
+                  ( ExpressionLeaf . Identity . TagExpressionValue $
                       TagExpression
                         (DescriptorTerm "descriptor_13")
                         ( SubBinary

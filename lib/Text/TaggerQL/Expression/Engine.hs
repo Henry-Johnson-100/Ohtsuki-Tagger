@@ -66,14 +66,7 @@ import Database.Tagger.Type (
  )
 import Text.Parsec.Error (errorMessages, messageString)
 import Text.RawString.QQ (r)
-import Text.TaggerQL.Expression.AST (
-  BinaryExpression (..),
-  Expression (..),
-  FileTerm (FileTerm),
-  SubExpression (..),
-  TagExpression (..),
-  TagTerm (..),
- )
+import Text.TaggerQL.Expression.AST
 import Text.TaggerQL.Expression.Parser (parseExpr, parseTagExpr)
 
 {- |
@@ -94,19 +87,20 @@ runExpr expr = runReaderT (evalExpr expr)
 
 evalExpr :: Expression Identity -> ReaderT TaggedConnection IO (HashSet File)
 evalExpr expr = case expr of
-  FileTermValue (Identity (FileTerm txt)) ->
-    ask >>= liftIO . fmap HS.fromList . queryForFileByPattern txt
-  TagTermValue (Identity tt) ->
-    ask
-      >>= liftIO . fmap HS.fromList . case tt of
-        DescriptorTerm txt -> flatQueryForFileByTagDescriptorPattern txt
-        MetaDescriptorTerm txt -> flatQueryForFileOnMetaRelationPattern txt
-  TagExpressionValue (Identity (TagExpression tt subExpr)) ->
-    ask
-      >>= \c -> do
-        supertags <- liftIO . fmap HS.fromList $ queryTags tt c
-        subExprResult <- evalSubExpression subExpr supertags
-        liftIO $ toFileSet subExprResult c
+  ExpressionLeaf (Identity l) -> case l of
+    FileTermValue (FileTerm txt) ->
+      ask >>= liftIO . fmap HS.fromList . queryForFileByPattern txt
+    TagTermValue tt ->
+      ask
+        >>= liftIO . fmap HS.fromList . case tt of
+          DescriptorTerm txt -> flatQueryForFileByTagDescriptorPattern txt
+          MetaDescriptorTerm txt -> flatQueryForFileOnMetaRelationPattern txt
+    TagExpressionValue (TagExpression tt subExpr) ->
+      ask
+        >>= \c -> do
+          supertags <- liftIO . fmap HS.fromList $ queryTags tt c
+          subExprResult <- evalSubExpression subExpr supertags
+          liftIO $ toFileSet subExprResult c
   BinaryExpressionValue (Identity (BinaryExpression lhs so rhs)) ->
     ( case so of
         Union -> HS.union

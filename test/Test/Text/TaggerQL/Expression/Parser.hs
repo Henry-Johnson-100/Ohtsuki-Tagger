@@ -97,25 +97,25 @@ parserTests =
                 "Parse implicit tag term expr"
                 ( assertEqual
                     ""
-                    (Right (TagTermValue . Identity $ MetaDescriptorTerm "hello"))
+                    (Right (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "hello"))
                     (parseExpr "hello")
                 )
             , testCase
                 "Parse explicit tag term expr"
                 ( assertEqual
                     ""
-                    (Right (TagTermValue . Identity $ DescriptorTerm "hello"))
+                    (Right (ExpressionLeaf . Identity . TagTermValue $ DescriptorTerm "hello"))
                     (parseExpr "d.hello")
                 )
             , testCase
                 "file term value"
-                (assertEqual "" (Right (FileTermValue "hello")) (parseExpr "p.hello"))
+                (assertEqual "" (Right (ExpressionLeaf . Identity . FileTermValue $ "hello")) (parseExpr "p.hello"))
             , testCase
                 "tag expression entrance"
                 ( assertEqual
                     ""
                     ( Right
-                        ( TagExpressionValue . Identity $
+                        ( ExpressionLeaf . Identity . TagExpressionValue $
                             TagExpression
                                 (MetaDescriptorTerm "a")
                                 (SubTag (MetaDescriptorTerm "b"))
@@ -132,9 +132,9 @@ parserTests =
                         ( Right
                             ( BinaryExpressionValue . Identity $
                                 BinaryExpression
-                                    (TagTermValue . Identity $ MetaDescriptorTerm "a")
+                                    (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "a")
                                     Union
-                                    (TagTermValue . Identity $ MetaDescriptorTerm "b")
+                                    (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "b")
                             )
                         )
                         (parseExpr "a | b")
@@ -146,9 +146,9 @@ parserTests =
                         ( Right
                             ( BinaryExpressionValue . Identity $
                                 BinaryExpression
-                                    (TagTermValue . Identity $ MetaDescriptorTerm "a")
+                                    (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "a")
                                     Intersect
-                                    (TagTermValue . Identity $ MetaDescriptorTerm "b")
+                                    (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "b")
                             )
                         )
                         (parseExpr "a b")
@@ -162,12 +162,12 @@ parserTests =
                                 BinaryExpression
                                     ( BinaryExpressionValue . Identity $
                                         BinaryExpression
-                                            (TagTermValue . Identity $ MetaDescriptorTerm "a")
+                                            (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "a")
                                             Union
-                                            (TagTermValue . Identity $ MetaDescriptorTerm "b")
+                                            (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "b")
                                     )
                                     Difference
-                                    (TagTermValue . Identity $ MetaDescriptorTerm "c")
+                                    (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "c")
                             )
                         )
                         (parseExpr "a | b ! c")
@@ -179,14 +179,14 @@ parserTests =
                         ( Right
                             ( BinaryExpressionValue . Identity $
                                 BinaryExpression
-                                    ( TagTermValue . Identity $ MetaDescriptorTerm "a"
+                                    ( ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "a"
                                     )
                                     Union
                                     ( BinaryExpressionValue . Identity $
                                         BinaryExpression
-                                            (TagTermValue . Identity $ MetaDescriptorTerm "b")
+                                            (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "b")
                                             Difference
-                                            (TagTermValue . Identity $ MetaDescriptorTerm "c")
+                                            (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "c")
                                     )
                             )
                         )
@@ -203,9 +203,9 @@ parserTests =
                                         BinaryExpression
                                             ( BinaryExpressionValue . Identity $
                                                 BinaryExpression
-                                                    (TagTermValue . Identity $ MetaDescriptorTerm "a")
+                                                    (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "a")
                                                     Intersect
-                                                    ( TagExpressionValue . Identity $
+                                                    ( ExpressionLeaf . Identity . TagExpressionValue $
                                                         TagExpression
                                                             (MetaDescriptorTerm "b")
                                                             (SubTag (MetaDescriptorTerm "c"))
@@ -214,13 +214,13 @@ parserTests =
                                             Union
                                             ( BinaryExpressionValue . Identity $
                                                 BinaryExpression
-                                                    (FileTermValue "hi")
+                                                    (ExpressionLeaf . Identity . FileTermValue $ "hi")
                                                     Intersect
-                                                    (FileTermValue "bye")
+                                                    (ExpressionLeaf . Identity . FileTermValue $ "bye")
                                             )
                                     )
                                     Difference
-                                    (TagTermValue . Identity $ DescriptorTerm "unwanted")
+                                    (ExpressionLeaf . Identity . TagTermValue $ DescriptorTerm "unwanted")
                             )
                         )
                         (parseExpr "a b{c} | (p.hi & p.bye) ! d.unwanted")
@@ -235,9 +235,9 @@ parserTests =
                             BinaryExpression
                                 ( BinaryExpressionValue . Identity $
                                     BinaryExpression
-                                        (TagTermValue . Identity $ MetaDescriptorTerm "a")
+                                        (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "a")
                                         Intersect
-                                        ( TagExpressionValue . Identity $
+                                        ( ExpressionLeaf . Identity . TagExpressionValue $
                                             TagExpression
                                                 (MetaDescriptorTerm "b")
                                                 ( SubBinary
@@ -248,7 +248,7 @@ parserTests =
                                         )
                                 )
                                 Intersect
-                                (TagTermValue . Identity $ MetaDescriptorTerm "e")
+                                (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "e")
                         )
                     )
                     (parseExpr "a b{\nc d\n}\ne")
@@ -262,9 +262,9 @@ parserTests =
                         ( Right
                             ( BinaryExpressionValue . Identity $
                                 BinaryExpression
-                                    (TagTermValue . Identity $ MetaDescriptorTerm "a")
+                                    (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "a")
                                     Intersect
-                                    (TagTermValue . Identity $ MetaDescriptorTerm "b")
+                                    (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "b")
                             )
                         )
                         (parseExpr "a b ")
@@ -276,9 +276,9 @@ parserTests =
                         ( Right
                             ( BinaryExpressionValue . Identity $
                                 BinaryExpression
-                                    (TagTermValue . Identity $ MetaDescriptorTerm "a")
+                                    (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "a")
                                     Union
-                                    (TagTermValue . Identity $ MetaDescriptorTerm "b")
+                                    (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "b")
                             )
                         )
                         (parseExpr "a | b ")

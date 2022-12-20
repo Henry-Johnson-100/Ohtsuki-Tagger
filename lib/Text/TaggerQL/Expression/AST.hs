@@ -9,6 +9,8 @@
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
+{-# HLINT ignore "Use lambda-case" #-}
+
 {- |
 Module      : Text.TaggerQL.Expression.AST
 Description : The syntax tree for the TaggerQL query language.
@@ -17,23 +19,34 @@ License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL.Expression.AST (
+  -- * AST
+  Expression (..),
+  ExpressionLeaf (..),
+  BinaryExpression (..),
+  TagExpression (..),
+  SubExpression (..),
   TagTerm (..),
   FileTerm (..),
-  SubExpression (..),
-  TagExpression (..),
-  BinaryExpression (..),
-  Expression (..),
+
+  -- * Classes
+  ExpressionIdentity (..),
+
+  -- * Annotations
+  -- $Annotations
+  annotate,
+  annotateIndices,
 
   -- * Constants
   zero,
   universe,
 ) where
 
-import Control.Monad.Trans.State.Strict
+import Control.Monad.Trans.State.Strict (evalState, get, modify)
+import Data.Functor (($>))
 import Data.Functor.Identity (Identity (Identity))
 import Data.Ix (Ix)
 import Data.String (IsString)
-import Data.Tagger (SetOp (Difference, Intersect))
+import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -81,6 +94,10 @@ data SubExpression
 data TagExpression = TagExpression TagTerm SubExpression
   deriving (Show, Eq)
 
+{- |
+ Intermediate constructor for lifting a binary set operation over 'Expression` into
+ an 'Expression`
+-}
 data BinaryExpression t = BinaryExpression (Expression t) SetOp (Expression t)
 
 deriving instance Show (BinaryExpression Identity)
@@ -92,20 +109,30 @@ deriving instance Show a => Show (BinaryExpression ((,) a))
 deriving instance Eq a => Eq (BinaryExpression ((,) a))
 
 {- |
- An 'Expression` is a structure that defines a set of 'File` that is some subset of
- the set of all 'File` in the database.
-
- An 'Expression` is a complete TaggerQL query.
+ Intermediate constructor denoting the terminal evaluations of an 'Expression`
 -}
-data Expression t
-  = FileTermValue (t FileTerm)
-  | TagTermValue (t TagTerm)
+data ExpressionLeaf
+  = FileTermValue FileTerm
+  | TagTermValue TagTerm
   | -- | Constructs a 'Tag` set from the given 'TagTerm`
     -- that serves as the inital environment for the given 'SubExpression`.
     --
     -- Essentially, defines the set of 'File` where 'SubExpression` are subtags
     -- of any 'Tag` appearing in the set defined by the 'TagTerm`.
-    TagExpressionValue (t TagExpression)
+    TagExpressionValue TagExpression
+  deriving (Show, Eq)
+
+{- |
+ An 'Expression` is a structure that defines a set of 'File` that is some subset of
+ the set of all 'File` in the database.
+
+ 'Expression` is a higher kinded type. This additional type can be used to annotate the
+ leaves of an 'Expression` tree.
+
+ An 'Expression` is a complete TaggerQL query.
+-}
+data Expression t
+  = ExpressionLeaf (t ExpressionLeaf)
   | BinaryExpressionValue (t (BinaryExpression t))
 
 deriving instance Show (Expression Identity)
@@ -130,9 +157,7 @@ instance ExpressionIdentity Identity where
 instance ExpressionIdentity ((,) a) where
   expressionIdentity :: Expression ((,) a) -> Expression Identity
   expressionIdentity expr = case expr of
-    FileTermValue x0 -> FileTermValue . Identity . snd $ x0
-    TagTermValue x0 -> TagTermValue . Identity . snd $ x0
-    TagExpressionValue x0 -> TagExpressionValue . Identity . snd $ x0
+    ExpressionLeaf l -> ExpressionLeaf . Identity . snd $ l
     BinaryExpressionValue (_, BinaryExpression lhs so rhs) ->
       BinaryExpressionValue . Identity $
         BinaryExpression
@@ -141,28 +166,96 @@ instance ExpressionIdentity ((,) a) where
           (expressionIdentity rhs)
 
 {- |
- Index an 'Expression` by its evaluation order.
+ Annotate each leaf of an 'Expression` in the order it gets evaluated.
+
+ 0 indexed.
 -}
-buildIndexedExpression :: (Ix a, Num a) => Expression Identity -> Expression ((,) a)
-buildIndexedExpression expr = evalState (go expr) 0
- where
-  go :: (Ix a, Num a) => Expression Identity -> State a (Expression ((,) a))
-  go e =
-    case e of
-      FileTermValue (Identity ft) -> fmap (FileTermValue . (,ft)) get <* modify (+ 1)
-      TagTermValue (Identity tte) -> fmap (TagTermValue . (,tte)) get <* modify (+ 1)
-      TagExpressionValue (Identity tev) ->
-        fmap (TagExpressionValue . (,tev)) get <* modify (+ 1)
-      BinaryExpressionValue (Identity (BinaryExpression lhs so rhs)) ->
-        ( ( \lhsIx rhsIx soSt ->
-              BinaryExpressionValue
-                (soSt, BinaryExpression lhsIx so rhsIx)
+annotateIndices :: (Num a, Ix a) => Expression Identity -> Expression ((,) a)
+annotateIndices =
+  flip evalState 0
+    . annotate
+      (\_ _ -> get)
+      (\_ _ -> get)
+      (\_ _ -> get)
+      (,)
+      (\expr -> modify (+ 1) $> expr)
+      (\leaf -> fmap (ExpressionLeaf . (,leaf)) get <* modify (+ 1))
+
+{- $Annotations
+ Expression can be annotated using 'annotate` to supplement the leaf of each 'Expression`
+ with some additional information. Below is an example showing how 'annotate` is used
+ to create an index of each leaf of an expression in the order that it is evaluated.
+
+ @
+annotateIndices :: (Num a, Ix a) => Expression Identity -> Expression ((,) a)
+annotateIndices =
+  flip evalState 0
+    . annotate
+      (\\_ _ -> get)
+      (\\_ _ -> get)
+      (\\_ _ -> get)
+      (,)
+      (\\expr -> modify (+ 1) $> expr)
+      (\\leaf -> fmap (ExpressionLeaf . (,leaf)) get <* modify (+ 1))
+ @
+
+This function uses the 'StateT` monad to keep track of the current index.
+-}
+
+{- |
+ Generalized traversal of an 'Expression Identity`.
+
+ Runs on the 'Expression` in evaluation order, annotating its leaves as it goes.
+-}
+annotate ::
+  Monad m =>
+  -- | Result when 'Union` is called on two 'Expression`
+  (Expression t1 -> Expression t1 -> m t2) ->
+  -- | Result when 'Intersect` is called on two 'Expression`
+  (Expression t1 -> Expression t1 -> m t2) ->
+  -- | Result when 'Difference` is called on two 'Expression`
+  (Expression t1 -> Expression t1 -> m t2) ->
+  -- | Uses the result of one of the above functions to annotate a 'BinaryExpression`
+  -- with some intermediate annotation
+  (t2 -> BinaryExpression t1 -> t3 (BinaryExpression t3)) ->
+  -- | lifts the above intermediate annotation to the context of the traversal
+  (Expression t3 -> m (Expression t1)) ->
+  -- | Annotate an 'ExpressionLeaf`
+  (ExpressionLeaf -> m (Expression t1)) ->
+  -- | The 'Expression` to annotate
+  Expression Identity ->
+  m (Expression t1)
+annotate
+  unionF
+  intersectF
+  differenceF
+  liftBinaryExpressionWith
+  returnBinary
+  onLeaf
+  expr =
+    case expr of
+      ExpressionLeaf (Identity leaf) -> onLeaf leaf
+      BinaryExpressionValue (Identity (BinaryExpression lhs so rhs)) -> do
+        lhsLifted <- annotate' lhs
+        rhsLifted <- annotate' rhs
+        combination <- lhsLifted `combFunc` rhsLifted
+        returnBinary
+          ( BinaryExpressionValue . liftBinaryExpressionWith combination $
+              BinaryExpression lhsLifted so rhsLifted
           )
-            <$> go lhs
-            <*> go rhs
-            <*> get
-        )
-          <* modify (+ 1)
+       where
+        combFunc = case so of
+          Union -> unionF
+          Intersect -> intersectF
+          Difference -> differenceF
+        annotate' =
+          annotate
+            unionF
+            intersectF
+            differenceF
+            liftBinaryExpressionWith
+            returnBinary
+            onLeaf
 
 {-# INLINE zero #-}
 
@@ -181,11 +274,17 @@ zero =
                   BinaryExpression
                     universe
                     Difference
-                    (TagTermValue . Identity . DescriptorTerm . T.pack $ "%")
+                    ( ExpressionLeaf
+                        . Identity
+                        . TagTermValue
+                        . DescriptorTerm
+                        . T.pack
+                        $ "%"
+                    )
               )
           )
           Intersect
-          (TagTermValue . Identity . DescriptorTerm . T.pack $ "%")
+          (ExpressionLeaf . Identity . TagTermValue . DescriptorTerm . T.pack $ "%")
     )
 
 {-# INLINE universe #-}
@@ -194,4 +293,4 @@ zero =
  This 'Expression` will always evaluate to all files in the database.
 -}
 universe :: Expression Identity
-universe = FileTermValue . Identity . FileTerm . T.pack $ "%"
+universe = ExpressionLeaf . Identity . FileTermValue . FileTerm . T.pack $ "%"

@@ -57,6 +57,7 @@ import Text.Parsec (
 import Text.TaggerQL.Expression.AST (
   BinaryExpression (..),
   Expression (..),
+  ExpressionLeaf (..),
   FileTerm (..),
   SubExpression (..),
   TagExpression (..),
@@ -105,7 +106,7 @@ expressionParser =
             <|> ( try fileTermValueParser
                     <|> ( tagTermParser
                             <**> ( tagExpressionLookAhead
-                                    <|> pure (TagTermValue . Identity)
+                                    <|> pure (ExpressionLeaf . Identity . TagTermValue)
                                  )
                         )
                 )
@@ -114,14 +115,20 @@ expressionParser =
     precedentExpressionParser =
       between (char '(') (spaces *> char ')') expressionParser
     tagExpressionLookAhead =
-      (\subExpr tt -> TagExpressionValue . Identity . TagExpression tt $ subExpr)
+      ( \subExpr tt ->
+          ExpressionLeaf
+            . Identity
+            . TagExpressionValue
+            . TagExpression tt
+            $ subExpr
+      )
         <$> between
           (try (spaces *> char '{'))
           (spaces *> char '}')
           subExpressionParser
 
 fileTermValueParser :: Parser (Expression Identity)
-fileTermValueParser = FileTermValue . Identity <$> fileTermParser
+fileTermValueParser = ExpressionLeaf . Identity . FileTermValue <$> fileTermParser
 
 subExpressionParser :: Parser SubExpression
 subExpressionParser =
