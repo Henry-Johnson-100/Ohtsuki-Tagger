@@ -115,8 +115,8 @@ parserTests =
                 ( assertEqual
                     ""
                     ( Right
-                        ( ExpressionLeaf . Identity . TagExpressionValue $
-                            TagExpression
+                        ( ExpressionLeaf . Identity $
+                            TagExpressionValue
                                 (MetaDescriptorTerm "a")
                                 (SubTag (MetaDescriptorTerm "b"))
                         )
@@ -205,8 +205,8 @@ parserTests =
                                                 BinaryExpression
                                                     (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "a")
                                                     Intersect
-                                                    ( ExpressionLeaf . Identity . TagExpressionValue $
-                                                        TagExpression
+                                                    ( ExpressionLeaf . Identity $
+                                                        TagExpressionValue
                                                             (MetaDescriptorTerm "b")
                                                             (SubTag (MetaDescriptorTerm "c"))
                                                     )
@@ -237,8 +237,8 @@ parserTests =
                                     BinaryExpression
                                         (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "a")
                                         Intersect
-                                        ( ExpressionLeaf . Identity . TagExpressionValue $
-                                            TagExpression
+                                        ( ExpressionLeaf . Identity $
+                                            TagExpressionValue
                                                 (MetaDescriptorTerm "b")
                                                 ( SubBinary
                                                     (SubTag (MetaDescriptorTerm "c"))

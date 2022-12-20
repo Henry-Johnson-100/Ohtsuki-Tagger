@@ -60,7 +60,6 @@ import Text.TaggerQL.Expression.AST (
   ExpressionLeaf (..),
   FileTerm (..),
   SubExpression (..),
-  TagExpression (..),
   TagTerm (..),
  )
 
@@ -118,8 +117,7 @@ expressionParser =
       ( \subExpr tt ->
           ExpressionLeaf
             . Identity
-            . TagExpressionValue
-            . TagExpression tt
+            . TagExpressionValue tt
             $ subExpr
       )
         <$> between

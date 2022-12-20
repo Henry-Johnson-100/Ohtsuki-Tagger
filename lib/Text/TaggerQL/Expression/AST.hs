@@ -23,7 +23,6 @@ module Text.TaggerQL.Expression.AST (
   Expression (..),
   ExpressionLeaf (..),
   BinaryExpression (..),
-  TagExpression (..),
   SubExpression (..),
   TagTerm (..),
   FileTerm (..),
@@ -88,13 +87,6 @@ data SubExpression
   deriving (Show, Eq)
 
 {- |
- Intermediate constructor for lifting a 'SubExpression` into an 'Expression` with a
- 'TagTerm`.
--}
-data TagExpression = TagExpression TagTerm SubExpression
-  deriving (Show, Eq)
-
-{- |
  Intermediate constructor for lifting a binary set operation over 'Expression` into
  an 'Expression`
 -}
@@ -119,7 +111,7 @@ data ExpressionLeaf
     --
     -- Essentially, defines the set of 'File` where 'SubExpression` are subtags
     -- of any 'Tag` appearing in the set defined by the 'TagTerm`.
-    TagExpressionValue TagExpression
+    TagExpressionValue TagTerm SubExpression
   deriving (Show, Eq)
 
 {- |

@@ -160,8 +160,8 @@ basicQueryFunctionality c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity . TagExpressionValue $
-                      TagExpression
+                  ( ExpressionLeaf . Identity $
+                      TagExpressionValue
                         (DescriptorTerm "descriptor_5")
                         (SubTag (DescriptorTerm "descriptor_6"))
                   )
@@ -173,8 +173,8 @@ basicQueryFunctionality c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity . TagExpressionValue $
-                      TagExpression
+                  ( ExpressionLeaf . Identity $
+                      TagExpressionValue
                         (DescriptorTerm "descriptor_6")
                         (SubTag (DescriptorTerm "descriptor_7"))
                   )
@@ -186,8 +186,8 @@ basicQueryFunctionality c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity . TagExpressionValue $
-                      TagExpression
+                  ( ExpressionLeaf . Identity $
+                      TagExpressionValue
                         (DescriptorTerm "descriptor_17")
                         ( SubExpression
                             (DescriptorTerm "descriptor_18")
@@ -202,8 +202,8 @@ basicQueryFunctionality c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity . TagExpressionValue $
-                      TagExpression
+                  ( ExpressionLeaf . Identity $
+                      TagExpressionValue
                         (DescriptorTerm "descriptor_17")
                         (SubTag (DescriptorTerm "descriptor_18"))
                   )
@@ -255,8 +255,8 @@ basicQueryFunctionality c =
                 r <-
                   c
                     >>= runExpr
-                      ( ExpressionLeaf . Identity . TagExpressionValue $
-                          TagExpression
+                      ( ExpressionLeaf . Identity $
+                          TagExpressionValue
                             (DescriptorTerm "descriptor_17")
                             ( SubBinary
                                 (SubTag (DescriptorTerm "descriptor_18"))
@@ -278,8 +278,8 @@ basicQueryFunctionality c =
                 r <-
                   c
                     >>= runExpr
-                      ( ExpressionLeaf . Identity . TagExpressionValue $
-                          TagExpression
+                      ( ExpressionLeaf . Identity $
+                          TagExpressionValue
                             (DescriptorTerm "descriptor_17")
                             ( SubBinary
                                 (SubTag (DescriptorTerm "descriptor_18"))
@@ -297,8 +297,8 @@ basicQueryFunctionality c =
                 r <-
                   c
                     >>= runExpr
-                      ( ExpressionLeaf . Identity . TagExpressionValue $
-                          TagExpression
+                      ( ExpressionLeaf . Identity $
+                          TagExpressionValue
                             (DescriptorTerm "descriptor_17")
                             ( SubBinary
                                 (SubTag (DescriptorTerm "descriptor_18"))
@@ -322,8 +322,8 @@ basicQueryFunctionality c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity . TagExpressionValue $
-                      TagExpression
+                  ( ExpressionLeaf . Identity $
+                      TagExpressionValue
                         (DescriptorTerm "%")
                         ( SubBinary
                             (SubTag (DescriptorTerm "descriptor_20"))
@@ -351,8 +351,8 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity . TagExpressionValue $
-                      TagExpression
+                  ( ExpressionLeaf . Identity $
+                      TagExpressionValue
                         (DescriptorTerm "descriptor_8")
                         ( SubExpression
                             (DescriptorTerm "descriptor_9")
@@ -367,8 +367,8 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity . TagExpressionValue $
-                      TagExpression
+                  ( ExpressionLeaf . Identity $
+                      TagExpressionValue
                         (DescriptorTerm "descriptor_8")
                         (SubTag (DescriptorTerm "descriptor_9"))
                   )
@@ -380,8 +380,8 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity . TagExpressionValue $
-                      TagExpression
+                  ( ExpressionLeaf . Identity $
+                      TagExpressionValue
                         (DescriptorTerm "descriptor_9")
                         (SubTag (DescriptorTerm "descriptor_10"))
                   )
@@ -393,8 +393,8 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity . TagExpressionValue $
-                      TagExpression
+                  ( ExpressionLeaf . Identity $
+                      TagExpressionValue
                         (DescriptorTerm "descriptor_11")
                         (SubTag (DescriptorTerm "descriptor_9"))
                   )
@@ -409,8 +409,8 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity . TagExpressionValue $
-                      TagExpression
+                  ( ExpressionLeaf . Identity $
+                      TagExpressionValue
                         (MetaDescriptorTerm "descriptor_12")
                         ( SubBinary
                             (SubTag (DescriptorTerm "descriptor_15"))
@@ -428,14 +428,14 @@ queryEdgeCases c =
                 >>= runExpr
                   ( BinaryExpressionValue . Identity $
                       BinaryExpression
-                        ( ExpressionLeaf . Identity . TagExpressionValue $
-                            TagExpression
+                        ( ExpressionLeaf . Identity $
+                            TagExpressionValue
                               (MetaDescriptorTerm "descriptor_12")
                               (SubTag (DescriptorTerm "descriptor_15"))
                         )
                         Intersect
-                        ( ExpressionLeaf . Identity . TagExpressionValue $
-                            TagExpression
+                        ( ExpressionLeaf . Identity $
+                            TagExpressionValue
                               (MetaDescriptorTerm "descriptor_12")
                               (SubTag (DescriptorTerm "descriptor_16"))
                         )
@@ -448,8 +448,8 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity . TagExpressionValue $
-                      TagExpression
+                  ( ExpressionLeaf . Identity $
+                      TagExpressionValue
                         (DescriptorTerm "descriptor_13")
                         ( SubBinary
                             (SubTag (DescriptorTerm "descriptor_15"))

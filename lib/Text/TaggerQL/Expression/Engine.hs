@@ -95,7 +95,7 @@ evalExpr expr = case expr of
         >>= liftIO . fmap HS.fromList . case tt of
           DescriptorTerm txt -> flatQueryForFileByTagDescriptorPattern txt
           MetaDescriptorTerm txt -> flatQueryForFileOnMetaRelationPattern txt
-    TagExpressionValue (TagExpression tt subExpr) ->
+    TagExpressionValue tt subExpr ->
       ask
         >>= \c -> do
           supertags <- liftIO . fmap HS.fromList $ queryTags tt c
