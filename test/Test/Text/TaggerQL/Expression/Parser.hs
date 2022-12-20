@@ -5,6 +5,7 @@ module Test.Text.TaggerQL.Expression.Parser (
 ) where
 
 import Data.Either (isLeft)
+import Data.Functor.Identity
 import Data.Tagger (SetOp (..))
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -96,14 +97,14 @@ parserTests =
                 "Parse implicit tag term expr"
                 ( assertEqual
                     ""
-                    (Right (TagTermValue (MetaDescriptorTerm "hello")))
+                    (Right (TagTermValue . Identity $ MetaDescriptorTerm "hello"))
                     (parseExpr "hello")
                 )
             , testCase
                 "Parse explicit tag term expr"
                 ( assertEqual
                     ""
-                    (Right (TagTermValue (DescriptorTerm "hello")))
+                    (Right (TagTermValue . Identity $ DescriptorTerm "hello"))
                     (parseExpr "d.hello")
                 )
             , testCase
@@ -114,9 +115,10 @@ parserTests =
                 ( assertEqual
                     ""
                     ( Right
-                        ( TagExpression
-                            (MetaDescriptorTerm "a")
-                            (SubTag (MetaDescriptorTerm "b"))
+                        ( TagExpressionValue . Identity $
+                            TagExpression
+                                (MetaDescriptorTerm "a")
+                                (SubTag (MetaDescriptorTerm "b"))
                         )
                     )
                     (parseExpr "a{b}")
@@ -128,10 +130,11 @@ parserTests =
                     ( assertEqual
                         ""
                         ( Right
-                            ( Binary
-                                (TagTermValue (MetaDescriptorTerm "a"))
-                                Union
-                                (TagTermValue (MetaDescriptorTerm "b"))
+                            ( BinaryExpressionValue . Identity $
+                                BinaryExpression
+                                    (TagTermValue . Identity $ MetaDescriptorTerm "a")
+                                    Union
+                                    (TagTermValue . Identity $ MetaDescriptorTerm "b")
                             )
                         )
                         (parseExpr "a | b")
@@ -141,10 +144,11 @@ parserTests =
                     ( assertEqual
                         ""
                         ( Right
-                            ( Binary
-                                (TagTermValue (MetaDescriptorTerm "a"))
-                                Intersect
-                                (TagTermValue (MetaDescriptorTerm "b"))
+                            ( BinaryExpressionValue . Identity $
+                                BinaryExpression
+                                    (TagTermValue . Identity $ MetaDescriptorTerm "a")
+                                    Intersect
+                                    (TagTermValue . Identity $ MetaDescriptorTerm "b")
                             )
                         )
                         (parseExpr "a b")
@@ -154,14 +158,16 @@ parserTests =
                     ( assertEqual
                         ""
                         ( Right
-                            ( Binary
-                                ( Binary
-                                    (TagTermValue (MetaDescriptorTerm "a"))
-                                    Union
-                                    (TagTermValue (MetaDescriptorTerm "b"))
-                                )
-                                Difference
-                                (TagTermValue (MetaDescriptorTerm "c"))
+                            ( BinaryExpressionValue . Identity $
+                                BinaryExpression
+                                    ( BinaryExpressionValue . Identity $
+                                        BinaryExpression
+                                            (TagTermValue . Identity $ MetaDescriptorTerm "a")
+                                            Union
+                                            (TagTermValue . Identity $ MetaDescriptorTerm "b")
+                                    )
+                                    Difference
+                                    (TagTermValue . Identity $ MetaDescriptorTerm "c")
                             )
                         )
                         (parseExpr "a | b ! c")
@@ -171,15 +177,17 @@ parserTests =
                     ( assertEqual
                         ""
                         ( Right
-                            ( Binary
-                                ( TagTermValue (MetaDescriptorTerm "a")
-                                )
-                                Union
-                                ( Binary
-                                    (TagTermValue (MetaDescriptorTerm "b"))
-                                    Difference
-                                    (TagTermValue (MetaDescriptorTerm "c"))
-                                )
+                            ( BinaryExpressionValue . Identity $
+                                BinaryExpression
+                                    ( TagTermValue . Identity $ MetaDescriptorTerm "a"
+                                    )
+                                    Union
+                                    ( BinaryExpressionValue . Identity $
+                                        BinaryExpression
+                                            (TagTermValue . Identity $ MetaDescriptorTerm "b")
+                                            Difference
+                                            (TagTermValue . Identity $ MetaDescriptorTerm "c")
+                                    )
                             )
                         )
                         (parseExpr "a | (b ! c)")
@@ -189,25 +197,30 @@ parserTests =
                     ( assertEqual
                         ""
                         ( Right
-                            ( Binary
-                                ( Binary
-                                    ( Binary
-                                        (TagTermValue (MetaDescriptorTerm "a"))
-                                        Intersect
-                                        ( TagExpression
-                                            (MetaDescriptorTerm "b")
-                                            (SubTag (MetaDescriptorTerm "c"))
-                                        )
+                            ( BinaryExpressionValue . Identity $
+                                BinaryExpression
+                                    ( BinaryExpressionValue . Identity $
+                                        BinaryExpression
+                                            ( BinaryExpressionValue . Identity $
+                                                BinaryExpression
+                                                    (TagTermValue . Identity $ MetaDescriptorTerm "a")
+                                                    Intersect
+                                                    ( TagExpressionValue . Identity $
+                                                        TagExpression
+                                                            (MetaDescriptorTerm "b")
+                                                            (SubTag (MetaDescriptorTerm "c"))
+                                                    )
+                                            )
+                                            Union
+                                            ( BinaryExpressionValue . Identity $
+                                                BinaryExpression
+                                                    (FileTermValue "hi")
+                                                    Intersect
+                                                    (FileTermValue "bye")
+                                            )
                                     )
-                                    Union
-                                    ( Binary
-                                        (FileTermValue "hi")
-                                        Intersect
-                                        (FileTermValue "bye")
-                                    )
-                                )
-                                Difference
-                                (TagTermValue (DescriptorTerm "unwanted"))
+                                    Difference
+                                    (TagTermValue . Identity $ DescriptorTerm "unwanted")
                             )
                         )
                         (parseExpr "a b{c} | (p.hi & p.bye) ! d.unwanted")
@@ -218,21 +231,24 @@ parserTests =
                 ( assertEqual
                     ""
                     ( Right
-                        ( Binary
-                            ( Binary
-                                (TagTermValue (MetaDescriptorTerm "a"))
-                                Intersect
-                                ( TagExpression
-                                    (MetaDescriptorTerm "b")
-                                    ( SubBinary
-                                        (SubTag (MetaDescriptorTerm "c"))
+                        ( BinaryExpressionValue . Identity $
+                            BinaryExpression
+                                ( BinaryExpressionValue . Identity $
+                                    BinaryExpression
+                                        (TagTermValue . Identity $ MetaDescriptorTerm "a")
                                         Intersect
-                                        (SubTag (MetaDescriptorTerm "d"))
-                                    )
+                                        ( TagExpressionValue . Identity $
+                                            TagExpression
+                                                (MetaDescriptorTerm "b")
+                                                ( SubBinary
+                                                    (SubTag (MetaDescriptorTerm "c"))
+                                                    Intersect
+                                                    (SubTag (MetaDescriptorTerm "d"))
+                                                )
+                                        )
                                 )
-                            )
-                            Intersect
-                            (TagTermValue (MetaDescriptorTerm "e"))
+                                Intersect
+                                (TagTermValue . Identity $ MetaDescriptorTerm "e")
                         )
                     )
                     (parseExpr "a b{\nc d\n}\ne")
@@ -244,10 +260,11 @@ parserTests =
                     ( assertEqual
                         ""
                         ( Right
-                            ( Binary
-                                (TagTermValue (MetaDescriptorTerm "a"))
-                                Intersect
-                                (TagTermValue (MetaDescriptorTerm "b"))
+                            ( BinaryExpressionValue . Identity $
+                                BinaryExpression
+                                    (TagTermValue . Identity $ MetaDescriptorTerm "a")
+                                    Intersect
+                                    (TagTermValue . Identity $ MetaDescriptorTerm "b")
                             )
                         )
                         (parseExpr "a b ")
@@ -257,10 +274,11 @@ parserTests =
                     ( assertEqual
                         ""
                         ( Right
-                            ( Binary
-                                (TagTermValue (MetaDescriptorTerm "a"))
-                                Union
-                                (TagTermValue (MetaDescriptorTerm "b"))
+                            ( BinaryExpressionValue . Identity $
+                                BinaryExpression
+                                    (TagTermValue . Identity $ MetaDescriptorTerm "a")
+                                    Union
+                                    (TagTermValue . Identity $ MetaDescriptorTerm "b")
                             )
                         )
                         (parseExpr "a | b ")

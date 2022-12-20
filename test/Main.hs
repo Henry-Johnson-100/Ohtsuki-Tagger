@@ -2,17 +2,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
-import Data.List.NonEmpty
-import Data.Tagger
-import qualified Data.Text as T
 import Test.Resources (
     removeResource,
     secureResource,
     setup_0_InitializeDatabase,
     setup_1_TestInitialization,
  )
-import Test.Tasty
-import Test.Tasty.HUnit
+import Test.Tasty (
+    DependencyType (AllSucceed),
+    after,
+    defaultMain,
+    testGroup,
+    withResource,
+ )
 import Test.Text.TaggerQL.Expression.Engine (queryEngineASTTests)
 import Test.Text.TaggerQL.Expression.Parser (parserTests)
 
