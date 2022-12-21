@@ -29,6 +29,9 @@ that defines it.
 
 Simply put, interpretation of an expression is just a fold in some monad. An annotation
 is a traversal.
+
+Intepreters have lots of resemblances to Functors, though their internal computations
+are stateful over their inner type, making a proper Functor instance difficult.
 -}
 module Text.TaggerQL.Expression.Interpreter (
   AnnotatedExpression (..),
@@ -37,6 +40,12 @@ module Text.TaggerQL.Expression.Interpreter (
   runInterpreter,
   annotate,
 
+  -- * Manipulation
+  withInterpreterContext,
+  fanoutInterpreter,
+  mapInterpreter,
+  mapMInterpreter,
+
   -- * Interpreters
   queryer,
   prettyPrinter,
@@ -44,10 +53,11 @@ module Text.TaggerQL.Expression.Interpreter (
   counter,
 ) where
 
+import Control.Monad ((<=<))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Reader (ReaderT, ask)
 import Control.Monad.Trans.State.Strict (State, get, modify)
-import Data.Functor.Identity (Identity (Identity))
+import Data.Functor.Identity (Identity (..))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Ix (Ix)
@@ -85,6 +95,63 @@ data Interpreter m t = Interpreter
   { interpretBinaryOperation :: SetOp -> t -> t -> m t
   , interpretExpressionLeaf :: ExpressionLeaf -> m t
   }
+
+{- |
+ Given two 'Interpreter` that run in the same context, combine their output.
+-}
+fanoutInterpreter :: Monad m => Interpreter m a -> Interpreter m b -> Interpreter m (a, b)
+fanoutInterpreter (Interpreter aob ael) (Interpreter bob bel) =
+  Interpreter
+    { interpretBinaryOperation = \so (alhs, blhs) (arhs, brhs) ->
+        (,) <$> aob so alhs arhs <*> bob so blhs brhs
+    , interpretExpressionLeaf = \leaf -> (,) <$> ael leaf <*> bel leaf
+    }
+
+{- |
+ Map an 'Interpreter` from one context to another.
+-}
+withInterpreterContext :: (m a -> n a) -> Interpreter m a -> Interpreter n a
+withInterpreterContext f (Interpreter iob iel) =
+  Interpreter
+    { interpretBinaryOperation = \so lhs rhs -> f $ iob so lhs rhs
+    , interpretExpressionLeaf = f . iel
+    }
+
+{- |
+ Map an 'Interpreter` over isomorphic types.
+
+ An 'Interpreter` cannot be a simple Functor, but given an isomorphism it can convert to
+ and from an intermediate type during interpretation.
+-}
+mapInterpreter :: Functor m => (a -> b) -> (b -> a) -> Interpreter m a -> Interpreter m b
+mapInterpreter to from (Interpreter iob iel) =
+  Interpreter
+    { interpretBinaryOperation = \so lhs rhs -> fmap to $ iob so (from lhs) (from rhs)
+    , interpretExpressionLeaf = fmap to . iel
+    }
+
+{- |
+ Map an 'Interpreter` over types that are monadically isomorphic.
+
+ More flexible than 'mapInterpreter` though a bit more work. With this function it is
+ possible to declare a kind of isomorphism that exists during runtime. Using
+ the type m to be some MonadIO and the isomorphisms as some kind of storage and retrieval
+ of the appropriate values.
+-}
+mapMInterpreter ::
+  Monad m =>
+  (a -> m c) ->
+  (c -> m a) ->
+  Interpreter m a ->
+  Interpreter m c
+mapMInterpreter toM fromM (Interpreter iob iel) =
+  Interpreter
+    { interpretBinaryOperation = \so lhs rhs -> do
+        lhsM <- fromM lhs
+        rhsM <- fromM rhs
+        iob so lhsM rhsM >>= toM
+    , interpretExpressionLeaf = toM <=< iel
+    }
 
 {- |
  newtype wrapper for an 'Expression ((,) a)`.
