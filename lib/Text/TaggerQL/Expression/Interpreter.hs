@@ -1,11 +1,26 @@
 {-# LANGUAGE InstanceSigs #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TupleSections #-}
 {-# HLINT ignore "Use lambda-case" #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
+{- |
+Module      : Text.TaggerQL.Expression.Interpreter
+Description : Defining various interpreters and annotators for the TaggerQL language.
+
+License     : GPL-3
+Maintainer  : monawasensei@gmail.com
+
+Interpreters allow for the semantics of TaggerQL execution to changed in a simple way.
+The definition of an interpreter provides computations for how to compute the leaves
+of an expression and how to combine them given the syntactic rules of the language.
+
+Actual evaluation of an expression using any given interpreter is abstracted behind
+'runInterpreter`, which takes care of evaluation order.
+
+An expression can be annotated with the same interpreter used to evaluate it, showing
+the output of the interpreter at each step of evaluation, along with the expression
+that defines it.
+-}
 module Text.TaggerQL.Expression.Interpreter (
   AnnotatedExpression (..),
   annotation,
@@ -14,23 +29,39 @@ module Text.TaggerQL.Expression.Interpreter (
   annotate,
 
   -- * Interpreters
-  -- $Interpreters
   queryer,
   voider,
   counter,
 ) where
 
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Trans.Reader
+import Control.Monad.Trans.Reader (ReaderT, ask)
 import Control.Monad.Trans.State.Strict (State, get, modify)
 import Data.Functor.Identity (Identity (Identity))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Ix (Ix)
 import Data.Tagger (SetOp (..))
-import Database.Tagger
-import Text.TaggerQL.Expression.AST
-import Text.TaggerQL.Expression.Interpreter.Internal
+import Database.Tagger (
+  File,
+  TaggedConnection,
+  flatQueryForFileByTagDescriptorPattern,
+  flatQueryForFileOnMetaRelationPattern,
+  queryForFileByPattern,
+ )
+import Text.TaggerQL.Expression.AST (
+  BinaryExpression (BinaryExpression),
+  Expression (..),
+  ExpressionIdentity (..),
+  ExpressionLeaf (..),
+  FileTerm (FileTerm),
+  TagTerm (DescriptorTerm, MetaDescriptorTerm),
+ )
+import Text.TaggerQL.Expression.Interpreter.Internal (
+  evalSubExpression,
+  queryTags,
+  toFileSet,
+ )
 
 {- |
  A data type containing behavior for how to interpret an 'Expression`.
@@ -174,7 +205,7 @@ queryer =
  Used to easily create a spine-like functor over an 'Expression`
 
  @
- annotate voider :: 
+ annotate voider ::
   ExpressionIdentity l => Expression l -> Identity (AnnotatedExpression ())
  @
 -}

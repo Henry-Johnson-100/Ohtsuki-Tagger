@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_HADDOCK hide #-}
 
 module Text.TaggerQL.Expression.Interpreter.Internal (
   toFileSet,
@@ -14,9 +15,17 @@ import Data.Functor ((<&>))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Tagger (SetOp (..))
-import Database.Tagger
+import Database.Tagger (
+  File,
+  Tag (tagId, tagSubtagOfId),
+  TaggedConnection,
+  query,
+ )
 import Text.RawString.QQ (r)
-import Text.TaggerQL.Expression.AST
+import Text.TaggerQL.Expression.AST (
+  SubExpression (..),
+  TagTerm (..),
+ )
 
 toFileSet :: HashSet Tag -> TaggedConnection -> IO (HashSet File)
 toFileSet (map tagId . HS.toList -> ts) conn = do
