@@ -51,6 +51,7 @@ module Text.TaggerQL.Expression.Interpreter (
   prettyPrinter,
   voider,
   counter,
+  hasher,
 ) where
 
 import Control.Monad ((<=<))
@@ -60,6 +61,7 @@ import Control.Monad.Trans.State.Strict (State, get, modify)
 import Data.Functor.Identity (Identity (..))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
+import Data.Hashable
 import Data.Ix (Ix)
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
@@ -350,3 +352,18 @@ counter =
     { interpretBinaryOperation = \_ _ _ -> get <* modify (+ 1)
     , interpretExpressionLeaf = \_ -> get <* modify (+ 1)
     }
+
+{- |
+ Hashes an expression based on the formatted text of its leaves.
+-}
+hasher :: Interpreter Identity Int
+hasher =
+  let (Interpreter _ iel) = prettyPrinter
+   in Interpreter
+        { interpretBinaryOperation = \so lhs rhs ->
+            Identity $
+              hashWithSalt
+                (fromEnum so)
+                (hashWithSalt lhs rhs)
+        , interpretExpressionLeaf = fmap (hash . fst) . iel
+        }
