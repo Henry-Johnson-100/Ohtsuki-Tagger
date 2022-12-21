@@ -8,6 +8,8 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_HADDOCK prune #-}
 
+{-# HLINT ignore "Use lambda-case" #-}
+
 {- |
 Module      : Text.TaggerQL.Expression.Engine
 Description : The interpreter for the TaggerQL query language.
@@ -21,6 +23,7 @@ Contains functions that interprets the TaggerQL query language to either run que
 module Text.TaggerQL.Expression.Engine (
   runQuery,
   tagFile,
+  queryInterpreter,
 
   -- * Primitive Functions
   runExpr,
@@ -85,30 +88,44 @@ runQuery c t =
 runExpr :: Expression Identity -> TaggedConnection -> IO (HashSet File)
 runExpr expr = runReaderT (evalExpr expr)
 
-evalExpr :: Expression Identity -> ReaderT TaggedConnection IO (HashSet File)
-evalExpr expr = case expr of
-  ExpressionLeaf (Identity l) -> case l of
-    FileTermValue (FileTerm txt) ->
-      ask >>= liftIO . fmap HS.fromList . queryForFileByPattern txt
-    TagTermValue tt ->
-      ask
-        >>= liftIO . fmap HS.fromList . case tt of
-          DescriptorTerm txt -> flatQueryForFileByTagDescriptorPattern txt
-          MetaDescriptorTerm txt -> flatQueryForFileOnMetaRelationPattern txt
-    TagExpressionValue tt subExpr ->
-      ask
-        >>= \c -> do
+{- |
+ The 'Interpreter` that governs querying a database for a set of 'File`s.
+
+ The very heart and soul of this program.
+-}
+queryInterpreter :: Interpreter (ReaderT TaggedConnection IO) (HashSet File)
+queryInterpreter =
+  Interpreter
+    { interpretBinaryOperation =
+        \so lhs rhs ->
+          pure $
+            ( case so of
+                Union -> HS.union
+                Intersect -> HS.intersection
+                Difference -> HS.difference
+            )
+              lhs
+              rhs
+    , interpretExpressionLeaf = \leaf -> case leaf of
+        FileTermValue (FileTerm t) ->
+          ask
+            >>= liftIO . fmap HS.fromList . queryForFileByPattern t
+        TagTermValue tt ->
+          ask
+            >>= liftIO . fmap HS.fromList
+              . ( case tt of
+                    DescriptorTerm txt -> flatQueryForFileByTagDescriptorPattern txt
+                    MetaDescriptorTerm txt -> flatQueryForFileOnMetaRelationPattern txt
+                )
+        TagExpressionValue tt se -> do
+          c <- ask
           supertags <- liftIO . fmap HS.fromList $ queryTags tt c
-          subExprResult <- evalSubExpression subExpr supertags
+          subExprResult <- evalSubExpression se supertags
           liftIO $ toFileSet subExprResult c
-  BinaryExpressionValue (Identity (BinaryExpression lhs so rhs)) ->
-    ( case so of
-        Union -> HS.union
-        Intersect -> HS.intersection
-        Difference -> HS.difference
-    )
-      <$> evalExpr lhs
-      <*> evalExpr rhs
+    }
+
+evalExpr :: Expression Identity -> ReaderT TaggedConnection IO (HashSet File)
+evalExpr = runInterpreter queryInterpreter
 
 {- |
  Given a 'SubExpression` and a set of 'Tag`, compute the set of 'Tag` that
