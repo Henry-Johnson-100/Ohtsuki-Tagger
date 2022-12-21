@@ -222,15 +222,16 @@ annotate ::
   Interpreter m t ->
   Expression l ->
   m (AnnotatedExpression t)
-annotate itr@(Interpreter ibo iel) expr = case expressionIdentity expr of
-  ExpressionLeaf (Identity leaf) ->
-    AnnotatedExpression . ExpressionLeaf . (,leaf) <$> iel leaf
-  BinaryExpressionValue (Identity (BinaryExpression lhs so rhs)) -> do
-    lhsI <- annotate itr lhs
-    rhsI <- annotate itr rhs
-    combination <- ibo so (annotation lhsI) (annotation rhsI)
-    return . AnnotatedExpression . BinaryExpressionValue $
-      (combination, BinaryExpression (runAnnotation lhsI) so (runAnnotation rhsI))
+annotate itr@(Interpreter ibo iel) expr =
+  case expressionIdentity expr of
+    ExpressionLeaf (Identity leaf) ->
+      AnnotatedExpression . ExpressionLeaf . (,leaf) <$> iel leaf
+    BinaryExpressionValue (Identity (BinaryExpression lhs so rhs)) -> do
+      lhsI <- annotate itr lhs
+      rhsI <- annotate itr rhs
+      combination <- ibo so (annotation lhsI) (annotation rhsI)
+      return . AnnotatedExpression . BinaryExpressionValue $
+        (combination, BinaryExpression (runAnnotation lhsI) so (runAnnotation rhsI))
 
 {- |
  A generic interpreter over an 'Expression Identity`
