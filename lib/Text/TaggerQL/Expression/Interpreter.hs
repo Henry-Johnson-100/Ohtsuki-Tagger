@@ -1,7 +1,13 @@
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# HLINT ignore "Eta reduce" #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE TupleSections #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# HLINT ignore "Use lambda-case" #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use <$>" #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.Interpreter
@@ -20,6 +26,9 @@ Actual evaluation of an expression using any given interpreter is abstracted beh
 An expression can be annotated with the same interpreter used to evaluate it, showing
 the output of the interpreter at each step of evaluation, along with the expression
 that defines it.
+
+Simply put, interpretation of an expression is just a fold in some monad. An annotation
+is a traversal.
 -}
 module Text.TaggerQL.Expression.Interpreter (
   AnnotatedExpression (..),
@@ -30,6 +39,7 @@ module Text.TaggerQL.Expression.Interpreter (
 
   -- * Interpreters
   queryer,
+  prettyPrinter,
   voider,
   counter,
 ) where
@@ -42,6 +52,7 @@ import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Ix (Ix)
 import Data.Tagger (SetOp (..))
+import Data.Text (Text)
 import Database.Tagger (
   File,
   TaggedConnection,
@@ -55,6 +66,7 @@ import Text.TaggerQL.Expression.AST (
   ExpressionIdentity (..),
   ExpressionLeaf (..),
   FileTerm (FileTerm),
+  SubExpression (..),
   TagTerm (DescriptorTerm, MetaDescriptorTerm),
  )
 import Text.TaggerQL.Expression.Interpreter.Internal (
@@ -198,6 +210,46 @@ queryer =
           subExprResult <- evalSubExpression se supertags
           liftIO $ toFileSet subExprResult c
     }
+
+{- |
+ The return type of this Interpreter is a tuple with boolean state to keep track
+ of nested binary operations to correctly apply parentheses when printing.
+
+ it can be discarded after interpretation.
+-}
+prettyPrinter :: Interpreter Identity (Text, Bool)
+prettyPrinter =
+  Interpreter
+    { interpretBinaryOperation = \so (lhs, _) (rhs, rIsNested) ->
+        Identity . (,True) $
+          (lhs <> formatSO so <> (if rIsNested then (\t -> "(" <> t <> ")") else id) rhs)
+    , interpretExpressionLeaf = \leaf ->
+        Identity . (,False) $
+          ( case leaf of
+              FileTermValue (FileTerm t) -> "p." <> t
+              TagTermValue tt -> formatTT tt
+              TagExpressionValue tt se -> formatTT tt <> " {" <> formatSe se <> "}"
+          )
+    }
+ where
+  formatTT tt = case tt of
+    DescriptorTerm txt -> "d." <> txt
+    MetaDescriptorTerm txt -> txt
+  formatSO so = case so of
+    Union -> " | "
+    Intersect -> " & "
+    Difference -> " ! "
+  formatSe se =
+    case se of
+      SubBinary lhs so rhs ->
+        formatSe lhs <> formatSO so
+          <> (if isNestedSubExpr rhs then "(" <> formatSe rhs <> ")" else formatSe rhs)
+      SubTag tt -> formatTT tt
+      SubExpression tt se' -> formatTT tt <> " {" <> formatSe se' <> "}"
+  isNestedSubExpr se =
+    case se of
+      SubBinary{} -> True
+      _notNested -> False
 
 {- |
  Voids an expression.
