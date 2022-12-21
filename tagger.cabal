@@ -112,6 +112,8 @@ library tagger-lib
                       ,Text.TaggerQL
                       ,Text.TaggerQL.Expression.AST
                       ,Text.TaggerQL.Expression.Engine
+                      ,Text.TaggerQL.Expression.Interpreter
+                      ,Text.TaggerQL.Expression.Interpreter.Internal
                       ,Text.TaggerQL.Expression.Parser
 
   other-modules:       Database.Tagger.Script
