@@ -99,7 +99,11 @@ data Interpreter m t = Interpreter
 {- |
  Given two 'Interpreter` that run in the same context, combine their output.
 -}
-fanoutInterpreter :: Monad m => Interpreter m a -> Interpreter m b -> Interpreter m (a, b)
+fanoutInterpreter ::
+  Applicative f =>
+  Interpreter f a ->
+  Interpreter f b ->
+  Interpreter f (a, b)
 fanoutInterpreter (Interpreter aob ael) (Interpreter bob bel) =
   Interpreter
     { interpretBinaryOperation = \so (alhs, blhs) (arhs, brhs) ->
