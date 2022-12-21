@@ -10,7 +10,7 @@ Description : Defining various interpreters and annotators for the TaggerQL lang
 License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 
-Interpreters allow for the semantics of TaggerQL execution to changed in a simple way.
+Interpreters allow for the semantics of TaggerQL execution to be changed in a simple way.
 The definition of an interpreter provides computations for how to compute the leaves
 of an expression and how to combine them given the syntactic rules of the language.
 
