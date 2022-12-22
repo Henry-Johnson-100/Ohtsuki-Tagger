@@ -55,11 +55,14 @@ import Text.Parsec (
   (<|>),
  )
 import Text.TaggerQL.Expression.AST (
-  BinaryExpression (..),
+  BinaryExpression (BinaryExpression),
+  BinarySubExpression (BinarySubExpression),
   Expression (..),
-  ExpressionLeaf (..),
+  ExpressionLeaf (FileTermValue, TagTermValue),
+  ExpressionSubContext (ExpressionSubContext),
   FileTerm (..),
   SubExpression (..),
+  SubExpressionExtension (SubExpressionExtension),
   TagTerm (..),
  )
 
@@ -68,7 +71,7 @@ type Parser a = Parsec Text () a
 {- |
  Parse an 'Expression` from a TaggerQL query.
 -}
-parseExpr :: Text -> Either ParseError (Expression Identity)
+parseExpr :: Text -> Either ParseError (Expression Identity Identity)
 parseExpr = parse expressionParser "TaggerQL"
 
 {- |
@@ -76,10 +79,10 @@ parseExpr = parse expressionParser "TaggerQL"
 
  Used to parse expressions that tag images, rather than query.
 -}
-parseTagExpr :: Text -> Either ParseError SubExpression
+parseTagExpr :: Text -> Either ParseError (SubExpression Identity)
 parseTagExpr = parse subExpressionParser "TaggerQL"
 
-expressionParser :: Parser (Expression Identity)
+expressionParser :: Parser (Expression Identity Identity)
 expressionParser =
   spaces
     *> ( try
@@ -98,7 +101,7 @@ expressionParser =
           <|> lhsExprParser
        )
  where
-  lhsExprParser :: Parser (Expression Identity)
+  lhsExprParser :: Parser (Expression Identity Identity)
   lhsExprParser =
     spaces
       *> ( precedentExpressionParser
@@ -115,9 +118,9 @@ expressionParser =
       between (char '(') (spaces *> char ')') expressionParser
     tagExpressionLookAhead =
       ( \subExpr tt ->
-          ExpressionLeaf
+          ExpressionSubContextValue
             . Identity
-            . TagExpressionValue tt
+            . ExpressionSubContext tt
             $ subExpr
       )
         <$> between
@@ -125,28 +128,30 @@ expressionParser =
           (spaces *> char '}')
           subExpressionParser
 
-fileTermValueParser :: Parser (Expression Identity)
+fileTermValueParser :: Parser (Expression Identity Identity)
 fileTermValueParser = ExpressionLeaf . Identity . FileTermValue <$> fileTermParser
 
-subExpressionParser :: Parser SubExpression
+subExpressionParser :: Parser (SubExpression Identity)
 subExpressionParser =
   spaces
     *> ( try
           ( myChainl1
               lhsSubExpressionParser
-              (flip SubBinary <$> (spaces *> setOpParser))
+              ( (\so lhs rhs -> SubBinary . Identity $ BinarySubExpression lhs so rhs)
+                  <$> (spaces *> setOpParser)
+              )
               pure
           )
           <|> lhsSubExpressionParser
        )
  where
-  lhsSubExpressionParser :: Parser SubExpression
+  lhsSubExpressionParser :: Parser (SubExpression Identity)
   lhsSubExpressionParser =
     spaces
       *> ( precedentSubExpressionParser
             <|> ( tagTermParser
                     <**> ( subExpressionLookAheadParser
-                            <|> pure SubTag
+                            <|> pure (SubTag . Identity)
                          )
                 )
          )
@@ -157,7 +162,7 @@ subExpressionParser =
         (spaces *> char ')')
         subExpressionParser
     subExpressionLookAheadParser =
-      flip SubExpression
+      (\y tt -> SubExpression . Identity $ SubExpressionExtension tt y)
         <$> between
           (try (spaces *> char '{'))
           (spaces *> char '}')
