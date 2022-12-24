@@ -73,6 +73,10 @@ deriving instance Show a => Show (Expression Identity ((,) a))
 
 deriving instance Eq a => Eq (Expression Identity ((,) a))
 
+deriving instance (Show a, Show b) => Show (Expression ((,) a) ((,) b))
+
+deriving instance (Eq a, Eq b) => Eq (Expression ((,) a) ((,) b))
+
 {- |
  Intermediate constructor denoting the terminal evaluations of an 'Expression`
 -}
@@ -98,6 +102,10 @@ deriving instance Eq a => Eq (BinaryExpression ((,) a) Identity)
 deriving instance Show a => Show (BinaryExpression Identity ((,) a))
 
 deriving instance Eq a => Eq (BinaryExpression Identity ((,) a))
+
+deriving instance (Show a, Show b) => Show (BinaryExpression ((,) a) ((,) b))
+
+deriving instance (Eq a, Eq b) => Eq (BinaryExpression ((,) a) ((,) b))
 
 {- |
  Expression leaf for entering into a 'SubExpression` from an 'Expression`

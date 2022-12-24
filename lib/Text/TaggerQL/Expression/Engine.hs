@@ -80,7 +80,7 @@ runExpr :: Expression Identity Identity -> TaggedConnection -> IO (HashSet File)
 runExpr expr = runReaderT (evalExpr expr)
 
 evalExpr :: Expression Identity Identity -> ReaderT TaggedConnection IO (HashSet File)
-evalExpr = runInterpreter queryer
+evalExpr = flip runReaderT mempty . runInterpreter queryer
 
 -- Tagging Engine
 

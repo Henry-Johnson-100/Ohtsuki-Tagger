@@ -9,6 +9,9 @@
 {-# HLINT ignore "Use lambda-case" #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
+{-# HLINT ignore "Use const" #-}
+{-# HLINT ignore "Avoid lambda" #-}
+
 {- |
 Module      : Text.TaggerQL.Expression.Interpreter
 Description : Defining various interpreters and annotators for the TaggerQL language.
@@ -34,40 +37,33 @@ Intepreters have lots of resemblances to Functors, though their internal computa
 are stateful over their inner type, making a proper Functor instance difficult.
 -}
 module Text.TaggerQL.Expression.Interpreter (
+  -- * Interpreters
   Interpreter (..),
-  runInterpreter,
   SubInterpreter (..),
+  runInterpreter,
+  runSubInterpreter,
+
+  -- * Annotators
+  AnnotatedExpression (..),
+  expressionAnnotation,
+  AnnotatedSubExpression (..),
+  subExpressionAnnotation,
+  annotator,
+
+  -- * Examples
   queryer,
+  indexer,
+  printer,
 ) where
 
--- AnnotatedExpression (..),
--- annotation,
--- Interpreter (..),
--- runInterpreter,
--- annotate,
-
--- -- * Manipulation
--- withInterpreterContext,
--- fanoutInterpreter,
--- mapInterpreter,
--- mapMInterpreter,
-
--- -- * Interpreters
--- queryer,
--- prettyPrinter,
--- voider,
--- counter,
--- hasher,
-
-import Control.Monad ((<=<))
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Trans.Class (MonadTrans, lift)
-import Control.Monad.Trans.Reader (ReaderT, ask, local, runReaderT)
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Reader (ReaderT, ask, local)
 import Control.Monad.Trans.State.Strict (State, get, modify)
+import Data.Bifunctor (Bifunctor (first, second))
 import Data.Functor.Identity (Identity (..))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
-import Data.Hashable
 import Data.Ix (Ix)
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
@@ -79,39 +75,130 @@ import Database.Tagger (
   flatQueryForFileOnMetaRelationPattern,
   queryForFileByPattern,
  )
-import Text.TaggerQL.Expression.AST
+import Text.TaggerQL.Expression.AST (
+  BinaryExpression (BinaryExpression),
+  BinarySubExpression (BinarySubExpression),
+  Expression (..),
+  ExpressionLeaf (..),
+  ExpressionSubContext (ExpressionSubContext),
+  FileTerm (FileTerm),
+  IdentityKind,
+  SubExpression (..),
+  SubExpressionExtension (SubExpressionExtension),
+  TagTerm (..),
+  expressionIdentity,
+  subExpressionIdentity,
+ )
 import Text.TaggerQL.Expression.Interpreter.Internal (
-  evalSubExpression,
   joinSubTags',
   queryTags,
   toFileSet,
  )
 
-data SubInterpreter n b = SubInterpreter
-  { interpretSubTag :: TagTerm -> n b
-  , interpretSubExpressionExtension :: TagTerm -> n b -> n b
-  , interpretBinarySubExpression :: SetOp -> b -> b -> n b
-  }
+newtype AnnotatedExpression a b = AnnotatedExpression
+  {runAnnotatedExpression :: Expression ((,) a) ((,) b)}
+  deriving (Show, Eq)
 
-data Interpreter m n b a = Interpreter
-  { interpretSubExpression :: SubInterpreter n b
+instance Bifunctor AnnotatedExpression where
+  first :: (a -> b) -> AnnotatedExpression a c -> AnnotatedExpression b c
+  first f (AnnotatedExpression expr) = AnnotatedExpression $
+    case expr of
+      ExpressionLeaf x0 -> ExpressionLeaf . first f $ x0
+      BinaryExpressionValue (x, BinaryExpression lhs so rhs) ->
+        BinaryExpressionValue
+          ( f x
+          , BinaryExpression
+              (runAnnotatedExpression . first f . AnnotatedExpression $ lhs)
+              so
+              (runAnnotatedExpression . first f . AnnotatedExpression $ rhs)
+          )
+      ExpressionSubContextValue x0 -> ExpressionSubContextValue . first f $ x0
+  second :: (b -> c) -> AnnotatedExpression a b -> AnnotatedExpression a c
+  second f (AnnotatedExpression expr) =
+    AnnotatedExpression $
+      case expr of
+        ExpressionLeaf x0 -> ExpressionLeaf x0
+        BinaryExpressionValue (x, BinaryExpression lhs so rhs) ->
+          BinaryExpressionValue
+            ( x
+            , BinaryExpression
+                (runAnnotatedExpression . second f . AnnotatedExpression $ lhs)
+                so
+                (runAnnotatedExpression . second f . AnnotatedExpression $ rhs)
+            )
+        ExpressionSubContextValue (x, ExpressionSubContext tt se) ->
+          ExpressionSubContextValue
+            ( x
+            , ExpressionSubContext
+                tt
+                (runAnnotatedSubExpression . fmap f . AnnotatedSubExpression $ se)
+            )
+
+newtype AnnotatedSubExpression a = AnnotatedSubExpression
+  {runAnnotatedSubExpression :: SubExpression ((,) a)}
+  deriving (Show, Eq)
+
+instance Functor AnnotatedSubExpression where
+  fmap :: (a -> b) -> AnnotatedSubExpression a -> AnnotatedSubExpression b
+  fmap f (AnnotatedSubExpression se) = AnnotatedSubExpression $
+    case se of
+      SubTag x0 -> SubTag . first f $ x0
+      SubBinary (x, BinarySubExpression lhs so rhs) ->
+        SubBinary
+          ( f x
+          , BinarySubExpression
+              (runAnnotatedSubExpression . fmap f . AnnotatedSubExpression $ lhs)
+              so
+              (runAnnotatedSubExpression . fmap f . AnnotatedSubExpression $ rhs)
+          )
+      SubExpression (x, SubExpressionExtension tt se') ->
+        SubExpression
+          ( f x
+          , SubExpressionExtension
+              tt
+              (runAnnotatedSubExpression . fmap f . AnnotatedSubExpression $ se')
+          )
+
+{- |
+ An interpreter over 'Expression` constructors.
+
+ Provides definitions for evaluation as well as mapping a
+ 'SubExpression` to an 'Expression`.
+-}
+data Interpreter m b a = Interpreter
+  { interpretSubExpression :: SubInterpreter m b
   , interpretExpressionLeaf :: ExpressionLeaf -> m a
   , interpretBinaryExpression :: SetOp -> a -> a -> m a
-  , interpretExpressionSubContext :: TagTerm -> n b -> m a
+  , -- | An 'Expression` of the form: \"a{b}\".
+    -- That computes the 'SubExpression` \"b\" after extending the computation context
+    -- with \"a\".
+    interpretExpressionSubContext :: TagTerm -> m b -> m a
   }
 
+{- |
+ An interpreter over 'SubExpression` constructors.
+
+ Provides definitions for evaluation.
+-}
+data SubInterpreter m b = SubInterpreter
+  { interpretSubTag :: TagTerm -> m b
+  , -- | A 'SubExpression` with the syntax: \"a{b}\"
+    -- used to extend the context that a 'SubInterpreter` is computing in.
+    interpretSubExpressionExtension :: TagTerm -> m b -> m b
+  , interpretBinarySubExpression :: SetOp -> b -> b -> m b
+  }
+
+{- |
+ Run the given 'Interpreter` over an 'Expression` that can be mapped to its identity.
+-}
 runInterpreter ::
-  (Monad m, Monad n, IdentityKind t, IdentityKind k) =>
-  Interpreter m n b a ->
+  (Monad m, IdentityKind t, IdentityKind k) =>
+  Interpreter m b a ->
   Expression t k ->
   m a
 runInterpreter
   itr@( Interpreter
-          ( SubInterpreter
-              ist
-              isee
-              ibss
-            )
+          sitr
           iel
           ibe
           iesc
@@ -123,22 +210,107 @@ runInterpreter
       r <- runInterpreter itr rhs
       ibe so l r
     ExpressionSubContextValue (Identity (ExpressionSubContext tt se)) ->
-      iesc
-        tt
-        $ subItr se
-   where
-    subItr se =
-      case se of
-        SubTag (Identity tt) -> ist tt
-        SubBinary (Identity (BinarySubExpression lhs so rhs)) -> do
-          l <- subItr lhs
-          r <- subItr rhs
-          ibss so l r
-        SubExpression (Identity (SubExpressionExtension tt se')) -> isee tt $ subItr se'
+      iesc tt $ runSubInterpreter sitr se
 
+runSubInterpreter ::
+  (IdentityKind k, Monad n) =>
+  SubInterpreter n b ->
+  SubExpression k ->
+  n b
+runSubInterpreter sitr@(SubInterpreter ist isee ibss) (subExpressionIdentity -> se) =
+  case se of
+    SubTag (Identity tt) -> ist tt
+    SubBinary (Identity (BinarySubExpression lhs so rhs)) -> do
+      l <- runSubInterpreter sitr lhs
+      r <- runSubInterpreter sitr rhs
+      ibss so l r
+    SubExpression (Identity (SubExpressionExtension tt se')) ->
+      isee tt $ runSubInterpreter sitr se'
+
+{- |
+ Retrieve the annotation from a given 'Expression`
+-}
+expressionAnnotation :: AnnotatedExpression a b -> a
+expressionAnnotation (AnnotatedExpression expr) = case expr of
+  ExpressionLeaf x0 -> fst x0
+  BinaryExpressionValue x0 -> fst x0
+  ExpressionSubContextValue x0 -> fst x0
+
+{- |
+ Retrieve the annotation from a given 'SubExpression`
+-}
+subExpressionAnnotation :: AnnotatedSubExpression a -> a
+subExpressionAnnotation (AnnotatedSubExpression se) = case se of
+  SubTag x0 -> fst x0
+  SubBinary x0 -> fst x0
+  SubExpression x0 -> fst x0
+
+{- |
+ Annotate the leaves of an 'Expression` with the results of an interpreter.
+-}
+annotator ::
+  (Monad m) =>
+  Interpreter m b a ->
+  Interpreter m (AnnotatedSubExpression b) (AnnotatedExpression a b)
+annotator (Interpreter (SubInterpreter sa sb sc) a b c) =
+  Interpreter
+    { interpretSubExpression =
+        SubInterpreter
+          { interpretSubTag = \tt ->
+              fmap (AnnotatedSubExpression . SubTag . (,tt)) $
+                sa tt
+          , interpretBinarySubExpression =
+              \so
+               lhs@(subExpressionAnnotation -> lhsa)
+               rhs@(subExpressionAnnotation -> rhsa) -> do
+                  r <- sc so lhsa rhsa
+                  return
+                    ( AnnotatedSubExpression $
+                        SubBinary
+                          ( r
+                          , BinarySubExpression
+                              (runAnnotatedSubExpression lhs)
+                              so
+                              (runAnnotatedSubExpression rhs)
+                          )
+                    )
+          , interpretSubExpressionExtension = \tt ase -> do
+              r <- sb tt . fmap subExpressionAnnotation $ ase
+              aser <- fmap runAnnotatedSubExpression ase
+              return
+                ( AnnotatedSubExpression $
+                    SubExpression
+                      (r, SubExpressionExtension tt aser)
+                )
+          }
+    , interpretBinaryExpression =
+        \so
+         lhs@(expressionAnnotation -> lhsa)
+         rhs@(expressionAnnotation -> rhsa) -> do
+            r <- b so lhsa rhsa
+            return . AnnotatedExpression . BinaryExpressionValue $
+              ( r
+              , BinaryExpression
+                  (runAnnotatedExpression lhs)
+                  so
+                  (runAnnotatedExpression rhs)
+              )
+    , interpretExpressionLeaf = \leaf ->
+        fmap (AnnotatedExpression . ExpressionLeaf . (,leaf)) $ a leaf
+    , interpretExpressionSubContext = \tt ase -> do
+        aser <- fmap runAnnotatedSubExpression ase
+        r <- c tt . fmap subExpressionAnnotation $ ase
+        return . AnnotatedExpression . ExpressionSubContextValue $
+          (r, ExpressionSubContext tt aser)
+    }
+
+{- |
+ Query a database for a set of files.
+
+ The heart and soul of this program.
+-}
 queryer ::
   Interpreter
-    (ReaderT TaggedConnection IO)
     (ReaderT (HashSet Tag) (ReaderT TaggedConnection IO))
     (HashSet Tag)
     (HashSet File)
@@ -169,10 +341,10 @@ queryer =
           }
     , interpretExpressionLeaf = \leaf -> case leaf of
         FileTermValue (FileTerm t) ->
-          ask
+          lift ask
             >>= liftIO . fmap HS.fromList . queryForFileByPattern t
         TagTermValue tt ->
-          ask
+          lift ask
             >>= liftIO . fmap HS.fromList
               . ( case tt of
                     DescriptorTerm txt -> flatQueryForFileByTagDescriptorPattern txt
@@ -188,289 +360,84 @@ queryer =
             lhs
             rhs
     , interpretExpressionSubContext = \tt se -> do
-        c <- ask
+        c <- lift ask
         supertags <- liftIO . fmap HS.fromList $ queryTags tt c
-        result <- runReaderT se supertags
+        result <- local (const supertags) se
         liftIO . flip toFileSet c $ result
     }
 
--- {- |
---  A data type containing behavior for how to interpret an 'Expression`.
+{- |
+ Count the total number of expressions and subExpressions.
+-}
+counter ::
+  (Ix a, Num a) =>
+  Interpreter (State a) a a
+counter =
+  Interpreter
+    { interpretSubExpression =
+        SubInterpreter
+          { interpretBinarySubExpression = \_ _ _ -> get <* modify (1 +)
+          , interpretSubExpressionExtension = \_ se -> get <* modify (1 +) <* se
+          , interpretSubTag = \_ -> get <* modify (1 +)
+          }
+    , interpretExpressionLeaf = \_ -> get <* modify (1 +)
+    , interpretBinaryExpression = \_ _ _ -> get <* modify (1 +)
+    , interpretExpressionSubContext = \_ sc -> get <* modify (1 +) <* sc
+    }
 
---  Where 'm` is the context to interpret in, typically some monad, and
---  t is the final output of the interpreter.
--- -}
--- data Interpreter m t = Interpreter
---   { interpretBinaryOperation :: SetOp -> t -> t -> m t
---   , interpretExpressionLeaf :: ExpressionLeaf -> m t
---   }
+{- |
+ Supply an index to each 'Expression` or 'SubExpression` in evaluation order.
+-}
+indexer ::
+  (Ix a, Num a) =>
+  Interpreter
+    (State a)
+    (AnnotatedSubExpression a)
+    (AnnotatedExpression a a)
+indexer =
+  annotator
+    counter
 
--- {- |
---  Given two 'Interpreter` that run in the same context, combine their output.
--- -}
--- fanoutInterpreter ::
---   Applicative f =>
---   Interpreter f a ->
---   Interpreter f b ->
---   Interpreter f (a, b)
--- fanoutInterpreter (Interpreter aob ael) (Interpreter bob bel) =
---   Interpreter
---     { interpretBinaryOperation = \so (alhs, blhs) (arhs, brhs) ->
---         (,) <$> aob so alhs arhs <*> bob so blhs brhs
---     , interpretExpressionLeaf = \leaf -> (,) <$> ael leaf <*> bel leaf
---     }
+{- |
+ Pretty print an 'Expression`.
 
--- {- |
---  Map an 'Interpreter` from one context to another.
--- -}
--- withInterpreterContext :: (m a -> n a) -> Interpreter m a -> Interpreter n a
--- withInterpreterContext f (Interpreter iob iel) =
---   Interpreter
---     { interpretBinaryOperation = \so lhs rhs -> f $ iob so lhs rhs
---     , interpretExpressionLeaf = f . iel
---     }
-
--- {- |
---  Map an 'Interpreter` over isomorphic types.
-
---  An 'Interpreter` cannot be a simple Functor, but given an isomorphism it can convert to
---  and from an intermediate type during interpretation.
--- -}
--- mapInterpreter :: Functor m => (a -> b) -> (b -> a) -> Interpreter m a -> Interpreter m b
--- mapInterpreter to from (Interpreter iob iel) =
---   Interpreter
---     { interpretBinaryOperation = \so lhs rhs -> fmap to $ iob so (from lhs) (from rhs)
---     , interpretExpressionLeaf = fmap to . iel
---     }
-
--- {- |
---  Map an 'Interpreter` over types that are monadically isomorphic.
-
---  More flexible than 'mapInterpreter` though a bit more work. With this function it is
---  possible to declare a kind of isomorphism that exists during runtime. Using
---  the type m to be some MonadIO and the isomorphisms as some kind of storage and retrieval
---  of the appropriate values.
--- -}
--- mapMInterpreter ::
---   Monad m =>
---   (a -> m c) ->
---   (c -> m a) ->
---   Interpreter m a ->
---   Interpreter m c
--- mapMInterpreter toM fromM (Interpreter iob iel) =
---   Interpreter
---     { interpretBinaryOperation = \so lhs rhs -> do
---         lhsM <- fromM lhs
---         rhsM <- fromM rhs
---         iob so lhsM rhsM >>= toM
---     , interpretExpressionLeaf = toM <=< iel
---     }
-
--- {- |
---  newtype wrapper for an 'Expression ((,) a)`.
-
---  denoting some auxiliary information at each leaf in the 'Expression`
--- -}
--- newtype AnnotatedExpression a = AnnotatedExpression {runAnnotation :: Expression ((,) a)}
---   deriving (Show, Eq)
-
--- instance Functor AnnotatedExpression where
---   fmap :: (a -> b) -> AnnotatedExpression a -> AnnotatedExpression b
---   fmap f (AnnotatedExpression expr) = AnnotatedExpression $ case expr of
---     ExpressionLeaf (x, i) -> ExpressionLeaf (f x, i)
---     BinaryExpressionValue
---       ( x
---         , BinaryExpression
---             lhs
---             so
---             rhs
---         ) ->
---         BinaryExpressionValue
---           ( f x
---           , BinaryExpression
---               (runAnnotation . fmap f . AnnotatedExpression $ lhs)
---               so
---               (runAnnotation . fmap f . AnnotatedExpression $ rhs)
---           )
-
--- {- |
---  Return the given 'Expression` annotation.
--- -}
--- annotation :: AnnotatedExpression a -> a
--- annotation (AnnotatedExpression expr) = case expr of
---   ExpressionLeaf x0 -> fst x0
---   BinaryExpressionValue x0 -> fst x0
-
--- {- |
---  Interpret the given 'Expression` as if it were @Expression Identity@.
--- -}
--- runInterpreter ::
---   (Monad m, ExpressionIdentity l) =>
---   Interpreter m t ->
---   Expression l ->
---   m t
--- runInterpreter (Interpreter ibo iel) = interpret ibo iel . expressionIdentity
---  where
---   interpret ::
---     Monad m =>
---     (SetOp -> t -> t -> m t) ->
---     (ExpressionLeaf -> m t) ->
---     Expression Identity ->
---     m t
---   interpret
---     dispatchComb
---     onLeaf
---     expr =
---       case expr of
---         ExpressionLeaf (Identity l) -> onLeaf l
---         BinaryExpressionValue (Identity (BinaryExpression lhs so rhs)) -> do
---           lhsI <- interpret' lhs
---           rhsI <- interpret' rhs
---           dispatchComb so lhsI rhsI
---      where
---       interpret' =
---         interpret
---           dispatchComb
---           onLeaf
-
--- {- |
---  Given any 'Interpreter` i and any 'Expression` e, then the following should (hopefully)
---  be true:
-
---  >interpret i e = fmap annotation (annotate i e)
--- -}
--- annotate ::
---   (Monad m, ExpressionIdentity l) =>
---   Interpreter m t ->
---   Expression l ->
---   m (AnnotatedExpression t)
--- annotate itr@(Interpreter ibo iel) expr =
---   case expressionIdentity expr of
---     ExpressionLeaf (Identity leaf) ->
---       AnnotatedExpression . ExpressionLeaf . (,leaf) <$> iel leaf
---     BinaryExpressionValue (Identity (BinaryExpression lhs so rhs)) -> do
---       lhsI <- annotate itr lhs
---       rhsI <- annotate itr rhs
---       combination <- ibo so (annotation lhsI) (annotation rhsI)
---       return . AnnotatedExpression . BinaryExpressionValue $
---         (combination, BinaryExpression (runAnnotation lhsI) so (runAnnotation rhsI))
-
--- {- |
---  The 'Interpreter` that governs querying a database for a set of 'File`s.
-
---  The very heart and soul of this program.
--- -}
--- queryer :: Interpreter (ReaderT TaggedConnection IO) (HashSet File)
--- queryer =
---   Interpreter
---     { interpretBinaryOperation =
---         \so lhs rhs ->
---           pure $
---             ( case so of
---                 Union -> HS.union
---                 Intersect -> HS.intersection
---                 Difference -> HS.difference
---             )
---               lhs
---               rhs
---     , interpretExpressionLeaf = \leaf -> case leaf of
---         FileTermValue (FileTerm t) ->
---           ask
---             >>= liftIO . fmap HS.fromList . queryForFileByPattern t
---         TagTermValue tt ->
---           ask
---             >>= liftIO . fmap HS.fromList
---               . ( case tt of
---                     DescriptorTerm txt -> flatQueryForFileByTagDescriptorPattern txt
---                     MetaDescriptorTerm txt -> flatQueryForFileOnMetaRelationPattern txt
---                 )
---         TagExpressionValue tt se -> do
---           c <- ask
---           supertags <- liftIO . fmap HS.fromList $ queryTags tt c
---           subExprResult <- evalSubExpression se supertags
---           liftIO $ toFileSet subExprResult c
---     }
-
--- {- |
---  The return type of this Interpreter is a tuple with boolean state to keep track
---  of nested binary operations to correctly apply parentheses when printing.
-
---  it can be discarded after interpretation.
--- -}
--- prettyPrinter :: Interpreter Identity (Text, Bool)
--- prettyPrinter =
---   Interpreter
---     { interpretBinaryOperation = \so (lhs, _) (rhs, rIsNested) ->
---         Identity . (,True) $
---           (lhs <> formatSO so <> (if rIsNested then (\t -> "(" <> t <> ")") else id) rhs)
---     , interpretExpressionLeaf = \leaf ->
---         Identity . (,False) $
---           ( case leaf of
---               FileTermValue (FileTerm t) -> "p." <> t
---               TagTermValue tt -> formatTT tt
---               TagExpressionValue tt se -> formatTT tt <> " {" <> formatSe se <> "}"
---           )
---     }
---  where
---   formatTT tt = case tt of
---     DescriptorTerm txt -> "d." <> txt
---     MetaDescriptorTerm txt -> txt
---   formatSO so = case so of
---     Union -> " | "
---     Intersect -> " & "
---     Difference -> " ! "
---   formatSe se =
---     case se of
---       SubBinary lhs so rhs ->
---         formatSe lhs <> formatSO so
---           <> (if isNestedSubExpr rhs then "(" <> formatSe rhs <> ")" else formatSe rhs)
---       SubTag tt -> formatTT tt
---       SubExpression tt se' -> formatTT tt <> " {" <> formatSe se' <> "}"
---   isNestedSubExpr se =
---     case se of
---       SubBinary{} -> True
---       _notNested -> False
-
--- {- |
---  Voids an expression.
-
---  Used to easily create a spine-like functor over an 'Expression`
-
---  @
---  annotate voider ::
---   ExpressionIdentity l => Expression l -> Identity (AnnotatedExpression ())
---  @
--- -}
--- voider :: Interpreter Identity ()
--- voider =
---   Interpreter
---     { interpretBinaryOperation = \_ _ _ -> pure ()
---     , interpretExpressionLeaf = \_ -> pure ()
---     }
-
--- {- |
---  Counts the leafs of an 'Expression` by order of evaluation.
-
---  Annotating with this 'Interpreter` creates an 'Expression` where each leaf has an index.
--- -}
--- counter :: (Ix a, Num a) => Interpreter (State a) a
--- counter =
---   Interpreter
---     { interpretBinaryOperation = \_ _ _ -> get <* modify (+ 1)
---     , interpretExpressionLeaf = \_ -> get <* modify (+ 1)
---     }
-
--- {- |
---  Hashes an expression based on the formatted text of its leaves.
--- -}
--- hasher :: Interpreter Identity Int
--- hasher =
---   let (Interpreter _ iel) = prettyPrinter
---    in Interpreter
---         { interpretBinaryOperation = \so lhs rhs ->
---             Identity $
---               hashWithSalt
---                 (fromEnum so)
---                 (hashWithSalt lhs rhs)
---         , interpretExpressionLeaf = fmap (hash . fst) . iel
---         }
+ Tracks state in the snd term, can be discarded after interpretatioon.
+-}
+printer :: Interpreter Identity (Text, Bool) (Text, Bool)
+printer =
+  Interpreter
+    { interpretSubExpression =
+        SubInterpreter
+          { interpretBinarySubExpression = \so (lhs, _) (rhs, n) ->
+              Identity . (,True) $
+                lhs
+                  <> ( case so of
+                        Union -> " | "
+                        Intersect -> " "
+                        Difference -> " ! "
+                     )
+                  <> (if n then (\t -> "(" <> t <> ")") else id) rhs
+          , interpretSubExpressionExtension = \tt (Identity (se, _)) ->
+              Identity . (,False) $ formatTT tt <> " {" <> se <> "}"
+          , interpretSubTag = Identity . (,False) . formatTT
+          }
+    , interpretBinaryExpression = \so (lhs, _) (rhs, n) ->
+        Identity . (,True) $
+          lhs
+            <> ( case so of
+                  Union -> " | "
+                  Intersect -> " "
+                  Difference -> " ! "
+               )
+            <> (if n then (\t -> "(" <> t <> ")") else id) rhs
+    , interpretExpressionLeaf = \leaf -> Identity . (,False) $ case leaf of
+        FileTermValue (FileTerm t) -> "p." <> t
+        TagTermValue tt -> formatTT tt
+    , interpretExpressionSubContext = \tt (Identity (se, _)) ->
+        Identity . (,False) $
+          formatTT tt <> " {" <> se <> "}"
+    }
+ where
+  formatTT tt = case tt of
+    DescriptorTerm t -> "d." <> t
+    MetaDescriptorTerm t -> t
