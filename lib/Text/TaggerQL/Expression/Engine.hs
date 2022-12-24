@@ -37,7 +37,7 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (ExceptT, throwE)
 import Control.Monad.Trans.Reader (ReaderT (runReaderT), asks)
 import Data.Functor (($>))
-import Data.Functor.Identity (Identity)
+import Data.Functor.Identity (Identity (..))
 import Data.HashSet (HashSet)
 import qualified Data.List as L
 import Data.Maybe (fromJust)
@@ -59,15 +59,8 @@ import Database.Tagger.Type (
   TaggedConnection,
  )
 import Text.Parsec.Error (errorMessages, messageString)
-import Text.TaggerQL.Expression.AST (
-  Expression,
-  SubExpression (..),
-  TagTerm (DescriptorTerm, MetaDescriptorTerm),
- )
-import Text.TaggerQL.Expression.Interpreter (
-  queryer,
-  runInterpreter,
- )
+import Text.TaggerQL.Expression.AST
+import Text.TaggerQL.Expression.Interpreter
 import Text.TaggerQL.Expression.Parser (parseExpr, parseTagExpr)
 
 {- |
@@ -83,10 +76,10 @@ runQuery c t =
 {- |
  Query an 'Expression`
 -}
-runExpr :: Expression Identity -> TaggedConnection -> IO (HashSet File)
+runExpr :: Expression Identity Identity -> TaggedConnection -> IO (HashSet File)
 runExpr expr = runReaderT (evalExpr expr)
 
-evalExpr :: Expression Identity -> ReaderT TaggedConnection IO (HashSet File)
+evalExpr :: Expression Identity Identity -> ReaderT TaggedConnection IO (HashSet File)
 evalExpr = runInterpreter queryer
 
 -- Tagging Engine
@@ -104,25 +97,25 @@ tagFile fk c =
     (\se -> runSubExprOnFile se fk c $> Nothing)
     . parseTagExpr
 
-runSubExprOnFile :: SubExpression -> RecordKey File -> TaggedConnection -> IO ()
+runSubExprOnFile :: SubExpression Identity -> RecordKey File -> TaggedConnection -> IO ()
 runSubExprOnFile se fk c = void (runReaderT (insertSubExpr se Nothing) (fk, c))
 
 insertSubExpr ::
-  SubExpression ->
+  SubExpression Identity ->
   Maybe [RecordKey Tag] ->
   ReaderT (RecordKey File, TaggedConnection) IO [RecordKey Tag]
 insertSubExpr se supertags =
   asks snd >>= \c ->
     ( case se of
-        SubExpression tt se' -> do
-          insertedSubtags <- insertSubExpr (SubTag tt) supertags
+        SubExpression (Identity (SubExpressionExtension tt se')) -> do
+          insertedSubtags <- insertSubExpr (SubTag . Identity $ tt) supertags
           insertSubExpr se' (Just insertedSubtags)
-        SubBinary se' _ se2 -> do
+        SubBinary (Identity (BinarySubExpression se' _ se2)) -> do
           void $ insertSubExpr se' supertags
           void $ insertSubExpr se2 supertags
           -- tags inserted by a SubBinary is indeterminate and empty by default
           return mempty
-        SubTag tt -> do
+        SubTag (Identity tt) -> do
           let txt = termTxt tt
           withDescriptors <- qDescriptor txt
           fk <- asks fst
