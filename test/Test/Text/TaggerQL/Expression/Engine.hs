@@ -161,10 +161,10 @@ basicQueryFunctionality c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity $
-                      TagExpressionValue
+                  ( ExpressionSubContextValue . Identity $
+                      ExpressionSubContext
                         (DescriptorTerm "descriptor_5")
-                        (SubTag (DescriptorTerm "descriptor_6"))
+                        (SubTag . Identity $ DescriptorTerm "descriptor_6")
                   )
             assertEqual
               "Simple subtag 4{5} should find files with 4{5} tags."
@@ -174,10 +174,10 @@ basicQueryFunctionality c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity $
-                      TagExpressionValue
+                  ( ExpressionSubContextValue . Identity $
+                      ExpressionSubContext
                         (DescriptorTerm "descriptor_6")
-                        (SubTag (DescriptorTerm "descriptor_7"))
+                        (SubTag . Identity $ DescriptorTerm "descriptor_7")
                   )
             assertEqual
               "SubTag queries are a flat operation."
@@ -187,12 +187,13 @@ basicQueryFunctionality c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity $
-                      TagExpressionValue
+                  ( ExpressionSubContextValue . Identity $
+                      ExpressionSubContext
                         (DescriptorTerm "descriptor_17")
-                        ( SubExpression
-                            (DescriptorTerm "descriptor_18")
-                            (SubTag (DescriptorTerm "descriptor_20"))
+                        ( SubExpression . Identity $
+                            SubExpressionExtension
+                              (DescriptorTerm "descriptor_18")
+                              (SubTag . Identity $ DescriptorTerm "descriptor_20")
                         )
                   )
             assertEqual
@@ -203,10 +204,10 @@ basicQueryFunctionality c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity $
-                      TagExpressionValue
+                  ( ExpressionSubContextValue . Identity $
+                      ExpressionSubContext
                         (DescriptorTerm "descriptor_17")
-                        (SubTag (DescriptorTerm "descriptor_18"))
+                        (SubTag . Identity $ DescriptorTerm "descriptor_18")
                   )
             assertEqual
               "The LHS of the below test."
@@ -222,7 +223,7 @@ basicQueryFunctionality c =
               c
                 >>= runReaderT
                   ( evalSubExpression
-                      (SubTag (DescriptorTerm "descriptor_18"))
+                      (SubTag . Identity $ DescriptorTerm "descriptor_18")
                       (HS.fromList h)
                   )
             assertEqual
@@ -240,7 +241,7 @@ basicQueryFunctionality c =
               c
                 >>= runReaderT
                   ( evalSubExpression
-                      (SubTag (DescriptorTerm "descriptor_19"))
+                      (SubTag . Identity $ DescriptorTerm "descriptor_19")
                       (HS.fromList h)
                   )
             assertEqual
@@ -256,13 +257,14 @@ basicQueryFunctionality c =
                 r <-
                   c
                     >>= runExpr
-                      ( ExpressionLeaf . Identity $
-                          TagExpressionValue
+                      ( ExpressionSubContextValue . Identity $
+                          ExpressionSubContext
                             (DescriptorTerm "descriptor_17")
-                            ( SubBinary
-                                (SubTag (DescriptorTerm "descriptor_18"))
-                                Union
-                                (SubTag (DescriptorTerm "descriptor_19"))
+                            ( SubBinary . Identity $
+                                BinarySubExpression
+                                  (SubTag . Identity $ DescriptorTerm "descriptor_18")
+                                  Union
+                                  (SubTag . Identity $ DescriptorTerm "descriptor_19")
                             )
                       )
                 assertEqual
@@ -279,13 +281,14 @@ basicQueryFunctionality c =
                 r <-
                   c
                     >>= runExpr
-                      ( ExpressionLeaf . Identity $
-                          TagExpressionValue
+                      ( ExpressionSubContextValue . Identity $
+                          ExpressionSubContext
                             (DescriptorTerm "descriptor_17")
-                            ( SubBinary
-                                (SubTag (DescriptorTerm "descriptor_18"))
-                                Intersect
-                                (SubTag (DescriptorTerm "descriptor_19"))
+                            ( SubBinary . Identity $
+                                BinarySubExpression
+                                  (SubTag . Identity $ DescriptorTerm "descriptor_18")
+                                  Intersect
+                                  (SubTag . Identity $ DescriptorTerm "descriptor_19")
                             )
                       )
                 assertEqual
@@ -298,13 +301,14 @@ basicQueryFunctionality c =
                 r <-
                   c
                     >>= runExpr
-                      ( ExpressionLeaf . Identity $
-                          TagExpressionValue
+                      ( ExpressionSubContextValue . Identity $
+                          ExpressionSubContext
                             (DescriptorTerm "descriptor_17")
-                            ( SubBinary
-                                (SubTag (DescriptorTerm "descriptor_18"))
-                                Difference
-                                (SubTag (DescriptorTerm "descriptor_19"))
+                            ( SubBinary . Identity $
+                                BinarySubExpression
+                                  (SubTag . Identity $ DescriptorTerm "descriptor_18")
+                                  Difference
+                                  (SubTag . Identity $ DescriptorTerm "descriptor_19")
                             )
                       )
                 assertEqual
@@ -323,13 +327,14 @@ basicQueryFunctionality c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity $
-                      TagExpressionValue
+                  ( ExpressionSubContextValue . Identity $
+                      ExpressionSubContext
                         (DescriptorTerm "%")
-                        ( SubBinary
-                            (SubTag (DescriptorTerm "descriptor_20"))
-                            Difference
-                            (SubTag (DescriptorTerm "descriptor_18"))
+                        ( SubBinary . Identity $
+                            BinarySubExpression
+                              (SubTag . Identity $ DescriptorTerm "descriptor_20")
+                              Difference
+                              (SubTag . Identity $ DescriptorTerm "descriptor_18")
                         )
                   )
             assertEqual
@@ -352,12 +357,13 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity $
-                      TagExpressionValue
+                  ( ExpressionSubContextValue . Identity $
+                      ExpressionSubContext
                         (DescriptorTerm "descriptor_8")
-                        ( SubExpression
-                            (DescriptorTerm "descriptor_9")
-                            (SubTag (DescriptorTerm "descriptor_10"))
+                        ( SubExpression . Identity $
+                            SubExpressionExtension
+                              (DescriptorTerm "descriptor_9")
+                              (SubTag . Identity $ DescriptorTerm "descriptor_10")
                         )
                   )
             assertEqual
@@ -368,10 +374,10 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity $
-                      TagExpressionValue
+                  ( ExpressionSubContextValue . Identity $
+                      ExpressionSubContext
                         (DescriptorTerm "descriptor_8")
-                        (SubTag (DescriptorTerm "descriptor_9"))
+                        (SubTag . Identity $ DescriptorTerm "descriptor_9")
                   )
             assertEqual
               ""
@@ -381,10 +387,10 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity $
-                      TagExpressionValue
+                  ( ExpressionSubContextValue . Identity $
+                      ExpressionSubContext
                         (DescriptorTerm "descriptor_9")
-                        (SubTag (DescriptorTerm "descriptor_10"))
+                        (SubTag . Identity $ DescriptorTerm "descriptor_10")
                   )
             assertEqual
               ""
@@ -394,10 +400,10 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity $
-                      TagExpressionValue
+                  ( ExpressionSubContextValue . Identity $
+                      ExpressionSubContext
                         (DescriptorTerm "descriptor_11")
-                        (SubTag (DescriptorTerm "descriptor_9"))
+                        (SubTag . Identity $ DescriptorTerm "descriptor_9")
                   )
             assertEqual
               ""
@@ -410,13 +416,14 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity $
-                      TagExpressionValue
+                  ( ExpressionSubContextValue . Identity $
+                      ExpressionSubContext
                         (MetaDescriptorTerm "descriptor_12")
-                        ( SubBinary
-                            (SubTag (DescriptorTerm "descriptor_15"))
-                            Intersect
-                            (SubTag (DescriptorTerm "descriptor_16"))
+                        ( SubBinary . Identity $
+                            BinarySubExpression
+                              (SubTag . Identity $ DescriptorTerm "descriptor_15")
+                              Intersect
+                              (SubTag . Identity $ DescriptorTerm "descriptor_16")
                         )
                   )
             assertEqual
@@ -429,16 +436,16 @@ queryEdgeCases c =
                 >>= runExpr
                   ( BinaryExpressionValue . Identity $
                       BinaryExpression
-                        ( ExpressionLeaf . Identity $
-                            TagExpressionValue
+                        ( ExpressionSubContextValue . Identity $
+                            ExpressionSubContext
                               (MetaDescriptorTerm "descriptor_12")
-                              (SubTag (DescriptorTerm "descriptor_15"))
+                              (SubTag . Identity $ DescriptorTerm "descriptor_15")
                         )
                         Intersect
-                        ( ExpressionLeaf . Identity $
-                            TagExpressionValue
+                        ( ExpressionSubContextValue . Identity $
+                            ExpressionSubContext
                               (MetaDescriptorTerm "descriptor_12")
-                              (SubTag (DescriptorTerm "descriptor_16"))
+                              (SubTag . Identity $ DescriptorTerm "descriptor_16")
                         )
                   )
             assertEqual
@@ -449,13 +456,14 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionLeaf . Identity $
-                      TagExpressionValue
+                  ( ExpressionSubContextValue . Identity $
+                      ExpressionSubContext
                         (DescriptorTerm "descriptor_13")
-                        ( SubBinary
-                            (SubTag (DescriptorTerm "descriptor_15"))
-                            Intersect
-                            (SubTag (DescriptorTerm "descriptor_16"))
+                        ( SubBinary . Identity $
+                            BinarySubExpression
+                              (SubTag . Identity $ DescriptorTerm "descriptor_15")
+                              Intersect
+                              (SubTag . Identity $ DescriptorTerm "descriptor_16")
                         )
                   )
             assertEqual
@@ -471,13 +479,15 @@ taggingEngineTests c =
     "Tagging Engine Tests"
     [ testCase "Tagging Engine - 0" $ do
         let se =
-              SubExpression
-                (td 21)
-                ( SubBinary
-                    (SubTag (td 22))
-                    Intersect
-                    (SubTag (td 23))
-                )
+              SubExpression . Identity $
+                SubExpressionExtension
+                  (td 21)
+                  ( SubBinary . Identity $
+                      BinarySubExpression
+                        (SubTag . Identity $ td 22)
+                        Intersect
+                        (SubTag . Identity $ td 23)
+                  )
             fk = 17
             expectedResults =
               [ Tag 44 17 21 Nothing
@@ -498,20 +508,24 @@ taggingEngineTests c =
     , after AllSucceed "Tagging Engine - 0" $
         testCase "Tagging Engine - 1" $ do
           let se =
-                SubExpression
-                  (td 21)
-                  ( SubBinary
-                      ( SubExpression
-                          (td 22)
-                          ( SubBinary
-                              (SubTag (td 24))
-                              Intersect
-                              (SubTag (td 25))
+                SubExpression . Identity $
+                  SubExpressionExtension
+                    (td 21)
+                    ( SubBinary . Identity $
+                        BinarySubExpression
+                          ( SubExpression . Identity $
+                              SubExpressionExtension
+                                (td 22)
+                                ( SubBinary . Identity $
+                                    BinarySubExpression
+                                      (SubTag . Identity $ td 24)
+                                      Intersect
+                                      (SubTag . Identity $ td 25)
+                                )
                           )
-                      )
-                      Intersect
-                      (SubTag (td 23))
-                  )
+                          Intersect
+                          (SubTag . Identity $ td 23)
+                    )
               fk = 17
               expectedResults =
                 [ Tag 44 17 21 Nothing
@@ -534,23 +548,28 @@ taggingEngineTests c =
     , after AllSucceed "Tagging Engine - 1" $
         testCase "Tagging Engine - 2" $ do
           let se =
-                SubExpression
-                  (td 26)
-                  ( SubBinary
-                      ( SubExpression
-                          (td 27)
-                          ( SubBinary
-                              ( SubExpression
-                                  (td 28)
-                                  (SubTag (td 29))
-                              )
-                              Intersect
-                              (SubTag (td 30))
+                SubExpression . Identity $
+                  SubExpressionExtension
+                    (td 26)
+                    ( SubBinary . Identity $
+                        BinarySubExpression
+                          ( SubExpression . Identity $
+                              SubExpressionExtension
+                                (td 27)
+                                ( SubBinary . Identity $
+                                    BinarySubExpression
+                                      ( SubExpression . Identity $
+                                          SubExpressionExtension
+                                            (td 28)
+                                            (SubTag . Identity $ td 29)
+                                      )
+                                      Intersect
+                                      (SubTag . Identity $ td 30)
+                                )
                           )
-                      )
-                      Intersect
-                      (SubTag (td 31))
-                  )
+                          Intersect
+                          (SubTag . Identity $ td 31)
+                    )
               fk = 18
               expectedResults =
                 [ Tag 49 18 26 Nothing
@@ -573,14 +592,16 @@ taggingEngineTests c =
             f
     , after AllSucceed "Tagging Engine - 2" . testCase "Tagging Engine - 3" $ do
         let se =
-              SubBinary
-                ( SubBinary
-                    (SubTag (td 32))
-                    Intersect
-                    (SubTag (td 33))
-                )
-                Intersect
-                (SubTag (td 34))
+              SubBinary . Identity $
+                BinarySubExpression
+                  ( SubBinary . Identity $
+                      BinarySubExpression
+                        (SubTag . Identity $ td 32)
+                        Intersect
+                        (SubTag . Identity $ td 33)
+                  )
+                  Intersect
+                  (SubTag . Identity $ td 34)
             fk = 19
             expectedResults =
               [ Tag 55 19 32 Nothing
@@ -600,7 +621,7 @@ taggingEngineTests c =
           f
     , after AllSucceed "Tagging Engine - 3" . testCase "Tagging Engine - 4" $ do
         let se =
-              SubExpression (td 33) (SubTag (td 32))
+              SubExpression . Identity $ SubExpressionExtension (td 33) (SubTag . Identity $ td 32)
             fk = 19
             expectedResults =
               [ Tag 55 19 32 Nothing
