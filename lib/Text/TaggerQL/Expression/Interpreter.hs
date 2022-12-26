@@ -61,7 +61,6 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Reader (ReaderT, ask, local)
 import Control.Monad.Trans.State.Strict (State, get, modify)
-import Data.Bifunctor (Bifunctor (first, second))
 import Data.Functor.Identity (Identity (..))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
@@ -87,65 +86,9 @@ newtype AnnotatedExpression a b = AnnotatedExpression
   {runAnnotatedExpression :: Expression ((,) a) ((,) b)}
   deriving (Show, Eq)
 
--- instance Bifunctor AnnotatedExpression where
---   first :: (a -> b) -> AnnotatedExpression a c -> AnnotatedExpression b c
---   first f (AnnotatedExpression expr) = AnnotatedExpression $
---     case expr of
---       ExpressionLeaf x0 -> ExpressionLeaf . first f $ x0
---       BinaryExpressionValue (x, BinaryExpression lhs so rhs) ->
---         BinaryExpressionValue
---           ( f x
---           , BinaryExpression
---               (runAnnotatedExpression . first f . AnnotatedExpression $ lhs)
---               so
---               (runAnnotatedExpression . first f . AnnotatedExpression $ rhs)
---           )
---       ExpressionTagTermExtension x0 -> ExpressionSubContextValue . first f $ x0
---   second :: (b -> c) -> AnnotatedExpression a b -> AnnotatedExpression a c
---   second f (AnnotatedExpression expr) =
---     AnnotatedExpression $
---       case expr of
---         ExpressionLeaf x0 -> ExpressionLeaf x0
---         BinaryExpressionValue (x, BinaryExpression lhs so rhs) ->
---           BinaryExpressionValue
---             ( x
---             , BinaryExpression
---                 (runAnnotatedExpression . second f . AnnotatedExpression $ lhs)
---                 so
---                 (runAnnotatedExpression . second f . AnnotatedExpression $ rhs)
---             )
---         ExpressionTagTermExtension (x, ExpressionSubContext tt se) ->
---           ExpressionSubContextValue
---             ( x
---             , ExpressionSubContext
---                 tt
---                 (runAnnotatedSubExpression . fmap f . AnnotatedSubExpression $ se)
---             )
-
 newtype AnnotatedSubExpression a = AnnotatedSubExpression
   {runAnnotatedSubExpression :: SubExpression ((,) a)}
   deriving (Show, Eq)
-
--- instance Functor AnnotatedSubExpression where
---   fmap :: (a -> b) -> AnnotatedSubExpression a -> AnnotatedSubExpression b
---   fmap f (AnnotatedSubExpression se) = AnnotatedSubExpression $
---     case se of
---       SubTag x0 -> SubTag . first f $ x0
---       SubBinary (x, BinarySubExpression lhs so rhs) ->
---         SubBinary
---           ( f x
---           , BinarySubExpression
---               (runAnnotatedSubExpression . fmap f . AnnotatedSubExpression $ lhs)
---               so
---               (runAnnotatedSubExpression . fmap f . AnnotatedSubExpression $ rhs)
---           )
---       SubExpression (x, SubExpressionExtension tt se') ->
---         SubExpression
---           ( f x
---           , SubExpressionExtension
---               tt
---               (runAnnotatedSubExpression . fmap f . AnnotatedSubExpression $ se')
---           )
 
 {- |
  An interpreter over 'Expression` constructors.
@@ -160,7 +103,7 @@ data Interpreter m b a = Interpreter
   , -- | An 'Expression` of the form: \"a{b}\".
     -- That computes the 'SubExpression` \"b\" after extending the computation context
     -- with \"a\".
-    interpretExpressionSubContext :: TagTerm -> m b -> m a
+    interpretExpressionSubContext :: TagTermExtension (m b) -> m a
   }
 
 {- |
@@ -197,8 +140,8 @@ runInterpreter
       l <- runInterpreter itr lhs
       r <- runInterpreter itr rhs
       ibe $ BinaryExpression l so r
-    ExpressionTagTermExtension (Identity (TagTermExtension tt se)) ->
-      iesc tt $ runSubInterpreter sitr se
+    ExpressionTagTermExtension (Identity (TagTermExtension tt se)) -> do
+      iesc . TagTermExtension tt . runSubInterpreter sitr $ se
 
 runSubInterpreter ::
   (IdentityKind k, Monad n) =>
@@ -286,11 +229,12 @@ annotator (Interpreter (SubInterpreter sa sb sc) a b c) =
             bin
     , interpretExpressionLeaf = \leaf ->
         fmap (AnnotatedExpression . ExpressionLeaf . (,leaf)) $ a leaf
-    , interpretExpressionSubContext = \tt ase -> do
-        aser <- fmap runAnnotatedSubExpression ase
-        r <- c tt . fmap subExpressionAnnotation $ ase
-        return . AnnotatedExpression . ExpressionTagTermExtension $
-          (r, TagTermExtension tt aser)
+    , interpretExpressionSubContext = \tte@(TagTermExtension tt se) -> do
+        r <- c . fmap (fmap subExpressionAnnotation) $ tte
+        r' <- fmap runAnnotatedSubExpression se
+        return . AnnotatedExpression
+          . ExpressionTagTermExtension
+          $ (r, TagTermExtension tt r')
     }
 
 {- |
@@ -348,7 +292,7 @@ queryer =
           )
             lhs
             rhs
-    , interpretExpressionSubContext = \tt se -> do
+    , interpretExpressionSubContext = \(TagTermExtension tt se) -> do
         c <- lift ask
         supertags <- liftIO . fmap HS.fromList $ queryTags tt c
         result <- local (const supertags) se
@@ -371,7 +315,8 @@ counter =
           }
     , interpretExpressionLeaf = \_ -> get <* modify (1 +)
     , interpretBinaryExpression = \_ -> get <* modify (1 +)
-    , interpretExpressionSubContext = \_ sc -> get <* modify (1 +) <* sc
+    , interpretExpressionSubContext = \(TagTermExtension _ sc) ->
+        get <* modify (1 +) <* sc
     }
 
 {- |
@@ -422,9 +367,10 @@ printer =
     , interpretExpressionLeaf = \leaf -> Identity . (,False) $ case leaf of
         FileTermValue (FileTerm t) -> "p." <> t
         TagTermValue tt -> formatTT tt
-    , interpretExpressionSubContext = \tt (Identity (se, _)) ->
-        Identity . (,False) $
-          formatTT tt <> " {" <> se <> "}"
+    , interpretExpressionSubContext = \(TagTermExtension tt (Identity (se, _))) ->
+        Identity
+          . (,False)
+          $ formatTT tt <> " {" <> se <> "}"
     }
  where
   formatTT tt = case tt of
