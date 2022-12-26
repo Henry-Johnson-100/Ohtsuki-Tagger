@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
@@ -58,7 +59,7 @@ import Data.Text (Text)
 -}
 data Expression t k
   = ExpressionLeaf (t ExpressionLeaf)
-  | BinaryExpressionValue (t (BinaryExpression t k))
+  | BinaryExpressionValue (t (BinaryExpression (Expression t k)))
   | ExpressionSubContextValue (t (ExpressionSubContext k))
 
 deriving instance Show (Expression Identity Identity)
@@ -89,23 +90,8 @@ data ExpressionLeaf
  Intermediate constructor for lifting a binary set operation over 'Expression` into
  an 'Expression`
 -}
-data BinaryExpression t k = BinaryExpression (Expression t k) SetOp (Expression t k)
-
-deriving instance Show (BinaryExpression Identity Identity)
-
-deriving instance Eq (BinaryExpression Identity Identity)
-
-deriving instance Show a => Show (BinaryExpression ((,) a) Identity)
-
-deriving instance Eq a => Eq (BinaryExpression ((,) a) Identity)
-
-deriving instance Show a => Show (BinaryExpression Identity ((,) a))
-
-deriving instance Eq a => Eq (BinaryExpression Identity ((,) a))
-
-deriving instance (Show a, Show b) => Show (BinaryExpression ((,) a) ((,) b))
-
-deriving instance (Eq a, Eq b) => Eq (BinaryExpression ((,) a) ((,) b))
+data BinaryExpression a = BinaryExpression a SetOp a
+  deriving (Show, Eq, Functor)
 
 {- |
  Expression leaf for entering into a 'SubExpression` from an 'Expression`

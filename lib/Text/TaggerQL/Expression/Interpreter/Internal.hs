@@ -19,6 +19,7 @@ import qualified Data.HashSet as HS
 import Data.Tagger (SetOp (..))
 import Database.Tagger (
   File,
+  RecordKey (..),
   Tag (tagId, tagSubtagOfId),
   TaggedConnection,
   query,
@@ -86,6 +87,10 @@ evalSubExpression subExpr supertags = case subExpr of
   joinSubtags subtags =
     HS.filter (\(Just . tagId -> supertagId) -> HS.member supertagId subtags) supertags
 
+joinSubTags' ::
+  HashSet Tag ->
+  HashSet (Maybe (RecordKey Tag)) ->
+  HashSet Tag
 joinSubTags' supertags subtags =
   HS.filter (\(Just . tagId -> supertagId) -> HS.member supertagId subtags) supertags
 

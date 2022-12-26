@@ -56,6 +56,7 @@ module Text.TaggerQL.Expression.Interpreter (
   printer,
 ) where
 
+import Control.Monad ((<=<))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Reader (ReaderT, ask, local)
@@ -168,7 +169,7 @@ instance Functor AnnotatedSubExpression where
 data Interpreter m b a = Interpreter
   { interpretSubExpression :: SubInterpreter m b
   , interpretExpressionLeaf :: ExpressionLeaf -> m a
-  , interpretBinaryExpression :: SetOp -> a -> a -> m a
+  , interpretBinaryExpression :: BinaryExpression a -> m a
   , -- | An 'Expression` of the form: \"a{b}\".
     -- That computes the 'SubExpression` \"b\" after extending the computation context
     -- with \"a\".
@@ -208,7 +209,7 @@ runInterpreter
     BinaryExpressionValue (Identity (BinaryExpression lhs so rhs)) -> do
       l <- runInterpreter itr lhs
       r <- runInterpreter itr rhs
-      ibe so l r
+      ibe $ BinaryExpression l so r
     ExpressionSubContextValue (Identity (ExpressionSubContext tt se)) ->
       iesc tt $ runSubInterpreter sitr se
 
@@ -284,17 +285,18 @@ annotator (Interpreter (SubInterpreter sa sb sc) a b c) =
                 )
           }
     , interpretBinaryExpression =
-        \so
-         lhs@(expressionAnnotation -> lhsa)
-         rhs@(expressionAnnotation -> rhsa) -> do
-            r <- b so lhsa rhsa
-            return . AnnotatedExpression . BinaryExpressionValue $
-              ( r
-              , BinaryExpression
-                  (runAnnotatedExpression lhs)
-                  so
-                  (runAnnotatedExpression rhs)
-              )
+        \bin@(BinaryExpression lhs so rhs) -> do
+          ( return
+              . AnnotatedExpression
+              . BinaryExpressionValue
+              . (,BinaryExpression
+                    (runAnnotatedExpression lhs)
+                    so
+                    (runAnnotatedExpression rhs))
+              <=< b
+                . fmap expressionAnnotation
+            )
+            bin
     , interpretExpressionLeaf = \leaf ->
         fmap (AnnotatedExpression . ExpressionLeaf . (,leaf)) $ a leaf
     , interpretExpressionSubContext = \tt ase -> do
@@ -350,7 +352,7 @@ queryer =
                     DescriptorTerm txt -> flatQueryForFileByTagDescriptorPattern txt
                     MetaDescriptorTerm txt -> flatQueryForFileOnMetaRelationPattern txt
                 )
-    , interpretBinaryExpression = \so lhs rhs ->
+    , interpretBinaryExpression = \(BinaryExpression lhs so rhs) ->
         pure $
           ( case so of
               Union -> HS.union
@@ -381,7 +383,7 @@ counter =
           , interpretSubTag = \_ -> get <* modify (1 +)
           }
     , interpretExpressionLeaf = \_ -> get <* modify (1 +)
-    , interpretBinaryExpression = \_ _ _ -> get <* modify (1 +)
+    , interpretBinaryExpression = \_ -> get <* modify (1 +)
     , interpretExpressionSubContext = \_ sc -> get <* modify (1 +) <* sc
     }
 
@@ -421,7 +423,7 @@ printer =
               Identity . (,False) $ formatTT tt <> " {" <> se <> "}"
           , interpretSubTag = Identity . (,False) . formatTT
           }
-    , interpretBinaryExpression = \so (lhs, _) (rhs, n) ->
+    , interpretBinaryExpression = \(BinaryExpression (lhs, _) so (rhs, n)) ->
         Identity . (,True) $
           lhs
             <> ( case so of
