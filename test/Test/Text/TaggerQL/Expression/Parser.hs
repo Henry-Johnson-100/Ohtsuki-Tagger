@@ -241,7 +241,7 @@ parserTests =
                                             TagTermExtension
                                                 (MetaDescriptorTerm "b")
                                                 ( SubBinary . Identity $
-                                                    BinarySubExpression
+                                                    BinaryExpression
                                                         (SubTag . Identity $ MetaDescriptorTerm "c")
                                                         Intersect
                                                         (SubTag . Identity $ MetaDescriptorTerm "d")
@@ -348,7 +348,7 @@ parserTests =
                                 ""
                                 ( Right
                                     ( SubBinary . Identity $
-                                        BinarySubExpression
+                                        BinaryExpression
                                             (SubTag . Identity $ MetaDescriptorTerm "a")
                                             Intersect
                                             (SubTag . Identity $ MetaDescriptorTerm "b")
@@ -362,7 +362,7 @@ parserTests =
                                 ""
                                 ( Right
                                     ( SubBinary . Identity $
-                                        BinarySubExpression
+                                        BinaryExpression
                                             (SubTag . Identity $ MetaDescriptorTerm "a")
                                             Union
                                             (SubTag . Identity $ MetaDescriptorTerm "b")
@@ -376,9 +376,9 @@ parserTests =
                                 ""
                                 ( Right
                                     ( SubBinary . Identity $
-                                        BinarySubExpression
+                                        BinaryExpression
                                             ( SubBinary . Identity $
-                                                BinarySubExpression
+                                                BinaryExpression
                                                     (SubTag . Identity $ MetaDescriptorTerm "a")
                                                     Intersect
                                                     (SubTag . Identity $ MetaDescriptorTerm "b")
@@ -395,11 +395,11 @@ parserTests =
                                 ""
                                 ( Right
                                     ( SubBinary . Identity $
-                                        BinarySubExpression
+                                        BinaryExpression
                                             ( SubBinary . Identity $
-                                                BinarySubExpression
+                                                BinaryExpression
                                                     ( SubBinary . Identity $
-                                                        BinarySubExpression
+                                                        BinaryExpression
                                                             (SubTag . Identity $ MetaDescriptorTerm "a")
                                                             Union
                                                             (SubTag . Identity $ MetaDescriptorTerm "b")
@@ -419,16 +419,16 @@ parserTests =
                                 ""
                                 ( Right
                                     ( SubBinary . Identity $
-                                        BinarySubExpression
+                                        BinaryExpression
                                             ( SubBinary . Identity $
-                                                BinarySubExpression
+                                                BinaryExpression
                                                     (SubTag . Identity $ MetaDescriptorTerm "a")
                                                     Union
                                                     (SubTag . Identity $ MetaDescriptorTerm "b")
                                             )
                                             Intersect
                                             ( SubBinary . Identity $
-                                                BinarySubExpression
+                                                BinaryExpression
                                                     (SubTag . Identity $ MetaDescriptorTerm "c")
                                                     Difference
                                                     (SubTag . Identity $ MetaDescriptorTerm "d")
@@ -443,7 +443,7 @@ parserTests =
                                 ""
                                 ( Right
                                     ( SubBinary . Identity $
-                                        BinarySubExpression
+                                        BinaryExpression
                                             ( SubExpression . Identity $
                                                 SubExpressionExtension
                                                     (MetaDescriptorTerm "a")
@@ -454,7 +454,7 @@ parserTests =
                                                 SubExpressionExtension
                                                     (MetaDescriptorTerm "c")
                                                     ( SubBinary . Identity $
-                                                        BinarySubExpression
+                                                        BinaryExpression
                                                             (SubTag . Identity $ MetaDescriptorTerm "d")
                                                             Intersect
                                                             (SubTag . Identity $ MetaDescriptorTerm "e")
@@ -471,7 +471,7 @@ parserTests =
                             ""
                             ( Right
                                 ( SubBinary . Identity $
-                                    BinarySubExpression
+                                    BinaryExpression
                                         (SubTag . Identity $ MetaDescriptorTerm "a")
                                         Intersect
                                         (SubTag . Identity $ MetaDescriptorTerm "b")
@@ -487,7 +487,7 @@ parserTests =
                                 ""
                                 ( Right
                                     ( SubBinary . Identity $
-                                        BinarySubExpression
+                                        BinaryExpression
                                             (SubTag . Identity $ MetaDescriptorTerm "a")
                                             Intersect
                                             (SubTag . Identity $ MetaDescriptorTerm "b")
@@ -501,7 +501,7 @@ parserTests =
                                 ""
                                 ( Right
                                     ( SubBinary . Identity $
-                                        BinarySubExpression
+                                        BinaryExpression
                                             (SubTag . Identity $ MetaDescriptorTerm "a")
                                             Union
                                             (SubTag . Identity $ MetaDescriptorTerm "b")
@@ -515,16 +515,16 @@ parserTests =
                                 ""
                                 ( Right
                                     ( SubBinary . Identity $
-                                        BinarySubExpression
+                                        BinaryExpression
                                             ( SubBinary . Identity $
-                                                BinarySubExpression
+                                                BinaryExpression
                                                     (SubTag . Identity $ MetaDescriptorTerm "a")
                                                     Intersect
                                                     ( SubExpression . Identity $
                                                         SubExpressionExtension
                                                             (MetaDescriptorTerm "b")
                                                             ( SubBinary . Identity $
-                                                                BinarySubExpression
+                                                                BinaryExpression
                                                                     (SubTag . Identity $ MetaDescriptorTerm "c")
                                                                     Intersect
                                                                     (SubTag . Identity $ MetaDescriptorTerm "d")
@@ -543,16 +543,16 @@ parserTests =
                                 ""
                                 ( Right
                                     ( SubBinary . Identity $
-                                        BinarySubExpression
+                                        BinaryExpression
                                             ( SubBinary . Identity $
-                                                BinarySubExpression
+                                                BinaryExpression
                                                     (SubTag . Identity $ MetaDescriptorTerm "a")
                                                     Intersect
                                                     ( SubExpression . Identity $
                                                         SubExpressionExtension
                                                             (MetaDescriptorTerm "b")
                                                             ( SubBinary . Identity $
-                                                                BinarySubExpression
+                                                                BinaryExpression
                                                                     (SubTag . Identity $ MetaDescriptorTerm "c")
                                                                     Intersect
                                                                     (SubTag . Identity $ MetaDescriptorTerm "d")
@@ -571,16 +571,16 @@ parserTests =
                                 ""
                                 ( Right
                                     ( SubBinary . Identity $
-                                        BinarySubExpression
+                                        BinaryExpression
                                             ( SubBinary . Identity $
-                                                BinarySubExpression
+                                                BinaryExpression
                                                     (SubTag . Identity $ MetaDescriptorTerm "a")
                                                     Intersect
                                                     ( SubExpression . Identity $
                                                         SubExpressionExtension
                                                             (MetaDescriptorTerm "b")
                                                             ( SubBinary . Identity $
-                                                                BinarySubExpression
+                                                                BinaryExpression
                                                                     (SubTag . Identity $ MetaDescriptorTerm "c")
                                                                     Intersect
                                                                     (SubTag . Identity $ MetaDescriptorTerm "d")
@@ -599,12 +599,12 @@ parserTests =
                                 ""
                                 ( Right
                                     ( SubBinary . Identity $
-                                        BinarySubExpression
+                                        BinaryExpression
                                             ( SubExpression . Identity $
                                                 SubExpressionExtension
                                                     (MetaDescriptorTerm "b")
                                                     ( SubBinary . Identity $
-                                                        BinarySubExpression
+                                                        BinaryExpression
                                                             (SubTag . Identity $ MetaDescriptorTerm "c")
                                                             Intersect
                                                             (SubTag . Identity $ MetaDescriptorTerm "d")
@@ -622,12 +622,12 @@ parserTests =
                                 ""
                                 ( Right
                                     ( SubBinary . Identity $
-                                        BinarySubExpression
+                                        BinaryExpression
                                             ( SubExpression . Identity $
                                                 SubExpressionExtension
                                                     (MetaDescriptorTerm "b")
                                                     ( SubBinary . Identity $
-                                                        BinarySubExpression
+                                                        BinaryExpression
                                                             (SubTag . Identity $ MetaDescriptorTerm "c")
                                                             Intersect
                                                             (SubTag . Identity $ MetaDescriptorTerm "d")

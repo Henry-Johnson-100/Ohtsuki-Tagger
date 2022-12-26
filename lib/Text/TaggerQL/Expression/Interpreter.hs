@@ -56,7 +56,6 @@ module Text.TaggerQL.Expression.Interpreter (
   printer,
 ) where
 
-import Control.Monad ((<=<))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Reader (ReaderT, ask, local)
@@ -116,7 +115,7 @@ data SubInterpreter m b = SubInterpreter
   , -- | A 'SubExpression` with the syntax: \"a{b}\"
     -- used to extend the context that a 'SubInterpreter` is computing in.
     interpretSubExpressionExtension :: TagTerm -> m b -> m b
-  , interpretBinarySubExpression :: SetOp -> b -> b -> m b
+  , interpretBinarySubExpression :: BinaryExpression b -> m b
   }
 
 {- |
@@ -151,10 +150,10 @@ runSubInterpreter ::
 runSubInterpreter sitr@(SubInterpreter ist isee ibss) (subExpressionIdentity -> se) =
   case se of
     SubTag (Identity tt) -> ist tt
-    SubBinary (Identity (BinarySubExpression lhs so rhs)) -> do
+    SubBinary (Identity (BinaryExpression lhs so rhs)) -> do
       l <- runSubInterpreter sitr lhs
       r <- runSubInterpreter sitr rhs
-      ibss so l r
+      ibss $ BinaryExpression l so r
     SubExpression (Identity (SubExpressionExtension tt se')) ->
       isee tt $ runSubInterpreter sitr se'
 
@@ -190,21 +189,15 @@ annotator (Interpreter (SubInterpreter sa sb sc) a b c) =
           { interpretSubTag = \tt ->
               fmap (AnnotatedSubExpression . SubTag . (,tt)) $
                 sa tt
-          , interpretBinarySubExpression =
-              \so
-               lhs@(subExpressionAnnotation -> lhsa)
-               rhs@(subExpressionAnnotation -> rhsa) -> do
-                  r <- sc so lhsa rhsa
-                  return
-                    ( AnnotatedSubExpression $
-                        SubBinary
-                          ( r
-                          , BinarySubExpression
-                              (runAnnotatedSubExpression lhs)
-                              so
-                              (runAnnotatedSubExpression rhs)
-                          )
-                    )
+          , interpretBinarySubExpression = \bin@(BinaryExpression lhs so rhs) -> do
+              r <- sc . fmap subExpressionAnnotation $ bin
+              return . AnnotatedSubExpression . SubBinary $
+                ( r
+                , BinaryExpression
+                    (runAnnotatedSubExpression lhs)
+                    so
+                    (runAnnotatedSubExpression rhs)
+                )
           , interpretSubExpressionExtension = \tt ase -> do
               r <- sb tt . fmap subExpressionAnnotation $ ase
               aser <- fmap runAnnotatedSubExpression ase
@@ -216,17 +209,14 @@ annotator (Interpreter (SubInterpreter sa sb sc) a b c) =
           }
     , interpretBinaryExpression =
         \bin@(BinaryExpression lhs so rhs) -> do
-          ( return
-              . AnnotatedExpression
-              . BinaryExpressionValue
-              . (,BinaryExpression
-                    (runAnnotatedExpression lhs)
-                    so
-                    (runAnnotatedExpression rhs))
-              <=< b
-                . fmap expressionAnnotation
+          r <- b . fmap expressionAnnotation $ bin
+          return . AnnotatedExpression . BinaryExpressionValue $
+            ( r
+            , BinaryExpression
+                (runAnnotatedExpression lhs)
+                so
+                (runAnnotatedExpression rhs)
             )
-            bin
     , interpretExpressionLeaf = \leaf ->
         fmap (AnnotatedExpression . ExpressionLeaf . (,leaf)) $ a leaf
     , interpretExpressionSubContext = \tte@(TagTermExtension tt se) -> do
@@ -256,7 +246,7 @@ queryer =
               supertags <- ask
               subtags <- liftIO . fmap (HS.fromList . map tagSubtagOfId) $ queryTags tt c
               return $ joinSubTags' supertags subtags
-          , interpretBinarySubExpression = \so lhs rhs -> do
+          , interpretBinarySubExpression = \(BinaryExpression lhs so rhs) -> do
               pure $
                 ( case so of
                     Union -> HS.union
@@ -309,7 +299,7 @@ counter =
   Interpreter
     { interpretSubExpression =
         SubInterpreter
-          { interpretBinarySubExpression = \_ _ _ -> get <* modify (1 +)
+          { interpretBinarySubExpression = \_ -> get <* modify (1 +)
           , interpretSubExpressionExtension = \_ se -> get <* modify (1 +) <* se
           , interpretSubTag = \_ -> get <* modify (1 +)
           }
@@ -342,7 +332,7 @@ printer =
   Interpreter
     { interpretSubExpression =
         SubInterpreter
-          { interpretBinarySubExpression = \so (lhs, _) (rhs, n) ->
+          { interpretBinarySubExpression = \(BinaryExpression (lhs, _) so (rhs, n)) ->
               Identity . (,True) $
                 lhs
                   <> ( case so of

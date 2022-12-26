@@ -54,17 +54,7 @@ import Text.Parsec (
   try,
   (<|>),
  )
-import Text.TaggerQL.Expression.AST (
-  BinaryExpression (BinaryExpression),
-  BinarySubExpression (BinarySubExpression),
-  Expression (..),
-  ExpressionLeaf (FileTermValue, TagTermValue),
-  FileTerm (..),
-  SubExpression (..),
-  SubExpressionExtension (SubExpressionExtension),
-  TagTerm (..),
-  TagTermExtension (..),
- )
+import Text.TaggerQL.Expression.AST
 
 type Parser a = Parsec Text () a
 
@@ -137,7 +127,7 @@ subExpressionParser =
     *> ( try
           ( myChainl1
               lhsSubExpressionParser
-              ( (\so lhs rhs -> SubBinary . Identity $ BinarySubExpression lhs so rhs)
+              ( (\so lhs rhs -> SubBinary . Identity $ BinaryExpression lhs so rhs)
                   <$> (spaces *> setOpParser)
               )
               pure

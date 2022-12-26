@@ -110,7 +110,7 @@ insertSubExpr se supertags =
         SubExpression (Identity (SubExpressionExtension tt se')) -> do
           insertedSubtags <- insertSubExpr (SubTag . Identity $ tt) supertags
           insertSubExpr se' (Just insertedSubtags)
-        SubBinary (Identity (BinarySubExpression se' _ se2)) -> do
+        SubBinary (Identity (BinaryExpression se' _ se2)) -> do
           void $ insertSubExpr se' supertags
           void $ insertSubExpr se2 supertags
           -- tags inserted by a SubBinary is indeterminate and empty by default

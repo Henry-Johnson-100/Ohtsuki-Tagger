@@ -261,7 +261,7 @@ basicQueryFunctionality c =
                           TagTermExtension
                             (DescriptorTerm "descriptor_17")
                             ( SubBinary . Identity $
-                                BinarySubExpression
+                                BinaryExpression
                                   (SubTag . Identity $ DescriptorTerm "descriptor_18")
                                   Union
                                   (SubTag . Identity $ DescriptorTerm "descriptor_19")
@@ -285,7 +285,7 @@ basicQueryFunctionality c =
                           TagTermExtension
                             (DescriptorTerm "descriptor_17")
                             ( SubBinary . Identity $
-                                BinarySubExpression
+                                BinaryExpression
                                   (SubTag . Identity $ DescriptorTerm "descriptor_18")
                                   Intersect
                                   (SubTag . Identity $ DescriptorTerm "descriptor_19")
@@ -305,7 +305,7 @@ basicQueryFunctionality c =
                           TagTermExtension
                             (DescriptorTerm "descriptor_17")
                             ( SubBinary . Identity $
-                                BinarySubExpression
+                                BinaryExpression
                                   (SubTag . Identity $ DescriptorTerm "descriptor_18")
                                   Difference
                                   (SubTag . Identity $ DescriptorTerm "descriptor_19")
@@ -331,7 +331,7 @@ basicQueryFunctionality c =
                       TagTermExtension
                         (DescriptorTerm "%")
                         ( SubBinary . Identity $
-                            BinarySubExpression
+                            BinaryExpression
                               (SubTag . Identity $ DescriptorTerm "descriptor_20")
                               Difference
                               (SubTag . Identity $ DescriptorTerm "descriptor_18")
@@ -420,7 +420,7 @@ queryEdgeCases c =
                       TagTermExtension
                         (MetaDescriptorTerm "descriptor_12")
                         ( SubBinary . Identity $
-                            BinarySubExpression
+                            BinaryExpression
                               (SubTag . Identity $ DescriptorTerm "descriptor_15")
                               Intersect
                               (SubTag . Identity $ DescriptorTerm "descriptor_16")
@@ -460,7 +460,7 @@ queryEdgeCases c =
                       TagTermExtension
                         (DescriptorTerm "descriptor_13")
                         ( SubBinary . Identity $
-                            BinarySubExpression
+                            BinaryExpression
                               (SubTag . Identity $ DescriptorTerm "descriptor_15")
                               Intersect
                               (SubTag . Identity $ DescriptorTerm "descriptor_16")
@@ -483,7 +483,7 @@ taggingEngineTests c =
                 SubExpressionExtension
                   (td 21)
                   ( SubBinary . Identity $
-                      BinarySubExpression
+                      BinaryExpression
                         (SubTag . Identity $ td 22)
                         Intersect
                         (SubTag . Identity $ td 23)
@@ -512,12 +512,12 @@ taggingEngineTests c =
                   SubExpressionExtension
                     (td 21)
                     ( SubBinary . Identity $
-                        BinarySubExpression
+                        BinaryExpression
                           ( SubExpression . Identity $
                               SubExpressionExtension
                                 (td 22)
                                 ( SubBinary . Identity $
-                                    BinarySubExpression
+                                    BinaryExpression
                                       (SubTag . Identity $ td 24)
                                       Intersect
                                       (SubTag . Identity $ td 25)
@@ -552,12 +552,12 @@ taggingEngineTests c =
                   SubExpressionExtension
                     (td 26)
                     ( SubBinary . Identity $
-                        BinarySubExpression
+                        BinaryExpression
                           ( SubExpression . Identity $
                               SubExpressionExtension
                                 (td 27)
                                 ( SubBinary . Identity $
-                                    BinarySubExpression
+                                    BinaryExpression
                                       ( SubExpression . Identity $
                                           SubExpressionExtension
                                             (td 28)
@@ -593,9 +593,9 @@ taggingEngineTests c =
     , after AllSucceed "Tagging Engine - 2" . testCase "Tagging Engine - 3" $ do
         let se =
               SubBinary . Identity $
-                BinarySubExpression
+                BinaryExpression
                   ( SubBinary . Identity $
-                      BinarySubExpression
+                      BinaryExpression
                         (SubTag . Identity $ td 32)
                         Intersect
                         (SubTag . Identity $ td 33)

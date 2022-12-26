@@ -72,7 +72,7 @@ evalSubExpression subExpr supertags = case subExpr of
   Therefore, the SubBinary case does not need a final intersection of its
   product with supertags, because both operands are subsets of the supertag set.
   -}
-  SubBinary (Identity (BinarySubExpression se so se')) ->
+  SubBinary (Identity (BinaryExpression se so se')) ->
     ( evalSubExpression se supertags
         <&> ( case so of
                 Union -> HS.union

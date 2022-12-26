@@ -23,14 +23,13 @@ module Text.TaggerQL.Expression.AST (
   -- ** Expressions
   Expression (..),
   ExpressionLeaf (..),
-  BinaryExpression (..),
 
   -- ** SubExpressions
   SubExpression (..),
-  BinarySubExpression (..),
   SubExpressionExtension (..),
 
   -- ** Primitives
+  BinaryExpression (..),
   TagTermExtension (..),
   TagTerm (..),
   FileTerm (..),
@@ -93,6 +92,9 @@ data ExpressionLeaf
 data BinaryExpression a = BinaryExpression a SetOp a
   deriving (Show, Eq, Functor)
 
+{- |
+ A type that can be modified or extended by a 'TagTerm`
+-}
 data TagTermExtension a = TagTermExtension TagTerm a deriving (Show, Eq, Functor)
 
 {- |
@@ -108,7 +110,7 @@ data TagTermExtension a = TagTermExtension TagTerm a deriving (Show, Eq, Functor
 data SubExpression k
   = -- | A search term for a set of 'Tag` that are subtags in the current environment.
     SubTag (k TagTerm)
-  | SubBinary (k (BinarySubExpression k))
+  | SubBinary (k (BinaryExpression (SubExpression k)))
   | -- | Extends the current 'Tag` environment through the given 'TagTerm`
     -- to define a more constrained set with the given 'SubExpression`.
     SubExpression (k (SubExpressionExtension k))
@@ -120,16 +122,6 @@ deriving instance Eq (SubExpression Identity)
 deriving instance Show a => Show (SubExpression ((,) a))
 
 deriving instance Eq a => Eq (SubExpression ((,) a))
-
-data BinarySubExpression k = BinarySubExpression (SubExpression k) SetOp (SubExpression k)
-
-deriving instance Show (BinarySubExpression Identity)
-
-deriving instance Eq (BinarySubExpression Identity)
-
-deriving instance Show a => Show (BinarySubExpression ((,) a))
-
-deriving instance Eq a => Eq (BinarySubExpression ((,) a))
 
 {- |
  Extends the current 'SubExpression` with the given 'TagTerm`
@@ -179,9 +171,9 @@ instance IdentityKind ((,) a) where
 subExpressionIdentity :: IdentityKind k => SubExpression k -> SubExpression Identity
 subExpressionIdentity se = case se of
   SubTag (identityKind -> k) -> SubTag k
-  SubBinary (identityKind -> Identity (BinarySubExpression lhs so rhs)) ->
+  SubBinary (identityKind -> Identity (BinaryExpression lhs so rhs)) ->
     SubBinary . Identity $
-      BinarySubExpression (subExpressionIdentity lhs) so (subExpressionIdentity rhs)
+      BinaryExpression (subExpressionIdentity lhs) so (subExpressionIdentity rhs)
   SubExpression (identityKind -> Identity (SubExpressionExtension tt se')) ->
     SubExpression . Identity $ SubExpressionExtension tt (subExpressionIdentity se')
 
