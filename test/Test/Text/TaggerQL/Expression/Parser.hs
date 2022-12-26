@@ -115,8 +115,8 @@ parserTests =
                 ( assertEqual
                     ""
                     ( Right
-                        ( ExpressionSubContextValue . Identity $
-                            ExpressionSubContext
+                        ( ExpressionTagTermExtension . Identity $
+                            TagTermExtension
                                 (MetaDescriptorTerm "a")
                                 (SubTag . Identity $ MetaDescriptorTerm "b")
                         )
@@ -205,8 +205,8 @@ parserTests =
                                                 BinaryExpression
                                                     (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "a")
                                                     Intersect
-                                                    ( ExpressionSubContextValue . Identity $
-                                                        ExpressionSubContext
+                                                    ( ExpressionTagTermExtension . Identity $
+                                                        TagTermExtension
                                                             (MetaDescriptorTerm "b")
                                                             (SubTag . Identity $ MetaDescriptorTerm "c")
                                                     )
@@ -237,8 +237,8 @@ parserTests =
                                     BinaryExpression
                                         (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "a")
                                         Intersect
-                                        ( ExpressionSubContextValue . Identity $
-                                            ExpressionSubContext
+                                        ( ExpressionTagTermExtension . Identity $
+                                            TagTermExtension
                                                 (MetaDescriptorTerm "b")
                                                 ( SubBinary . Identity $
                                                     BinarySubExpression

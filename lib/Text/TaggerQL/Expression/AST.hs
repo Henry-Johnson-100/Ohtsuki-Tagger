@@ -24,7 +24,6 @@ module Text.TaggerQL.Expression.AST (
   Expression (..),
   ExpressionLeaf (..),
   BinaryExpression (..),
-  ExpressionSubContext (..),
 
   -- ** SubExpressions
   SubExpression (..),
@@ -32,6 +31,7 @@ module Text.TaggerQL.Expression.AST (
   SubExpressionExtension (..),
 
   -- ** Primitives
+  TagTermExtension (..),
   TagTerm (..),
   FileTerm (..),
 
@@ -60,7 +60,7 @@ import Data.Text (Text)
 data Expression t k
   = ExpressionLeaf (t ExpressionLeaf)
   | BinaryExpressionValue (t (BinaryExpression (Expression t k)))
-  | ExpressionSubContextValue (t (ExpressionSubContext k))
+  | ExpressionTagTermExtension (t (TagTermExtension (SubExpression k)))
 
 deriving instance Show (Expression Identity Identity)
 
@@ -93,18 +93,7 @@ data ExpressionLeaf
 data BinaryExpression a = BinaryExpression a SetOp a
   deriving (Show, Eq, Functor)
 
-{- |
- Expression leaf for entering into a 'SubExpression` from an 'Expression`
--}
-data ExpressionSubContext k = ExpressionSubContext TagTerm (SubExpression k)
-
-deriving instance Show (ExpressionSubContext Identity)
-
-deriving instance Eq (ExpressionSubContext Identity)
-
-deriving instance Show a => Show (ExpressionSubContext ((,) a))
-
-deriving instance Eq a => Eq (ExpressionSubContext ((,) a))
+data TagTermExtension a = TagTermExtension TagTerm a deriving (Show, Eq, Functor)
 
 {- |
  A 'SubExpression` is a structure that defines a set of 'Tag` that is some
@@ -205,6 +194,6 @@ expressionIdentity expr = case expr of
   BinaryExpressionValue (identityKind -> (Identity (BinaryExpression lhs so rhs))) ->
     BinaryExpressionValue . Identity $
       BinaryExpression (expressionIdentity lhs) so (expressionIdentity rhs)
-  ExpressionSubContextValue (identityKind -> (Identity (ExpressionSubContext x y))) ->
-    ExpressionSubContextValue . Identity $
-      ExpressionSubContext x (subExpressionIdentity y)
+  ExpressionTagTermExtension (identityKind -> (Identity (TagTermExtension x y))) ->
+    ExpressionTagTermExtension . Identity $
+      TagTermExtension x (subExpressionIdentity y)

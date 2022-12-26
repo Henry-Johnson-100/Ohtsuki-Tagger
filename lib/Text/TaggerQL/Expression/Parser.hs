@@ -59,11 +59,11 @@ import Text.TaggerQL.Expression.AST (
   BinarySubExpression (BinarySubExpression),
   Expression (..),
   ExpressionLeaf (FileTermValue, TagTermValue),
-  ExpressionSubContext (ExpressionSubContext),
   FileTerm (..),
   SubExpression (..),
   SubExpressionExtension (SubExpressionExtension),
   TagTerm (..),
+  TagTermExtension (..),
  )
 
 type Parser a = Parsec Text () a
@@ -118,9 +118,9 @@ expressionParser =
       between (char '(') (spaces *> char ')') expressionParser
     tagExpressionLookAhead =
       ( \subExpr tt ->
-          ExpressionSubContextValue
+          ExpressionTagTermExtension
             . Identity
-            . ExpressionSubContext tt
+            . TagTermExtension tt
             $ subExpr
       )
         <$> between

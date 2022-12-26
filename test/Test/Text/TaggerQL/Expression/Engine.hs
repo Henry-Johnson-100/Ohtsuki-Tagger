@@ -161,8 +161,8 @@ basicQueryFunctionality c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionSubContextValue . Identity $
-                      ExpressionSubContext
+                  ( ExpressionTagTermExtension . Identity $
+                      TagTermExtension
                         (DescriptorTerm "descriptor_5")
                         (SubTag . Identity $ DescriptorTerm "descriptor_6")
                   )
@@ -174,8 +174,8 @@ basicQueryFunctionality c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionSubContextValue . Identity $
-                      ExpressionSubContext
+                  ( ExpressionTagTermExtension . Identity $
+                      TagTermExtension
                         (DescriptorTerm "descriptor_6")
                         (SubTag . Identity $ DescriptorTerm "descriptor_7")
                   )
@@ -187,8 +187,8 @@ basicQueryFunctionality c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionSubContextValue . Identity $
-                      ExpressionSubContext
+                  ( ExpressionTagTermExtension . Identity $
+                      TagTermExtension
                         (DescriptorTerm "descriptor_17")
                         ( SubExpression . Identity $
                             SubExpressionExtension
@@ -204,8 +204,8 @@ basicQueryFunctionality c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionSubContextValue . Identity $
-                      ExpressionSubContext
+                  ( ExpressionTagTermExtension . Identity $
+                      TagTermExtension
                         (DescriptorTerm "descriptor_17")
                         (SubTag . Identity $ DescriptorTerm "descriptor_18")
                   )
@@ -257,8 +257,8 @@ basicQueryFunctionality c =
                 r <-
                   c
                     >>= runExpr
-                      ( ExpressionSubContextValue . Identity $
-                          ExpressionSubContext
+                      ( ExpressionTagTermExtension . Identity $
+                          TagTermExtension
                             (DescriptorTerm "descriptor_17")
                             ( SubBinary . Identity $
                                 BinarySubExpression
@@ -281,8 +281,8 @@ basicQueryFunctionality c =
                 r <-
                   c
                     >>= runExpr
-                      ( ExpressionSubContextValue . Identity $
-                          ExpressionSubContext
+                      ( ExpressionTagTermExtension . Identity $
+                          TagTermExtension
                             (DescriptorTerm "descriptor_17")
                             ( SubBinary . Identity $
                                 BinarySubExpression
@@ -301,8 +301,8 @@ basicQueryFunctionality c =
                 r <-
                   c
                     >>= runExpr
-                      ( ExpressionSubContextValue . Identity $
-                          ExpressionSubContext
+                      ( ExpressionTagTermExtension . Identity $
+                          TagTermExtension
                             (DescriptorTerm "descriptor_17")
                             ( SubBinary . Identity $
                                 BinarySubExpression
@@ -327,8 +327,8 @@ basicQueryFunctionality c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionSubContextValue . Identity $
-                      ExpressionSubContext
+                  ( ExpressionTagTermExtension . Identity $
+                      TagTermExtension
                         (DescriptorTerm "%")
                         ( SubBinary . Identity $
                             BinarySubExpression
@@ -357,8 +357,8 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionSubContextValue . Identity $
-                      ExpressionSubContext
+                  ( ExpressionTagTermExtension . Identity $
+                      TagTermExtension
                         (DescriptorTerm "descriptor_8")
                         ( SubExpression . Identity $
                             SubExpressionExtension
@@ -374,8 +374,8 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionSubContextValue . Identity $
-                      ExpressionSubContext
+                  ( ExpressionTagTermExtension . Identity $
+                      TagTermExtension
                         (DescriptorTerm "descriptor_8")
                         (SubTag . Identity $ DescriptorTerm "descriptor_9")
                   )
@@ -387,8 +387,8 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionSubContextValue . Identity $
-                      ExpressionSubContext
+                  ( ExpressionTagTermExtension . Identity $
+                      TagTermExtension
                         (DescriptorTerm "descriptor_9")
                         (SubTag . Identity $ DescriptorTerm "descriptor_10")
                   )
@@ -400,8 +400,8 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionSubContextValue . Identity $
-                      ExpressionSubContext
+                  ( ExpressionTagTermExtension . Identity $
+                      TagTermExtension
                         (DescriptorTerm "descriptor_11")
                         (SubTag . Identity $ DescriptorTerm "descriptor_9")
                   )
@@ -416,8 +416,8 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionSubContextValue . Identity $
-                      ExpressionSubContext
+                  ( ExpressionTagTermExtension . Identity $
+                      TagTermExtension
                         (MetaDescriptorTerm "descriptor_12")
                         ( SubBinary . Identity $
                             BinarySubExpression
@@ -436,14 +436,14 @@ queryEdgeCases c =
                 >>= runExpr
                   ( BinaryExpressionValue . Identity $
                       BinaryExpression
-                        ( ExpressionSubContextValue . Identity $
-                            ExpressionSubContext
+                        ( ExpressionTagTermExtension . Identity $
+                            TagTermExtension
                               (MetaDescriptorTerm "descriptor_12")
                               (SubTag . Identity $ DescriptorTerm "descriptor_15")
                         )
                         Intersect
-                        ( ExpressionSubContextValue . Identity $
-                            ExpressionSubContext
+                        ( ExpressionTagTermExtension . Identity $
+                            TagTermExtension
                               (MetaDescriptorTerm "descriptor_12")
                               (SubTag . Identity $ DescriptorTerm "descriptor_16")
                         )
@@ -456,8 +456,8 @@ queryEdgeCases c =
             r <-
               c
                 >>= runExpr
-                  ( ExpressionSubContextValue . Identity $
-                      ExpressionSubContext
+                  ( ExpressionTagTermExtension . Identity $
+                      TagTermExtension
                         (DescriptorTerm "descriptor_13")
                         ( SubBinary . Identity $
                             BinarySubExpression
