@@ -191,7 +191,7 @@ basicQueryFunctionality c =
                       TagTermExtension
                         (DescriptorTerm "descriptor_17")
                         ( SubExpression . Identity $
-                            SubExpressionExtension
+                            TagTermExtension
                               (DescriptorTerm "descriptor_18")
                               (SubTag . Identity $ DescriptorTerm "descriptor_20")
                         )
@@ -361,7 +361,7 @@ queryEdgeCases c =
                       TagTermExtension
                         (DescriptorTerm "descriptor_8")
                         ( SubExpression . Identity $
-                            SubExpressionExtension
+                            TagTermExtension
                               (DescriptorTerm "descriptor_9")
                               (SubTag . Identity $ DescriptorTerm "descriptor_10")
                         )
@@ -480,7 +480,7 @@ taggingEngineTests c =
     [ testCase "Tagging Engine - 0" $ do
         let se =
               SubExpression . Identity $
-                SubExpressionExtension
+                TagTermExtension
                   (td 21)
                   ( SubBinary . Identity $
                       BinaryExpression
@@ -509,12 +509,12 @@ taggingEngineTests c =
         testCase "Tagging Engine - 1" $ do
           let se =
                 SubExpression . Identity $
-                  SubExpressionExtension
+                  TagTermExtension
                     (td 21)
                     ( SubBinary . Identity $
                         BinaryExpression
                           ( SubExpression . Identity $
-                              SubExpressionExtension
+                              TagTermExtension
                                 (td 22)
                                 ( SubBinary . Identity $
                                     BinaryExpression
@@ -549,17 +549,17 @@ taggingEngineTests c =
         testCase "Tagging Engine - 2" $ do
           let se =
                 SubExpression . Identity $
-                  SubExpressionExtension
+                  TagTermExtension
                     (td 26)
                     ( SubBinary . Identity $
                         BinaryExpression
                           ( SubExpression . Identity $
-                              SubExpressionExtension
+                              TagTermExtension
                                 (td 27)
                                 ( SubBinary . Identity $
                                     BinaryExpression
                                       ( SubExpression . Identity $
-                                          SubExpressionExtension
+                                          TagTermExtension
                                             (td 28)
                                             (SubTag . Identity $ td 29)
                                       )
@@ -621,7 +621,7 @@ taggingEngineTests c =
           f
     , after AllSucceed "Tagging Engine - 3" . testCase "Tagging Engine - 4" $ do
         let se =
-              SubExpression . Identity $ SubExpressionExtension (td 33) (SubTag . Identity $ td 32)
+              SubExpression . Identity $ TagTermExtension (td 33) (SubTag . Identity $ td 32)
             fk = 19
             expectedResults =
               [ Tag 55 19 32 Nothing

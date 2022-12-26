@@ -152,7 +152,7 @@ subExpressionParser =
         (spaces *> char ')')
         subExpressionParser
     subExpressionLookAheadParser =
-      (\y tt -> SubExpression . Identity $ SubExpressionExtension tt y)
+      (\y tt -> SubExpression . Identity $ TagTermExtension tt y)
         <$> between
           (try (spaces *> char '{'))
           (spaces *> char '}')

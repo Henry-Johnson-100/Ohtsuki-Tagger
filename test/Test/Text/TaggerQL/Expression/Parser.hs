@@ -316,7 +316,7 @@ parserTests =
                             ""
                             ( Right
                                 ( SubExpression . Identity $
-                                    SubExpressionExtension
+                                    TagTermExtension
                                         (MetaDescriptorTerm "a")
                                         (SubTag . Identity $ MetaDescriptorTerm "b")
                                 )
@@ -329,10 +329,10 @@ parserTests =
                             ""
                             ( Right
                                 ( SubExpression . Identity $
-                                    SubExpressionExtension
+                                    TagTermExtension
                                         (MetaDescriptorTerm "a")
                                         ( SubExpression . Identity $
-                                            SubExpressionExtension
+                                            TagTermExtension
                                                 (MetaDescriptorTerm "b")
                                                 (SubTag . Identity $ MetaDescriptorTerm "c")
                                         )
@@ -445,13 +445,13 @@ parserTests =
                                     ( SubBinary . Identity $
                                         BinaryExpression
                                             ( SubExpression . Identity $
-                                                SubExpressionExtension
+                                                TagTermExtension
                                                     (MetaDescriptorTerm "a")
                                                     (SubTag . Identity $ MetaDescriptorTerm "b")
                                             )
                                             Union
                                             ( SubExpression . Identity $
-                                                SubExpressionExtension
+                                                TagTermExtension
                                                     (MetaDescriptorTerm "c")
                                                     ( SubBinary . Identity $
                                                         BinaryExpression
@@ -521,7 +521,7 @@ parserTests =
                                                     (SubTag . Identity $ MetaDescriptorTerm "a")
                                                     Intersect
                                                     ( SubExpression . Identity $
-                                                        SubExpressionExtension
+                                                        TagTermExtension
                                                             (MetaDescriptorTerm "b")
                                                             ( SubBinary . Identity $
                                                                 BinaryExpression
@@ -549,7 +549,7 @@ parserTests =
                                                     (SubTag . Identity $ MetaDescriptorTerm "a")
                                                     Intersect
                                                     ( SubExpression . Identity $
-                                                        SubExpressionExtension
+                                                        TagTermExtension
                                                             (MetaDescriptorTerm "b")
                                                             ( SubBinary . Identity $
                                                                 BinaryExpression
@@ -577,7 +577,7 @@ parserTests =
                                                     (SubTag . Identity $ MetaDescriptorTerm "a")
                                                     Intersect
                                                     ( SubExpression . Identity $
-                                                        SubExpressionExtension
+                                                        TagTermExtension
                                                             (MetaDescriptorTerm "b")
                                                             ( SubBinary . Identity $
                                                                 BinaryExpression
@@ -601,7 +601,7 @@ parserTests =
                                     ( SubBinary . Identity $
                                         BinaryExpression
                                             ( SubExpression . Identity $
-                                                SubExpressionExtension
+                                                TagTermExtension
                                                     (MetaDescriptorTerm "b")
                                                     ( SubBinary . Identity $
                                                         BinaryExpression
@@ -624,7 +624,7 @@ parserTests =
                                     ( SubBinary . Identity $
                                         BinaryExpression
                                             ( SubExpression . Identity $
-                                                SubExpressionExtension
+                                                TagTermExtension
                                                     (MetaDescriptorTerm "b")
                                                     ( SubBinary . Identity $
                                                         BinaryExpression

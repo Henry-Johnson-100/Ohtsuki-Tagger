@@ -59,7 +59,7 @@ evalSubExpression subExpr supertags = case subExpr of
     c <- ask
     subtags <- liftIO . fmap (HS.fromList . map tagSubtagOfId) $ queryTags tt c
     return $ joinSubtags subtags
-  SubExpression (Identity (SubExpressionExtension tt se)) -> do
+  SubExpression (Identity (TagTermExtension tt se)) -> do
     c <- ask
     nextTagEnv <- liftIO . fmap HS.fromList $ queryTags tt c
     subExprResult <- fmap (HS.map tagSubtagOfId) . evalSubExpression se $ nextTagEnv

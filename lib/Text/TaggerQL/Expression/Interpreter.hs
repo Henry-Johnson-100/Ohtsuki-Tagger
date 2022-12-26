@@ -114,7 +114,7 @@ data SubInterpreter m b = SubInterpreter
   { interpretSubTag :: TagTerm -> m b
   , -- | A 'SubExpression` with the syntax: \"a{b}\"
     -- used to extend the context that a 'SubInterpreter` is computing in.
-    interpretSubExpressionExtension :: TagTerm -> m b -> m b
+    interpretSubExpressionExtension :: TagTermExtension (m b) -> m b
   , interpretBinarySubExpression :: BinaryExpression b -> m b
   }
 
@@ -154,8 +154,7 @@ runSubInterpreter sitr@(SubInterpreter ist isee ibss) (subExpressionIdentity -> 
       l <- runSubInterpreter sitr lhs
       r <- runSubInterpreter sitr rhs
       ibss $ BinaryExpression l so r
-    SubExpression (Identity (SubExpressionExtension tt se')) ->
-      isee tt $ runSubInterpreter sitr se'
+    SubExpression (Identity tte) -> isee . fmap (runSubInterpreter sitr) $ tte
 
 {- |
  Retrieve the annotation from a given 'Expression`
@@ -198,14 +197,11 @@ annotator (Interpreter (SubInterpreter sa sb sc) a b c) =
                     so
                     (runAnnotatedSubExpression rhs)
                 )
-          , interpretSubExpressionExtension = \tt ase -> do
-              r <- sb tt . fmap subExpressionAnnotation $ ase
-              aser <- fmap runAnnotatedSubExpression ase
-              return
-                ( AnnotatedSubExpression $
-                    SubExpression
-                      (r, SubExpressionExtension tt aser)
-                )
+          , interpretSubExpressionExtension = \tte@(TagTermExtension tt se) -> do
+              r <- sb . fmap (fmap subExpressionAnnotation) $ tte
+              r' <- fmap runAnnotatedSubExpression se
+              return . AnnotatedSubExpression . SubExpression $
+                (r, TagTermExtension tt r')
           }
     , interpretBinaryExpression =
         \bin@(BinaryExpression lhs so rhs) -> do
@@ -255,7 +251,7 @@ queryer =
                 )
                   lhs
                   rhs
-          , interpretSubExpressionExtension = \tt se -> do
+          , interpretSubExpressionExtension = \(TagTermExtension tt se) -> do
               c <- lift ask
               supertags <- ask
               nextTagEnv <- liftIO . fmap HS.fromList $ queryTags tt c
@@ -300,7 +296,8 @@ counter =
     { interpretSubExpression =
         SubInterpreter
           { interpretBinarySubExpression = \_ -> get <* modify (1 +)
-          , interpretSubExpressionExtension = \_ se -> get <* modify (1 +) <* se
+          , interpretSubExpressionExtension = \(TagTermExtension _ se) ->
+              get <* modify (1 +) <* se
           , interpretSubTag = \_ -> get <* modify (1 +)
           }
     , interpretExpressionLeaf = \_ -> get <* modify (1 +)
@@ -341,7 +338,7 @@ printer =
                         Difference -> " ! "
                      )
                   <> (if n then (\t -> "(" <> t <> ")") else id) rhs
-          , interpretSubExpressionExtension = \tt (Identity (se, _)) ->
+          , interpretSubExpressionExtension = \(TagTermExtension tt (Identity (se, _))) ->
               Identity . (,False) $ formatTT tt <> " {" <> se <> "}"
           , interpretSubTag = Identity . (,False) . formatTT
           }

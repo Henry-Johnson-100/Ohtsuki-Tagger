@@ -26,7 +26,6 @@ module Text.TaggerQL.Expression.AST (
 
   -- ** SubExpressions
   SubExpression (..),
-  SubExpressionExtension (..),
 
   -- ** Primitives
   BinaryExpression (..),
@@ -113,7 +112,7 @@ data SubExpression k
   | SubBinary (k (BinaryExpression (SubExpression k)))
   | -- | Extends the current 'Tag` environment through the given 'TagTerm`
     -- to define a more constrained set with the given 'SubExpression`.
-    SubExpression (k (SubExpressionExtension k))
+    SubExpression (k (TagTermExtension (SubExpression k)))
 
 deriving instance Show (SubExpression Identity)
 
@@ -174,8 +173,8 @@ subExpressionIdentity se = case se of
   SubBinary (identityKind -> Identity (BinaryExpression lhs so rhs)) ->
     SubBinary . Identity $
       BinaryExpression (subExpressionIdentity lhs) so (subExpressionIdentity rhs)
-  SubExpression (identityKind -> Identity (SubExpressionExtension tt se')) ->
-    SubExpression . Identity $ SubExpressionExtension tt (subExpressionIdentity se')
+  SubExpression (identityKind -> Identity (TagTermExtension tt se')) ->
+    SubExpression . Identity $ TagTermExtension tt (subExpressionIdentity se')
 
 expressionIdentity ::
   (IdentityKind t, IdentityKind k) =>

@@ -107,7 +107,7 @@ insertSubExpr ::
 insertSubExpr se supertags =
   asks snd >>= \c ->
     ( case se of
-        SubExpression (Identity (SubExpressionExtension tt se')) -> do
+        SubExpression (Identity (TagTermExtension tt se')) -> do
           insertedSubtags <- insertSubExpr (SubTag . Identity $ tt) supertags
           insertSubExpr se' (Just insertedSubtags)
         SubBinary (Identity (BinaryExpression se' _ se2)) -> do
