@@ -123,19 +123,6 @@ deriving instance Show a => Show (SubExpression ((,) a))
 deriving instance Eq a => Eq (SubExpression ((,) a))
 
 {- |
- Extends the current 'SubExpression` with the given 'TagTerm`
--}
-data SubExpressionExtension k = SubExpressionExtension TagTerm (SubExpression k)
-
-deriving instance Show (SubExpressionExtension Identity)
-
-deriving instance Eq (SubExpressionExtension Identity)
-
-deriving instance Show a => Show (SubExpressionExtension ((,) a))
-
-deriving instance Eq a => Eq (SubExpressionExtension ((,) a))
-
-{- |
  Data structure representing search terms over the set of 'Descriptor`.
 -}
 data TagTerm
@@ -170,11 +157,10 @@ instance IdentityKind ((,) a) where
 subExpressionIdentity :: IdentityKind k => SubExpression k -> SubExpression Identity
 subExpressionIdentity se = case se of
   SubTag (identityKind -> k) -> SubTag k
-  SubBinary (identityKind -> Identity (BinaryExpression lhs so rhs)) ->
-    SubBinary . Identity $
-      BinaryExpression (subExpressionIdentity lhs) so (subExpressionIdentity rhs)
-  SubExpression (identityKind -> Identity (TagTermExtension tt se')) ->
-    SubExpression . Identity $ TagTermExtension tt (subExpressionIdentity se')
+  SubBinary (identityKind -> bin) ->
+    SubBinary . fmap (fmap subExpressionIdentity) $ bin
+  SubExpression (identityKind -> tte) ->
+    SubExpression . fmap (fmap subExpressionIdentity) $ tte
 
 expressionIdentity ::
   (IdentityKind t, IdentityKind k) =>
@@ -182,9 +168,8 @@ expressionIdentity ::
   Expression Identity Identity
 expressionIdentity expr = case expr of
   ExpressionLeaf (identityKind -> t) -> ExpressionLeaf t
-  BinaryExpressionValue (identityKind -> (Identity (BinaryExpression lhs so rhs))) ->
-    BinaryExpressionValue . Identity $
-      BinaryExpression (expressionIdentity lhs) so (expressionIdentity rhs)
+  BinaryExpressionValue (identityKind -> bin) ->
+    BinaryExpressionValue . fmap (fmap expressionIdentity) $ bin
   ExpressionTagTermExtension (identityKind -> (Identity (TagTermExtension x y))) ->
     ExpressionTagTermExtension . Identity $
       TagTermExtension x (subExpressionIdentity y)
