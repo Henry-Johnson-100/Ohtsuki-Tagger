@@ -52,29 +52,50 @@ module Text.TaggerQL.Expression.Interpreter (
 
   -- * Examples
   queryer,
+  tagger,
   indexer,
   printer,
 ) where
 
+import Control.Monad (void)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Reader (ReaderT, ask, local)
+import Control.Monad.Trans.Reader (ReaderT, ask, asks, local)
 import Control.Monad.Trans.State.Strict (State, get, modify)
 import Data.Functor.Identity (Identity (..))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Ix (Ix)
+import qualified Data.List as L
+import Data.Maybe (fromJust)
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import Database.Tagger (
+  Descriptor (..),
   File,
+  RecordKey (..),
   Tag (..),
   TaggedConnection,
   flatQueryForFileByTagDescriptorPattern,
   flatQueryForFileOnMetaRelationPattern,
+  insertTags,
+  queryForDescriptorByPattern,
   queryForFileByPattern,
+  queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf,
+  queryForTagBySubTagTriple,
  )
-import Text.TaggerQL.Expression.AST
+import Text.TaggerQL.Expression.AST (
+  BinaryExpression (..),
+  Expression (..),
+  ExpressionLeaf (..),
+  FileTerm (FileTerm),
+  IdentityKind,
+  SubExpression (..),
+  TagTerm (..),
+  TagTermExtension (..),
+  expressionIdentity,
+  subExpressionIdentity,
+ )
 import Text.TaggerQL.Expression.Interpreter.Internal (
   joinSubTags',
   queryTags,
@@ -284,6 +305,67 @@ queryer =
         result <- local (const supertags) se
         liftIO . flip toFileSet c $ result
     }
+
+{- |
+ A 'SubInterpreter` that tags a given file with the tags defined by the given
+ 'SubExpression`
+ as subtags of the given list of 'Tag` Id's if present.
+-}
+tagger ::
+  SubInterpreter
+    ( ReaderT (RecordKey File, Maybe [RecordKey Tag], TaggedConnection) IO
+    )
+    [RecordKey Tag]
+tagger =
+  SubInterpreter
+    { -- Tags inserted by a BinaryExpression are indeterminate and empty by default.
+      interpretBinarySubExpression = const . pure $ []
+    , interpretSubExpressionExtension =
+        \( TagTermExtension
+            (SubTag . Identity -> st)
+            se
+          ) -> do
+            insertedSubtags <- runSubInterpreter tagger st
+            local (\(x, _, z) -> (x, Just insertedSubtags, z)) se
+    , interpretSubTag = \tt -> do
+        (fk, supertags, c) <- ask
+        let txt = termTxt tt
+        withDescriptors <- qDescriptor txt
+        let tagTriples =
+              (fk,,) <$> (descriptorId <$> withDescriptors)
+                <*> maybe [Nothing] (fmap Just) supertags
+        void . liftIO . insertTags tagTriples $ c
+        -- Tag insertion may fail because some tags of the same form already exist.
+        -- This query gets all of those pre-existing tags,
+        -- and returns them as if they were just made.
+        case supertags of
+          -- If nothing, then these are top-level tags
+          Nothing ->
+            map tagId
+              <$> liftIO
+                ( queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf
+                    fk
+                    txt
+                    c
+                )
+          -- If just, these are subtags of existing tags.
+          Just _ ->
+            map tagId . unions
+              <$> liftIO
+                ( mapM
+                    (`queryForTagBySubTagTriple` c)
+                    (third fromJust <$> tagTriples)
+                )
+    }
+ where
+  termTxt tt =
+    case tt of
+      DescriptorTerm txt -> txt
+      MetaDescriptorTerm txt -> txt
+  qDescriptor txt = asks (\(_, _, c) -> c) >>= liftIO . queryForDescriptorByPattern txt
+  unions :: (Foldable t, Eq a) => t [a] -> [a]
+  unions xs = if null xs then [] else L.foldl' L.union [] xs
+  third f (x, y, z) = (x, y, f z)
 
 {- |
  Count the total number of expressions and subExpressions.
