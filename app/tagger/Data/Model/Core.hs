@@ -32,7 +32,7 @@ module Data.Model.Core (
   QueryBuilderModel (..),
 ) where
 
-import Data.Functor.Identity (Identity)
+import Data.Functor.Identity (Identity (..))
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import Data.HashSet (HashSet)
@@ -48,7 +48,7 @@ import qualified Data.Sequence as Seq
 import Data.Tagger
 import Data.Text (Text)
 import Database.Tagger.Type
-import Text.TaggerQL.Expression.AST (Expression, universe)
+import Text.TaggerQL.Expression.AST
 
 data TaggerModel = TaggerModel
   { _taggermodelDescriptorTreeModel :: DescriptorTreeModel
@@ -300,7 +300,7 @@ defaultFileDetailAndDescriptorTreePositioningModel (PositioningModel ov oh _ _) 
 
 data QueryBuilderModel = QueryBuilderModel
   { _querybuilderInput :: TextInput
-  , _querybuilderExpression :: Expression Identity
+  , _querybuilderExpression :: Expression Identity Identity
   }
   deriving (Show, Eq)
 
@@ -308,5 +308,8 @@ createQueryBuilderModel :: QueryBuilderModel
 createQueryBuilderModel =
   QueryBuilderModel
     { _querybuilderInput = createTextInput 10
-    , _querybuilderExpression = universe
+    , _querybuilderExpression = fileUniverseExpression
     }
+
+fileUniverseExpression :: Expression Identity k
+fileUniverseExpression = ExpressionLeaf . Identity . FileTermValue . FileTerm $ "p.%"

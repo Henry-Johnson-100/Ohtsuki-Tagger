@@ -115,10 +115,10 @@ parserTests =
                 ( assertEqual
                     ""
                     ( Right
-                        ( ExpressionLeaf . Identity $
-                            TagExpressionValue
+                        ( ExpressionTagTermExtension . Identity $
+                            TagTermExtension
                                 (MetaDescriptorTerm "a")
-                                (SubTag (MetaDescriptorTerm "b"))
+                                (SubTag . Identity $ MetaDescriptorTerm "b")
                         )
                     )
                     (parseExpr "a{b}")
@@ -205,10 +205,10 @@ parserTests =
                                                 BinaryExpression
                                                     (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "a")
                                                     Intersect
-                                                    ( ExpressionLeaf . Identity $
-                                                        TagExpressionValue
+                                                    ( ExpressionTagTermExtension . Identity $
+                                                        TagTermExtension
                                                             (MetaDescriptorTerm "b")
-                                                            (SubTag (MetaDescriptorTerm "c"))
+                                                            (SubTag . Identity $ MetaDescriptorTerm "c")
                                                     )
                                             )
                                             Union
@@ -237,13 +237,14 @@ parserTests =
                                     BinaryExpression
                                         (ExpressionLeaf . Identity . TagTermValue $ MetaDescriptorTerm "a")
                                         Intersect
-                                        ( ExpressionLeaf . Identity $
-                                            TagExpressionValue
+                                        ( ExpressionTagTermExtension . Identity $
+                                            TagTermExtension
                                                 (MetaDescriptorTerm "b")
-                                                ( SubBinary
-                                                    (SubTag (MetaDescriptorTerm "c"))
-                                                    Intersect
-                                                    (SubTag (MetaDescriptorTerm "d"))
+                                                ( SubBinary . Identity $
+                                                    BinaryExpression
+                                                        (SubTag . Identity $ MetaDescriptorTerm "c")
+                                                        Intersect
+                                                        (SubTag . Identity $ MetaDescriptorTerm "d")
                                                 )
                                         )
                                 )
@@ -292,21 +293,21 @@ parserTests =
                         "Parse a single subtag"
                         ( assertEqual
                             ""
-                            (Right (SubTag (DescriptorTerm "hello")))
+                            (Right (SubTag . Identity $ DescriptorTerm "hello"))
                             (parseSE "d.hello")
                         )
                   , testCase
                         "Parse a single MetaDescriptor Term Subtag"
                         ( assertEqual
                             ""
-                            (Right (SubTag (MetaDescriptorTerm "hello")))
+                            (Right (SubTag . Identity $ MetaDescriptorTerm "hello"))
                             (parseSE "hello")
                         )
                   , testCase
                         "Parse a parenthesized subtag"
                         ( assertEqual
                             ""
-                            (Right (SubTag (MetaDescriptorTerm "hello")))
+                            (Right (SubTag . Identity $ MetaDescriptorTerm "hello"))
                             (parseSE "(  hello  )")
                         )
                   , testCase
@@ -314,9 +315,10 @@ parserTests =
                         ( assertEqual
                             ""
                             ( Right
-                                ( SubExpression
-                                    (MetaDescriptorTerm "a")
-                                    (SubTag (MetaDescriptorTerm "b"))
+                                ( SubExpression . Identity $
+                                    TagTermExtension
+                                        (MetaDescriptorTerm "a")
+                                        (SubTag . Identity $ MetaDescriptorTerm "b")
                                 )
                             )
                             (parseSE "a{b}")
@@ -326,12 +328,14 @@ parserTests =
                         ( assertEqual
                             ""
                             ( Right
-                                ( SubExpression
-                                    (MetaDescriptorTerm "a")
-                                    ( SubExpression
-                                        (MetaDescriptorTerm "b")
-                                        (SubTag (MetaDescriptorTerm "c"))
-                                    )
+                                ( SubExpression . Identity $
+                                    TagTermExtension
+                                        (MetaDescriptorTerm "a")
+                                        ( SubExpression . Identity $
+                                            TagTermExtension
+                                                (MetaDescriptorTerm "b")
+                                                (SubTag . Identity $ MetaDescriptorTerm "c")
+                                        )
                                 )
                             )
                             (parseSE "a{b{c}}")
@@ -343,10 +347,11 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        (SubTag (MetaDescriptorTerm "a"))
-                                        Intersect
-                                        (SubTag (MetaDescriptorTerm "b"))
+                                    ( SubBinary . Identity $
+                                        BinaryExpression
+                                            (SubTag . Identity $ MetaDescriptorTerm "a")
+                                            Intersect
+                                            (SubTag . Identity $ MetaDescriptorTerm "b")
                                     )
                                 )
                                 (parseSE "a b")
@@ -356,10 +361,11 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        (SubTag (MetaDescriptorTerm "a"))
-                                        Union
-                                        (SubTag (MetaDescriptorTerm "b"))
+                                    ( SubBinary . Identity $
+                                        BinaryExpression
+                                            (SubTag . Identity $ MetaDescriptorTerm "a")
+                                            Union
+                                            (SubTag . Identity $ MetaDescriptorTerm "b")
                                     )
                                 )
                                 (parseSE "a | b")
@@ -369,14 +375,16 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        ( SubBinary
-                                            (SubTag (MetaDescriptorTerm "a"))
+                                    ( SubBinary . Identity $
+                                        BinaryExpression
+                                            ( SubBinary . Identity $
+                                                BinaryExpression
+                                                    (SubTag . Identity $ MetaDescriptorTerm "a")
+                                                    Intersect
+                                                    (SubTag . Identity $ MetaDescriptorTerm "b")
+                                            )
                                             Intersect
-                                            (SubTag (MetaDescriptorTerm "b"))
-                                        )
-                                        Intersect
-                                        (SubTag (MetaDescriptorTerm "c"))
+                                            (SubTag . Identity $ MetaDescriptorTerm "c")
                                     )
                                 )
                                 (parseSE "a b c")
@@ -386,18 +394,21 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        ( SubBinary
-                                            ( SubBinary
-                                                (SubTag (MetaDescriptorTerm "a"))
-                                                Union
-                                                (SubTag (MetaDescriptorTerm "b"))
+                                    ( SubBinary . Identity $
+                                        BinaryExpression
+                                            ( SubBinary . Identity $
+                                                BinaryExpression
+                                                    ( SubBinary . Identity $
+                                                        BinaryExpression
+                                                            (SubTag . Identity $ MetaDescriptorTerm "a")
+                                                            Union
+                                                            (SubTag . Identity $ MetaDescriptorTerm "b")
+                                                    )
+                                                    Intersect
+                                                    (SubTag . Identity $ MetaDescriptorTerm "c")
                                             )
-                                            Intersect
-                                            (SubTag (MetaDescriptorTerm "c"))
-                                        )
-                                        Difference
-                                        (SubTag (MetaDescriptorTerm "d"))
+                                            Difference
+                                            (SubTag . Identity $ MetaDescriptorTerm "d")
                                     )
                                 )
                                 (parseSE "a | b & c ! d")
@@ -407,18 +418,21 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        ( SubBinary
-                                            (SubTag (MetaDescriptorTerm "a"))
-                                            Union
-                                            (SubTag (MetaDescriptorTerm "b"))
-                                        )
-                                        Intersect
-                                        ( SubBinary
-                                            (SubTag (MetaDescriptorTerm "c"))
-                                            Difference
-                                            (SubTag (MetaDescriptorTerm "d"))
-                                        )
+                                    ( SubBinary . Identity $
+                                        BinaryExpression
+                                            ( SubBinary . Identity $
+                                                BinaryExpression
+                                                    (SubTag . Identity $ MetaDescriptorTerm "a")
+                                                    Union
+                                                    (SubTag . Identity $ MetaDescriptorTerm "b")
+                                            )
+                                            Intersect
+                                            ( SubBinary . Identity $
+                                                BinaryExpression
+                                                    (SubTag . Identity $ MetaDescriptorTerm "c")
+                                                    Difference
+                                                    (SubTag . Identity $ MetaDescriptorTerm "d")
+                                            )
                                     )
                                 )
                                 (parseSE "a | b & (c ! d)")
@@ -428,20 +442,24 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        ( SubExpression
-                                            (MetaDescriptorTerm "a")
-                                            (SubTag (MetaDescriptorTerm "b"))
-                                        )
-                                        Union
-                                        ( SubExpression
-                                            (MetaDescriptorTerm "c")
-                                            ( SubBinary
-                                                (SubTag (MetaDescriptorTerm "d"))
-                                                Intersect
-                                                (SubTag (MetaDescriptorTerm "e"))
+                                    ( SubBinary . Identity $
+                                        BinaryExpression
+                                            ( SubExpression . Identity $
+                                                TagTermExtension
+                                                    (MetaDescriptorTerm "a")
+                                                    (SubTag . Identity $ MetaDescriptorTerm "b")
                                             )
-                                        )
+                                            Union
+                                            ( SubExpression . Identity $
+                                                TagTermExtension
+                                                    (MetaDescriptorTerm "c")
+                                                    ( SubBinary . Identity $
+                                                        BinaryExpression
+                                                            (SubTag . Identity $ MetaDescriptorTerm "d")
+                                                            Intersect
+                                                            (SubTag . Identity $ MetaDescriptorTerm "e")
+                                                    )
+                                            )
                                     )
                                 )
                                 (parseSE "a{b} | c{d e}")
@@ -452,10 +470,11 @@ parserTests =
                         ( assertEqual
                             ""
                             ( Right
-                                ( SubBinary
-                                    (SubTag (MetaDescriptorTerm "a"))
-                                    Intersect
-                                    (SubTag (MetaDescriptorTerm "b"))
+                                ( SubBinary . Identity $
+                                    BinaryExpression
+                                        (SubTag . Identity $ MetaDescriptorTerm "a")
+                                        Intersect
+                                        (SubTag . Identity $ MetaDescriptorTerm "b")
                                 )
                             )
                             (parseSE "a\nb")
@@ -467,10 +486,11 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        (SubTag (MetaDescriptorTerm "a"))
-                                        Intersect
-                                        (SubTag (MetaDescriptorTerm "b"))
+                                    ( SubBinary . Identity $
+                                        BinaryExpression
+                                            (SubTag . Identity $ MetaDescriptorTerm "a")
+                                            Intersect
+                                            (SubTag . Identity $ MetaDescriptorTerm "b")
                                     )
                                 )
                                 (parseSE "a b ")
@@ -480,10 +500,11 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        (SubTag (MetaDescriptorTerm "a"))
-                                        Union
-                                        (SubTag (MetaDescriptorTerm "b"))
+                                    ( SubBinary . Identity $
+                                        BinaryExpression
+                                            (SubTag . Identity $ MetaDescriptorTerm "a")
+                                            Union
+                                            (SubTag . Identity $ MetaDescriptorTerm "b")
                                     )
                                 )
                                 (parseSE "a | b ")
@@ -493,21 +514,25 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        ( SubBinary
-                                            (SubTag (MetaDescriptorTerm "a"))
-                                            Intersect
-                                            ( SubExpression
-                                                (MetaDescriptorTerm "b")
-                                                ( SubBinary
-                                                    (SubTag (MetaDescriptorTerm "c"))
+                                    ( SubBinary . Identity $
+                                        BinaryExpression
+                                            ( SubBinary . Identity $
+                                                BinaryExpression
+                                                    (SubTag . Identity $ MetaDescriptorTerm "a")
                                                     Intersect
-                                                    (SubTag (MetaDescriptorTerm "d"))
-                                                )
+                                                    ( SubExpression . Identity $
+                                                        TagTermExtension
+                                                            (MetaDescriptorTerm "b")
+                                                            ( SubBinary . Identity $
+                                                                BinaryExpression
+                                                                    (SubTag . Identity $ MetaDescriptorTerm "c")
+                                                                    Intersect
+                                                                    (SubTag . Identity $ MetaDescriptorTerm "d")
+                                                            )
+                                                    )
                                             )
-                                        )
-                                        Intersect
-                                        (SubTag (MetaDescriptorTerm "e"))
+                                            Intersect
+                                            (SubTag . Identity $ MetaDescriptorTerm "e")
                                     )
                                 )
                                 (parseSE "a b {\n c d\n}\ne")
@@ -517,21 +542,25 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        ( SubBinary
-                                            (SubTag (MetaDescriptorTerm "a"))
-                                            Intersect
-                                            ( SubExpression
-                                                (MetaDescriptorTerm "b")
-                                                ( SubBinary
-                                                    (SubTag (MetaDescriptorTerm "c"))
+                                    ( SubBinary . Identity $
+                                        BinaryExpression
+                                            ( SubBinary . Identity $
+                                                BinaryExpression
+                                                    (SubTag . Identity $ MetaDescriptorTerm "a")
                                                     Intersect
-                                                    (SubTag (MetaDescriptorTerm "d"))
-                                                )
+                                                    ( SubExpression . Identity $
+                                                        TagTermExtension
+                                                            (MetaDescriptorTerm "b")
+                                                            ( SubBinary . Identity $
+                                                                BinaryExpression
+                                                                    (SubTag . Identity $ MetaDescriptorTerm "c")
+                                                                    Intersect
+                                                                    (SubTag . Identity $ MetaDescriptorTerm "d")
+                                                            )
+                                                    )
                                             )
-                                        )
-                                        Intersect
-                                        (SubTag (MetaDescriptorTerm "e"))
+                                            Intersect
+                                            (SubTag . Identity $ MetaDescriptorTerm "e")
                                     )
                                 )
                                 (parseSE "a&b{\nc&d\n}\n&e")
@@ -541,21 +570,25 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        ( SubBinary
-                                            (SubTag (MetaDescriptorTerm "a"))
-                                            Intersect
-                                            ( SubExpression
-                                                (MetaDescriptorTerm "b")
-                                                ( SubBinary
-                                                    (SubTag (MetaDescriptorTerm "c"))
+                                    ( SubBinary . Identity $
+                                        BinaryExpression
+                                            ( SubBinary . Identity $
+                                                BinaryExpression
+                                                    (SubTag . Identity $ MetaDescriptorTerm "a")
                                                     Intersect
-                                                    (SubTag (MetaDescriptorTerm "d"))
-                                                )
+                                                    ( SubExpression . Identity $
+                                                        TagTermExtension
+                                                            (MetaDescriptorTerm "b")
+                                                            ( SubBinary . Identity $
+                                                                BinaryExpression
+                                                                    (SubTag . Identity $ MetaDescriptorTerm "c")
+                                                                    Intersect
+                                                                    (SubTag . Identity $ MetaDescriptorTerm "d")
+                                                            )
+                                                    )
                                             )
-                                        )
-                                        Intersect
-                                        (SubTag (MetaDescriptorTerm "e"))
+                                            Intersect
+                                            (SubTag . Identity $ MetaDescriptorTerm "e")
                                     )
                                 )
                                 (parseSE "a b { c d } e")
@@ -565,17 +598,20 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        ( SubExpression
-                                            (MetaDescriptorTerm "b")
-                                            ( SubBinary
-                                                (SubTag (MetaDescriptorTerm "c"))
-                                                Intersect
-                                                (SubTag (MetaDescriptorTerm "d"))
+                                    ( SubBinary . Identity $
+                                        BinaryExpression
+                                            ( SubExpression . Identity $
+                                                TagTermExtension
+                                                    (MetaDescriptorTerm "b")
+                                                    ( SubBinary . Identity $
+                                                        BinaryExpression
+                                                            (SubTag . Identity $ MetaDescriptorTerm "c")
+                                                            Intersect
+                                                            (SubTag . Identity $ MetaDescriptorTerm "d")
+                                                    )
                                             )
-                                        )
-                                        Intersect
-                                        (SubTag (MetaDescriptorTerm "e"))
+                                            Intersect
+                                            (SubTag . Identity $ MetaDescriptorTerm "e")
                                     )
                                 )
                                 (parseSE "b {\n c d\n}\ne")
@@ -585,17 +621,20 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        ( SubExpression
-                                            (MetaDescriptorTerm "b")
-                                            ( SubBinary
-                                                (SubTag (MetaDescriptorTerm "c"))
-                                                Intersect
-                                                (SubTag (MetaDescriptorTerm "d"))
+                                    ( SubBinary . Identity $
+                                        BinaryExpression
+                                            ( SubExpression . Identity $
+                                                TagTermExtension
+                                                    (MetaDescriptorTerm "b")
+                                                    ( SubBinary . Identity $
+                                                        BinaryExpression
+                                                            (SubTag . Identity $ MetaDescriptorTerm "c")
+                                                            Intersect
+                                                            (SubTag . Identity $ MetaDescriptorTerm "d")
+                                                    )
                                             )
-                                        )
-                                        Intersect
-                                        (SubTag (MetaDescriptorTerm "e"))
+                                            Intersect
+                                            (SubTag . Identity $ MetaDescriptorTerm "e")
                                     )
                                 )
                                 (parseSE "b{\n c&d\n}\n&e")

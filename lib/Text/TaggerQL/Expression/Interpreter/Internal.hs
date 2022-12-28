@@ -7,25 +7,25 @@ module Text.TaggerQL.Expression.Interpreter.Internal (
   toFileSet,
   evalSubExpression,
   queryTags,
+  joinSubTags',
 ) where
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Reader
 import Data.Functor ((<&>))
+import Data.Functor.Identity
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Tagger (SetOp (..))
 import Database.Tagger (
   File,
+  RecordKey (..),
   Tag (tagId, tagSubtagOfId),
   TaggedConnection,
   query,
  )
 import Text.RawString.QQ (r)
-import Text.TaggerQL.Expression.AST (
-  SubExpression (..),
-  TagTerm (..),
- )
+import Text.TaggerQL.Expression.AST
 
 toFileSet :: HashSet Tag -> TaggedConnection -> IO (HashSet File)
 toFileSet (map tagId . HS.toList -> ts) conn = do
@@ -46,7 +46,7 @@ toFileSet (map tagId . HS.toList -> ts) conn = do
  is defined by the 'SubExpression` and filter the argument by those that are subtags.
 -}
 evalSubExpression ::
-  SubExpression ->
+  SubExpression Identity ->
   -- | The current 'Tag` environment. Any set of 'Tag` computed by this function
   -- will be a subset of this argument.
   HashSet Tag ->
@@ -55,11 +55,11 @@ evalSubExpression ::
     IO
     (HashSet Tag)
 evalSubExpression subExpr supertags = case subExpr of
-  SubTag tt -> do
+  SubTag (Identity tt) -> do
     c <- ask
     subtags <- liftIO . fmap (HS.fromList . map tagSubtagOfId) $ queryTags tt c
     return $ joinSubtags subtags
-  SubExpression tt se -> do
+  SubExpression (Identity (TagTermExtension tt se)) -> do
     c <- ask
     nextTagEnv <- liftIO . fmap HS.fromList $ queryTags tt c
     subExprResult <- fmap (HS.map tagSubtagOfId) . evalSubExpression se $ nextTagEnv
@@ -72,7 +72,7 @@ evalSubExpression subExpr supertags = case subExpr of
   Therefore, the SubBinary case does not need a final intersection of its
   product with supertags, because both operands are subsets of the supertag set.
   -}
-  SubBinary se so se' ->
+  SubBinary (Identity (BinaryExpression se so se')) ->
     ( evalSubExpression se supertags
         <&> ( case so of
                 Union -> HS.union
@@ -86,6 +86,13 @@ evalSubExpression subExpr supertags = case subExpr of
   -- set of subTagOfIds.
   joinSubtags subtags =
     HS.filter (\(Just . tagId -> supertagId) -> HS.member supertagId subtags) supertags
+
+joinSubTags' ::
+  HashSet Tag ->
+  HashSet (Maybe (RecordKey Tag)) ->
+  HashSet Tag
+joinSubTags' supertags subtags =
+  HS.filter (\(Just . tagId -> supertagId) -> HS.member supertagId subtags) supertags
 
 queryTags :: TagTerm -> TaggedConnection -> IO [Tag]
 queryTags tt c =

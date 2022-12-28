@@ -32,41 +32,28 @@ module Text.TaggerQL.Expression.Engine (
   runSubExprOnFile,
 ) where
 
-import Control.Monad (void)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (ExceptT, throwE)
-import Control.Monad.Trans.Reader (ReaderT (runReaderT), asks)
+import Control.Monad.Trans.Reader (ReaderT (runReaderT))
 import Data.Functor (($>))
-import Data.Functor.Identity (Identity)
+import Data.Functor.Identity (Identity (..))
 import Data.HashSet (HashSet)
-import qualified Data.List as L
-import Data.Maybe (fromJust)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger (
   RecordKey,
-  insertTags,
-  queryForDescriptorByPattern,
-  queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf,
- )
-import Database.Tagger.Query (
-  queryForTagBySubTagTriple,
  )
 import Database.Tagger.Type (
-  Descriptor (descriptorId),
   File,
-  Tag (tagId),
   TaggedConnection,
  )
 import Text.Parsec.Error (errorMessages, messageString)
-import Text.TaggerQL.Expression.AST (
-  Expression,
-  SubExpression (..),
-  TagTerm (DescriptorTerm, MetaDescriptorTerm),
- )
+import Text.TaggerQL.Expression.AST (Expression, SubExpression)
 import Text.TaggerQL.Expression.Interpreter (
   queryer,
   runInterpreter,
+  runSubInterpreter,
+  tagger,
  )
 import Text.TaggerQL.Expression.Parser (parseExpr, parseTagExpr)
 
@@ -83,11 +70,11 @@ runQuery c t =
 {- |
  Query an 'Expression`
 -}
-runExpr :: Expression Identity -> TaggedConnection -> IO (HashSet File)
+runExpr :: Expression Identity Identity -> TaggedConnection -> IO (HashSet File)
 runExpr expr = runReaderT (evalExpr expr)
 
-evalExpr :: Expression Identity -> ReaderT TaggedConnection IO (HashSet File)
-evalExpr = runInterpreter queryer
+evalExpr :: Expression Identity Identity -> ReaderT TaggedConnection IO (HashSet File)
+evalExpr = flip runReaderT mempty . runInterpreter queryer
 
 -- Tagging Engine
 
@@ -104,61 +91,7 @@ tagFile fk c =
     (\se -> runSubExprOnFile se fk c $> Nothing)
     . parseTagExpr
 
-runSubExprOnFile :: SubExpression -> RecordKey File -> TaggedConnection -> IO ()
-runSubExprOnFile se fk c = void (runReaderT (insertSubExpr se Nothing) (fk, c))
-
-insertSubExpr ::
-  SubExpression ->
-  Maybe [RecordKey Tag] ->
-  ReaderT (RecordKey File, TaggedConnection) IO [RecordKey Tag]
-insertSubExpr se supertags =
-  asks snd >>= \c ->
-    ( case se of
-        SubExpression tt se' -> do
-          insertedSubtags <- insertSubExpr (SubTag tt) supertags
-          insertSubExpr se' (Just insertedSubtags)
-        SubBinary se' _ se2 -> do
-          void $ insertSubExpr se' supertags
-          void $ insertSubExpr se2 supertags
-          -- tags inserted by a SubBinary is indeterminate and empty by default
-          return mempty
-        SubTag tt -> do
-          let txt = termTxt tt
-          withDescriptors <- qDescriptor txt
-          fk <- asks fst
-          let tagTriples =
-                (fk,,)
-                  <$> (descriptorId <$> withDescriptors)
-                    <*> maybe [Nothing] (fmap Just) supertags
-          void . liftIO . insertTags tagTriples $ c
-          -- Tag insertion may fail because some tags of the same form already exist.
-          -- This query gets all of those pre-existing tags,
-          -- and returns them as if they were just made.
-          case supertags of
-            -- If nothing, then these are top-level tags
-            Nothing ->
-              map tagId
-                <$> liftIO
-                  ( queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf
-                      fk
-                      txt
-                      c
-                  )
-            Just _ ->
-              -- If just, these are subtags of existing tags.
-              map tagId . unions
-                <$> liftIO
-                  ( mapM
-                      (`queryForTagBySubTagTriple` c)
-                      (third fromJust <$> tagTriples)
-                  )
-    )
- where
-  termTxt tt =
-    case tt of
-      DescriptorTerm txt -> txt
-      MetaDescriptorTerm txt -> txt
-  qDescriptor txt = asks snd >>= liftIO . queryForDescriptorByPattern txt
-  unions :: (Foldable t, Eq a) => t [a] -> [a]
-  unions xs = if null xs then [] else L.foldl' L.union [] xs
-  third f (x, y, z) = (x, y, f z)
+runSubExprOnFile :: SubExpression Identity -> RecordKey File -> TaggedConnection -> IO ()
+runSubExprOnFile se fk c =
+  ()
+    <$ runReaderT (runSubInterpreter tagger se) (fk, Nothing, c)

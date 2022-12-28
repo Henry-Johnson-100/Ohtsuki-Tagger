@@ -1,9 +1,10 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
-{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# HLINT ignore "Use lambda-case" #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# HLINT ignore "Use newtype instead of data" #-}
@@ -18,26 +19,108 @@ Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL.Expression.AST (
   -- * AST
+
+  -- ** Expressions
   Expression (..),
   ExpressionLeaf (..),
-  BinaryExpression (..),
+
+  -- ** SubExpressions
   SubExpression (..),
+
+  -- ** Primitives
+  BinaryExpression (..),
+  TagTermExtension (..),
   TagTerm (..),
   FileTerm (..),
 
   -- * Classes
-  ExpressionIdentity (..),
+  IdentityKind (..),
 
-  -- * Constants
-  zero,
-  universe,
+  -- * Helpers
+  expressionIdentity,
+  subExpressionIdentity,
 ) where
 
 import Data.Functor.Identity (Identity (..))
 import Data.String (IsString)
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
-import qualified Data.Text as T
+
+{- |
+ An 'Expression` is a structure that defines a set of 'File` that is some subset of
+ the set of all 'File` in the database.
+
+ 'Expression` is a higher kinded type. This additional type can be used to annotate the
+ leaves of an 'Expression` tree.
+
+ An 'Expression` is a complete TaggerQL query.
+-}
+data Expression t k
+  = ExpressionLeaf (t ExpressionLeaf)
+  | BinaryExpressionValue (t (BinaryExpression (Expression t k)))
+  | ExpressionTagTermExtension (t (TagTermExtension (SubExpression k)))
+
+deriving instance Show (Expression Identity Identity)
+
+deriving instance Eq (Expression Identity Identity)
+
+deriving instance Show a => Show (Expression ((,) a) Identity)
+
+deriving instance Eq a => Eq (Expression ((,) a) Identity)
+
+deriving instance Show a => Show (Expression Identity ((,) a))
+
+deriving instance Eq a => Eq (Expression Identity ((,) a))
+
+deriving instance (Show a, Show b) => Show (Expression ((,) a) ((,) b))
+
+deriving instance (Eq a, Eq b) => Eq (Expression ((,) a) ((,) b))
+
+{- |
+ Intermediate constructor denoting the terminal evaluations of an 'Expression`
+-}
+data ExpressionLeaf
+  = FileTermValue FileTerm
+  | TagTermValue TagTerm
+  deriving (Show, Eq)
+
+{- |
+ Intermediate constructor for lifting a binary set operation over 'Expression` into
+ an 'Expression`
+-}
+data BinaryExpression a = BinaryExpression a SetOp a
+  deriving (Show, Eq, Functor)
+
+{- |
+ A type that can be modified or extended by a 'TagTerm`
+-}
+data TagTermExtension a = TagTermExtension TagTerm a deriving (Show, Eq, Functor)
+
+{- |
+ A 'SubExpression` is a structure that defines a set of 'Tag` that is some
+ subset of the set of all 'Tag` in the database.
+
+ A 'SubExpression` is then used:
+
+  * as an operand in another 'SubExpression`
+  * to compute a set of 'File` in an 'Expression`
+  * to tag a single 'File` with the set of 'Tag` that the 'SubExpression` represents.
+-}
+data SubExpression k
+  = -- | A search term for a set of 'Tag` that are subtags in the current environment.
+    SubTag (k TagTerm)
+  | SubBinary (k (BinaryExpression (SubExpression k)))
+  | -- | Extends the current 'Tag` environment through the given 'TagTerm`
+    -- to define a more constrained set with the given 'SubExpression`.
+    SubExpression (k (TagTermExtension (SubExpression k)))
+
+deriving instance Show (SubExpression Identity)
+
+deriving instance Eq (SubExpression Identity)
+
+deriving instance Show a => Show (SubExpression ((,) a))
+
+deriving instance Eq a => Eq (SubExpression ((,) a))
 
 {- |
  Data structure representing search terms over the set of 'Descriptor`.
@@ -58,129 +141,35 @@ newtype FileTerm
   deriving (Show, Eq, Semigroup, Monoid, IsString)
 
 {- |
- A 'SubExpression` is a structure that defines a set of 'Tag` that is some
- subset of the set of all 'Tag` in the database.
-
- A 'SubExpression` is then used:
-
-  * as an operand in another 'SubExpression`
-  * to compute a set of 'File` in an 'Expression`
-  * to tag a single 'File` with the set of 'Tag` that the 'SubExpression` represents.
+ A class for second kinded types that can be mapped to an Identity
 -}
-data SubExpression
-  = -- | A search term for a set of 'Tag` that are subtags in the current environment.
-    SubTag TagTerm
-  | SubBinary SubExpression SetOp SubExpression
-  | -- | Extends the current 'Tag` environment through the given 'TagTerm`
-    -- to define a more constrained set with the given 'SubExpression`.
-    SubExpression TagTerm SubExpression
-  deriving (Show, Eq)
+class IdentityKind k where
+  identityKind :: k a -> Identity a
 
-{- |
- Intermediate constructor for lifting a binary set operation over 'Expression` into
- an 'Expression`
--}
-data BinaryExpression t = BinaryExpression (Expression t) SetOp (Expression t)
+instance IdentityKind Identity where
+  identityKind :: Identity a -> Identity a
+  identityKind = id
 
-deriving instance Show (BinaryExpression Identity)
+instance IdentityKind ((,) a) where
+  identityKind :: (a1, a2) -> Identity a2
+  identityKind (_, y) = Identity y
 
-deriving instance Eq (BinaryExpression Identity)
+subExpressionIdentity :: IdentityKind k => SubExpression k -> SubExpression Identity
+subExpressionIdentity se = case se of
+  SubTag (identityKind -> k) -> SubTag k
+  SubBinary (identityKind -> bin) ->
+    SubBinary . fmap (fmap subExpressionIdentity) $ bin
+  SubExpression (identityKind -> tte) ->
+    SubExpression . fmap (fmap subExpressionIdentity) $ tte
 
-deriving instance Show a => Show (BinaryExpression ((,) a))
-
-deriving instance Eq a => Eq (BinaryExpression ((,) a))
-
-{- |
- Intermediate constructor denoting the terminal evaluations of an 'Expression`
--}
-data ExpressionLeaf
-  = FileTermValue FileTerm
-  | TagTermValue TagTerm
-  | -- | Constructs a 'Tag` set from the given 'TagTerm`
-    -- that serves as the inital environment for the given 'SubExpression`.
-    --
-    -- Essentially, defines the set of 'File` where 'SubExpression` are subtags
-    -- of any 'Tag` appearing in the set defined by the 'TagTerm`.
-    TagExpressionValue TagTerm SubExpression
-  deriving (Show, Eq)
-
-{- |
- An 'Expression` is a structure that defines a set of 'File` that is some subset of
- the set of all 'File` in the database.
-
- 'Expression` is a higher kinded type. This additional type can be used to annotate the
- leaves of an 'Expression` tree.
-
- An 'Expression` is a complete TaggerQL query.
--}
-data Expression t
-  = ExpressionLeaf (t ExpressionLeaf)
-  | BinaryExpressionValue (t (BinaryExpression t))
-
-deriving instance Show (Expression Identity)
-
-deriving instance Eq (Expression Identity)
-
-deriving instance Show a => Show (Expression ((,) a))
-
-deriving instance Eq a => Eq (Expression ((,) a))
-
-{- |
- A class for an 'Expression t` that is possible to transform to
- an 'Expression Identity`
--}
-class ExpressionIdentity t where
-  expressionIdentity :: Expression t -> Expression Identity
-
-instance ExpressionIdentity Identity where
-  expressionIdentity :: Expression Identity -> Expression Identity
-  expressionIdentity = id
-
-instance ExpressionIdentity ((,) a) where
-  expressionIdentity :: Expression ((,) a) -> Expression Identity
-  expressionIdentity expr = case expr of
-    ExpressionLeaf l -> ExpressionLeaf . Identity . snd $ l
-    BinaryExpressionValue (_, BinaryExpression lhs so rhs) ->
-      BinaryExpressionValue . Identity $
-        BinaryExpression
-          (expressionIdentity lhs)
-          so
-          (expressionIdentity rhs)
-
-{-# INLINE zero #-}
-
-{- |
- This 'Expression` will always evaluate to an empty set.
-
- It is the intersection of tagged and untagged files.
--}
-zero :: Expression Identity
-zero =
-  BinaryExpressionValue
-    ( Identity $
-        BinaryExpression
-          ( BinaryExpressionValue
-              ( Identity $
-                  BinaryExpression
-                    universe
-                    Difference
-                    ( ExpressionLeaf
-                        . Identity
-                        . TagTermValue
-                        . DescriptorTerm
-                        . T.pack
-                        $ "%"
-                    )
-              )
-          )
-          Intersect
-          (ExpressionLeaf . Identity . TagTermValue . DescriptorTerm . T.pack $ "%")
-    )
-
-{-# INLINE universe #-}
-
-{- |
- This 'Expression` will always evaluate to all files in the database.
--}
-universe :: Expression Identity
-universe = ExpressionLeaf . Identity . FileTermValue . FileTerm . T.pack $ "%"
+expressionIdentity ::
+  (IdentityKind t, IdentityKind k) =>
+  Expression t k ->
+  Expression Identity Identity
+expressionIdentity expr = case expr of
+  ExpressionLeaf (identityKind -> t) -> ExpressionLeaf t
+  BinaryExpressionValue (identityKind -> bin) ->
+    BinaryExpressionValue . fmap (fmap expressionIdentity) $ bin
+  ExpressionTagTermExtension (identityKind -> (Identity (TagTermExtension x y))) ->
+    ExpressionTagTermExtension . Identity $
+      TagTermExtension x (subExpressionIdentity y)
