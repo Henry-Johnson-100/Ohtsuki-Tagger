@@ -22,6 +22,15 @@ module Text.TaggerQL.Expression.Engine (
   runQuery,
   tagFile,
 
+  -- * Interpreters
+  ExpressionInterpreter (..),
+  runExpressionInterpreter,
+  SubExpressionInterpreter (..),
+  runSubExpressionInterpreter,
+
+  -- ** Examples
+  queryer,
+
   -- * Primitive Functions
   runExpr,
   evalExpr,
@@ -36,7 +45,7 @@ import Control.Monad (void)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (ExceptT, throwE)
 import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask, asks)
-import Data.Functor (($>), (<&>))
+import Data.Functor (($>))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import qualified Data.List as L
@@ -76,6 +85,134 @@ import Text.TaggerQL.Expression.AST (
 import Text.TaggerQL.Expression.Parser (parseExpr, parseTagExpr)
 
 {- |
+ Defines a computation for each constructor of a 'SubExpression`.
+
+ Used to monadically fold a 'SubExpression`.
+-}
+data SubExpressionInterpreter n b = SubExpressionInterpreter
+  { interpretSubTag :: TagTerm -> n b
+  , interpretBinarySubExpression :: BinaryOperation b -> n b
+  , interpretSubExpression :: TagTermExtension (n b) -> n b
+  }
+
+{- |
+ Run the given 'SubExpressionInterpreter` over a 'SubExpression`.
+-}
+runSubExpressionInterpreter ::
+  Monad n =>
+  SubExpressionInterpreter n b ->
+  SubExpression ->
+  n b
+runSubExpressionInterpreter setr@(SubExpressionInterpreter a b c) se = case se of
+  SubTag tt -> a tt
+  BinarySubExpression (BinaryOperation lhs so rhs) -> do
+    lhsR <- runSubExpressionInterpreter setr lhs
+    rhsR <- runSubExpressionInterpreter setr rhs
+    b $ BinaryOperation lhsR so rhsR
+  SubExpression (TagTermExtension tt se') ->
+    c
+      . TagTermExtension tt
+      . runSubExpressionInterpreter setr
+      $ se'
+
+{- |
+ Defines a computation for each constructor of an 'Expression`.
+
+ Used to monadically fold an 'Expression`.
+-}
+data ExpressionInterpreter m b a = ExpressionInterpreter
+  { interpretFileTerm :: FileTerm -> m a
+  , interpretTagTerm :: TagTerm -> m a
+  , interpretTagExpression :: TagTermExtension (m b) -> m a
+  , interpretBinaryExpression :: BinaryOperation a -> m a
+  , subExpressionInterpreter :: SubExpressionInterpreter m b
+  }
+
+{- |
+ Run the given 'ExpressionInterpreter` over an 'Expression`. Appropriately
+ sequencing monadic actions and computational side effects when extending the
+ 'Expression` with a 'SubExpression`.
+-}
+runExpressionInterpreter :: Monad m => ExpressionInterpreter m b a -> Expression -> m a
+runExpressionInterpreter itr@(ExpressionInterpreter ift itt itte ibo setr) expr =
+  case expr of
+    FileTermValue ft -> ift ft
+    TagTermValue tt -> itt tt
+    TagExpression (TagTermExtension tt se) ->
+      itte
+        . TagTermExtension tt
+        . runSubExpressionInterpreter setr
+        $ se
+    BinaryExpression (BinaryOperation lhs so rhs) -> do
+      lhsR <- runExpressionInterpreter itr lhs
+      rhsR <- runExpressionInterpreter itr rhs
+      ibo $ BinaryOperation lhsR so rhsR
+
+{- |
+ Defines an 'Interpreter` that queries the given connection for a set of 'File`.
+
+ The 'SubExpression` evaluates to a function accepting a set of 'Tag` that are defined
+ by the outer scope of any given 'SubExpression`. Meaning that a set of 'Tag`
+ is created from the bottom-up of a given tag-subtag hierarchy.
+-}
+queryer ::
+  ExpressionInterpreter
+    (ReaderT TaggedConnection IO)
+    (HashSet Tag -> HashSet Tag)
+    (HashSet File)
+queryer =
+  ExpressionInterpreter
+    { interpretFileTerm = \(FileTerm t) ->
+        ask
+          >>= liftIO
+            . fmap HS.fromList
+            . queryForFileByPattern t
+    , interpretTagTerm = \tt ->
+        ask
+          >>= liftIO
+            . fmap HS.fromList
+            . ( case tt of
+                  DescriptorTerm txt -> flatQueryForFileByTagDescriptorPattern txt
+                  MetaDescriptorTerm txt -> flatQueryForFileOnMetaRelationPattern txt
+              )
+    , interpretBinaryExpression = \(BinaryOperation lhs so rhs) ->
+        return $ hsOp so lhs rhs
+    , interpretTagExpression = \(TagTermExtension tt se) -> do
+        c <- ask
+        supertags <- liftIO . fmap HS.fromList $ queryTags tt c
+        joinSubTagsTo <- se
+        liftIO $ toFileSet (joinSubTagsTo supertags) c
+    , subExpressionInterpreter =
+        SubExpressionInterpreter
+          { interpretSubTag = \tt ->
+              flip joinSubtags
+                <$> ( ask
+                        >>= liftIO
+                          . fmap (HS.fromList . map tagSubtagOfId)
+                          . queryTags tt
+                    )
+          , interpretBinarySubExpression = \(BinaryOperation lhs so rhs) ->
+              return $ \higherEnv -> hsOp so (lhs higherEnv) (rhs higherEnv)
+          , interpretSubExpression = \(TagTermExtension tt se) -> do
+              c <- ask
+              supertags <- liftIO . fmap HS.fromList $ queryTags tt c
+              joinLowerEnv <- se
+              return $ \higherEnv ->
+                joinSubtags
+                  higherEnv
+                  (HS.map tagSubtagOfId $ joinLowerEnv supertags)
+          }
+    }
+ where
+  joinSubtags supertags subtags =
+    HS.filter (\(Just . tagId -> supertagId) -> HS.member supertagId subtags) supertags
+  hsOp so =
+    case so of
+      Union -> HS.union
+      Intersect -> HS.intersection
+      Difference -> HS.difference
+
+{- |
  Run a TaggerQL query on the given database.
 -}
 runQuery :: TaggedConnection -> Text -> ExceptT [Text] IO (HashSet File)
@@ -92,27 +229,7 @@ runExpr :: Expression -> TaggedConnection -> IO (HashSet File)
 runExpr expr = runReaderT (evalExpr expr)
 
 evalExpr :: Expression -> ReaderT TaggedConnection IO (HashSet File)
-evalExpr expr = case expr of
-  FileTermValue (FileTerm txt) ->
-    ask >>= liftIO . fmap HS.fromList . queryForFileByPattern txt
-  TagTermValue tt ->
-    ask
-      >>= liftIO . fmap HS.fromList . case tt of
-        DescriptorTerm txt -> flatQueryForFileByTagDescriptorPattern txt
-        MetaDescriptorTerm txt -> flatQueryForFileOnMetaRelationPattern txt
-  TagExpression (TagTermExtension tt subExpr) ->
-    ask >>= \c -> do
-      supertags <- liftIO . fmap HS.fromList $ queryTags tt c
-      subExprResult <- evalSubExpression subExpr supertags
-      liftIO $ toFileSet subExprResult c
-  BinaryExpression (BinaryOperation lhs so rhs) ->
-    ( case so of
-        Union -> HS.union
-        Intersect -> HS.intersection
-        Difference -> HS.difference
-    )
-      <$> evalExpr lhs
-      <*> evalExpr rhs
+evalExpr = runExpressionInterpreter queryer
 
 {- |
  Given a 'SubExpression` and a set of 'Tag`, compute the set of 'Tag` that
@@ -127,38 +244,9 @@ evalSubExpression ::
     TaggedConnection
     IO
     (HashSet Tag)
-evalSubExpression subExpr supertags = case subExpr of
-  SubTag tt -> do
-    c <- ask
-    subtags <- liftIO . fmap (HS.fromList . map tagSubtagOfId) $ queryTags tt c
-    return $ joinSubtags subtags
-  SubExpression (TagTermExtension tt se) -> do
-    c <- ask
-    nextTagEnv <- liftIO . fmap HS.fromList $ queryTags tt c
-    subExprResult <- fmap (HS.map tagSubtagOfId) . evalSubExpression se $ nextTagEnv
-    return $ joinSubtags subExprResult
-  {-
-  For a given set of supertags, evalSubExpression.joinSubtags is closed on that set.
-  Meaning that any given set of tags returned by evalSubExpression will be a subset of
-    the set it was given.
-
-  Therefore, the SubBinary case does not need a final intersection of its
-  product with supertags, because both operands are subsets of the supertag set.
-  -}
-  BinarySubExpression (BinaryOperation se so se') ->
-    ( evalSubExpression se supertags
-        <&> ( case so of
-                Union -> HS.union
-                Intersect -> HS.intersection
-                Difference -> HS.difference
-            )
-    )
-      <*> evalSubExpression se' supertags
- where
-  -- Filter the given set of tags based on whether or not it appears in the latter given
-  -- set of subTagOfIds.
-  joinSubtags subtags =
-    HS.filter (\(Just . tagId -> supertagId) -> HS.member supertagId subtags) supertags
+evalSubExpression subExpr supertags = do
+  joinSubTagsTo <- runSubExpressionInterpreter (subExpressionInterpreter queryer) subExpr
+  return . joinSubTagsTo $ supertags
 
 toFileSet :: HashSet Tag -> TaggedConnection -> IO (HashSet File)
 toFileSet (map tagId . HS.toList -> ts) conn = do
