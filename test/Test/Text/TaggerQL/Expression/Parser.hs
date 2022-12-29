@@ -114,9 +114,10 @@ parserTests =
                 ( assertEqual
                     ""
                     ( Right
-                        ( TagExpression
-                            (MetaDescriptorTerm "a")
-                            (SubTag (MetaDescriptorTerm "b"))
+                        ( TagExpression $
+                            TagTermExtension
+                                (MetaDescriptorTerm "a")
+                                (SubTag (MetaDescriptorTerm "b"))
                         )
                     )
                     (parseExpr "a{b}")
@@ -128,10 +129,11 @@ parserTests =
                     ( assertEqual
                         ""
                         ( Right
-                            ( Binary
-                                (TagTermValue (MetaDescriptorTerm "a"))
-                                Union
-                                (TagTermValue (MetaDescriptorTerm "b"))
+                            ( BinaryExpression $
+                                BinaryOperation
+                                    (TagTermValue (MetaDescriptorTerm "a"))
+                                    Union
+                                    (TagTermValue (MetaDescriptorTerm "b"))
                             )
                         )
                         (parseExpr "a | b")
@@ -141,10 +143,11 @@ parserTests =
                     ( assertEqual
                         ""
                         ( Right
-                            ( Binary
-                                (TagTermValue (MetaDescriptorTerm "a"))
-                                Intersect
-                                (TagTermValue (MetaDescriptorTerm "b"))
+                            ( BinaryExpression $
+                                BinaryOperation
+                                    (TagTermValue (MetaDescriptorTerm "a"))
+                                    Intersect
+                                    (TagTermValue (MetaDescriptorTerm "b"))
                             )
                         )
                         (parseExpr "a b")
@@ -154,14 +157,16 @@ parserTests =
                     ( assertEqual
                         ""
                         ( Right
-                            ( Binary
-                                ( Binary
-                                    (TagTermValue (MetaDescriptorTerm "a"))
-                                    Union
-                                    (TagTermValue (MetaDescriptorTerm "b"))
-                                )
-                                Difference
-                                (TagTermValue (MetaDescriptorTerm "c"))
+                            ( BinaryExpression $
+                                BinaryOperation
+                                    ( BinaryExpression $
+                                        BinaryOperation
+                                            (TagTermValue (MetaDescriptorTerm "a"))
+                                            Union
+                                            (TagTermValue (MetaDescriptorTerm "b"))
+                                    )
+                                    Difference
+                                    (TagTermValue (MetaDescriptorTerm "c"))
                             )
                         )
                         (parseExpr "a | b ! c")
@@ -171,15 +176,17 @@ parserTests =
                     ( assertEqual
                         ""
                         ( Right
-                            ( Binary
-                                ( TagTermValue (MetaDescriptorTerm "a")
-                                )
-                                Union
-                                ( Binary
-                                    (TagTermValue (MetaDescriptorTerm "b"))
-                                    Difference
-                                    (TagTermValue (MetaDescriptorTerm "c"))
-                                )
+                            ( BinaryExpression $
+                                BinaryOperation
+                                    ( TagTermValue (MetaDescriptorTerm "a")
+                                    )
+                                    Union
+                                    ( BinaryExpression $
+                                        BinaryOperation
+                                            (TagTermValue (MetaDescriptorTerm "b"))
+                                            Difference
+                                            (TagTermValue (MetaDescriptorTerm "c"))
+                                    )
                             )
                         )
                         (parseExpr "a | (b ! c)")
@@ -189,25 +196,30 @@ parserTests =
                     ( assertEqual
                         ""
                         ( Right
-                            ( Binary
-                                ( Binary
-                                    ( Binary
-                                        (TagTermValue (MetaDescriptorTerm "a"))
-                                        Intersect
-                                        ( TagExpression
-                                            (MetaDescriptorTerm "b")
-                                            (SubTag (MetaDescriptorTerm "c"))
-                                        )
+                            ( BinaryExpression $
+                                BinaryOperation
+                                    ( BinaryExpression $
+                                        BinaryOperation
+                                            ( BinaryExpression $
+                                                BinaryOperation
+                                                    (TagTermValue (MetaDescriptorTerm "a"))
+                                                    Intersect
+                                                    ( TagExpression $
+                                                        TagTermExtension
+                                                            (MetaDescriptorTerm "b")
+                                                            (SubTag (MetaDescriptorTerm "c"))
+                                                    )
+                                            )
+                                            Union
+                                            ( BinaryExpression $
+                                                BinaryOperation
+                                                    (FileTermValue "hi")
+                                                    Intersect
+                                                    (FileTermValue "bye")
+                                            )
                                     )
-                                    Union
-                                    ( Binary
-                                        (FileTermValue "hi")
-                                        Intersect
-                                        (FileTermValue "bye")
-                                    )
-                                )
-                                Difference
-                                (TagTermValue (DescriptorTerm "unwanted"))
+                                    Difference
+                                    (TagTermValue (DescriptorTerm "unwanted"))
                             )
                         )
                         (parseExpr "a b{c} | (p.hi & p.bye) ! d.unwanted")
@@ -218,21 +230,25 @@ parserTests =
                 ( assertEqual
                     ""
                     ( Right
-                        ( Binary
-                            ( Binary
-                                (TagTermValue (MetaDescriptorTerm "a"))
-                                Intersect
-                                ( TagExpression
-                                    (MetaDescriptorTerm "b")
-                                    ( SubBinary
-                                        (SubTag (MetaDescriptorTerm "c"))
+                        ( BinaryExpression $
+                            BinaryOperation
+                                ( BinaryExpression $
+                                    BinaryOperation
+                                        (TagTermValue (MetaDescriptorTerm "a"))
                                         Intersect
-                                        (SubTag (MetaDescriptorTerm "d"))
-                                    )
+                                        ( TagExpression $
+                                            TagTermExtension
+                                                (MetaDescriptorTerm "b")
+                                                ( BinarySubExpression $
+                                                    BinaryOperation
+                                                        (SubTag (MetaDescriptorTerm "c"))
+                                                        Intersect
+                                                        (SubTag (MetaDescriptorTerm "d"))
+                                                )
+                                        )
                                 )
-                            )
-                            Intersect
-                            (TagTermValue (MetaDescriptorTerm "e"))
+                                Intersect
+                                (TagTermValue (MetaDescriptorTerm "e"))
                         )
                     )
                     (parseExpr "a b{\nc d\n}\ne")
@@ -244,10 +260,11 @@ parserTests =
                     ( assertEqual
                         ""
                         ( Right
-                            ( Binary
-                                (TagTermValue (MetaDescriptorTerm "a"))
-                                Intersect
-                                (TagTermValue (MetaDescriptorTerm "b"))
+                            ( BinaryExpression $
+                                BinaryOperation
+                                    (TagTermValue (MetaDescriptorTerm "a"))
+                                    Intersect
+                                    (TagTermValue (MetaDescriptorTerm "b"))
                             )
                         )
                         (parseExpr "a b ")
@@ -257,10 +274,11 @@ parserTests =
                     ( assertEqual
                         ""
                         ( Right
-                            ( Binary
-                                (TagTermValue (MetaDescriptorTerm "a"))
-                                Union
-                                (TagTermValue (MetaDescriptorTerm "b"))
+                            ( BinaryExpression $
+                                BinaryOperation
+                                    (TagTermValue (MetaDescriptorTerm "a"))
+                                    Union
+                                    (TagTermValue (MetaDescriptorTerm "b"))
                             )
                         )
                         (parseExpr "a | b ")
@@ -296,9 +314,10 @@ parserTests =
                         ( assertEqual
                             ""
                             ( Right
-                                ( SubExpression
-                                    (MetaDescriptorTerm "a")
-                                    (SubTag (MetaDescriptorTerm "b"))
+                                ( SubExpression $
+                                    TagTermExtension
+                                        (MetaDescriptorTerm "a")
+                                        (SubTag (MetaDescriptorTerm "b"))
                                 )
                             )
                             (parseSE "a{b}")
@@ -308,12 +327,14 @@ parserTests =
                         ( assertEqual
                             ""
                             ( Right
-                                ( SubExpression
-                                    (MetaDescriptorTerm "a")
-                                    ( SubExpression
-                                        (MetaDescriptorTerm "b")
-                                        (SubTag (MetaDescriptorTerm "c"))
-                                    )
+                                ( SubExpression $
+                                    TagTermExtension
+                                        (MetaDescriptorTerm "a")
+                                        ( SubExpression $
+                                            TagTermExtension
+                                                (MetaDescriptorTerm "b")
+                                                (SubTag (MetaDescriptorTerm "c"))
+                                        )
                                 )
                             )
                             (parseSE "a{b{c}}")
@@ -325,10 +346,11 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        (SubTag (MetaDescriptorTerm "a"))
-                                        Intersect
-                                        (SubTag (MetaDescriptorTerm "b"))
+                                    ( BinarySubExpression $
+                                        BinaryOperation
+                                            (SubTag (MetaDescriptorTerm "a"))
+                                            Intersect
+                                            (SubTag (MetaDescriptorTerm "b"))
                                     )
                                 )
                                 (parseSE "a b")
@@ -338,10 +360,11 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        (SubTag (MetaDescriptorTerm "a"))
-                                        Union
-                                        (SubTag (MetaDescriptorTerm "b"))
+                                    ( BinarySubExpression $
+                                        BinaryOperation
+                                            (SubTag (MetaDescriptorTerm "a"))
+                                            Union
+                                            (SubTag (MetaDescriptorTerm "b"))
                                     )
                                 )
                                 (parseSE "a | b")
@@ -351,14 +374,16 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        ( SubBinary
-                                            (SubTag (MetaDescriptorTerm "a"))
+                                    ( BinarySubExpression $
+                                        BinaryOperation
+                                            ( BinarySubExpression $
+                                                BinaryOperation
+                                                    (SubTag (MetaDescriptorTerm "a"))
+                                                    Intersect
+                                                    (SubTag (MetaDescriptorTerm "b"))
+                                            )
                                             Intersect
-                                            (SubTag (MetaDescriptorTerm "b"))
-                                        )
-                                        Intersect
-                                        (SubTag (MetaDescriptorTerm "c"))
+                                            (SubTag (MetaDescriptorTerm "c"))
                                     )
                                 )
                                 (parseSE "a b c")
@@ -368,18 +393,21 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        ( SubBinary
-                                            ( SubBinary
-                                                (SubTag (MetaDescriptorTerm "a"))
-                                                Union
-                                                (SubTag (MetaDescriptorTerm "b"))
+                                    ( BinarySubExpression $
+                                        BinaryOperation
+                                            ( BinarySubExpression $
+                                                BinaryOperation
+                                                    ( BinarySubExpression $
+                                                        BinaryOperation
+                                                            (SubTag (MetaDescriptorTerm "a"))
+                                                            Union
+                                                            (SubTag (MetaDescriptorTerm "b"))
+                                                    )
+                                                    Intersect
+                                                    (SubTag (MetaDescriptorTerm "c"))
                                             )
-                                            Intersect
-                                            (SubTag (MetaDescriptorTerm "c"))
-                                        )
-                                        Difference
-                                        (SubTag (MetaDescriptorTerm "d"))
+                                            Difference
+                                            (SubTag (MetaDescriptorTerm "d"))
                                     )
                                 )
                                 (parseSE "a | b & c ! d")
@@ -389,18 +417,21 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        ( SubBinary
-                                            (SubTag (MetaDescriptorTerm "a"))
-                                            Union
-                                            (SubTag (MetaDescriptorTerm "b"))
-                                        )
-                                        Intersect
-                                        ( SubBinary
-                                            (SubTag (MetaDescriptorTerm "c"))
-                                            Difference
-                                            (SubTag (MetaDescriptorTerm "d"))
-                                        )
+                                    ( BinarySubExpression $
+                                        BinaryOperation
+                                            ( BinarySubExpression $
+                                                BinaryOperation
+                                                    (SubTag (MetaDescriptorTerm "a"))
+                                                    Union
+                                                    (SubTag (MetaDescriptorTerm "b"))
+                                            )
+                                            Intersect
+                                            ( BinarySubExpression $
+                                                BinaryOperation
+                                                    (SubTag (MetaDescriptorTerm "c"))
+                                                    Difference
+                                                    (SubTag (MetaDescriptorTerm "d"))
+                                            )
                                     )
                                 )
                                 (parseSE "a | b & (c ! d)")
@@ -410,20 +441,24 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        ( SubExpression
-                                            (MetaDescriptorTerm "a")
-                                            (SubTag (MetaDescriptorTerm "b"))
-                                        )
-                                        Union
-                                        ( SubExpression
-                                            (MetaDescriptorTerm "c")
-                                            ( SubBinary
-                                                (SubTag (MetaDescriptorTerm "d"))
-                                                Intersect
-                                                (SubTag (MetaDescriptorTerm "e"))
+                                    ( BinarySubExpression $
+                                        BinaryOperation
+                                            ( SubExpression $
+                                                TagTermExtension
+                                                    (MetaDescriptorTerm "a")
+                                                    (SubTag (MetaDescriptorTerm "b"))
                                             )
-                                        )
+                                            Union
+                                            ( SubExpression $
+                                                TagTermExtension
+                                                    (MetaDescriptorTerm "c")
+                                                    ( BinarySubExpression $
+                                                        BinaryOperation
+                                                            (SubTag (MetaDescriptorTerm "d"))
+                                                            Intersect
+                                                            (SubTag (MetaDescriptorTerm "e"))
+                                                    )
+                                            )
                                     )
                                 )
                                 (parseSE "a{b} | c{d e}")
@@ -434,10 +469,11 @@ parserTests =
                         ( assertEqual
                             ""
                             ( Right
-                                ( SubBinary
-                                    (SubTag (MetaDescriptorTerm "a"))
-                                    Intersect
-                                    (SubTag (MetaDescriptorTerm "b"))
+                                ( BinarySubExpression $
+                                    BinaryOperation
+                                        (SubTag (MetaDescriptorTerm "a"))
+                                        Intersect
+                                        (SubTag (MetaDescriptorTerm "b"))
                                 )
                             )
                             (parseSE "a\nb")
@@ -449,10 +485,11 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        (SubTag (MetaDescriptorTerm "a"))
-                                        Intersect
-                                        (SubTag (MetaDescriptorTerm "b"))
+                                    ( BinarySubExpression $
+                                        BinaryOperation
+                                            (SubTag (MetaDescriptorTerm "a"))
+                                            Intersect
+                                            (SubTag (MetaDescriptorTerm "b"))
                                     )
                                 )
                                 (parseSE "a b ")
@@ -462,10 +499,11 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        (SubTag (MetaDescriptorTerm "a"))
-                                        Union
-                                        (SubTag (MetaDescriptorTerm "b"))
+                                    ( BinarySubExpression $
+                                        BinaryOperation
+                                            (SubTag (MetaDescriptorTerm "a"))
+                                            Union
+                                            (SubTag (MetaDescriptorTerm "b"))
                                     )
                                 )
                                 (parseSE "a | b ")
@@ -475,21 +513,25 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        ( SubBinary
-                                            (SubTag (MetaDescriptorTerm "a"))
-                                            Intersect
-                                            ( SubExpression
-                                                (MetaDescriptorTerm "b")
-                                                ( SubBinary
-                                                    (SubTag (MetaDescriptorTerm "c"))
+                                    ( BinarySubExpression $
+                                        BinaryOperation
+                                            ( BinarySubExpression $
+                                                BinaryOperation
+                                                    (SubTag (MetaDescriptorTerm "a"))
                                                     Intersect
-                                                    (SubTag (MetaDescriptorTerm "d"))
-                                                )
+                                                    ( SubExpression $
+                                                        TagTermExtension
+                                                            (MetaDescriptorTerm "b")
+                                                            ( BinarySubExpression $
+                                                                BinaryOperation
+                                                                    (SubTag (MetaDescriptorTerm "c"))
+                                                                    Intersect
+                                                                    (SubTag (MetaDescriptorTerm "d"))
+                                                            )
+                                                    )
                                             )
-                                        )
-                                        Intersect
-                                        (SubTag (MetaDescriptorTerm "e"))
+                                            Intersect
+                                            (SubTag (MetaDescriptorTerm "e"))
                                     )
                                 )
                                 (parseSE "a b {\n c d\n}\ne")
@@ -499,21 +541,25 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        ( SubBinary
-                                            (SubTag (MetaDescriptorTerm "a"))
-                                            Intersect
-                                            ( SubExpression
-                                                (MetaDescriptorTerm "b")
-                                                ( SubBinary
-                                                    (SubTag (MetaDescriptorTerm "c"))
+                                    ( BinarySubExpression $
+                                        BinaryOperation
+                                            ( BinarySubExpression $
+                                                BinaryOperation
+                                                    (SubTag (MetaDescriptorTerm "a"))
                                                     Intersect
-                                                    (SubTag (MetaDescriptorTerm "d"))
-                                                )
+                                                    ( SubExpression $
+                                                        TagTermExtension
+                                                            (MetaDescriptorTerm "b")
+                                                            ( BinarySubExpression $
+                                                                BinaryOperation
+                                                                    (SubTag (MetaDescriptorTerm "c"))
+                                                                    Intersect
+                                                                    (SubTag (MetaDescriptorTerm "d"))
+                                                            )
+                                                    )
                                             )
-                                        )
-                                        Intersect
-                                        (SubTag (MetaDescriptorTerm "e"))
+                                            Intersect
+                                            (SubTag (MetaDescriptorTerm "e"))
                                     )
                                 )
                                 (parseSE "a&b{\nc&d\n}\n&e")
@@ -523,21 +569,25 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        ( SubBinary
-                                            (SubTag (MetaDescriptorTerm "a"))
-                                            Intersect
-                                            ( SubExpression
-                                                (MetaDescriptorTerm "b")
-                                                ( SubBinary
-                                                    (SubTag (MetaDescriptorTerm "c"))
+                                    ( BinarySubExpression $
+                                        BinaryOperation
+                                            ( BinarySubExpression $
+                                                BinaryOperation
+                                                    (SubTag (MetaDescriptorTerm "a"))
                                                     Intersect
-                                                    (SubTag (MetaDescriptorTerm "d"))
-                                                )
+                                                    ( SubExpression $
+                                                        TagTermExtension
+                                                            (MetaDescriptorTerm "b")
+                                                            ( BinarySubExpression $
+                                                                BinaryOperation
+                                                                    (SubTag (MetaDescriptorTerm "c"))
+                                                                    Intersect
+                                                                    (SubTag (MetaDescriptorTerm "d"))
+                                                            )
+                                                    )
                                             )
-                                        )
-                                        Intersect
-                                        (SubTag (MetaDescriptorTerm "e"))
+                                            Intersect
+                                            (SubTag (MetaDescriptorTerm "e"))
                                     )
                                 )
                                 (parseSE "a b { c d } e")
@@ -547,17 +597,20 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        ( SubExpression
-                                            (MetaDescriptorTerm "b")
-                                            ( SubBinary
-                                                (SubTag (MetaDescriptorTerm "c"))
-                                                Intersect
-                                                (SubTag (MetaDescriptorTerm "d"))
+                                    ( BinarySubExpression $
+                                        BinaryOperation
+                                            ( SubExpression $
+                                                TagTermExtension
+                                                    (MetaDescriptorTerm "b")
+                                                    ( BinarySubExpression $
+                                                        BinaryOperation
+                                                            (SubTag (MetaDescriptorTerm "c"))
+                                                            Intersect
+                                                            (SubTag (MetaDescriptorTerm "d"))
+                                                    )
                                             )
-                                        )
-                                        Intersect
-                                        (SubTag (MetaDescriptorTerm "e"))
+                                            Intersect
+                                            (SubTag (MetaDescriptorTerm "e"))
                                     )
                                 )
                                 (parseSE "b {\n c d\n}\ne")
@@ -567,17 +620,20 @@ parserTests =
                             ( assertEqual
                                 ""
                                 ( Right
-                                    ( SubBinary
-                                        ( SubExpression
-                                            (MetaDescriptorTerm "b")
-                                            ( SubBinary
-                                                (SubTag (MetaDescriptorTerm "c"))
-                                                Intersect
-                                                (SubTag (MetaDescriptorTerm "d"))
+                                    ( BinarySubExpression $
+                                        BinaryOperation
+                                            ( SubExpression $
+                                                TagTermExtension
+                                                    (MetaDescriptorTerm "b")
+                                                    ( BinarySubExpression $
+                                                        BinaryOperation
+                                                            (SubTag (MetaDescriptorTerm "c"))
+                                                            Intersect
+                                                            (SubTag (MetaDescriptorTerm "d"))
+                                                    )
                                             )
-                                        )
-                                        Intersect
-                                        (SubTag (MetaDescriptorTerm "e"))
+                                            Intersect
+                                            (SubTag (MetaDescriptorTerm "e"))
                                     )
                                 )
                                 (parseSE "b{\n c&d\n}\n&e")

@@ -1,8 +1,8 @@
+{-# HLINT ignore "Use newtype instead of data" #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE StrictData #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use newtype instead of data" #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.AST
@@ -14,6 +14,8 @@ Maintainer  : monawasensei@gmail.com
 module Text.TaggerQL.Expression.AST (
   TagTerm (..),
   FileTerm (..),
+  BinaryOperation (..),
+  TagTermExtension (..),
   SubExpression (..),
   Expression (..),
 ) where
@@ -53,10 +55,10 @@ newtype FileTerm
 data SubExpression
   = -- | A search term for a set of 'Tag` that are subtags in the current environment.
     SubTag TagTerm
-  | SubBinary SubExpression SetOp SubExpression
+  | BinarySubExpression (BinaryOperation SubExpression)
   | -- | Extends the current 'Tag` environment through the given 'TagTerm`
     -- to define a more constrained set with the given 'SubExpression`.
-    SubExpression TagTerm SubExpression
+    SubExpression (TagTermExtension SubExpression)
   deriving (Show, Eq)
 
 {- |
@@ -73,6 +75,10 @@ data Expression
     --
     -- Essentially, defines the set of 'File` where 'SubExpression` are subtags
     -- of any 'Tag` appearing in the set defined by the 'TagTerm`.
-    TagExpression TagTerm SubExpression
-  | Binary Expression SetOp Expression
+    TagExpression (TagTermExtension SubExpression)
+  | BinaryExpression (BinaryOperation Expression)
   deriving (Show, Eq)
+
+data BinaryOperation a = BinaryOperation a SetOp a deriving (Show, Eq, Functor)
+
+data TagTermExtension a = TagTermExtension TagTerm a deriving (Show, Eq, Functor)

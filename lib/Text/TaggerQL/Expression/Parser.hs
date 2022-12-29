@@ -54,10 +54,12 @@ import Text.Parsec (
   (<|>),
  )
 import Text.TaggerQL.Expression.AST (
+  BinaryOperation (BinaryOperation),
   Expression (..),
   FileTerm (..),
   SubExpression (..),
   TagTerm (..),
+  TagTermExtension (TagTermExtension),
  )
 
 type Parser a = Parsec Text () a
@@ -82,7 +84,9 @@ expressionParser =
     *> ( try
           ( myChainl1
               lhsExprParser
-              (flip Binary <$> (spaces *> setOpParser))
+              ( (\so lhs rhs -> BinaryExpression (BinaryOperation lhs so rhs))
+                  <$> (spaces *> setOpParser)
+              )
               pure
           )
           <|> lhsExprParser
@@ -104,7 +108,7 @@ expressionParser =
     precedentExpressionParser =
       between (char '(') (spaces *> char ')') expressionParser
     tagExpressionLookAhead =
-      flip TagExpression
+      (\se tt -> TagExpression (TagTermExtension tt se))
         <$> between
           (try (spaces *> char '{'))
           (spaces *> char '}')
@@ -119,7 +123,9 @@ subExpressionParser =
     *> ( try
           ( myChainl1
               lhsSubExpressionParser
-              (flip SubBinary <$> (spaces *> setOpParser))
+              ( (\so lhs rhs -> BinarySubExpression (BinaryOperation lhs so rhs))
+                  <$> (spaces *> setOpParser)
+              )
               pure
           )
           <|> lhsSubExpressionParser
@@ -142,7 +148,7 @@ subExpressionParser =
         (spaces *> char ')')
         subExpressionParser
     subExpressionLookAheadParser =
-      flip SubExpression
+      (\se tt -> SubExpression (TagTermExtension tt se))
         <$> between
           (try (spaces *> char '{'))
           (spaces *> char '}')

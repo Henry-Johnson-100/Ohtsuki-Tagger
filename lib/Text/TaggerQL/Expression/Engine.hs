@@ -66,10 +66,12 @@ import Database.Tagger.Type (
 import Text.Parsec.Error (errorMessages, messageString)
 import Text.RawString.QQ (r)
 import Text.TaggerQL.Expression.AST (
+  BinaryOperation (BinaryOperation),
   Expression (..),
   FileTerm (FileTerm),
   SubExpression (..),
   TagTerm (..),
+  TagTermExtension (TagTermExtension),
  )
 import Text.TaggerQL.Expression.Parser (parseExpr, parseTagExpr)
 
@@ -98,12 +100,12 @@ evalExpr expr = case expr of
       >>= liftIO . fmap HS.fromList . case tt of
         DescriptorTerm txt -> flatQueryForFileByTagDescriptorPattern txt
         MetaDescriptorTerm txt -> flatQueryForFileOnMetaRelationPattern txt
-  TagExpression tt subExpr ->
+  TagExpression (TagTermExtension tt subExpr) ->
     ask >>= \c -> do
       supertags <- liftIO . fmap HS.fromList $ queryTags tt c
       subExprResult <- evalSubExpression subExpr supertags
       liftIO $ toFileSet subExprResult c
-  Binary lhs so rhs ->
+  BinaryExpression (BinaryOperation lhs so rhs) ->
     ( case so of
         Union -> HS.union
         Intersect -> HS.intersection
@@ -130,7 +132,7 @@ evalSubExpression subExpr supertags = case subExpr of
     c <- ask
     subtags <- liftIO . fmap (HS.fromList . map tagSubtagOfId) $ queryTags tt c
     return $ joinSubtags subtags
-  SubExpression tt se -> do
+  SubExpression (TagTermExtension tt se) -> do
     c <- ask
     nextTagEnv <- liftIO . fmap HS.fromList $ queryTags tt c
     subExprResult <- fmap (HS.map tagSubtagOfId) . evalSubExpression se $ nextTagEnv
@@ -143,7 +145,7 @@ evalSubExpression subExpr supertags = case subExpr of
   Therefore, the SubBinary case does not need a final intersection of its
   product with supertags, because both operands are subsets of the supertag set.
   -}
-  SubBinary se so se' ->
+  BinarySubExpression (BinaryOperation se so se') ->
     ( evalSubExpression se supertags
         <&> ( case so of
                 Union -> HS.union
@@ -236,10 +238,10 @@ insertSubExpr ::
 insertSubExpr se supertags =
   asks snd >>= \c ->
     ( case se of
-        SubExpression tt se' -> do
+        SubExpression (TagTermExtension tt se') -> do
           insertedSubtags <- insertSubExpr (SubTag tt) supertags
           insertSubExpr se' (Just insertedSubtags)
-        SubBinary se' _ se2 -> do
+        BinarySubExpression (BinaryOperation se' _ se2) -> do
           void $ insertSubExpr se' supertags
           void $ insertSubExpr se2 supertags
           -- tags inserted by a SubBinary is indeterminate and empty by default
