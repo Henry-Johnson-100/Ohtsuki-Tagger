@@ -49,6 +49,8 @@ makeLensesWith abbreviatedFields ''TaggerInfoModel
 
 makeLensesWith abbreviatedFields ''PositioningModel
 
+makeLensesWith abbreviatedFields ''QueryModel
+
 {-# INLINE fileInfoAt #-}
 
 {- |

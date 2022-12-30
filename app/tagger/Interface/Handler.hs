@@ -252,18 +252,21 @@ fileSelectionEventHandler
                   runExceptT $
                     runQuery
                       conn
-                      (T.strip $ model ^. fileSelectionModel . queryInput . text)
+                      (T.strip $ model ^. fileSelectionModel . queryModel . input . text)
                 either
                   (mapM_ T.IO.putStrLn >=> (pure . Unit))
                   (return . DoFileSelectionEvent . PutFiles)
                   r
             )
         , Model $
-            model & fileSelectionModel . queryInput . history
-              %~ putHist (T.strip $ model ^. fileSelectionModel . queryInput . text)
-        , Event . Mempty $ TaggerLens (fileSelectionModel . queryInput . text)
+            model & fileSelectionModel . queryModel . input . history
+              %~ putHist
+                ( T.strip $
+                    model ^. fileSelectionModel . queryModel . input . text
+                )
+        , Event . Mempty $ TaggerLens (fileSelectionModel . queryModel . input . text)
         , Event . Mempty $
-            TaggerLens (fileSelectionModel . queryInput . history . historyIndex)
+            TaggerLens (fileSelectionModel . queryModel . input . history . historyIndex)
         ]
       RefreshSpecificFile fk ->
         [ Task

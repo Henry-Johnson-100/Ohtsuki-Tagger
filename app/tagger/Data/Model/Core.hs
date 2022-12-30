@@ -10,6 +10,7 @@ module Data.Model.Core (
   TaggerModel (..),
   createTaggerModel,
   FileSelectionModel (..),
+  QueryModel (..),
   getSelectionChunk,
   selectionChunkLength,
   FileSelectionTagListModel (..),
@@ -31,6 +32,7 @@ module Data.Model.Core (
   defaultFileDetailAndDescriptorTreePositioningModel,
 ) where
 
+import Control.Lens
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import Data.HashSet (HashSet)
@@ -46,6 +48,7 @@ import qualified Data.Sequence as Seq
 import Data.Tagger
 import Data.Text (Text)
 import Database.Tagger.Type
+import Text.TaggerQL.Expression.AST
 
 data TaggerModel = TaggerModel
   { _taggermodelDescriptorTreeModel :: DescriptorTreeModel
@@ -82,13 +85,13 @@ createTaggerModel tc d unRelatedD defaultFilePath =
 
 data FileSelectionModel = FileSelectionModel
   { _fileselectionTagList :: FileSelectionTagListModel
+  , _fileselectionQueryModel :: QueryModel
   , _fileselectionSelection :: Seq File
   , _fileselectionCurrentChunk :: Int
   , _fileselectionChunkSize :: Int
   , _fileselectionChunkSequence :: Seq Int
   , _fileselectionFileSelectionInfoMap :: IntMap FileInfo
   , _fileselectionSetOp :: SetOp
-  , _fileselectionQueryInput :: TextInput
   , _fileselectionFileSelectionVis :: Visibility
   , _fileselectionAddFileInput :: TextInput
   , _fileselectionIsMassOpMode :: Bool
@@ -99,16 +102,29 @@ createFileSelectionModel :: FileSelectionModel
 createFileSelectionModel =
   FileSelectionModel
     { _fileselectionTagList = createFileSelectionTagListModel
+    , _fileselectionQueryModel = createQueryModel
     , _fileselectionSelection = S.empty
     , _fileselectionCurrentChunk = 0
     , _fileselectionChunkSize = 50
     , _fileselectionChunkSequence = S.singleton 0
     , _fileselectionFileSelectionInfoMap = IntMap.empty
     , _fileselectionSetOp = Union
-    , _fileselectionQueryInput = createTextInput 10
     , _fileselectionFileSelectionVis = VisibilityMain
     , _fileselectionAddFileInput = createTextInput 10
     , _fileselectionIsMassOpMode = False
+    }
+
+data QueryModel = QueryModel
+  { _queryInput :: TextInput
+  , _queryExpression :: Expression
+  }
+  deriving (Show, Eq)
+
+createQueryModel :: QueryModel
+createQueryModel =
+  QueryModel
+    { _queryInput = createTextInput 10 & text .~ "p.%"
+    , _queryExpression = FileTermValue . FileTerm $ "%"
     }
 
 data FileSelectionTagListModel = FileSelectionTagListModel
