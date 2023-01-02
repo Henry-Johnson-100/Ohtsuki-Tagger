@@ -16,6 +16,7 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
+import Data.Either (fromRight)
 import Data.Event
 import qualified Data.Foldable as F
 import qualified Data.HashMap.Strict as HM
@@ -37,6 +38,7 @@ import Database.Tagger
 import Interface.Handler.Internal
 import Interface.Widget.Internal.Query (queryTextFieldKey)
 import Interface.Widget.Internal.Selection (fileSelectionScrollWidgetNodeKey)
+import Interface.Widget.Internal.Type (TaggerWidget)
 import Monomer
 import Paths_tagger
 import System.Directory (getCurrentDirectory)
@@ -44,6 +46,8 @@ import System.FilePath
 import System.IO
 import Tagger.Info (taggerVersion)
 import Text.TaggerQL
+import Text.TaggerQL.Expression.Engine (runExpr)
+import Text.TaggerQL.Expression.Parser (parseExpr)
 import Util
 
 taggerEventHandler ::
@@ -62,6 +66,7 @@ taggerEventHandler
       DoFileSelectionEvent e -> fileSelectionEventHandler wenv node model e
       DoDescriptorTreeEvent e -> descriptorTreeEventHandler wenv node model e
       DoTaggerInfoEvent e -> taggerInfoEventHandler wenv node model e
+      DoQueryEvent e -> queryEventHandler wenv node model e
       TaggerInit ->
         [ Event (DoDescriptorTreeEvent DescriptorTreeInit)
         , Task
@@ -126,6 +131,36 @@ taggerEventHandler
                         <> t
                     )
         ]
+
+queryEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  TaggerWidget ->
+  TaggerModel ->
+  QueryEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+queryEventHandler wenv node model@((^. connection) -> conn) event =
+  case event of
+    OnChangeParseQueryInput t ->
+      [ let currentExpr = model ^. fileSelectionModel . queryModel . expression
+            parseResult = parseExpr . T.strip $ t
+         in Model $
+              model & fileSelectionModel . queryModel . expression
+                .~ fromRight currentExpr parseResult
+      ]
+    RunQueryExpression ->
+      [ Task
+          ( do
+              queryResult <-
+                flip runExpr conn $
+                  model ^. fileSelectionModel . queryModel . expression
+              return . DoFileSelectionEvent . PutFiles $ queryResult
+          )
+      , Model $
+          model & fileSelectionModel . queryModel . input . history
+            %~ putHist (T.strip $ model ^. fileSelectionModel . queryModel . input . text)
+      , Event . Mempty $
+          TaggerLens (fileSelectionModel . queryModel . input . history . historyIndex)
+      ]
 
 fileSelectionEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -245,29 +280,6 @@ fileSelectionEventHandler
                )
       PutTagOccurrenceHashMap_ ohm ->
         [Model $ model & fileSelectionTagListModel . occurrences .~ ohm]
-      Query ->
-        [ Task
-            ( do
-                r <-
-                  runExceptT $
-                    runQuery
-                      conn
-                      (T.strip $ model ^. fileSelectionModel . queryModel . input . text)
-                either
-                  (mapM_ T.IO.putStrLn >=> (pure . Unit))
-                  (return . DoFileSelectionEvent . PutFiles)
-                  r
-            )
-        , Model $
-            model & fileSelectionModel . queryModel . input . history
-              %~ putHist
-                ( T.strip $
-                    model ^. fileSelectionModel . queryModel . input . text
-                )
-        , Event . Mempty $ TaggerLens (fileSelectionModel . queryModel . input . text)
-        , Event . Mempty $
-            TaggerLens (fileSelectionModel . queryModel . input . history . historyIndex)
-        ]
       RefreshSpecificFile fk ->
         [ Task
             ( do
