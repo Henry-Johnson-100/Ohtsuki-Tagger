@@ -116,6 +116,7 @@ createFileSelectionModel =
 
 data QueryModel = QueryModel
   { _queryInput :: TextInput
+  , _queryValidExpression :: Bool
   , _queryExpression :: Expression
   }
   deriving (Show, Eq)
@@ -124,6 +125,7 @@ createQueryModel :: QueryModel
 createQueryModel =
   QueryModel
     { _queryInput = createTextInput 10 & text .~ "p.%"
+    , _queryValidExpression = True
     , _queryExpression = FileTermValue . FileTerm $ "%"
     }
 

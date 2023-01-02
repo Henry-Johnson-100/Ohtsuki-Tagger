@@ -76,6 +76,7 @@ executable tagger
                       ,Interface.Widget.Internal.FilePreview
                       ,Interface.Widget.Internal.InfoPanel
                       ,Interface.Widget.Internal.Query
+                      ,Interface.Widget.Internal.Query.QueryBuilder
                       ,Interface.Widget.Internal.Selection
                       ,Interface.Widget.Internal.Type
                       ,Util

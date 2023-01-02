@@ -16,7 +16,6 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
-import Data.Either (fromRight)
 import Data.Event
 import qualified Data.Foldable as F
 import qualified Data.HashMap.Strict as HM
@@ -32,7 +31,6 @@ import qualified Data.Sequence as Seq
 import Data.Tagger
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.IO as T.IO
 import Data.Version (showVersion)
 import Database.Tagger
 import Interface.Handler.Internal
@@ -138,15 +136,8 @@ queryEventHandler ::
   TaggerModel ->
   QueryEvent ->
   [AppEventResponse TaggerModel TaggerEvent]
-queryEventHandler wenv node model@((^. connection) -> conn) event =
+queryEventHandler _wenv _node model@((^. connection) -> conn) event =
   case event of
-    OnChangeParseQueryInput t ->
-      [ let currentExpr = model ^. fileSelectionModel . queryModel . expression
-            parseResult = parseExpr . T.strip $ t
-         in Model $
-              model & fileSelectionModel . queryModel . expression
-                .~ fromRight currentExpr parseResult
-      ]
     RunQueryExpression ->
       [ Task
           ( do

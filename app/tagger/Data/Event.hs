@@ -37,7 +37,6 @@ import Database.Tagger.Type (
   Tag,
  )
 import Monomer (AppEventResponse)
-import Text.TaggerQL.Expression.AST
 
 data TaggerEvent
   = DoFocusedFileEvent FocusedFileEvent
@@ -111,8 +110,7 @@ data FileSelectionEvent
   deriving (Show, Eq)
 
 data QueryEvent
-  = OnChangeParseQueryInput Text
-  | RunQueryExpression
+  = RunQueryExpression
 
 data FileSelectionWidgetEvent
   = CycleNextChunk
