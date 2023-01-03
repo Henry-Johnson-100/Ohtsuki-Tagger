@@ -1,6 +1,10 @@
+{-# HLINT ignore "Use const" #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Test.Text.TaggerQL.Expression.Engine (
   queryEngineASTTests,
@@ -9,11 +13,14 @@ module Test.Text.TaggerQL.Expression.Engine (
 import Control.Monad.Trans.Maybe (runMaybeT)
 import Control.Monad.Trans.Reader (runReaderT)
 import qualified Data.HashSet as HS
+import Data.Maybe (fromJust, isJust)
 import Data.Tagger
+import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger
 import Test.Tasty
 import Test.Tasty.HUnit
+import Test.Tasty.QuickCheck
 import Text.TaggerQL.Expression.AST
 import Text.TaggerQL.Expression.Engine
 
@@ -24,6 +31,7 @@ queryEngineASTTests c =
     [ basicQueryFunctionality c
     , queryEdgeCases c
     , taggingEngineTests c
+    , enginePropertyTests
     ]
 
 basicQueryFunctionality :: IO TaggedConnection -> TestTree
@@ -645,3 +653,78 @@ file n = File n ("file_" <> (T.pack . show $ n))
 
 td :: RecordKey Descriptor -> TagTerm
 td n = MetaDescriptorTerm ("descriptor_" <> (T.pack . show $ n))
+
+enginePropertyTests :: TestTree
+enginePropertyTests =
+  testGroup
+    "enginePropertyTests"
+    [ testGroup
+        "Indexing tests"
+        [ testProperty
+            "Original Expression can be retrieved from flatten"
+            ( do
+                expr <- arbitrary :: Gen Expression
+                return . (==) expr . snd . last . flatten $ expr
+            )
+        , testProperty
+            "Replace an index with itself as an identity"
+            ( do
+                expr <- arbitrary :: Gen Expression
+                n <-
+                  suchThat
+                    arbitrary
+                    (\n' -> isJust . Text.TaggerQL.Expression.Engine.lookup n' $ expr)
+                let exprAt = fromJust $ Text.TaggerQL.Expression.Engine.lookup n expr
+                    replaceResult = replace n exprAt expr
+                let tr = expr == replaceResult
+                return $
+                  whenFail
+                    ( do
+                        print expr
+                        print replaceResult
+                    )
+                    tr
+            )
+        ]
+    ]
+
+instance Arbitrary Expression where
+  arbitrary :: Gen Expression
+  arbitrary = exprGen
+
+instance Arbitrary SubExpression where
+  arbitrary :: Gen SubExpression
+  arbitrary = subExprGen
+
+patternGen :: Gen Text
+patternGen = T.pack <$> suchThat arbitrary (not . null)
+
+ttGen :: Gen TagTerm
+ttGen = oneof (fmap <$> [DescriptorTerm, MetaDescriptorTerm] <*> [patternGen])
+
+subExprGen :: Gen SubExpression
+subExprGen = do
+  subtags <- SubTag <$> ttGen
+  subExpressions <- fmap SubExpression (TagTermExtension <$> ttGen <*> subExprGen)
+  binarySubExpressions <-
+    fmap
+      BinarySubExpression
+      ( BinaryOperation <$> subExprGen
+          <*> oneof (map pure [Union, Intersect, Difference])
+          <*> subExprGen
+      )
+  oneof . map pure $ [subtags, subExpressions, binarySubExpressions]
+
+exprGen :: Gen Expression
+exprGen = do
+  tagTermCon <- TagTermValue <$> ttGen
+  fileTerm <- FileTermValue . FileTerm <$> patternGen
+  tagExpr <- fmap TagExpression (TagTermExtension <$> ttGen <*> subExprGen)
+  binaryExpression <-
+    fmap
+      BinaryExpression
+      ( BinaryOperation <$> exprGen
+          <*> oneof (map pure [Union, Intersect, Difference])
+          <*> exprGen
+      )
+  oneof . map pure $ [tagTermCon, fileTerm, tagExpr, binaryExpression]

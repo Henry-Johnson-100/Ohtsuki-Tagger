@@ -166,6 +166,7 @@ test-suite tagger-test
   build-depends:       tagger-lib
                       ,tasty
                       ,tasty-hunit
+                      ,tasty-quickcheck
                       ,parsec
 
   hs-source-dirs:      test/
