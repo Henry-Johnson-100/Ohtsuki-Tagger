@@ -1,12 +1,17 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# HLINT ignore "Use const" #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_HADDOCK prune #-}
+
+{-# HLINT ignore "Use <&>" #-}
+{-# HLINT ignore "Move guards forward" #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.Engine
@@ -29,7 +34,12 @@ module Text.TaggerQL.Expression.Engine (
   runSubExpressionInterpreter,
 
   -- ** Examples
+  identityInterpreter,
   queryer,
+
+  -- * Indexing
+  ExpressionIndex (..),
+  flatten,
 
   -- * Primitive Functions
   runExpr,
@@ -41,15 +51,17 @@ module Text.TaggerQL.Expression.Engine (
   queryTags,
 ) where
 
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (ExceptT, throwE)
 import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask, asks)
+import Control.Monad.Trans.State.Strict (StateT, evalState, get, gets, modify, runState)
+import Data.Bifunctor
 import Data.Functor (($>))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import qualified Data.List as L
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, isJust)
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -83,6 +95,7 @@ import Text.TaggerQL.Expression.AST (
   TagTermExtension (TagTermExtension),
  )
 import Text.TaggerQL.Expression.Parser (parseExpr, parseTagExpr)
+import Prelude hiding (lookup, (!!))
 
 {- |
  Defines a computation for each constructor of a 'SubExpression`.
@@ -127,6 +140,26 @@ data ExpressionInterpreter m b a = ExpressionInterpreter
   , interpretBinaryExpression :: BinaryOperation a -> m a
   , subExpressionInterpreter :: SubExpressionInterpreter m b
   }
+
+{- |
+ A baseline 'Interpreter` to build others with.
+-}
+identityInterpreter :: Monad m => ExpressionInterpreter m SubExpression Expression
+identityInterpreter =
+  ExpressionInterpreter
+    { subExpressionInterpreter =
+        SubExpressionInterpreter
+          { interpretSubTag = return . SubTag
+          , interpretBinarySubExpression = return . BinarySubExpression
+          , interpretSubExpression = \(TagTermExtension tt se) ->
+              se >>= return . SubExpression . TagTermExtension tt
+          }
+    , interpretFileTerm = return . FileTermValue
+    , interpretTagTerm = return . TagTermValue
+    , interpretBinaryExpression = return . BinaryExpression
+    , interpretTagExpression = \(TagTermExtension tt se) ->
+        se >>= return . TagExpression . TagTermExtension tt
+    }
 
 {- |
  Run the given 'ExpressionInterpreter` over an 'Expression`. Appropriately
@@ -374,3 +407,98 @@ insertSubExpr se supertags =
   unions :: (Foldable t, Eq a) => t [a] -> [a]
   unions xs = if null xs then [] else L.foldl' L.union [] xs
   third f (x, y, z) = (x, y, f z)
+
+{- |
+ Where 'e` is 1-indexed in order of evaluation.
+-}
+class ExpressionIndex e where
+  -- | Find a subset of 'e` at the given index if it exists.
+  lookup :: Int -> e -> Maybe e
+
+  -- | Replace a location in the second set with first, if that location exists.
+  replace :: Int -> e -> e -> e
+
+  -- | An infix variant of 'lookup`
+  (!!) :: e -> Int -> Maybe e
+  e !! n = lookup n e
+
+instance ExpressionIndex Expression where
+  lookup :: Int -> Expression -> Maybe Expression
+  lookup n = snd . snd . flip runState (1, Nothing) . runExpressionInterpreter itr
+   where
+    itr =
+      ExpressionInterpreter
+        { subExpressionInterpreter = subExpressionInterpreter identityInterpreter
+        , interpretFileTerm = stlookupWith n . FileTermValue
+        , interpretTagTerm = stlookupWith n . TagTermValue
+        , interpretBinaryExpression = stlookupWith n . BinaryExpression
+        , interpretTagExpression = \(TagTermExtension tt se) ->
+            se >>= stlookupWith n . TagExpression . TagTermExtension tt
+        }
+  replace :: Int -> Expression -> Expression -> Expression
+  replace n replaceWith = flip evalState 1 . runExpressionInterpreter itr
+   where
+    itr =
+      ExpressionInterpreter
+        { subExpressionInterpreter = subExpressionInterpreter identityInterpreter
+        , interpretFileTerm = stReplaceWith n replaceWith . FileTermValue
+        , interpretTagTerm = stReplaceWith n replaceWith . TagTermValue
+        , interpretBinaryExpression = stReplaceWith n replaceWith . BinaryExpression
+        , interpretTagExpression = \(TagTermExtension tt se) ->
+            se >>= stReplaceWith n replaceWith . TagExpression . TagTermExtension tt
+        }
+
+instance ExpressionIndex SubExpression where
+  lookup :: Int -> SubExpression -> Maybe SubExpression
+  lookup n = snd . snd . flip runState (1, Nothing) . runSubExpressionInterpreter itr
+   where
+    itr =
+      SubExpressionInterpreter
+        { interpretSubTag = stlookupWith n . SubTag
+        , interpretBinarySubExpression = stlookupWith n . BinarySubExpression
+        , interpretSubExpression = \(TagTermExtension tt se) ->
+            se >>= stlookupWith n . SubExpression . TagTermExtension tt
+        }
+  replace :: Int -> SubExpression -> SubExpression -> SubExpression
+  replace n replaceWith = flip evalState 1 . runSubExpressionInterpreter itr
+   where
+    itr =
+      SubExpressionInterpreter
+        { interpretSubTag = stReplaceWith n replaceWith . SubTag
+        , interpretBinarySubExpression = stReplaceWith n replaceWith . BinarySubExpression
+        , interpretSubExpression = \(TagTermExtension tt se) ->
+            se >>= stReplaceWith n replaceWith . SubExpression . TagTermExtension tt
+        }
+
+{- |
+ Helper function for defining instances of 'ExpressionIndex.lookup`
+-}
+stlookupWith ::
+  (Monad m, Num a, Eq a) =>
+  a ->
+  b ->
+  StateT (a, Maybe b) m b
+stlookupWith n x = do
+  st <- gets fst
+  modify . first $ (1 +)
+  when (st == n) . modify . second . const . Just $ x
+  return x
+
+{- |
+ Helper function for defining instance of 'ExpressionIndex.replace`
+-}
+stReplaceWith :: (Monad m, Num a, Eq a) => a -> b -> b -> StateT a m b
+stReplaceWith n t e = do
+  st <- get
+  modify (1 +)
+  if st == n
+    then return t
+    else return e
+
+{- |
+ Flatten an 'ExpressionIndex` into its respective components along with their indices.
+-}
+flatten :: ExpressionIndex e => e -> [(Int, e)]
+flatten e =
+  map (second fromJust) . L.takeWhile (isJust . snd) $
+    [(n, e !! n) | n <- [1 ..]]
