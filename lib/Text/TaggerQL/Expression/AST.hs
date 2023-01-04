@@ -6,6 +6,8 @@
 {-# LANGUAGE StrictData #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
+{-# HLINT ignore "Use lambda-case" #-}
+
 {- |
 Module      : Text.TaggerQL.Expression.AST
 Description : The syntax tree for the TaggerQL query language.
@@ -15,9 +17,15 @@ Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL.Expression.AST (
   TagTerm (..),
+  tagTermPatternL,
   FileTerm (..),
   BinaryOperation (..),
+  lhsL,
+  soL,
+  rhsL,
   TagTermExtension (..),
+  tagTermL,
+  extensionL,
   SubExpression (..),
   Expression (..),
 
@@ -28,6 +36,7 @@ module Text.TaggerQL.Expression.AST (
 import Data.String (IsString)
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
+import Lens.Micro (Lens', lens)
 
 {- |
  Data structure representing search terms over the set of 'Descriptor`.
@@ -39,6 +48,18 @@ data TagTerm
     -- matching the given 'Text`, including the matches themselves.
     MetaDescriptorTerm Text
   deriving (Show, Eq)
+
+tagTermPatternL :: Lens' TagTerm Text
+tagTermPatternL =
+  lens
+    ( \tt -> case tt of
+        DescriptorTerm txt -> txt
+        MetaDescriptorTerm txt -> txt
+    )
+    ( \tt t -> case tt of
+        DescriptorTerm _ -> DescriptorTerm t
+        MetaDescriptorTerm _ -> MetaDescriptorTerm t
+    )
 
 {- |
  Corresponds to a search term over a filepath.
@@ -86,7 +107,37 @@ data Expression
 
 data BinaryOperation a = BinaryOperation a SetOp a deriving (Show, Eq, Functor)
 
+lhsL :: Lens' (BinaryOperation a) a
+lhsL =
+  lens
+    (\(BinaryOperation x _ _) -> x)
+    (\(BinaryOperation _ so rhs) y -> BinaryOperation y so rhs)
+
+soL :: Lens' (BinaryOperation a) SetOp
+soL =
+  lens
+    (\(BinaryOperation _ so _) -> so)
+    (\(BinaryOperation lhs _ rhs) so -> BinaryOperation lhs so rhs)
+
+rhsL :: Lens' (BinaryOperation a) a
+rhsL =
+  lens
+    (\(BinaryOperation _ _ rhs) -> rhs)
+    (\(BinaryOperation lhs so _) rhs -> BinaryOperation lhs so rhs)
+
 data TagTermExtension a = TagTermExtension TagTerm a deriving (Show, Eq, Functor)
+
+tagTermL :: Lens' (TagTermExtension a) TagTerm
+tagTermL =
+  lens
+    (\(TagTermExtension tt _) -> tt)
+    (\(TagTermExtension _ se) tt -> TagTermExtension tt se)
+
+extensionL :: Lens' (TagTermExtension a) a
+extensionL =
+  lens
+    (\(TagTermExtension _ se) -> se)
+    (flip (<$))
 
 class Ring r where
   -- | Identity over '(<+>)`
