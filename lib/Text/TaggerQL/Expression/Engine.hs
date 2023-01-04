@@ -1,7 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# HLINT ignore "Use <&>" #-}
+{-# HLINT ignore "Move guards forward" #-}
+{-# LANGUAGE RankNTypes #-}
 {-# HLINT ignore "Use const" #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -9,9 +13,6 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_HADDOCK prune #-}
-
-{-# HLINT ignore "Use <&>" #-}
-{-# HLINT ignore "Move guards forward" #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.Engine
@@ -39,7 +40,15 @@ module Text.TaggerQL.Expression.Engine (
 
   -- * Indexing
   ExpressionIndex (..),
+  exprAt,
+  foldIxGen,
   flatten,
+  index,
+  indexWith,
+
+  -- * Modifying
+  liftSubExpression,
+  lowerExpression,
 
   -- * Primitive Functions
   runExpr,
@@ -51,17 +60,18 @@ module Text.TaggerQL.Expression.Engine (
   queryTags,
 ) where
 
-import Control.Monad (void, when)
+import Control.Applicative ((<|>))
+import Control.Monad (guard, void, when)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (ExceptT, throwE)
 import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask, asks)
 import Control.Monad.Trans.State.Strict (StateT, evalState, get, gets, modify, runState)
-import Data.Bifunctor
+import Data.Bifunctor (Bifunctor (first, second))
 import Data.Functor (($>))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import qualified Data.List as L
-import Data.Maybe (fromJust, isJust)
+import Data.Maybe (fromJust)
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -84,6 +94,7 @@ import Database.Tagger.Type (
   TaggedConnection,
   descriptorId,
  )
+import Lens.Micro (Lens', lens)
 import Text.Parsec.Error (errorMessages, messageString)
 import Text.RawString.QQ (r)
 import Text.TaggerQL.Expression.AST (
@@ -471,6 +482,15 @@ instance ExpressionIndex SubExpression where
         }
 
 {- |
+ Lens for indexing an 'ExpressionIndex`
+-}
+exprAt :: ExpressionIndex e => Int -> Lens' e (Maybe e)
+exprAt n =
+  lens
+    (lookup n)
+    (\expr mReplace -> maybe expr (\re -> replace n re expr) mReplace)
+
+{- |
  Helper function for defining instances of 'ExpressionIndex.lookup`
 -}
 stlookupWith ::
@@ -496,9 +516,67 @@ stReplaceWith n t e = do
     else return e
 
 {- |
- Flatten an 'ExpressionIndex` into its respective components along with their indices.
+ Flatten an 'ExpressionIndex` into its respective components along with their indices
+ in reverse evaluation order.
+
+ Such that:
+
+ @e = (snd . head . flatten) e@
 -}
 flatten :: ExpressionIndex e => e -> [(Int, e)]
-flatten e =
-  map (second fromJust) . L.takeWhile (isJust . snd) $
-    [(n, e !! n) | n <- [1 ..]]
+flatten = foldIxGen (flip (:)) []
+
+{- |
+ Generate an infinite indexed list in evaluation order from an expression.
+
+ Calling @takeWhile (isJust . snd)@
+  will return a finite list of the expression's contents.
+-}
+exprIxGen :: ExpressionIndex e => e -> [(Int, Maybe e)]
+exprIxGen e = [(n, e !! n) | n <- [1 ..]]
+
+{- |
+ foldl' over a flattened 'ExpressionIndex` in reverse evaluation order.
+-}
+foldIxGen :: ExpressionIndex e => (a -> (Int, e) -> a) -> a -> e -> a
+foldIxGen foldF accum = go foldF accum . exprIxGen
+ where
+  go _ acc [] = acc
+  go _ acc ((_, Nothing) : _) = acc
+  go f acc (x : xs) = go f (f acc . second fromJust $ x) xs
+
+{- |
+ Find the latest evaluating subset of the expression.
+-}
+index :: (ExpressionIndex a, Eq a) => a -> a -> Maybe (Int, a)
+index needle = indexWith (== needle)
+
+{- |
+ Find the latest evaluating expression that satisfies the predicate.
+-}
+indexWith :: ExpressionIndex t => (t -> Bool) -> t -> Maybe (Int, t)
+indexWith p = foldIxGen (\m x@(_, a) -> m <|> (x <$ guard (p a))) Nothing
+
+{- |
+ Lifts a 'SubExpression` out of the domain of 'Tag` and in to the domain of 'File`
+-}
+liftSubExpression :: SubExpression -> Expression
+liftSubExpression se = case se of
+  SubTag tt -> TagTermValue tt
+  BinarySubExpression (BinaryOperation lhs so rhs) ->
+    BinaryExpression (BinaryOperation (liftSubExpression lhs) so (liftSubExpression rhs))
+  SubExpression tte -> TagExpression tte
+
+{- |
+ Attempt to lower an 'Expression` from the domain of 'File` to the domain of 'Tag`.
+
+ Fails if the expression contains a 'FileTermValue`.
+-}
+lowerExpression :: Expression -> Maybe SubExpression
+lowerExpression expr = case expr of
+  FileTermValue _ -> Nothing
+  TagTermValue tt -> Just . SubTag $ tt
+  TagExpression tte -> Just . SubExpression $ tte
+  BinaryExpression (BinaryOperation lhs so rhs) ->
+    BinarySubExpression
+      <$> (BinaryOperation <$> lowerExpression lhs <*> pure so <*> lowerExpression rhs)

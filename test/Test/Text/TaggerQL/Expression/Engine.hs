@@ -664,7 +664,7 @@ enginePropertyTests =
             "Original Expression can be retrieved from flatten"
             ( do
                 expr <- arbitrary :: Gen Expression
-                return . (==) expr . snd . last . flatten $ expr
+                return . (==) expr . snd . head . flatten $ expr
             )
         , testProperty
             "Replace an index with itself as an identity"
@@ -684,6 +684,29 @@ enginePropertyTests =
                         print replaceResult
                     )
                     tr
+            )
+        , testProperty
+            "index works"
+            ( do
+                expr <- arbitrary :: Gen Expression
+                n <-
+                  suchThat
+                    arbitrary
+                    ( \n ->
+                        isJust
+                          . Text.TaggerQL.Expression.Engine.lookup n
+                          $ expr
+                    )
+                let indexResult = fromJust $ Text.TaggerQL.Expression.Engine.lookup n expr
+                    ix' = index indexResult expr
+                return $
+                  whenFail
+                    ( print n
+                        >> print indexResult
+                        >> print (fmap fst ix')
+                        >> print (fmap snd ix')
+                    )
+                    $ maybe False (\(ixN, ixE) -> ixE == indexResult && ixN == n) ix'
             )
         ]
     ]
