@@ -44,7 +44,7 @@ import System.IO
 import Tagger.Info (taggerVersion)
 import Text.TaggerQL
 import Text.TaggerQL.Expression.AST (Ring (..))
-import Text.TaggerQL.Expression.Engine (runExpr)
+import Text.TaggerQL.Expression.Engine (exprAt, runExpr)
 import Text.TaggerQL.Expression.Parser (parseExpr)
 import Util
 
@@ -376,6 +376,8 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
                 conn
           return . DoFileSelectionEvent . PutFilesNoCombine $ r
       ]
+    UpdateExpression n expr ->
+      [Model $ model & fileSelectionModel . queryModel . expression . exprAt n ?~ expr]
 
 fileSelectionWidgetEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->

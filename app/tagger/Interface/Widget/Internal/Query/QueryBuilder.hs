@@ -1,5 +1,9 @@
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Redundant multi-way if" #-}
 
 module Interface.Widget.Internal.Query.QueryBuilder (
   expressionWidget,
@@ -12,15 +16,19 @@ import Control.Monad.Trans.State.Strict (
   get,
   modify,
  )
-import Data.Event (TaggerEvent)
+import Data.Event (QueryEvent (UpdateExpression), TaggerEvent (DoQueryEvent))
 import Data.Model (TaggerModel)
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
+import qualified Data.Text as T
+import Interface.Theme
 import Monomer
 import Text.TaggerQL.Expression.AST (
   BinaryOperation (BinaryOperation),
-  Expression,
+  Expression (..),
   FileTerm (FileTerm),
+  Ring (aid, mid),
+  SubExpression (..),
   TagTermExtension (TagTermExtension),
   tagTermPatternL,
  )
@@ -37,88 +45,138 @@ tShowSetOp Union = "|"
 tShowSetOp Intersect = "&"
 tShowSetOp Difference = "!"
 
-type IsNestedExpression = Bool
-
 expressionWidget :: Expression -> TaggerWidget
-expressionWidget =
-  box_ [alignTop, alignLeft]
-    . snd
-    . flip evalState 1
-    . runExpressionInterpreter expressionWidgetBuilder
+expressionWidget expr =
+  box_ [alignTop, alignLeft] $
+    vstack
+      [ hstack
+          [ draggable (mid :: Expression) $ label_ "all" [resizeFactor (-1)]
+          , spacer
+          , draggable (aid :: Expression) $ label_ "∅" [resizeFactor (-1)]
+          ]
+      , snd . flip evalState 1 $ runExpressionInterpreter expressionWidgetBuilder expr
+      ]
 
 expressionWidgetBuilder ::
   ExpressionInterpreter
     (State Int)
-    (IsNestedExpression, Int -> TaggerWidget)
-    (IsNestedExpression, TaggerWidget)
+    (SubExpression, Int -> TaggerWidget)
+    (Expression, TaggerWidget)
 expressionWidgetBuilder =
   ExpressionInterpreter
     { subExpressionInterpreter = subExpressionWidgetBuilder
     , interpretFileTerm = \(FileTerm t) -> do
-        _pos <- get
-        let w = label_ ("p." <> t) [resizeFactor (-1)]
+        pos <- get
+        let ex = FileTermValue . FileTerm $ t
+            w =
+              dragDropUpdater pos ex $
+                label_ ("p." <> t) [resizeFactor (-1)]
         modify (1 +)
-        return (False, w)
+        return (ex, w)
     , interpretTagTerm = \tt -> do
-        _pos <- get
-        let w = label_ (tt ^. tagTermPatternL) [resizeFactor (-1)]
+        pos <- get
+        let ex = TagTermValue tt
+            w =
+              dragDropUpdater pos ex $
+                label_ (tt ^. tagTermPatternL) [resizeFactor (-1)]
         modify (1 +)
-        return (False, w)
+        return (ex, w)
     , interpretBinaryExpression =
-        \(BinaryOperation (_, lhsw) so (rhsIsNested, rhsw)) -> do
-          _pos <- get
-          let w =
-                hstack
-                  [ lhsw
-                  , label_ (tShowSetOp so) [resizeFactor (-1)]
-                  , if rhsIsNested
-                      then
-                        hstack
-                          [ label_ "(" [resizeFactor (-1)]
-                          , rhsw
-                          , label_ ")" [resizeFactor (-1)]
-                          ]
-                      else rhsw
-                  ]
+        \bn@(BinaryOperation (lhs, lhsw) so (rhs, rhsw)) -> do
+          pos <- get
+          let mkBin =
+                let ex = BinaryExpression $ fmap fst bn
+                 in ( ex
+                    , draggable ex $
+                        if ex == aid
+                          then
+                            dragDropUpdater pos (aid :: Expression) $
+                              label_ "∅" [resizeFactor (-1)]
+                          else
+                            hstack
+                              [ lhsw
+                              , dropTarget_
+                                  (DoQueryEvent . UpdateExpression pos)
+                                  [dropTargetStyle [border 1 yuiOrange]]
+                                  $ label_ (tShowSetOp so) [resizeFactor (-1)]
+                              , if ( case rhs of
+                                      BinaryExpression _ -> True
+                                      _notNested -> False
+                                   )
+                                  then
+                                    hstack
+                                      [ label_ "(" [resizeFactor (-1)]
+                                      , rhsw
+                                      , label_ ")" [resizeFactor (-1)]
+                                      ]
+                                  else rhsw
+                              ]
+                    )
+              mkWidget = case so of
+                Union ->
+                  if
+                      | lhs == aid -> (rhs, rhsw)
+                      | rhs == aid -> (lhs, lhsw)
+                      | otherwise -> mkBin
+                Intersect ->
+                  if
+                      | lhs == mid -> (rhs, rhsw)
+                      | rhs == mid -> (lhs, lhsw)
+                      | otherwise -> mkBin
+                Difference ->
+                  if
+                      | lhs == aid ->
+                        ( aid
+                        , dragDropUpdater pos (aid :: Expression) $
+                            label_ "∅" [resizeFactor (-1)]
+                        )
+                      | rhs == aid -> (lhs, lhsw)
+                      | otherwise -> mkBin
           modify (1 +)
-          return (True, w)
+          return mkWidget
     , interpretTagExpression = \(TagTermExtension tt se') -> do
         pos <- get
-        let (_, se) = evalState se' 1
+        let (se, sew) = evalState se' 1
+            ex = TagExpression $ TagTermExtension tt se
             w =
-              hstack
-                [ label_ (tt ^. tagTermPatternL) [resizeFactor (-1)]
-                , hstack
-                    [ label_ "{" [resizeFactor (-1)]
-                    , se pos
-                    , label_ "}" [resizeFactor (-1)]
-                    ]
-                ]
+              dragDropUpdater pos ex $
+                hstack
+                  [ label_ (tt ^. tagTermPatternL) [resizeFactor (-1)]
+                  , hstack
+                      [ label_ "{" [resizeFactor (-1)]
+                      , sew pos
+                      , label_ "}" [resizeFactor (-1)]
+                      ]
+                  ]
         modify (1 +)
-        return (False, w)
+        return (ex, w)
     }
+ where
+  dragDropUpdater n dragExpr =
+    dropTarget_ (DoQueryEvent . UpdateExpression n) [dropTargetStyle [border 1 yuiOrange]]
+      . draggable dragExpr
 
 subExpressionWidgetBuilder ::
   SubExpressionInterpreter
     -- State tracking the index of the SubExpression as it is traversed
     (State Int)
     -- Where the snd function is a reader taking the parent Expression's index
-    (IsNestedExpression, Int -> TaggerWidget)
+    (SubExpression, Int -> TaggerWidget)
 subExpressionWidgetBuilder =
   SubExpressionInterpreter
     { interpretSubTag = \tt -> do
         _sepos <- get
         let w _exprPos = label_ (tt ^. tagTermPatternL) [resizeFactor (-1)]
         modify (1 +)
-        return (False, w)
+        return (SubTag tt, w)
     , interpretBinarySubExpression =
-        \(BinaryOperation (_, lhsw) so (rhsIsNested, rhsw)) -> do
+        \bn@(BinaryOperation (_, lhsw) so (rhs, rhsw)) -> do
           _pos <- get
           let w exprPos =
                 hstack
                   [ lhsw exprPos
                   , label_ (tShowSetOp so) [resizeFactor (-1)]
-                  , if rhsIsNested
+                  , if (case rhs of BinarySubExpression _ -> True; _notNested -> False)
                       then
                         hstack
                           [ label_ "(" [resizeFactor (-1)]
@@ -128,9 +186,9 @@ subExpressionWidgetBuilder =
                       else rhsw exprPos
                   ]
           modify (1 +)
-          return (True, w)
+          return (BinarySubExpression $ fmap fst bn, w)
     , interpretSubExpression = \(TagTermExtension tt se') -> do
-        (_, sew) <- se'
+        (se, sew) <- se'
         _sepos <- get
         let w exprPos =
               hstack
@@ -140,5 +198,5 @@ subExpressionWidgetBuilder =
                 , label_ "}" [resizeFactor (-1)]
                 ]
         modify (1 +)
-        return (False, w)
+        return (se, w)
     }
