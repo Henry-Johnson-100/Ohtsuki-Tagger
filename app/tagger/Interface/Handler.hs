@@ -370,13 +370,15 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
       [ let rawQuery = T.strip $ model ^. fileSelectionModel . queryModel . input . text
             action modelExpr = case T.splitAt 1 rawQuery of
               ("!", r) -> either (const modelExpr) (modelExpr <->) . parseExpr $ r
-              ("&", r) -> either (const modelExpr) (modelExpr <+>) . parseExpr $ r
+              ("&", r) -> either (const modelExpr) (modelExpr <^>) . parseExpr $ r
               ("|", r) -> either (const modelExpr) (modelExpr <+>) . parseExpr $ r
               (_defaultAction, _) ->
                 either (const modelExpr) (modelExpr <^>) . parseExpr $ rawQuery
          in Model $ model & fileSelectionModel . queryModel . expression %~ action
       , Event . Mempty $ TaggerLens $ fileSelectionModel . queryModel . input . text
       ]
+    ReplaceIndex (TaggerLens l) replaceWith ->
+      [Model $ model & fileSelectionModel . queryModel . expression . l ?~ replaceWith]
     RunQuery ->
       [ Task $ do
           r <-
@@ -387,7 +389,7 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
           return . DoFileSelectionEvent . PutFilesNoCombine $ r
       ]
     UpdateExpression n expr ->
-      [Model $ model & fileSelectionModel . queryModel . expression . exprAt n ?~ expr]
+      [Event . DoQueryEvent . ReplaceIndex (TaggerLens $ exprAt n) $ expr]
 
 fileSelectionWidgetEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
