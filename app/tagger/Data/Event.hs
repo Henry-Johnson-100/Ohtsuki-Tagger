@@ -18,7 +18,6 @@ module Data.Event (
 ) where
 
 import Data.HashMap.Strict (HashMap)
-import Data.HashSet (HashSet)
 import Data.IntMap.Strict (IntMap)
 import Data.Model.Core (DescriptorInfo, TaggerModel)
 import Data.Model.Lens (TaggerLens)

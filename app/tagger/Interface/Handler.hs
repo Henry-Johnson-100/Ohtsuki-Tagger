@@ -31,7 +31,6 @@ import qualified Data.Sequence as Seq
 import Data.Tagger
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.IO as T.IO
 import Data.Version (showVersion)
 import Database.Tagger
 import Interface.Handler.Internal

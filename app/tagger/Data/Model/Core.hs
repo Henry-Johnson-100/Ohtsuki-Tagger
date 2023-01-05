@@ -44,7 +44,6 @@ import Data.Model.Shared
 import Data.Sequence (Seq)
 import qualified Data.Sequence as S
 import qualified Data.Sequence as Seq
-import Data.Tagger
 import Data.Text (Text)
 import Database.Tagger.Type
 import Text.TaggerQL.Expression.AST
@@ -90,7 +89,6 @@ data FileSelectionModel = FileSelectionModel
   , _fileselectionChunkSize :: Int
   , _fileselectionChunkSequence :: Seq Int
   , _fileselectionFileSelectionInfoMap :: IntMap FileInfo
-  , _fileselectionSetOp :: SetOp
   , _fileselectionFileSelectionVis :: Visibility
   , _fileselectionAddFileInput :: TextInput
   , _fileselectionIsMassOpMode :: Bool
@@ -107,7 +105,6 @@ createFileSelectionModel =
     , _fileselectionChunkSize = 50
     , _fileselectionChunkSequence = S.singleton 0
     , _fileselectionFileSelectionInfoMap = IntMap.empty
-    , _fileselectionSetOp = Union
     , _fileselectionFileSelectionVis = VisibilityMain
     , _fileselectionAddFileInput = createTextInput 10
     , _fileselectionIsMassOpMode = False

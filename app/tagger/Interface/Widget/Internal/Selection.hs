@@ -55,7 +55,6 @@ import Data.Model.Lens (
   HasOccurrences (occurrences),
   HasOrdering (ordering),
   HasSelection (selection),
-  HasSetOp (setOp),
   HasShellText (shellText),
   TaggerLens (TaggerLens),
   addFileInput,
@@ -80,7 +79,6 @@ import Data.Model.Shared.Lens (
 import qualified Data.Ord as O
 import Data.Sequence ((|>))
 import qualified Data.Sequence as Seq
-import Data.Tagger (SetOp (Difference, Intersect, Union))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger (Descriptor (descriptor), File (File), descriptorId)
@@ -120,7 +118,6 @@ import Monomer (
   black,
   box_,
   draggable,
-  dropdown,
   hgrid_,
   hstack,
   hstack_,
@@ -163,21 +160,7 @@ widget m =
     hstack_
       []
       [ selectionSizeLabel m
-      , setOpDropdown
       ]
-
-setOpDropdown :: TaggerWidget
-setOpDropdown =
-  withStyleBasic [bgColor yuiLightPeach]
-    . tooltip_
-      "Choose how to combine the current selection with subsequent queries."
-      [tooltipDelay 1000]
-    . withStyleBasic [bgColor (yuiLightPeach & a .~ defaultElementOpacity)]
-    $ dropdown
-      (fileSelectionModel . setOp)
-      [Union, Intersect, Difference]
-      (flip label_ [resizeFactor (-1)] . T.pack . show)
-      (flip label_ [resizeFactor (-1)] . T.pack . show)
 
 clearSelectionButton :: TaggerWidget
 clearSelectionButton =

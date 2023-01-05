@@ -14,8 +14,6 @@ import Data.Event (
   ),
   TaggerEvent (
     DoFileSelectionEvent,
-    NextCyclicEnum,
-    PrevCyclicEnum,
     RefreshUI,
     ToggleVisibilityLabel
   ),
@@ -24,11 +22,9 @@ import Data.Event (
 import Data.Model (
   HasFileDetailAndDescriptorTreePosH (fileDetailAndDescriptorTreePosH),
   HasFileDetailAndDescriptorTreePosV (fileDetailAndDescriptorTreePosV),
-  HasFileSelectionModel (fileSelectionModel),
   HasPositioningModel (positioningModel),
   HasSelectionAndQueryPosH (selectionAndQueryPosH),
   HasSelectionAndQueryPosV (selectionAndQueryPosV),
-  HasSetOp (setOp),
   HasVisibilityModel (visibilityModel),
   TaggerLens (TaggerLens),
   TaggerModel,
@@ -193,8 +189,6 @@ globalKeystrokes m =
               ]
             else [SetFocusOnKey . WidgetKey $ Query.queryTextFieldKey]
       )
-    , ("Ctrl-g", NextCyclicEnum $ TaggerLens (fileSelectionModel . setOp))
-    , ("Ctrl-Shift-g", PrevCyclicEnum $ TaggerLens (fileSelectionModel . setOp))
     , ("Ctrl-u", DoFileSelectionEvent ClearSelection)
     ,
       ( "Ctrl-h"
