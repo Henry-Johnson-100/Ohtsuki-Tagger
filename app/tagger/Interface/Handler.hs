@@ -11,7 +11,7 @@ module Interface.Handler (
   taggerEventHandler,
 ) where
 
-import Control.Lens
+import Control.Lens ((%~), (&), (.~), (<|), (?~), (^.), (|>))
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
@@ -43,8 +43,8 @@ import System.FilePath
 import System.IO
 import Tagger.Info (taggerVersion)
 import Text.TaggerQL
-import Text.TaggerQL.Expression.AST (Ring (..))
-import Text.TaggerQL.Expression.Engine (exprAt, runExpr)
+import Text.TaggerQL.Expression.AST (Expression (BinaryExpression), Ring (..), soL)
+import Text.TaggerQL.Expression.Engine (exprAt, index, runExpr)
 import Text.TaggerQL.Expression.Parser (parseExpr)
 import Util
 
@@ -356,6 +356,16 @@ queryEventHandler ::
   [AppEventResponse TaggerModel TaggerEvent]
 queryEventHandler _wenv _node model@((^. connection) -> conn) event =
   case event of
+    CycleSetOp n ->
+      [ Model $
+          model & fileSelectionModel . queryModel . expression . exprAt n
+            %~ ( \mexpr -> do
+                  expr <- mexpr
+                  case expr of
+                    BinaryExpression bn -> Just . BinaryExpression $ bn & soL %~ next
+                    _notBinary -> Nothing
+               )
+      ]
     PushExpression ->
       [ let rawQuery = T.strip $ model ^. fileSelectionModel . queryModel . input . text
             action modelExpr = case T.splitAt 1 rawQuery of

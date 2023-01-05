@@ -16,12 +16,14 @@ import Control.Monad.Trans.State.Strict (
   get,
   modify,
  )
-import Data.Event (QueryEvent (UpdateExpression), TaggerEvent (DoQueryEvent))
+import Data.Event (QueryEvent (CycleSetOp, UpdateExpression), TaggerEvent (DoQueryEvent, Unit))
 import Data.Model (TaggerModel)
+import Data.Monoid (Sum (..))
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Interface.Theme
+import Interface.Widget.Internal.Core
 import Monomer
 import Text.TaggerQL.Expression.AST (
   BinaryOperation (BinaryOperation),
@@ -33,8 +35,12 @@ import Text.TaggerQL.Expression.AST (
   tagTermPatternL,
  )
 import Text.TaggerQL.Expression.Engine (
+  ExpressionIndex,
   ExpressionInterpreter (..),
   SubExpressionInterpreter (..),
+  flatten,
+  foldIxGen,
+  index,
   runExpressionInterpreter,
  )
 
@@ -82,35 +88,56 @@ expressionWidgetBuilder =
         modify (1 +)
         return (ex, w)
     , interpretBinaryExpression =
-        \bn@(BinaryOperation (lhs, lhsw) so (rhs, rhsw)) -> do
+        \bn@(BinaryOperation lhst@(lhs, lhsw) so rhst@(rhs, rhsw)) -> do
           pos <- get
           let mkBin =
                 let ex = BinaryExpression $ fmap fst bn
+                    mkEitherOperandWidget e =
+                      withStyleHover [border 1 yuiOrange] $
+                        hstack
+                          [ snd . either id id $ e
+                          , withStyleBasic [textSize 5]
+                              . box_ [alignTop, alignRight]
+                              $ styledButton_
+                                [resizeFactor (-1)]
+                                "x"
+                                ( DoQueryEvent
+                                    . UpdateExpression pos
+                                    $ ( case e of
+                                          Right _ -> lhs
+                                          Left _ -> rhs
+                                      )
+                                )
+                          ]
+                    w =
+                      hstack
+                        [ mkEitherOperandWidget . Left $ lhst
+                        , dropTarget_
+                            (DoQueryEvent . UpdateExpression pos)
+                            [dropTargetStyle [border 1 yuiOrange]]
+                            $ styledButton_
+                              [resizeFactor (-1)]
+                              (tShowSetOp so)
+                              (DoQueryEvent $ CycleSetOp pos)
+                        , if ( case rhs of
+                                BinaryExpression _ -> True
+                                _notNested -> False
+                             )
+                            then
+                              hstack
+                                [ label_ "(" [resizeFactor (-1)]
+                                , mkEitherOperandWidget . Right $ rhst
+                                , label_ ")" [resizeFactor (-1)]
+                                ]
+                            else mkEitherOperandWidget . Right $ rhst
+                        ]
                  in ( ex
                     , draggable ex $
                         if ex == aid
                           then
                             dragDropUpdater pos (aid :: Expression) $
                               label_ "∅" [resizeFactor (-1)]
-                          else
-                            hstack
-                              [ lhsw
-                              , dropTarget_
-                                  (DoQueryEvent . UpdateExpression pos)
-                                  [dropTargetStyle [border 1 yuiOrange]]
-                                  $ label_ (tShowSetOp so) [resizeFactor (-1)]
-                              , if ( case rhs of
-                                      BinaryExpression _ -> True
-                                      _notNested -> False
-                                   )
-                                  then
-                                    hstack
-                                      [ label_ "(" [resizeFactor (-1)]
-                                      , rhsw
-                                      , label_ ")" [resizeFactor (-1)]
-                                      ]
-                                  else rhsw
-                              ]
+                          else w
                     )
               mkWidget = case so of
                 Union ->
@@ -155,6 +182,16 @@ expressionWidgetBuilder =
   dragDropUpdater n dragExpr =
     dropTarget_ (DoQueryEvent . UpdateExpression n) [dropTargetStyle [border 1 yuiOrange]]
       . draggable dragExpr
+
+relativeToParent ::
+  (Eq b, ExpressionIndex b) =>
+  b ->
+  b ->
+  Maybe (Sum Int)
+relativeToParent parentExpr childExpr = do
+  let parentSize = fst . head . flatten $ parentExpr
+  relChildPos <- fst <$> index childExpr parentExpr
+  return . Sum $ relChildPos - parentSize
 
 subExpressionWidgetBuilder ::
   SubExpressionInterpreter

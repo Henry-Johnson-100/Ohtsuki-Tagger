@@ -109,7 +109,8 @@ data FileSelectionEvent
   deriving (Show, Eq)
 
 data QueryEvent
-  = PushExpression
+  = CycleSetOp Int
+  | PushExpression
   | RunQuery
   | UpdateExpression Int Expression
 
