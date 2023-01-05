@@ -44,6 +44,9 @@ import System.FilePath
 import System.IO
 import Tagger.Info (taggerVersion)
 import Text.TaggerQL
+import Text.TaggerQL.Expression.AST (Ring (..))
+import Text.TaggerQL.Expression.Engine (runExpr)
+import Text.TaggerQL.Expression.Parser (parseExpr)
 import Util
 
 taggerEventHandler ::
@@ -62,6 +65,7 @@ taggerEventHandler
       DoFileSelectionEvent e -> fileSelectionEventHandler wenv node model e
       DoDescriptorTreeEvent e -> descriptorTreeEventHandler wenv node model e
       DoTaggerInfoEvent e -> taggerInfoEventHandler wenv node model e
+      DoQueryEvent e -> queryEventHandler wenv node model e
       TaggerInit ->
         [ Event (DoDescriptorTreeEvent DescriptorTreeInit)
         , Task
@@ -148,12 +152,7 @@ fileSelectionEventHandler
             , Event . Mempty $ TaggerLens (fileSelectionModel . addFileInput . text)
             ]
       ClearSelection ->
-        [ Model $
-            model & fileSelectionModel . selection .~ Seq.empty
-              & fileSelectionTagListModel . occurrences .~ HM.empty
-              & fileSelectionModel . fileSelectionInfoMap .~ IntMap.empty
-              & fileSelectionModel . fileSelectionVis .~ VisibilityMain
-        ]
+        [Model $ model & fileSelectionModel . queryModel . expression .~ mid]
       CycleNextFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []
@@ -200,22 +199,6 @@ fileSelectionEventHandler
                 .. selectionChunkLength model
                 ]
         ]
-      PutFiles fs ->
-        let currentSet =
-              HS.fromList
-                . F.toList
-                $ model ^. fileSelectionModel . selection
-            combFun =
-              case model ^. fileSelectionModel . setOp of
-                Union -> HS.union
-                Intersect -> HS.intersection
-                Difference -> HS.difference
-            newSeq =
-              Seq.fromList
-                . HS.toList
-                . combFun currentSet
-                $ fs
-         in [Event . DoFileSelectionEvent . PutFilesNoCombine $ newSeq]
       PutFilesNoCombine
         ( uncurry (Seq.><)
             . (\(x, y) -> (y, x))
@@ -245,29 +228,6 @@ fileSelectionEventHandler
                )
       PutTagOccurrenceHashMap_ ohm ->
         [Model $ model & fileSelectionTagListModel . occurrences .~ ohm]
-      Query ->
-        [ Task
-            ( do
-                r <-
-                  runExceptT $
-                    runQuery
-                      conn
-                      (T.strip $ model ^. fileSelectionModel . queryModel . input . text)
-                either
-                  (mapM_ T.IO.putStrLn >=> (pure . Unit))
-                  (return . DoFileSelectionEvent . PutFiles)
-                  r
-            )
-        , Model $
-            model & fileSelectionModel . queryModel . input . history
-              %~ putHist
-                ( T.strip $
-                    model ^. fileSelectionModel . queryModel . input . text
-                )
-        , Event . Mempty $ TaggerLens (fileSelectionModel . queryModel . input . text)
-        , Event . Mempty $
-            TaggerLens (fileSelectionModel . queryModel . input . history . historyIndex)
-        ]
       RefreshSpecificFile fk ->
         [ Task
             ( do
@@ -388,6 +348,35 @@ fileSelectionEventHandler
                 . fileSelectionVis
               %~ toggleAltVis
         ]
+
+queryEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  QueryEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+queryEventHandler _wenv _node model@((^. connection) -> conn) event =
+  case event of
+    PushExpression ->
+      [ let rawQuery = T.strip $ model ^. fileSelectionModel . queryModel . input . text
+            action modelExpr = case T.splitAt 1 rawQuery of
+              ("!", r) -> either (const modelExpr) (modelExpr <->) . parseExpr $ r
+              ("&", r) -> either (const modelExpr) (modelExpr <+>) . parseExpr $ r
+              ("|", r) -> either (const modelExpr) (modelExpr <+>) . parseExpr $ r
+              (_defaultAction, _) ->
+                either (const modelExpr) (modelExpr <^>) . parseExpr $ rawQuery
+         in Model $ model & fileSelectionModel . queryModel . expression %~ action
+      , Event . Mempty $ TaggerLens $ fileSelectionModel . queryModel . input . text
+      ]
+    RunQuery ->
+      [ Task $ do
+          r <-
+            HS.foldl' (Seq.|>) Seq.empty
+              <$> runExpr
+                (model ^. fileSelectionModel . queryModel . expression)
+                conn
+          return . DoFileSelectionEvent . PutFilesNoCombine $ r
+      ]
 
 fileSelectionWidgetEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->

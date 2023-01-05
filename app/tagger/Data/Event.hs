@@ -10,6 +10,7 @@ module Data.Event (
   TaggerAnonymousEvent (..),
   anonymousEvent,
   FileSelectionEvent (..),
+  QueryEvent (..),
   FileSelectionWidgetEvent (..),
   DescriptorTreeEvent (..),
   FocusedFileEvent (..),
@@ -42,6 +43,7 @@ data TaggerEvent
   | DoFileSelectionEvent FileSelectionEvent
   | DoDescriptorTreeEvent DescriptorTreeEvent
   | DoTaggerInfoEvent TaggerInfoEvent
+  | DoQueryEvent QueryEvent
   | TaggerInit
   | RefreshUI
   | CloseConnection
@@ -89,10 +91,8 @@ data FileSelectionEvent
   | IncludeTagListInfraToPattern Text
   | MakeFileSelectionInfoMap (Seq File)
   | PutChunkSequence
-  | PutFiles (HashSet File)
   | PutFilesNoCombine (Seq File)
   | PutTagOccurrenceHashMap_ (HashMap Descriptor Int)
-  | Query
   | RefreshFileSelection
   | RefreshSpecificFile (RecordKey File)
   | RefreshSpecificFile_ File
@@ -107,6 +107,10 @@ data FileSelectionEvent
   | ShuffleSelection
   | ToggleSelectionView
   deriving (Show, Eq)
+
+data QueryEvent
+  = PushExpression
+  | RunQuery
 
 data FileSelectionWidgetEvent
   = CycleNextChunk

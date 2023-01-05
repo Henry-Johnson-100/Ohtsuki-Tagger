@@ -32,7 +32,6 @@ module Data.Model.Core (
   defaultFileDetailAndDescriptorTreePositioningModel,
 ) where
 
-import Control.Lens
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HM
 import Data.HashSet (HashSet)
@@ -123,8 +122,8 @@ data QueryModel = QueryModel
 createQueryModel :: QueryModel
 createQueryModel =
   QueryModel
-    { _queryInput = createTextInput 10 & text .~ "p.%"
-    , _queryExpression = FileTermValue . FileTerm $ "%"
+    { _queryInput = createTextInput 10
+    , _queryExpression = mid
     }
 
 data FileSelectionTagListModel = FileSelectionTagListModel

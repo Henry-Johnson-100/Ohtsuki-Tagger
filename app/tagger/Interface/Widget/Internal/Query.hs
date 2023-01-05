@@ -9,14 +9,12 @@ module Interface.Widget.Internal.Query (
   widget,
 ) where
 
-import Control.Lens ((&), (.~))
+import Control.Lens ((&), (.~), (^.))
 import Data.Event (
-  FileSelectionEvent (
-    Query
-  ),
+  QueryEvent (PushExpression, RunQuery),
   TaggerEvent (
     AppendText,
-    DoFileSelectionEvent,
+    DoQueryEvent,
     Mempty,
     NextHistory,
     PrevHistory,
@@ -47,6 +45,7 @@ import Interface.Widget.Internal.Core (
   withNodeKey,
   withStyleBasic,
  )
+import Interface.Widget.Internal.Query.QueryBuilder
 import Interface.Widget.Internal.Type (TaggerWidget)
 import Monomer (
   CmbAlignBottom (alignBottom),
@@ -62,18 +61,23 @@ import Monomer (
   dropTarget_,
   keystroke_,
   textField_,
+  vstack,
  )
 import Monomer.Graphics.Lens (HasA (a))
 
 widget :: TaggerModel -> TaggerWidget
-widget _ =
-  container
-    queryTextField
+widget m =
+  vstack
+    [ expressionWidget $ m ^. fileSelectionModel . queryModel . expression
+    , container
+        queryTextField
+    ]
 
 queryTextField :: TaggerWidget
 queryTextField =
   keystroke_
-    [ ("Enter", DoFileSelectionEvent Query)
+    [ ("Enter", DoQueryEvent PushExpression)
+    , ("Shift-Enter", DoQueryEvent RunQuery)
     , ("Up", NextHistory $ TaggerLens (fileSelectionModel . queryModel . input))
     , ("Down", PrevHistory $ TaggerLens (fileSelectionModel . queryModel . input))
     ]
