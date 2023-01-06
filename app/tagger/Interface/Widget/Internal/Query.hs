@@ -9,7 +9,7 @@ module Interface.Widget.Internal.Query (
   widget,
 ) where
 
-import Control.Lens ((&), (.~), (^.))
+import Control.Lens ((&), (.~))
 import Data.Event (
   QueryEvent (PushExpression, RunQuery),
   TaggerEvent (
@@ -45,7 +45,6 @@ import Interface.Widget.Internal.Core (
   withNodeKey,
   withStyleBasic,
  )
-import Interface.Widget.Internal.Query.QueryBuilder
 import Interface.Widget.Internal.Type (TaggerWidget)
 import Monomer (
   CmbAlignBottom (alignBottom),
@@ -60,15 +59,17 @@ import Monomer (
   dropTargetStyle,
   dropTarget_,
   keystroke_,
+  resizeFactor,
   textField_,
+  toggleButton_,
   vstack,
  )
 import Monomer.Graphics.Lens (HasA (a))
 
 widget :: TaggerModel -> TaggerWidget
-widget m =
+widget _ =
   vstack
-    [ expressionWidget $ m ^. fileSelectionModel . queryModel . expression
+    [ toggleButton_ "Edit" queryEditMode [resizeFactor (-1)]
     , container
         queryTextField
     ]

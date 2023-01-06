@@ -60,6 +60,7 @@ data TaggerModel = TaggerModel
     -- the FocusedFile and FileSelection models. I am not willing to combine those two
     -- so this will stay here for now.
     _taggerShellText :: Text
+  , _taggerQueryEditMode :: Bool
   }
   deriving (Show, Eq)
 
@@ -79,6 +80,7 @@ createTaggerModel tc d unRelatedD defaultFilePath =
     , _taggermodelVisibilityModel = VisibilityMain
     , _taggermodelConnection = tc
     , _taggerShellText = ""
+    , _taggerQueryEditMode = False
     }
 
 data FileSelectionModel = FileSelectionModel

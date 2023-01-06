@@ -19,18 +19,24 @@ import Data.Event (
   ),
   anonymousEvent,
  )
-import Data.Model (
-  HasFileDetailAndDescriptorTreePosH (fileDetailAndDescriptorTreePosH),
-  HasFileDetailAndDescriptorTreePosV (fileDetailAndDescriptorTreePosV),
-  HasPositioningModel (positioningModel),
-  HasSelectionAndQueryPosH (selectionAndQueryPosH),
-  HasSelectionAndQueryPosV (selectionAndQueryPosV),
-  HasVisibilityModel (visibilityModel),
-  TaggerLens (TaggerLens),
+import Data.Model.Core (
   TaggerModel,
   createPositioningModel,
   defaultFileDetailAndDescriptorTreePositioningModel,
   defaultSelectionAndQueryPositioningModel,
+ )
+import Data.Model.Lens (
+  HasExpression (expression),
+  HasFileDetailAndDescriptorTreePosH (fileDetailAndDescriptorTreePosH),
+  HasFileDetailAndDescriptorTreePosV (fileDetailAndDescriptorTreePosV),
+  HasFileSelectionModel (fileSelectionModel),
+  HasPositioningModel (positioningModel),
+  HasQueryEditMode (queryEditMode),
+  HasQueryModel (queryModel),
+  HasSelectionAndQueryPosH (selectionAndQueryPosH),
+  HasSelectionAndQueryPosV (selectionAndQueryPosV),
+  HasVisibilityModel (visibilityModel),
+  TaggerLens (TaggerLens),
  )
 import Data.Model.Shared.Core (
   Visibility (VisibilityLabel),
@@ -41,12 +47,16 @@ import Interface.Theme (yuiLightPeach)
 import Interface.Widget.Internal.Core (
   defaultElementOpacity,
   withNodeHidden,
+  withNodeVisible,
   withStyleBasic,
  )
 import qualified Interface.Widget.Internal.DescriptorTree as DescriptorTree
 import qualified Interface.Widget.Internal.FileDetail as FileDetail
 import qualified Interface.Widget.Internal.FilePreview as FilePreview
 import qualified Interface.Widget.Internal.Query as Query
+import Interface.Widget.Internal.Query.QueryBuilder (
+  expressionWidget,
+ )
 import qualified Interface.Widget.Internal.Selection as Selection
 import Interface.Widget.Internal.Type (TaggerWidget)
 import Monomer (
@@ -65,8 +75,10 @@ import Monomer (
   WidgetKey (WidgetKey),
   black,
   box_,
+  expandContent,
   hsplit_,
   keystroke_,
+  onlyTopActive,
   onlyTopActive_,
   spacer_,
   splitHandlePos,
@@ -81,11 +93,25 @@ taggerApplicationUI ::
   TaggerModel ->
   TaggerWidget
 taggerApplicationUI _ m =
-  globalKeystrokes m
-    . baseZStack m
-    $ [ selectionQueryLayer m
-      , fileDetailAndDescriptorTreeLayer m
-      ]
+  globalKeystrokes m . zstack_ [onlyTopActive] $
+    [ baseZStack
+        m
+        [ selectionQueryLayer m
+        , fileDetailAndDescriptorTreeLayer m
+        ]
+    , queryEditorPane m
+    ]
+
+queryEditorPane :: TaggerModel -> TaggerWidget
+queryEditorPane m =
+  withNodeVisible (m ^. queryEditMode)
+    . withStyleBasic [bgColor yuiLightPeach]
+    . box_ [expandContent]
+    . expressionWidget
+    $ m
+      ^. fileSelectionModel
+        . queryModel
+        . expression
 
 globalWidgetHideLabel :: Text
 globalWidgetHideLabel = "global-widget-hide"

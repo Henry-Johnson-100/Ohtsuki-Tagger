@@ -17,7 +17,7 @@ import Control.Monad.Trans.State.Strict (
   modify,
  )
 import Data.Event (QueryEvent (CycleExprSetOpAt, RingProduct, UpdateExpression, UpdateSubExpression), TaggerEvent (DoQueryEvent, Unit))
-import Data.Model (TaggerModel, fileSelectionModel, queryModel)
+import Data.Model (TaggerModel, fileSelectionModel, queryEditMode, queryModel)
 import Data.Model.Lens (expression)
 import Data.Monoid (Sum (..))
 import Data.Tagger (SetOp (..))
@@ -81,9 +81,7 @@ expressionWidget expr =
       ]
     $ vstack
       [ hstack
-          [ draggable (mid :: Expression) $ label_ "all" [resizeFactor (-1)]
-          , spacer
-          , draggable (aid :: Expression) $ label_ "∅" [resizeFactor (-1)]
+          [ toggleButton_ "Exit" queryEditMode [resizeFactor (-1)]
           ]
       , snd . flip evalState 1 $ runExpressionInterpreter expressionWidgetBuilder expr
       ]
