@@ -16,12 +16,14 @@ import Control.Monad.Trans.State.Strict (
   get,
   modify,
  )
-import Data.Event (QueryEvent (CycleSetOp, UpdateExpression), TaggerEvent (DoQueryEvent, Unit))
-import Data.Model (TaggerModel)
+import Data.Event (QueryEvent (CycleExprSetOpAt, RingProduct, UpdateExpression, UpdateSubExpression), TaggerEvent (DoQueryEvent, Unit))
+import Data.Model (TaggerModel, fileSelectionModel, queryModel)
+import Data.Model.Lens (expression)
 import Data.Monoid (Sum (..))
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
+import Database.Tagger (Descriptor (Descriptor), concreteTagDescriptor, descriptor)
 import Interface.Theme
 import Interface.Widget.Internal.Core
 import Monomer
@@ -31,6 +33,7 @@ import Text.TaggerQL.Expression.AST (
   FileTerm (FileTerm),
   Ring (aid, mid),
   SubExpression (..),
+  TagTerm (MetaDescriptorTerm),
   TagTermExtension (TagTermExtension),
   tagTermPatternL,
  )
@@ -53,8 +56,30 @@ tShowSetOp Difference = "!"
 
 expressionWidget :: Expression -> TaggerWidget
 expressionWidget expr =
-  box_ [alignTop, alignLeft] $
-    vstack
+  dropTarget_
+    ( \ct ->
+        DoQueryEvent $
+          RingProduct
+            expression
+            (TagTermValue . MetaDescriptorTerm . descriptor . concreteTagDescriptor $ ct)
+    )
+    [dropTargetStyle [border 1 yuiRed]]
+    . dropTarget_
+      ( \(Descriptor _ p) ->
+          DoQueryEvent $
+            RingProduct expression (TagTermValue . MetaDescriptorTerm $ p)
+      )
+      [dropTargetStyle [border 1 yuiBlue]]
+    . box_
+      [ alignTop
+      , alignLeft
+      , mergeRequired
+          ( \_wenv a b ->
+              let l = fileSelectionModel . queryModel . expression
+               in a ^. l /= b ^. l
+          )
+      ]
+    $ vstack
       [ hstack
           [ draggable (mid :: Expression) $ label_ "all" [resizeFactor (-1)]
           , spacer
@@ -118,7 +143,7 @@ expressionWidgetBuilder =
                             $ styledButton_
                               [resizeFactor (-1)]
                               (tShowSetOp so)
-                              (DoQueryEvent $ CycleSetOp pos)
+                              (DoQueryEvent $ CycleExprSetOpAt pos)
                         , if ( case rhs of
                                 BinaryExpression _ -> True
                                 _notNested -> False
@@ -202,10 +227,13 @@ subExpressionWidgetBuilder ::
 subExpressionWidgetBuilder =
   SubExpressionInterpreter
     { interpretSubTag = \tt -> do
-        _sepos <- get
-        let w _exprPos = label_ (tt ^. tagTermPatternL) [resizeFactor (-1)]
+        sePos <- get
+        let se = SubTag tt
+            w exprPos =
+              dragDropUpdater exprPos sePos se $
+                label_ (tt ^. tagTermPatternL) [resizeFactor (-1)]
         modify (1 +)
-        return (SubTag tt, w)
+        return (se, w)
     , interpretBinarySubExpression =
         \bn@(BinaryOperation (_, lhsw) so (rhs, rhsw)) -> do
           _pos <- get
@@ -226,14 +254,22 @@ subExpressionWidgetBuilder =
           return (BinarySubExpression $ fmap fst bn, w)
     , interpretSubExpression = \(TagTermExtension tt se') -> do
         (se, sew) <- se'
-        _sepos <- get
-        let w exprPos =
-              hstack
-                [ label_ (tt ^. tagTermPatternL) [resizeFactor (-1)]
-                , label_ "{" [resizeFactor (-1)]
-                , sew exprPos
-                , label_ "}" [resizeFactor (-1)]
-                ]
+        sePos <- get
+        let ttese = SubExpression $ TagTermExtension tt se
+            w exprPos =
+              draggable ttese $
+                hstack
+                  [ draggable tt $ label_ (tt ^. tagTermPatternL) [resizeFactor (-1)]
+                  , label_ "{" [resizeFactor (-1)]
+                  , sew exprPos
+                  , label_ "}" [resizeFactor (-1)]
+                  ]
         modify (1 +)
-        return (se, w)
+        return (ttese, w)
     }
+ where
+  dragDropUpdater exprPos sePos se =
+    dropTarget_
+      (DoQueryEvent . UpdateSubExpression exprPos sePos)
+      [dropTargetStyle [border 1 yuiOrange]]
+      . draggable se

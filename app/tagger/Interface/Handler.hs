@@ -43,8 +43,8 @@ import System.FilePath
 import System.IO
 import Tagger.Info (taggerVersion)
 import Text.TaggerQL
-import Text.TaggerQL.Expression.AST (Expression (BinaryExpression), Ring (..), soL)
-import Text.TaggerQL.Expression.Engine (exprAt, index, runExpr)
+import Text.TaggerQL.Expression.AST (Expression (BinaryExpression), Ring (..), SubExpression (BinarySubExpression), soL)
+import Text.TaggerQL.Expression.Engine (exprAt, runExpr, subExprAtL)
 import Text.TaggerQL.Expression.Parser (parseExpr)
 import Util
 
@@ -356,7 +356,7 @@ queryEventHandler ::
   [AppEventResponse TaggerModel TaggerEvent]
 queryEventHandler _wenv _node model@((^. connection) -> conn) event =
   case event of
-    CycleSetOp n ->
+    CycleExprSetOpAt n ->
       [ Model $
           model & fileSelectionModel . queryModel . expression . exprAt n
             %~ ( \mexpr -> do
@@ -365,6 +365,19 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
                     BinaryExpression bn -> Just . BinaryExpression $ bn & soL %~ next
                     _notBinary -> Nothing
                )
+      ]
+    CycleSubExprSetOpAt exprIx seIx ->
+      [ Model $
+          model
+            & fileSelectionModel
+              . queryModel
+              . expression
+              . subExprAtL exprIx seIx
+            %~ fmap
+              ( \se -> case se of
+                  BinarySubExpression bn -> BinarySubExpression $ bn & soL %~ next
+                  _notBN -> se
+              )
       ]
     PushExpression ->
       [ let rawQuery = T.strip $ model ^. fileSelectionModel . queryModel . input . text
@@ -377,8 +390,6 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
          in Model $ model & fileSelectionModel . queryModel . expression %~ action
       , Event . Mempty $ TaggerLens $ fileSelectionModel . queryModel . input . text
       ]
-    ReplaceIndex (TaggerLens l) replaceWith ->
-      [Model $ model & fileSelectionModel . queryModel . expression . l ?~ replaceWith]
     RunQuery ->
       [ Task $ do
           r <-
@@ -388,8 +399,19 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
                 conn
           return . DoFileSelectionEvent . PutFilesNoCombine $ r
       ]
+    RingProduct l r ->
+      [Model $ model & fileSelectionModel . queryModel . l %~ (<^> r)]
     UpdateExpression n expr ->
-      [Event . DoQueryEvent . ReplaceIndex (TaggerLens $ exprAt n) $ expr]
+      [Model $ model & fileSelectionModel . queryModel . expression . exprAt n ?~ expr]
+    UpdateSubExpression exprIx seIx se ->
+      [ Model $
+          model
+            & fileSelectionModel
+              . queryModel
+              . expression
+              . subExprAtL exprIx seIx
+            ?~ se
+      ]
 
 fileSelectionWidgetEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->

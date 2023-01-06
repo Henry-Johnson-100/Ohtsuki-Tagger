@@ -14,6 +14,8 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_HADDOCK prune #-}
 
+{-# HLINT ignore "Use lambda-case" #-}
+
 {- |
 Module      : Text.TaggerQL.Expression.Engine
 Description : The interpreter for the TaggerQL query language.
@@ -41,6 +43,7 @@ module Text.TaggerQL.Expression.Engine (
   -- * Indexing
   ExpressionIndex (..),
   exprAt,
+  subExprAtL,
   foldIxGen,
   flatten,
   index,
@@ -94,7 +97,7 @@ import Database.Tagger.Type (
   TaggedConnection,
   descriptorId,
  )
-import Lens.Micro (Lens', lens)
+import Lens.Micro (Lens', lens, (%~), (&), (.~), (?~), (^.))
 import Text.Parsec.Error (errorMessages, messageString)
 import Text.RawString.QQ (r)
 import Text.TaggerQL.Expression.AST (
@@ -104,6 +107,7 @@ import Text.TaggerQL.Expression.AST (
   SubExpression (..),
   TagTerm (..),
   TagTermExtension (TagTermExtension),
+  extensionL,
  )
 import Text.TaggerQL.Expression.Parser (parseExpr, parseTagExpr)
 import Prelude hiding (lookup, (!!))
@@ -489,6 +493,32 @@ exprAt n =
   lens
     (lookup n)
     (\expr mReplace -> maybe expr (\re -> replace n re expr) mReplace)
+
+{- |
+ A less general lens for traversing an 'Expression` for a 'SubExpression`
+
+ Where the first integer is an index of an expression and the second is the index
+ of a subexpression contained in it.
+-}
+subExprAtL :: Int -> Int -> Lens' Expression (Maybe SubExpression)
+subExprAtL exprIx seIx =
+  lens
+    ( \expr -> case expr ^. exprAt exprIx of
+        Just ex ->
+          case ex of
+            TagExpression tte -> tte ^. extensionL . exprAt seIx
+            _noSE -> Nothing
+        _noEx -> Nothing
+    )
+    ( \expr mse ->
+        expr & exprAt exprIx
+          %~ fmap
+            ( \ex -> case ex of
+                TagExpression tte ->
+                  TagExpression $ tte & extensionL %~ exprAt seIx .~ mse
+                _noSE -> ex
+            )
+    )
 
 {- |
  Helper function for defining instances of 'ExpressionIndex.lookup`

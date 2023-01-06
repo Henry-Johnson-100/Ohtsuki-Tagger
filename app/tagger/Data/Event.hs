@@ -17,9 +17,10 @@ module Data.Event (
   TaggerInfoEvent (..),
 ) where
 
+import Control.Lens (Lens')
 import Data.HashMap.Strict (HashMap)
 import Data.IntMap.Strict (IntMap)
-import Data.Model.Core (DescriptorInfo, TaggerModel)
+import Data.Model.Core (DescriptorInfo, QueryModel, TaggerModel)
 import Data.Model.Lens (TaggerLens)
 import Data.Model.Shared (Visibility)
 import Data.Model.Shared.Core (TextInput)
@@ -36,8 +37,7 @@ import Database.Tagger.Type (
   Tag,
  )
 import Monomer (AppEventResponse)
-import Text.TaggerQL.Expression.AST (Expression)
-import Text.TaggerQL.Expression.Engine (ExpressionIndex)
+import Text.TaggerQL.Expression.AST (Expression, Ring, SubExpression)
 
 data TaggerEvent
   = DoFocusedFileEvent FocusedFileEvent
@@ -110,15 +110,14 @@ data FileSelectionEvent
   deriving (Show, Eq)
 
 data QueryEvent
-  = CycleSetOp Int
+  = CycleExprSetOpAt Int
+  | CycleSubExprSetOpAt Int Int
   | PushExpression
-  | forall e.
-    (ExpressionIndex e) =>
-    ReplaceIndex
-      (TaggerLens Expression (Maybe e))
-      e
+  | -- | Adds an operand to the end of a Ring expression by an intersection.
+    forall r. (Ring r) => RingProduct (Lens' QueryModel r) r
   | RunQuery
   | UpdateExpression Int Expression
+  | UpdateSubExpression Int Int SubExpression
 
 data FileSelectionWidgetEvent
   = CycleNextChunk
