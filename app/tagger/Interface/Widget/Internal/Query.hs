@@ -69,7 +69,7 @@ import Monomer.Graphics.Lens (HasA (a))
 widget :: TaggerModel -> TaggerWidget
 widget _ =
   vstack
-    [ toggleButton_ "Edit" queryEditMode [resizeFactor (-1)]
+    [ toggleButton_ "Editor" queryEditMode [resizeFactor (-1)]
     , container
         queryTextField
     ]

@@ -7,6 +7,8 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
+{-# HLINT ignore "Redundant if" #-}
+
 module Interface.Handler (
   taggerEventHandler,
 ) where
@@ -16,6 +18,7 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
+import Data.Either (fromRight)
 import Data.Event
 import qualified Data.Foldable as F
 import qualified Data.HashMap.Strict as HM
@@ -380,16 +383,33 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
               )
       ]
     PushExpression ->
-      [ let rawQuery = T.strip $ model ^. fileSelectionModel . queryModel . input . text
-            action modelExpr = case T.splitAt 1 rawQuery of
-              ("!", r) -> either (const modelExpr) (modelExpr <->) . parseExpr $ r
-              ("&", r) -> either (const modelExpr) (modelExpr <^>) . parseExpr $ r
-              ("|", r) -> either (const modelExpr) (modelExpr <+>) . parseExpr $ r
-              (_defaultAction, _) ->
-                either (const modelExpr) (modelExpr <^>) . parseExpr $ rawQuery
-         in Model $ model & fileSelectionModel . queryModel . expression %~ action
-      , Event . Mempty $ TaggerLens $ fileSelectionModel . queryModel . input . text
-      ]
+      let !rawQuery = T.strip $ model ^. fileSelectionModel . queryModel . input . text
+       in ( if model ^. queryEditMode
+              then
+                [ let action modelExpr = case T.splitAt 1 rawQuery of
+                        ("!", r) ->
+                          either (const modelExpr) (modelExpr <->) . parseExpr $ r
+                        ("&", r) ->
+                          either (const modelExpr) (modelExpr <^>) . parseExpr $ r
+                        ("|", r) ->
+                          either (const modelExpr) (modelExpr <+>) . parseExpr $ r
+                        (_defaultAction, _) ->
+                          either (const modelExpr) (modelExpr <^>) . parseExpr $ rawQuery
+                   in Model $
+                        model
+                          & fileSelectionModel . queryModel . expression %~ action
+                ]
+              else
+                [ Model $
+                    model & fileSelectionModel . queryModel . expression
+                      %~ flip fromRight (parseExpr rawQuery)
+                , Event . DoQueryEvent $ RunQuery
+                ]
+          )
+            ++ [ Event . Mempty $
+                  TaggerLens $
+                    fileSelectionModel . queryModel . input . text
+               ]
     RunQuery ->
       [ Task $ do
           r <-
