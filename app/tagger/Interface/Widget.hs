@@ -1,5 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Redundant if" #-}
 
 module Interface.Widget (
   taggerApplicationUI,
@@ -15,6 +18,7 @@ import Data.Event (
   TaggerEvent (
     DoFileSelectionEvent,
     RefreshUI,
+    ToggleQueryEditMode,
     ToggleVisibilityLabel
   ),
   anonymousEvent,
@@ -56,6 +60,7 @@ import qualified Interface.Widget.Internal.FilePreview as FilePreview
 import qualified Interface.Widget.Internal.Query as Query
 import Interface.Widget.Internal.Query.QueryBuilder (
   expressionWidget,
+  queryEditorTextFieldKey,
  )
 import qualified Interface.Widget.Internal.Selection as Selection
 import Interface.Widget.Internal.Type (TaggerWidget)
@@ -205,17 +210,22 @@ globalKeystrokes m =
     ,
       ( "Ctrl-f"
       , anonymousEvent $
-          if (m ^. visibilityModel) `hasVis` VisibilityLabel selectionQueryHideLabel
-            then
-              [ Event $
-                  ToggleVisibilityLabel
-                    (TaggerLens visibilityModel)
-                    selectionQueryHideLabel
-              , SetFocusOnKey . WidgetKey $ Query.queryTextFieldKey
-              ]
-            else [SetFocusOnKey . WidgetKey $ Query.queryTextFieldKey]
+          let setFocusEvent =
+                SetFocusOnKey . WidgetKey $
+                  if m ^. queryEditMode
+                    then queryEditorTextFieldKey
+                    else Query.queryTextFieldKey
+           in if (m ^. visibilityModel) `hasVis` VisibilityLabel selectionQueryHideLabel
+                then
+                  [ Event $
+                      ToggleVisibilityLabel
+                        (TaggerLens visibilityModel)
+                        selectionQueryHideLabel
+                  , setFocusEvent
+                  ]
+                else [setFocusEvent]
       )
-    , ("Ctrl-u", DoFileSelectionEvent ClearSelection)
+    , ("Ctrl-d", ToggleQueryEditMode)
     ,
       ( "Ctrl-h"
       , anonymousEvent

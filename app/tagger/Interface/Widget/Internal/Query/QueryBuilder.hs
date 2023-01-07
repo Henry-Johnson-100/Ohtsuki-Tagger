@@ -7,6 +7,7 @@
 
 module Interface.Widget.Internal.Query.QueryBuilder (
   expressionWidget,
+  queryEditorTextFieldKey,
 ) where
 
 import Control.Lens ((^.))
@@ -16,9 +17,10 @@ import Control.Monad.Trans.State.Strict (
   get,
   modify,
  )
-import Data.Event (QueryEvent (CycleExprSetOpAt, RingProduct, UpdateExpression, UpdateSubExpression), TaggerEvent (DoQueryEvent, Unit))
+import Data.Event (FileSelectionEvent (ClearSelection), QueryEvent (CycleExprSetOpAt, PushExpression, RingProduct, RunQuery, UpdateExpression, UpdateSubExpression), TaggerEvent (DoFileSelectionEvent, DoQueryEvent, ToggleQueryEditMode, Unit), anonymousEvent)
 import Data.Model (TaggerModel, fileSelectionModel, queryEditMode, queryModel)
-import Data.Model.Lens (expression)
+import Data.Model.Lens (expression, input)
+import Data.Model.Shared.Lens (HasText (text))
 import Data.Monoid (Sum (..))
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
@@ -54,37 +56,35 @@ tShowSetOp Union = "|"
 tShowSetOp Intersect = "&"
 tShowSetOp Difference = "!"
 
+queryEditorTextFieldKey :: Text
+queryEditorTextFieldKey = "queryEditorTextField"
+
 expressionWidget :: Expression -> TaggerWidget
 expressionWidget expr =
-  dropTarget_
-    ( \ct ->
-        DoQueryEvent $
-          RingProduct
-            expression
-            (TagTermValue . MetaDescriptorTerm . descriptor . concreteTagDescriptor $ ct)
-    )
-    [dropTargetStyle [border 1 yuiRed]]
-    . dropTarget_
-      ( \(Descriptor _ p) ->
-          DoQueryEvent $
-            RingProduct expression (TagTermValue . MetaDescriptorTerm $ p)
-      )
-      [dropTargetStyle [border 1 yuiBlue]]
-    . box_
-      [ alignTop
-      , alignLeft
-      , mergeRequired
-          ( \_wenv a b ->
-              let l = fileSelectionModel . queryModel . expression
-               in a ^. l /= b ^. l
-          )
-      ]
+  keystroke
+    [ ("Ctrl-e", ToggleQueryEditMode)
+    , ("Ctrl-u", DoFileSelectionEvent ClearSelection)
+    , ("Enter", DoQueryEvent PushExpression)
+    , ("Shift-Enter", DoQueryEvent RunQuery)
+    ]
     $ vstack
       [ hstack
           [ toggleButton_ "Exit" queryEditMode [resizeFactor (-1)]
           ]
-      , snd . flip evalState 1 $ runExpressionInterpreter expressionWidgetBuilder expr
+      , queryEditorWidget expr
+      , box_ [alignMiddle, alignBottom]
+          . withNodeKey queryEditorTextFieldKey
+          $ textField (fileSelectionModel . queryModel . input . text)
       ]
+
+queryEditorWidget :: Expression -> TaggerWidget
+queryEditorWidget =
+  vscroll_ [wheelRate 50]
+    . withStyleBasic [border 1 green]
+    . box_ [alignCenter, alignMiddle]
+    . snd
+    . flip evalState 1
+    . runExpressionInterpreter expressionWidgetBuilder
 
 expressionWidgetBuilder ::
   ExpressionInterpreter

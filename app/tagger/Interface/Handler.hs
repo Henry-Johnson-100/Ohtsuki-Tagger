@@ -99,6 +99,7 @@ taggerEventHandler
         [ Event . DoDescriptorTreeEvent $ RefreshBothDescriptorTrees
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
+      ToggleQueryEditMode -> [Model $ model & queryEditMode %~ not]
       CloseConnection -> [Task (Unit <$> close conn)]
       Unit _ -> []
       AnonymousEvent (fmap (\(TaggerAnonymousEvent e) -> e) -> es) -> es

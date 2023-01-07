@@ -46,6 +46,7 @@ data TaggerEvent
   | DoTaggerInfoEvent TaggerInfoEvent
   | DoQueryEvent QueryEvent
   | TaggerInit
+  | ToggleQueryEditMode
   | RefreshUI
   | CloseConnection
   | Unit ()
