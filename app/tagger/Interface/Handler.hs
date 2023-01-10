@@ -46,7 +46,7 @@ import System.FilePath
 import System.IO
 import Tagger.Info (taggerVersion)
 import Text.TaggerQL
-import Text.TaggerQL.Expression.AST (Expression (BinaryExpression), Ring (..), SubExpression (BinarySubExpression), soL)
+import Text.TaggerQL.Expression.AST (Expression (BinaryExpression), Ling (..), Lng(..), SubExpression (BinarySubExpression), soL)
 import Text.TaggerQL.Expression.Engine (exprAt, runExpr, subExprAtL)
 import Text.TaggerQL.Expression.Parser (parseExpr)
 import Util

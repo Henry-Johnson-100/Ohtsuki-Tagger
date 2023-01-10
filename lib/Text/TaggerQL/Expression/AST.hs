@@ -1,12 +1,26 @@
+{-# LANGUAGE DeriveFoldable #-}
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# HLINT ignore "Redundant guard" #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# HLINT ignore "Use const" #-}
+{-# HLINT ignore "Avoid lambda" #-}
+{-# HLINT ignore "Use <$>" #-}
+{-# HLINT ignore "Eta reduce" #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# HLINT ignore "Use section" #-}
+{-# HLINT ignore "Monad law, left identity" #-}
+{-# HLINT ignore "Use join" #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StrictData #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
+{-# LANGUAGE ViewPatterns #-}
 {-# HLINT ignore "Use lambda-case" #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.AST
@@ -19,23 +33,59 @@ module Text.TaggerQL.Expression.AST (
   TagTerm (..),
   tagTermPatternL,
   FileTerm (..),
-  BinaryOperation (..),
-  lhsL,
-  soL,
-  rhsL,
   TagTermExtension (..),
   tagTermL,
   extensionL,
   SubExpression (..),
   Expression (..),
 
+  -- * Expressions
+  -- $Expressions
+  TExpression (..),
+  evaluateTExpression,
+  interpretTExpression,
+  FExpression (..),
+  liftFExpressionA,
+  liftFExpression,
+  UExpression (..),
+  fromUExpression,
+  evaluateUExpression,
+  interpretUExpression,
+
+  -- *Substructures
+  BinaryOperation (..),
+  runBinaryOperation,
+  dispatchLng,
+  lhsL,
+  soL,
+  rhsL,
+  Application (..),
+  runApplication,
+  pattern (:$),
+  rightL,
+  leftL,
+
+  -- * Text patterns
+  Pattern (..),
+  pattern Pattern,
+  patternL,
+  DTerm (..),
+
   -- * Classes
-  Ring (..),
+  Lng (..),
+  Ling (..),
+  RightAssoc (..),
 ) where
 
-import Data.String (IsString)
+import Control.Monad (ap)
+import Data.Bifoldable (Bifoldable (bifoldr))
+import Data.Bifunctor (Bifunctor (bimap, first, second))
+import Data.Bitraversable (Bitraversable)
+import Data.Functor.Identity (Identity (Identity), runIdentity)
+import Data.String (IsString (fromString))
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
+import qualified Data.Text as T
 import Lens.Micro (Lens', lens)
 
 {- |
@@ -105,7 +155,16 @@ data Expression
   | BinaryExpression (BinaryOperation Expression)
   deriving (Show, Eq)
 
-data BinaryOperation a = BinaryOperation a SetOp a deriving (Show, Eq, Functor)
+data BinaryOperation a = BinaryOperation a SetOp a deriving (Show, Eq, Functor, Foldable)
+
+instance Traversable BinaryOperation where
+  traverse ::
+    Applicative f =>
+    (a -> f b) ->
+    BinaryOperation a ->
+    f (BinaryOperation b)
+  traverse f (BinaryOperation lhs so rhs) =
+    (`BinaryOperation` so) <$> f lhs <*> f rhs
 
 lhsL :: Lens' (BinaryOperation a) a
 lhsL =
@@ -139,27 +198,427 @@ extensionL =
     (\(TagTermExtension _ se) -> se)
     (flip (<$))
 
-class Ring r where
-  -- | Identity over '(<+>)`
+{- |
+ Data type describing the application of type @a@ to type @b@
+-}
+data Application a b = Application a b deriving (Show, Eq, Functor, Foldable)
+
+runApplication :: Application (a -> b) a -> b
+runApplication (Application f x) = f x
+
+infixr 7 :$
+
+pattern (:$) :: a -> b -> Application a b
+pattern x :$ y <-
+  ((Application x y))
+  where
+    (:$) = Application
+
+instance Bifunctor Application where
+  first :: (a -> b) -> Application a c -> Application b c
+  first f (Application x y) = Application (f x) y
+  second :: (b -> c) -> Application a b -> Application a c
+  second = fmap
+
+instance Monoid a => Applicative (Application a) where
+  pure :: Monoid a => a1 -> Application a a1
+  pure = return
+  (<*>) ::
+    Monoid a =>
+    Application a (a1 -> b) ->
+    Application a a1 ->
+    Application a b
+  (<*>) = ap
+
+instance Monoid a => Monad (Application a) where
+  return :: Monoid a => a1 -> Application a a1
+  return = Application mempty
+  (>>=) ::
+    Monoid a =>
+    Application a a1 ->
+    (a1 -> Application a b) ->
+    Application a b
+  (Application c x) >>= f = first (c <>) (f x)
+
+rightL :: Lens' (Application a b) a
+rightL =
+  lens
+    (\(x :$ _) -> x)
+    (\r x -> first (const x) r)
+
+leftL :: Lens' (Application a b) b
+leftL =
+  lens
+    (\(_ :$ y) -> y)
+    (\r y -> second (const y) r)
+
+{- |
+ A sum type over all text patterns with a constructor for wildcards of varying length
+ sequences of the character \'%\'
+
+ The PatternSynonym 'Pattern` can be used as a smart constructor or for pattern matching.
+-}
+data Pattern
+  = WildCard
+  | PatternText Text
+  deriving (Show, Eq)
+
+instance IsString Pattern where
+  fromString :: String -> Pattern
+  fromString ts = if all (== '%') ts then WildCard else PatternText (fromString ts)
+
+pattern Pattern :: Text -> Pattern
+pattern Pattern t <-
+  ( \pt -> case pt of
+      WildCard -> "%"
+      PatternText txt -> txt ->
+      t
+    )
+  where
+    Pattern t = if T.all (== '%') t then WildCard else PatternText t
+
+patternL :: Lens' Pattern Text
+patternL = lens (\(Pattern t) -> t) (\_ t -> Pattern t)
+
+{- |
+ A type a two separate cases for evaluation:
+-}
+data DTerm a
+  = -- | The normal case \"D\"
+    DTerm a
+  | -- | The meta case which is a superset of \"D\"
+    DMetaTerm a
+  deriving (Show, Eq, Functor)
+
+{- |
+ An expression over the codomain of A to some domain T.
+-}
+data TExpression a
+  = TValue a
+  | BinaryTExpression (BinaryOperation (TExpression a))
+  | -- | A 'TExpression` can be applied to another 'TExpression` in some way.
+    TExpressionApplication (Application (TExpression a) (TExpression a))
+  deriving (Show, Eq)
+
+instance Functor TExpression where
+  fmap :: (a -> b) -> TExpression a -> TExpression b
+  fmap f texpr = case texpr of
+    TValue tt -> TValue (f tt)
+    BinaryTExpression bo -> BinaryTExpression (fmap (fmap f) bo)
+    TExpressionApplication a -> TExpressionApplication (bimap (fmap f) (fmap f) a)
+
+instance Applicative TExpression where
+  pure :: a -> TExpression a
+  pure = return
+  (<*>) :: TExpression (a -> b) -> TExpression a -> TExpression b
+  (<*>) = ap
+
+instance Monad TExpression where
+  return :: a -> TExpression a
+  return = TValue
+  (>>=) :: TExpression a -> (a -> TExpression b) -> TExpression b
+  texpr >>= f = case texpr of
+    TValue a -> f a
+    BinaryTExpression (BinaryOperation lhs so rhs) ->
+      dispatchLng so (lhs >>= f) (rhs >>= f)
+    TExpressionApplication (Application x y) -> (x >>= f) |-> (y >>= f)
+
+{- |
+ Folding a TExpression is 'SetOp` agnostic and largely structure agnostic
+ over a given 'TExpression`:
+
+ fix some fold function, f, for any function g and value x such that @f = foldr g x@
+ and 2 TExpressions a and b, the following is true:
+
+ @all (== (f (a |-\> b))) [c a b | c \<- [(\<+\>),(\<^\>),(\<-\>)]]@
+-}
+instance Foldable TExpression where
+  foldr :: (a -> b -> b) -> b -> TExpression a -> b
+  foldr f acc texpr = case texpr of
+    TValue a -> f a acc
+    BinaryTExpression (BinaryOperation lhs _ rhs) -> foldr f (foldr f acc rhs) lhs
+    TExpressionApplication (Application x y) -> foldr f (foldr f acc y) x
+
+instance Traversable TExpression where
+  traverse :: Applicative f => (a -> f b) -> TExpression a -> f (TExpression b)
+  traverse f texpr = case texpr of
+    TValue a -> TValue <$> f a
+    BinaryTExpression (BinaryOperation lhs so rhs) ->
+      dispatchLng so <$> traverse f lhs <*> traverse f rhs
+    TExpressionApplication (Application x y) -> (|->) <$> traverse f x <*> traverse f y
+
+instance Lng (TExpression a) where
+  (<+>) :: TExpression a -> TExpression a -> TExpression a
+  x <+> y = BinaryTExpression (BinaryOperation x Union y)
+  (<^>) :: TExpression a -> TExpression a -> TExpression a
+  x <^> y = BinaryTExpression (BinaryOperation x Intersect y)
+  (<->) :: TExpression a -> TExpression a -> TExpression a
+  x <-> y = BinaryTExpression (BinaryOperation x Difference y)
+
+instance Ling (TExpression (DTerm Pattern)) where
+  mid :: TExpression (DTerm Pattern)
+  mid = TValue . DTerm $ WildCard
+  aid :: TExpression (DTerm Pattern)
+  aid = mid <-> mid
+
+instance RightAssoc (TExpression a) where
+  (|->) :: TExpression a -> TExpression a -> TExpression a
+  x |-> y = TExpressionApplication $ x :$ y
+
+evaluateTExpression :: (Lng a, RightAssoc a) => TExpression a -> a
+evaluateTExpression texpr = case texpr of
+  TValue a -> a
+  BinaryTExpression bn -> runBinaryOperation . fmap evaluateTExpression $ bn
+  TExpressionApplication a ->
+    runApplication
+      . bimap ((|->) . evaluateTExpression) evaluateTExpression
+      $ a
+
+{- | A constrained sequence of an Applicative action over
+ a 'TExpression`. The constraints define how the structure of the 'TExpression`
+ effects evaluation.
+-}
+interpretTExpression ::
+  (Applicative f, Lng b, RightAssoc b) =>
+  (a -> f b) ->
+  TExpression a ->
+  f b
+interpretTExpression f = fmap evaluateTExpression . traverse f
+
+{- |
+ An expression over the domain of F that can map a 'TExpression` from the
+ domain of T.
+-}
+data FExpression b a
+  = FValue a
+  | BinaryFExpression (BinaryOperation (FExpression b a))
+  | -- | 'TExpression` lifted from the domain of T to F.
+    LiftTExpression (TExpression b)
+  deriving (Show, Eq, Functor, Foldable)
+
+instance Lng (FExpression b a) where
+  (<+>) :: FExpression b a -> FExpression b a -> FExpression b a
+  x <+> y = BinaryFExpression (BinaryOperation x Union y)
+  (<^>) :: FExpression b a -> FExpression b a -> FExpression b a
+  x <^> y = BinaryFExpression (BinaryOperation x Intersect y)
+  (<->) :: FExpression b a -> FExpression b a -> FExpression b a
+  x <-> y = BinaryFExpression (BinaryOperation x Difference y)
+
+instance Ling (FExpression (DTerm Pattern) Pattern) where
+  mid :: FExpression (DTerm Pattern) Pattern
+  mid = FValue WildCard
+  aid :: FExpression (DTerm Pattern) Pattern
+  aid = mid <-> mid
+
+instance Bifunctor FExpression where
+  second :: (b -> c) -> FExpression a b -> FExpression a c
+  second = fmap
+  first :: (a -> b) -> FExpression a c -> FExpression b c
+  first f fexpr = case fexpr of
+    FValue c -> FValue c
+    BinaryFExpression bo -> BinaryFExpression (fmap (first f) bo)
+    LiftTExpression te -> LiftTExpression (fmap f te)
+
+instance Applicative (FExpression b) where
+  pure :: a -> FExpression b a
+  pure = return
+  (<*>) :: FExpression b1 (a -> b2) -> FExpression b1 a -> FExpression b1 b2
+  (<*>) = ap
+
+instance Monad (FExpression b) where
+  return :: a -> FExpression b a
+  return = FValue
+  (>>=) :: FExpression b a -> (a -> FExpression b b2) -> FExpression b b2
+  fexpr >>= f = case fexpr of
+    FValue a -> f a
+    BinaryFExpression (BinaryOperation lhs so rhs) ->
+      dispatchLng so (lhs >>= f) (rhs >>= f)
+    LiftTExpression te -> LiftTExpression te
+
+instance Bifoldable FExpression where
+  bifoldr :: (a -> c -> c) -> (b -> c -> c) -> c -> FExpression a b -> c
+  bifoldr lf rf acc fexpr = case fexpr of
+    FValue b -> rf b acc
+    BinaryFExpression (BinaryOperation lhs _ rhs) ->
+      bifoldr lf rf (bifoldr lf rf acc rhs) lhs
+    LiftTExpression te -> foldr lf acc te
+
+instance Bitraversable FExpression
+
+{- |
+ Given an applicative morphism for the inner 'TExpression` from type @a -> f b@,
+
+ Evaluate the structure, reducing all 'TExpression` to 'UValue` and transform all
+ normal 'FExpression` constructors to 'UExpression` constructors.
+-}
+liftFExpressionA ::
+  Applicative f =>
+  (TExpression a -> f b) ->
+  FExpression a b ->
+  f (UExpression b)
+liftFExpressionA f fexpr = case fexpr of
+  FValue b -> pure . UValue $ b
+  BinaryFExpression bo -> BinaryUExpression <$> traverse (liftFExpressionA f) bo
+  LiftTExpression te -> UValue <$> f te
+
+{- |
+ Lift an inner 'TExpression` with a pure evaluation.
+-}
+liftFExpression :: (TExpression a -> b) -> FExpression a b -> UExpression b
+liftFExpression f = runIdentity . liftFExpressionA (Identity . f)
+
+{- |
+ A data type representing the final expression domain U for \"Ultimate\".
+
+ Representing an 'FExpression` after evaluating the inner type along with
+ some lifting function f :: @a -> b@.
+
+ @(Lng a, RightAssoc a) => (a -> b) -> FExpression a b -> FExpression b b@
+ therefore, since each inner 'TExpression` is evaluated,
+ it can be reduced to a single 'FValue`
+
+ Therefore the type 'UExpression` is injective to 'FExpression`
+ using only the constructors 'FValue` and 'BinaryFExpression`
+-}
+data UExpression a
+  = UValue a
+  | BinaryUExpression (BinaryOperation (UExpression a))
+  deriving (Show, Eq, Functor, Foldable)
+
+instance Traversable UExpression where
+  traverse :: Applicative f => (a -> f b) -> UExpression a -> f (UExpression b)
+  traverse f uexpr = case uexpr of
+    UValue a -> UValue <$> f a
+    BinaryUExpression (BinaryOperation lhs so rhs) ->
+      dispatchLng so <$> traverse f lhs <*> traverse f rhs
+
+instance Lng (UExpression a) where
+  (<+>) :: UExpression a -> UExpression a -> UExpression a
+  x <+> y = BinaryUExpression $ BinaryOperation x Union y
+  (<^>) :: UExpression a -> UExpression a -> UExpression a
+  x <^> y = BinaryUExpression $ BinaryOperation x Intersect y
+  (<->) :: UExpression a -> UExpression a -> UExpression a
+  x <-> y = BinaryUExpression $ BinaryOperation x Difference y
+
+instance Applicative UExpression where
+  pure :: a -> UExpression a
+  pure = return
+  (<*>) :: UExpression (a -> b) -> UExpression a -> UExpression b
+  (<*>) = ap
+
+instance Monad UExpression where
+  return :: a -> UExpression a
+  return = UValue
+  (>>=) :: UExpression a -> (a -> UExpression b) -> UExpression b
+  uexpr >>= f = case uexpr of
+    UValue a -> f a
+    BinaryUExpression (BinaryOperation lhs so rhs) ->
+      dispatchLng so (lhs >>= f) (rhs >>= f)
+
+{- |
+ The injective morphism for expressions U -> f
+
+ for all 'UEXpression` the function @liftFExpression undefined . fromUExpression@
+ is valid, though unwise.
+-}
+fromUExpression :: UExpression a -> FExpression b a
+fromUExpression uexpr = case uexpr of
+  UValue a -> FValue a
+  BinaryUExpression bo -> BinaryFExpression . fmap fromUExpression $ bo
+
+{- |
+ Run the structure of a 'UExpression`
+-}
+evaluateUExpression :: Lng a => UExpression a -> a
+evaluateUExpression uexpr =
+  case uexpr of
+    UValue a -> a
+    BinaryUExpression bn -> runBinaryOperation . fmap evaluateUExpression $ bn
+
+{- |
+ Traverse a 'UExpression` and evaluate its final structure.
+-}
+interpretUExpression :: (Applicative f, Lng b) => (a -> f b) -> UExpression a -> f b
+interpretUExpression f = fmap evaluateUExpression . traverse f
+
+{- $Expressions
+
+ There are three types of Expressions in TaggerQL:
+
+  - TExpression
+  - FExpression
+  - UExpression
+
+ Each one representing a step in computation through a single domain.
+
+ TExpressions are a subset of FExpressions which map to a different domain.
+ In order to finally evaluate any given expression to the ultimate domain U, there
+ first has to be an evaluation of a TExpression its domain T.
+ At the same time, an FExpression can be evaluated to its domain F.
+ Finally, an additional morphism must be supplied to any given FExpression that
+ transforms its inner TExpressions from T -> F so that the entire FExpression can
+ be lifted from F -> U at the same time.
+
+ The reason for this is that TExpressions rely on a right associative operation that
+ the domain of an FExpression is not obligated to satisfy. Therefore, an FExpression
+ must be parameterized over two distinct types and it's final evaluation is separated
+ into two distinct steps to avoid the constraint @RightAssoc f => FExpression f -> f@
+ that would arise from evaluation.
+
+ Instead, the structure of an FExpression is not examined during its interpretation.
+ Rather it is agnostically traversed by an applicative function. It isn't until the
+ evaluation of the lifted UExpression that the structure is used.
+-}
+
+dispatchLng :: Lng a => SetOp -> a -> a -> a
+dispatchLng Union = (<+>)
+dispatchLng Intersect = (<^>)
+dispatchLng Difference = (<->)
+
+runBinaryOperation :: Lng a => BinaryOperation a -> a
+runBinaryOperation (BinaryOperation lhs so rhs) = dispatchLng so lhs rhs
+
+infixr 7 |->
+
+{- |
+ Class for a right associative operation.
+-}
+class RightAssoc r where
+  (|->) :: r -> r -> r
+
+infixl 7 <+>
+infixl 7 <^>
+infixl 7 <->
+
+{- |
+ A typeclass for 3 left associative operations
+-}
+class Lng r where
+  -- | A left associative operation
+  (<+>) :: r -> r -> r
+
+  -- | A left associative operation
+  (<^>) :: r -> r -> r
+
+  -- | A left associative operation
+  (<->) :: r -> r -> r
+
+{- |
+ Providing identities for 'Lng` operations.
+
+ Like a Ring but for strictly left-associative operations. Additionally, there is
+ no requirement that the additive identity annihilates the multiplicative operation.
+
+ So the set of Rings is a proper subset of 'Ling`
+-}
+class Lng r => Ling r where
+  -- | Identity over '(<+>)`, may also annihilate '(<^>)`
   aid :: r
 
   -- | Identity over '(<^>)`
   mid :: r
 
-  -- | An associative operation
-  (<+>) :: r -> r -> r
-
-  -- | An associative operation
-  (<^>) :: r -> r -> r
-
-  -- | The inverse of '(<+>)`
-  (<->) :: r -> r -> r
-
-instance Ring SubExpression where
-  mid :: SubExpression
-  mid = SubTag . DescriptorTerm $ "%"
-  aid :: SubExpression
-  aid = BinarySubExpression $ BinaryOperation mid Difference mid
+instance Lng SubExpression where
   (<+>) :: SubExpression -> SubExpression -> SubExpression
   x <+> y = BinarySubExpression $ BinaryOperation x Union y
   (<^>) :: SubExpression -> SubExpression -> SubExpression
@@ -167,7 +626,21 @@ instance Ring SubExpression where
   (<->) :: SubExpression -> SubExpression -> SubExpression
   x <-> y = BinarySubExpression $ BinaryOperation x Difference y
 
-instance Ring Expression where
+instance Ling SubExpression where
+  mid :: SubExpression
+  mid = SubTag . DescriptorTerm $ "%"
+  aid :: SubExpression
+  aid = BinarySubExpression $ BinaryOperation mid Difference mid
+
+instance Lng Expression where
+  (<+>) :: Expression -> Expression -> Expression
+  x <+> y = BinaryExpression $ BinaryOperation x Union y
+  (<^>) :: Expression -> Expression -> Expression
+  x <^> y = BinaryExpression $ BinaryOperation x Intersect y
+  (<->) :: Expression -> Expression -> Expression
+  x <-> y = BinaryExpression $ BinaryOperation x Difference y
+
+instance Ling Expression where
   mid :: Expression
   mid = FileTermValue "%"
   aid :: Expression
@@ -179,9 +652,3 @@ instance Ring Expression where
               Intersect
               dUniverse
           )
-  (<+>) :: Expression -> Expression -> Expression
-  x <+> y = BinaryExpression $ BinaryOperation x Union y
-  (<^>) :: Expression -> Expression -> Expression
-  x <^> y = BinaryExpression $ BinaryOperation x Intersect y
-  (<->) :: Expression -> Expression -> Expression
-  x <-> y = BinaryExpression $ BinaryOperation x Difference y

@@ -33,7 +33,7 @@ import Text.TaggerQL.Expression.AST (
   BinaryOperation (BinaryOperation),
   Expression (..),
   FileTerm (FileTerm),
-  Ring (aid, mid),
+  Ling (aid, mid),
   SubExpression (..),
   TagTerm (MetaDescriptorTerm),
   TagTermExtension (TagTermExtension),
