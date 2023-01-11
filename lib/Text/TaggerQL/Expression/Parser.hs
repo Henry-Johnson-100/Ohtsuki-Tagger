@@ -138,9 +138,9 @@ fExpressionParser =
 lhsFExpressionParser :: Parser (FExpression (DTerm Pattern) Pattern)
 lhsFExpressionParser =
   spaces
-    *> ( liftTExpressionParser
+    *> ( try (fmap FValue fValueParser)
+          <|> liftTExpressionParser
           <|> between (char '(') (spaces *> char ')') fExpressionParser
-          <|> fmap FValue fValueParser
        )
 
 {- |
