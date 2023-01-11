@@ -54,6 +54,7 @@ module Text.TaggerQL.Expression.Engine (
   lowerExpression,
 
   -- * Primitive Functions
+  interpretQuery,
   runExpr,
   evalExpr,
 
@@ -61,6 +62,7 @@ module Text.TaggerQL.Expression.Engine (
   runSubExprOnFile,
   evalSubExpression,
   queryTags,
+  queryTagSet',
 ) where
 
 import Control.Applicative ((<|>))

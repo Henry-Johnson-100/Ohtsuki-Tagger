@@ -28,10 +28,341 @@ queryEngineASTTests :: IO TaggedConnection -> TestTree
 queryEngineASTTests c =
   testGroup
     "Query Engine AST Tests"
-    [ basicQueryFunctionality c
+    [ fExpressionBasicQueries c
     , queryEdgeCases c
     , taggingEngineTests c
     , enginePropertyTests
+    ]
+
+runFExpr e = runReaderT (interpretQuery e)
+
+runQueryTags d = runReaderT (queryTagSet' d)
+
+l = LiftTExpression
+
+dmt = TValue . DMetaTerm
+
+fExpressionBasicQueries :: IO TaggedConnection -> TestTree
+fExpressionBasicQueries c =
+  testGroup
+    "Query Engine AST Tests - Basic"
+    [ testCase "Pattern Wildcard" $ do
+        r <- c >>= runFExpr (FValue WildCard)
+        a <- c >>= allFiles
+        assertEqual
+          "FileTermValue \"%\" matches all files"
+          (HS.fromList a)
+          r
+    , testCase "mid is all files" $ do
+        r <- c >>= runFExpr mid
+        a <- c >>= allFiles
+        assertEqual
+          "The multiplicative identity for a query FExpression is all files"
+          (HS.fromList a)
+          r
+    , testCase "Untagged Files" $ do
+        r <-
+          c
+            >>= runFExpr
+              (FValue WildCard <-> (l . TValue . DTerm $ WildCard))
+        a <- c >>= queryForUntaggedFiles
+        assertEqual
+          "Untagged Constant"
+          (HS.fromList a)
+          r
+    , testCase "TagTermValue Expression - Descriptor" $ do
+        r <- c >>= runFExpr (l . TValue $ DTerm "descriptor_5")
+        a <- c >>= flatQueryForFileByTagDescriptorPattern "descriptor_5"
+        assertEqual
+          "A TagTermValue performs a flat query"
+          (HS.fromList a)
+          r
+    , testCase "TagTermValue Expression - Descriptor - Flat Query" $ do
+        r <- c >>= runFExpr (l . TValue $ (DTerm "descriptor_6"))
+        a <- c >>= flatQueryForFileByTagDescriptorPattern "descriptor_6"
+        assertEqual
+          "A TagTermValue performs a flat query"
+          (HS.fromList a)
+          r
+    , testCase "TagTermValue Expression - MetaDescriptor" $ do
+        r <- c >>= runFExpr (l . TValue $ (DMetaTerm "descriptor_12"))
+        a <- c >>= flatQueryForFileOnMetaRelationPattern "descriptor_12"
+        assertEqual
+          "A TagTermValue performs a flat query"
+          (HS.fromList a)
+          r
+    , testCase "TagTermValue Expression - MetaDescriptor - Manual" $ do
+        r <- c >>= runFExpr (l . TValue $ (DMetaTerm "descriptor_12"))
+        assertEqual
+          "Should match the case: \"TagTermValue Expression - MetaDescriptor\""
+          [file 8, file 9, file 10]
+          r
+    , testGroup
+        "Binary Expressions"
+        [ testCase "Union" $ do
+            r <-
+              c
+                >>= runFExpr
+                  ( FValue "file_1" <+> FValue "file_2"
+                  )
+            assertEqual
+              "Union wa union dayo"
+              [file 1, file 2]
+              r
+        , testCase "Intersect - Simple Operands" $ do
+            r <-
+              c
+                >>= runFExpr
+                  ( (l . TValue . DTerm $ "descriptor_5") <^> (l . TValue . DTerm $ "descriptor_6")
+                  )
+            assertEqual
+              ""
+              [file 4, file 5]
+              r
+        , testCase "Intersect - Complex Operand" $ do
+            r <-
+              c
+                >>= runFExpr
+                  ( (l . TValue . DTerm $ "descriptor_5") <+> FValue "file_3" <^> (l . TValue . DTerm $ "descriptor_6")
+                  )
+            assertEqual
+              "Binary Operations should be nestable."
+              [file 3, file 4, file 5]
+              r
+        , testCase "Difference" $ do
+            r <-
+              c
+                >>= runFExpr
+                  ( (l . TValue . DTerm $ "descriptor_4")
+                      <+> ((l . TValue . DTerm $ "descriptor_5") <+> (l . TValue . DTerm $ "descriptor_6"))
+                      <-> (l . TValue . DTerm $ "descriptor_5")
+                      -- BinaryExpression $
+                      --   BinaryOperation
+                      --     ( BinaryExpression $
+                      --         BinaryOperation
+                      --           (TagTermValue (DescriptorTerm "descriptor_4"))
+                      --           Union
+                      --           ( BinaryExpression $
+                      --               BinaryOperation
+                      --                 (TagTermValue (DescriptorTerm "descriptor_5"))
+                      --                 Union
+                      --                 (TagTermValue (DescriptorTerm "descriptor_6"))
+                      --           )
+                      --     )
+                      --     Difference
+                      --     (TagTermValue (DescriptorTerm "descriptor_5"))
+                  )
+            assertEqual
+              "Difference wa difference dayo"
+              [file 1, file 3]
+              r
+        ]
+    , testGroup
+        "TagExpressions"
+        [ testCase "Simple TagExpression" $ do
+            r <-
+              c
+                >>= runFExpr
+                  ( l (TExpressionDistribution (DTerm "descriptor_5" :$ (TValue . DTerm $ "descriptor_6")))
+                  -- TagExpression $
+                  --   TagTermExtension
+                  --     (DescriptorTerm "descriptor_5")
+                  --     (SubTag (DescriptorTerm "descriptor_6"))
+                  )
+            assertEqual
+              "Simple subtag 5{6} should find files with 5{6} tags."
+              [file 4, file 5]
+              r
+        , testCase "Flat SubTag TagExpression" $ do
+            r <-
+              c
+                >>= runFExpr
+                  ( l (TExpressionDistribution (DTerm "descriptor_6" :$ (TValue . DTerm $ "descriptor_7")))
+                  -- TagExpression $
+                  --   TagTermExtension
+                  --     (DescriptorTerm "descriptor_6")
+                  --     (SubTag (DescriptorTerm "descriptor_7"))
+                  )
+            assertEqual
+              "SubTag queries are a flat operation."
+              [file 5]
+              r
+        , testCase "Complex Nested SubTag" $ do
+            r <-
+              c
+                >>= runFExpr
+                  ( l
+                      ( TExpressionDistribution
+                          ( DTerm "descriptor_17"
+                              :$ TExpressionDistribution
+                                ( DTerm "descriptor_18"
+                                    :$ (TValue . DTerm $ "descriptor_20")
+                                )
+                          )
+                      )
+                      -- TagExpression $
+                      --   TagTermExtension
+                      --     (DescriptorTerm "descriptor_17")
+                      --     ( SubExpression $
+                      --         TagTermExtension
+                      --           (DescriptorTerm "descriptor_18")
+                      --           (SubTag (DescriptorTerm "descriptor_20"))
+                      --     )
+                  )
+            assertEqual
+              "SubExpressions modify the supertag environment for lower depths."
+              [file 15]
+              r
+        , testCase "SubTag Expression - 1" $ do
+            r <-
+              c
+                >>= runFExpr
+                  ( l (TExpressionDistribution (DTerm "descriptor_17" :$ (TValue . DTerm $ "descriptor_18")))
+                  -- TagExpression $
+                  --   TagTermExtension
+                  --     (DescriptorTerm "descriptor_17")
+                  --     (SubTag (DescriptorTerm "descriptor_18"))
+                  )
+            assertEqual
+              "The LHS of the below test."
+              [ file 11
+              , file 13
+              , file 15
+              , file 16
+              ]
+              r
+        , testCase "SubExpression Tags - 0" $ do
+            h <- c >>= runQueryTags (DTerm "descriptor_17")
+            r <-
+              c
+                >>= runReaderT
+                  ( evalSubExpression
+                      (SubTag (DescriptorTerm "descriptor_18"))
+                      h
+                  )
+            assertEqual
+              "Matches the tags returned by the LHS of the \
+              \\"TagExpressions - SubBinary Sub Union\" test."
+              [ Tag 28 11 17 Nothing
+              , Tag 32 13 17 Nothing
+              , Tag 38 15 17 Nothing
+              , Tag 41 16 17 Nothing
+              ]
+              r
+        , testCase "SubExpression Tags - 1" $ do
+            h <- c >>= queryTags (DescriptorTerm "descriptor_17")
+            r <-
+              c
+                >>= runReaderT
+                  ( evalSubExpression
+                      (SubTag (DescriptorTerm "descriptor_19"))
+                      (HS.fromList h)
+                  )
+            assertEqual
+              "Matches the tags returned by the RHS of the \
+              \\"TagExpressions - SubBinary Sub Union\" test."
+              [ Tag 30 12 17 Nothing
+              , Tag 32 13 17 Nothing
+              ]
+              r
+        , testGroup
+            "TagExpressions - SubBinary"
+            [ testCase "Sub Union" $ do
+                r <-
+                  c
+                    >>= runFExpr
+                      ( l (TExpressionDistribution (DTerm "descriptor_17" :$ ((TValue . DTerm $ "descriptor_18") <+> (TValue . DTerm $ "descriptor_19"))))
+                      -- TagExpression $
+                      --   TagTermExtension
+                      --     (DescriptorTerm "descriptor_17")
+                      --     ( BinarySubExpression $
+                      --         BinaryOperation
+                      --           (SubTag (DescriptorTerm "descriptor_18"))
+                      --           Union
+                      --           (SubTag (DescriptorTerm "descriptor_19"))
+                      --     )
+                      )
+                assertEqual
+                  "SubUnion filters supertags if the supertag\
+                  \ is subtagged by either one or the other subtag sets."
+                  [ file 11
+                  , file 12
+                  , file 13
+                  , file 15
+                  , file 16
+                  ]
+                  r
+            , testCase "Sub Intersection" $ do
+                r <-
+                  c
+                    >>= runFExpr
+                      ( l (TExpressionDistribution (DTerm "descriptor_17" :$ ((TValue . DTerm $ "descriptor_18") <^> (TValue . DTerm $ "descriptor_19"))))
+                      -- TagExpression $
+                      --   TagTermExtension
+                      --     (DescriptorTerm "descriptor_17")
+                      --     ( BinarySubExpression $
+                      --         BinaryOperation
+                      --           (SubTag (DescriptorTerm "descriptor_18"))
+                      --           Intersect
+                      --           (SubTag (DescriptorTerm "descriptor_19"))
+                      --     )
+                      )
+                assertEqual
+                  "SubUnion filters supertags if the supertag\
+                  \ is a member of both subtag sets."
+                  [ file 13
+                  ]
+                  r
+            , testCase "Sub Difference" $ do
+                r <-
+                  c
+                    >>= runFExpr
+                      ( l (TExpressionDistribution (DTerm "descriptor_17" :$ ((TValue . DTerm $ "descriptor_18") <-> (TValue . DTerm $ "descriptor_19"))))
+                      -- TagExpression $
+                      --   TagTermExtension
+                      --     (DescriptorTerm "descriptor_17")
+                      --     ( BinarySubExpression $
+                      --         BinaryOperation
+                      --           (SubTag (DescriptorTerm "descriptor_18"))
+                      --           Difference
+                      --           (SubTag (DescriptorTerm "descriptor_19"))
+                      --     )
+                      )
+                assertEqual
+                  "SubUnion filters supertags if the supertag\
+                  \ is a member of the first and not the second subtag set."
+                  [ file 11
+                  , file 15
+                  , file 16
+                  ]
+                  r
+            ]
+        ]
+    , testGroup
+        "Misc queries"
+        [ testCase "Descriptor Wildcard and SubExpressions - 0" $ do
+            r <-
+              c
+                >>= runFExpr
+                  ( l (TExpressionDistribution (DTerm WildCard :$ ((TValue . DTerm $ "descriptor_20") <-> (TValue . DTerm $ "descriptor_18"))))
+                  -- TagExpression $
+                  --   TagTermExtension
+                  --     (DescriptorTerm "%")
+                  --     ( BinarySubExpression $
+                  --         BinaryOperation
+                  --           (SubTag (DescriptorTerm "descriptor_20"))
+                  --           Difference
+                  --           (SubTag (DescriptorTerm "descriptor_18"))
+                  --     )
+                  )
+            assertEqual
+              ""
+              [ file 14
+              , file 15
+              -- , file 16 This file is removed by difference
+              ]
+              r
+        ]
     ]
 
 basicQueryFunctionality :: IO TaggedConnection -> TestTree
