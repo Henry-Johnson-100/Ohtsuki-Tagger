@@ -70,6 +70,7 @@ module Text.TaggerQL.Expression.AST (
   pattern Pattern,
   patternL,
   DTerm (..),
+  runDTerm,
 
   -- * Interpretation Modifiers
   Distribute (..),
@@ -295,6 +296,10 @@ data DTerm a
   | -- | The meta case which is a superset of \"D\"
     DMetaTerm a
   deriving (Show, Eq, Functor)
+
+runDTerm :: DTerm p -> p
+runDTerm (DTerm x) = x
+runDTerm (DMetaTerm x) = x
 
 {- |
  An expression over the codomain of A to some domain T.

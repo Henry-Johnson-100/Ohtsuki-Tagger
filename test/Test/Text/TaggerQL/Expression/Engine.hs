@@ -5,6 +5,7 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
 module Test.Text.TaggerQL.Expression.Engine (
   queryEngineASTTests,
@@ -14,6 +15,7 @@ import Control.Monad.Trans.Maybe (runMaybeT)
 import Control.Monad.Trans.Reader (runReaderT)
 import qualified Data.HashSet as HS
 import Data.Maybe (fromJust, isJust)
+import Data.String (IsString, fromString)
 import Data.Tagger
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -30,7 +32,7 @@ queryEngineASTTests c =
     "Query Engine AST Tests"
     [ fExpressionBasicQueries c
     , fExpressionEdgeCases c
-    , taggingEngineTests c
+    , tExpressionTaggingTests c
     , enginePropertyTests
     ]
 
@@ -524,21 +526,23 @@ fExpressionBasicQueries c =
         ]
     ]
 
-taggingEngineTests :: IO TaggedConnection -> TestTree
-taggingEngineTests c =
+tExpressionTaggingTests :: IO TaggedConnection -> TestTree
+tExpressionTaggingTests c =
   testGroup
     "Tagging Engine Tests"
     [ testCase "Tagging Engine - 0" $ do
         let se =
-              SubExpression $
-                TagTermExtension
-                  (td 21)
-                  ( BinarySubExpression $
-                      BinaryOperation
-                        (SubTag (td 22))
-                        Intersect
-                        (SubTag (td 23))
-                  )
+              -- 21 {22 23}
+              TExpressionDistribution (td 21 :$ ((TValue . td $ 22) <^> (TValue . td $ 23)))
+            -- SubExpression $
+            --   TagTermExtension
+            --     (td 21)
+            --     ( BinarySubExpression $
+            --         BinaryOperation
+            --           (SubTag (td 22))
+            --           Intersect
+            --           (SubTag (td 23))
+            --     )
             fk = 17
             expectedResults =
               [ Tag 44 17 21 Nothing
@@ -546,7 +550,7 @@ taggingEngineTests c =
               , Tag 46 17 23 (Just 44)
               ]
         c
-          >>= runSubExprOnFile
+          >>= applyTExpressionToFile
             se
             fk
         f <- fmap taggedFileTags <$> (c >>= runMaybeT . queryForTaggedFileWithFileId fk)
@@ -559,24 +563,34 @@ taggingEngineTests c =
     , after AllSucceed "Tagging Engine - 0" $
         testCase "Tagging Engine - 1" $ do
           let se =
-                SubExpression $
-                  TagTermExtension
-                    (td 21)
-                    ( BinarySubExpression $
-                        BinaryOperation
-                          ( SubExpression $
-                              TagTermExtension
-                                (td 22)
-                                ( BinarySubExpression $
-                                    BinaryOperation
-                                      (SubTag (td 24))
-                                      Intersect
-                                      (SubTag (td 25))
-                                )
-                          )
-                          Intersect
-                          (SubTag (td 23))
-                    )
+                -- 21 {22 {24 25} 23}
+                TExpressionDistribution
+                  ( td 21
+                      :$ ( TExpressionDistribution
+                            ( td 22
+                                :$ ((TValue . td $ 24) <^> (TValue . td $ 25))
+                            )
+                            <^> (TValue . td $ 23)
+                         )
+                  )
+              -- SubExpression $
+              --   TagTermExtension
+              --     (td 21)
+              --     ( BinarySubExpression $
+              --         BinaryOperation
+              --           ( SubExpression $
+              --               TagTermExtension
+              --                 (td 22)
+              --                 ( BinarySubExpression $
+              --                     BinaryOperation
+              --                       (SubTag (td 24))
+              --                       Intersect
+              --                       (SubTag (td 25))
+              --                 )
+              --           )
+              --           Intersect
+              --           (SubTag (td 23))
+              --     )
               fk = 17
               expectedResults =
                 [ Tag 44 17 21 Nothing
@@ -586,7 +600,7 @@ taggingEngineTests c =
                 , Tag 48 17 25 (Just 45)
                 ]
           c
-            >>= runSubExprOnFile
+            >>= applyTExpressionToFile
               se
               fk
           f <- fmap taggedFileTags <$> (c >>= runMaybeT . queryForTaggedFileWithFileId fk)
@@ -599,28 +613,43 @@ taggingEngineTests c =
     , after AllSucceed "Tagging Engine - 1" $
         testCase "Tagging Engine - 2" $ do
           let se =
-                SubExpression $
-                  TagTermExtension
-                    (td 26)
-                    ( BinarySubExpression $
-                        BinaryOperation
-                          ( SubExpression $
-                              TagTermExtension
-                                (td 27)
-                                ( BinarySubExpression $
-                                    BinaryOperation
-                                      ( SubExpression $
-                                          TagTermExtension
-                                            (td 28)
-                                            (SubTag (td 29))
+                -- 26 {27 {28 {29} 30} 31}
+                TExpressionDistribution
+                  ( td 26
+                      :$ ( TExpressionDistribution
+                            ( td 27
+                                :$ ( TExpressionDistribution
+                                      ( td 28
+                                          :$ (TValue . td $ 29)
                                       )
-                                      Intersect
-                                      (SubTag (td 30))
-                                )
-                          )
-                          Intersect
-                          (SubTag (td 31))
-                    )
+                                      <^> (TValue . td $ 30)
+                                   )
+                            )
+                            <^> (TValue . td $ 31)
+                         )
+                  )
+              -- SubExpression $
+              --   TagTermExtension
+              --     (td 26)
+              --     ( BinarySubExpression $
+              --         BinaryOperation
+              --           ( SubExpression $
+              --               TagTermExtension
+              --                 (td 27)
+              --                 ( BinarySubExpression $
+              --                     BinaryOperation
+              --                       ( SubExpression $
+              --                           TagTermExtension
+              --                             (td 28)
+              --                             (SubTag (td 29))
+              --                       )
+              --                       Intersect
+              --                       (SubTag (td 30))
+              --                 )
+              --           )
+              --           Intersect
+              --           (SubTag (td 31))
+              --     )
               fk = 18
               expectedResults =
                 [ Tag 49 18 26 Nothing
@@ -631,7 +660,7 @@ taggingEngineTests c =
                 , Tag 54 18 31 (Just 49)
                 ]
           c
-            >>= runSubExprOnFile
+            >>= applyTExpressionToFile
               se
               fk
           f <- fmap taggedFileTags <$> (c >>= runMaybeT . queryForTaggedFileWithFileId fk)
@@ -643,16 +672,18 @@ taggingEngineTests c =
             f
     , after AllSucceed "Tagging Engine - 2" . testCase "Tagging Engine - 3" $ do
         let se =
-              BinarySubExpression $
-                BinaryOperation
-                  ( BinarySubExpression $
-                      BinaryOperation
-                        (SubTag (td 32))
-                        Intersect
-                        (SubTag (td 33))
-                  )
-                  Intersect
-                  (SubTag (td 34))
+              -- 32 33 34
+              (TValue . td $ 32) <^> (TValue . td $ 33) <^> (TValue . td $ 34)
+            -- BinarySubExpression $
+            --   BinaryOperation
+            --     ( BinarySubExpression $
+            --         BinaryOperation
+            --           (SubTag (td 32))
+            --           Intersect
+            --           (SubTag (td 33))
+            --     )
+            --     Intersect
+            --     (SubTag (td 34))
             fk = 19
             expectedResults =
               [ Tag 55 19 32 Nothing
@@ -660,7 +691,7 @@ taggingEngineTests c =
               , Tag 57 19 34 Nothing
               ]
         c
-          >>= runSubExprOnFile
+          >>= applyTExpressionToFile
             se
             fk
         f <- fmap taggedFileTags <$> (c >>= runMaybeT . queryForTaggedFileWithFileId fk)
@@ -672,7 +703,9 @@ taggingEngineTests c =
           f
     , after AllSucceed "Tagging Engine - 3" . testCase "Tagging Engine - 4" $ do
         let se =
-              SubExpression $ TagTermExtension (td 33) (SubTag (td 32))
+              -- 33 {32}
+              TExpressionDistribution (td 33 :$ (TValue . td $ 32))
+            -- SubExpression $ TagTermExtension (td 33) (SubTag (td 32))
             fk = 19
             expectedResults =
               [ Tag 55 19 32 Nothing
@@ -681,7 +714,7 @@ taggingEngineTests c =
               , Tag 58 19 32 (Just 56)
               ]
         c
-          >>= runSubExprOnFile
+          >>= applyTExpressionToFile
             se
             fk
         f <- fmap taggedFileTags <$> (c >>= runMaybeT . queryForTaggedFileWithFileId fk)
@@ -696,8 +729,8 @@ taggingEngineTests c =
 file :: RecordKey File -> File
 file n = File n ("file_" <> (T.pack . show $ n))
 
-td :: RecordKey Descriptor -> TagTerm
-td n = MetaDescriptorTerm ("descriptor_" <> (T.pack . show $ n))
+td :: IsString s => Int -> s
+td n = fromString $ "descriptor_" <> show n
 
 enginePropertyTests :: TestTree
 enginePropertyTests =

@@ -57,7 +57,7 @@ module Text.TaggerQL.Expression.Engine (
   interpretQuery,
 
   -- ** For Testing
-  runSubExprOnFile,
+  applyTExpressionToFile,
   evalSubExpression,
   queryTagSet',
 ) where
@@ -66,36 +66,33 @@ import Control.Applicative ((<|>))
 import Control.Monad (guard, void, when, (<=<))
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Trans.Except (ExceptT, throwE)
-import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask, asks)
+import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask)
 import Control.Monad.Trans.State.Strict (StateT, evalState, get, gets, modify, runState)
 import Data.Bifunctor (Bifunctor (first, second))
 import Data.Bitraversable (bitraverse)
-import Data.Functor (($>))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import qualified Data.List as L
 import Data.Maybe (fromJust)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger (
-  RecordKey,
+import Database.Tagger.Connection (query)
+import Database.Tagger.Query (
   allFiles,
   allTags,
   insertTags,
   queryForDescriptorByPattern,
-  queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf,
- )
-import Database.Tagger.Connection (query)
-import Database.Tagger.Query (
   queryForFileByPattern,
+  queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf,
   queryForTagBySubTagTriple,
  )
 import Database.Tagger.Query.Type (TaggerQuery)
 import Database.Tagger.Type (
+  Descriptor (descriptorId),
   File,
+  RecordKey,
   Tag (tagId, tagSubtagOfId),
   TaggedConnection,
-  descriptorId,
  )
 import Lens.Micro (Lens', lens, (%~), (&), (.~), (^.))
 import Text.Parsec.Error (errorMessages, messageString)
@@ -119,8 +116,9 @@ import Text.TaggerQL.Expression.AST (
   evaluateUExpression,
   extensionL,
   liftFExpressionA,
+  runDTerm,
  )
-import Text.TaggerQL.Expression.Parser (parseFExpr, parseTagExpr)
+import Text.TaggerQL.Expression.Parser (parseFExpr, parseTExpr)
 import Prelude hiding (lookup, (!!))
 
 {- |
@@ -298,7 +296,7 @@ tagQueryOnMetaDescriptorPattern =
       SELECT id FROM r
     ) AS d ON t.descriptorId = d.id|]
 
--- Tagging Engine
+-- Tagging TExpression Engine
 
 {- |
  Run a sub-expression, a subset of the TaggerQL, to tag a file with Descriptors
@@ -307,70 +305,81 @@ tagQueryOnMetaDescriptorPattern =
  Returns Just error messages if parsing fails. Otherwise Nothing.
 -}
 tagFile :: RecordKey File -> TaggedConnection -> Text -> IO (Maybe Text)
-tagFile fk c =
-  either
-    (return . Just . T.pack . show)
-    (\se -> runSubExprOnFile se fk c $> Nothing)
-    . parseTagExpr
+tagFile fk c t =
+  let parseResult = parseTExpr t
+   in case parseResult of
+        Left pe ->
+          return
+            . Just
+            . T.unwords
+            . map (T.pack . messageString)
+            . errorMessages
+            $ pe
+        Right te -> Nothing <$ applyTExpressionToFile (fmap runDTerm te) fk c
 
-runSubExprOnFile :: SubExpression -> RecordKey File -> TaggedConnection -> IO ()
-runSubExprOnFile se fk c = void (runReaderT (insertSubExpr se Nothing) (fk, c))
+newtype TagApplication = TagApplication
+  { runTagApplication ::
+      Maybe [RecordKey Tag] ->
+      RecordKey File ->
+      TaggedConnection ->
+      IO [RecordKey Tag]
+  }
 
-insertSubExpr ::
-  SubExpression ->
-  Maybe [RecordKey Tag] ->
-  ReaderT (RecordKey File, TaggedConnection) IO [RecordKey Tag]
-insertSubExpr se supertags =
-  asks snd >>= \c ->
-    ( case se of
-        SubExpression (TagTermExtension tt se') -> do
-          insertedSubtags <- insertSubExpr (SubTag tt) supertags
-          insertSubExpr se' (Just insertedSubtags)
-        BinarySubExpression (BinaryOperation se' _ se2) -> do
-          void $ insertSubExpr se' supertags
-          void $ insertSubExpr se2 supertags
-          -- tags inserted by a SubBinary is indeterminate and empty by default
-          return mempty
-        SubTag tt -> do
-          let txt = termTxt tt
-          withDescriptors <- qDescriptor txt
-          fk <- asks fst
-          let tagTriples =
-                (fk,,)
-                  <$> (descriptorId <$> withDescriptors)
-                    <*> maybe [Nothing] (fmap Just) supertags
-          void . liftIO . insertTags tagTriples $ c
-          -- Tag insertion may fail because some tags of the same form already exist.
-          -- This query gets all of those pre-existing tags,
-          -- and returns them as if they were just made.
-          case supertags of
-            -- If nothing, then these are top-level tags
-            Nothing ->
-              map tagId
-                <$> liftIO
-                  ( queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf
-                      fk
-                      txt
-                      c
-                  )
-            Just _ ->
-              -- If just, these are subtags of existing tags.
-              map tagId . unions
-                <$> liftIO
-                  ( mapM
-                      (`queryForTagBySubTagTriple` c)
-                      (third fromJust <$> tagTriples)
-                  )
-    )
+instance Endomorphism TagApplication where
+  (@>) :: TagApplication -> TagApplication -> TagApplication
+  (TagApplication f) @> (TagApplication g) = TagApplication $ \mts fk c -> do
+    higherEnvResults <- f mts fk c
+    g (Just higherEnvResults) fk c
+
+instance Lng TagApplication where
+  (<+>) :: TagApplication -> TagApplication -> TagApplication
+  (<+>) = disregardBinaryOp
+  (<^>) :: TagApplication -> TagApplication -> TagApplication
+  (<^>) = disregardBinaryOp
+  (<->) :: TagApplication -> TagApplication -> TagApplication
+  (<->) = disregardBinaryOp
+
+disregardBinaryOp :: TagApplication -> TagApplication -> TagApplication
+disregardBinaryOp (TagApplication f) (TagApplication g) =
+  TagApplication $ \mts fk c -> do
+    _ <- f mts fk c
+    _ <- g mts fk c
+    return []
+
+insertPattern :: Pattern -> TagApplication
+insertPattern WildCard = TagApplication $ \_ _ _ -> return []
+insertPattern (PatternText t) = TagApplication $ \mts fk c -> do
+  descriptors <- queryForDescriptorByPattern t c
+  let taggingTriples =
+        (fk,,) <$> map descriptorId descriptors
+          <*> maybe [Nothing] (map Just) mts
+  void . insertTags taggingTriples $ c
+  -- Tag insertion may fail because some tags of the same form already exist.
+  -- This query gets all of those pre-existing tags,
+  -- and returns them as if they were just made.
+  case mts of
+    -- If nothing, then these are top-level tags
+    Nothing ->
+      map tagId <$> queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf fk t c
+    Just _ ->
+      -- If just, these are subtags of existing tags.
+      map tagId . unions
+        <$> mapM
+          (`queryForTagBySubTagTriple` c)
+          (third fromJust <$> taggingTriples)
  where
-  termTxt tt =
-    case tt of
-      DescriptorTerm txt -> txt
-      MetaDescriptorTerm txt -> txt
-  qDescriptor txt = asks snd >>= liftIO . queryForDescriptorByPattern txt
-  unions :: (Foldable t, Eq a) => t [a] -> [a]
   unions xs = if null xs then [] else L.foldl' L.union [] xs
   third f (x, y, z) = (x, y, f z)
+
+applyTExpressionToFile ::
+  TExpression Pattern ->
+  RecordKey File ->
+  TaggedConnection ->
+  IO [RecordKey Tag]
+applyTExpressionToFile texpr =
+  runTagApplication
+    (evalDistribute . evaluateTExpression . fmap (distribute . insertPattern) $ texpr)
+    Nothing
 
 {- |
  Where 'e` is 1-indexed in order of evaluation.
