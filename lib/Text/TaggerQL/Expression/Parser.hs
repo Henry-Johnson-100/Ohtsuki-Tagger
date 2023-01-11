@@ -30,13 +30,15 @@ module Text.TaggerQL.Expression.Parser (
   -- ** Term Parsers
   tagTermParser,
   fileTermParser,
+  fValueParser,
+  dTermPatternParser,
 
   -- ** Misc
   patternParser,
+  patternParser',
 ) where
 
 import Control.Applicative ((<**>))
-import Data.Bifunctor (second)
 import Data.Char (toLower, toUpper)
 import Data.Functor (($>), (<&>))
 import Data.Tagger (SetOp (..))
