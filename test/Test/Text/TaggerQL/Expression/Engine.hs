@@ -389,7 +389,7 @@ fExpressionBasicQueries c =
               c
                 >>= runReaderT
                   ( evalSubExpression
-                      (SubTag (DescriptorTerm "descriptor_18"))
+                      (TValue (DTerm "descriptor_18"))
                       h
                   )
             assertEqual
@@ -402,13 +402,13 @@ fExpressionBasicQueries c =
               ]
               r
         , testCase "SubExpression Tags - 1" $ do
-            h <- c >>= queryTags (DescriptorTerm "descriptor_17")
+            h <- c >>= runQueryTags (DTerm "descriptor_17")
             r <-
               c
                 >>= runReaderT
                   ( evalSubExpression
-                      (SubTag (DescriptorTerm "descriptor_19"))
-                      (HS.fromList h)
+                      (TValue (DTerm "descriptor_19"))
+                      h
                   )
             assertEqual
               "Matches the tags returned by the RHS of the \

@@ -38,7 +38,6 @@ module Text.TaggerQL.Expression.Engine (
 
   -- ** Examples
   identityInterpreter,
-  queryer,
 
   -- * Indexing
   ExpressionIndex (..),
@@ -54,21 +53,19 @@ module Text.TaggerQL.Expression.Engine (
   lowerExpression,
 
   -- * Primitive Functions
-  interpretQuery,
   runExpr,
-  evalExpr,
+  interpretQuery,
 
   -- ** For Testing
   runSubExprOnFile,
   evalSubExpression,
-  queryTags,
   queryTagSet',
 ) where
 
 import Control.Applicative ((<|>))
-import Control.Monad (guard, void, when, (<=<), (>=>))
+import Control.Monad (guard, void, when, (<=<))
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
+import Control.Monad.Trans.Except (ExceptT, throwE)
 import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask, asks)
 import Control.Monad.Trans.State.Strict (StateT, evalState, get, gets, modify, runState)
 import Data.Bifunctor (Bifunctor (first, second))
@@ -78,37 +75,52 @@ import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import qualified Data.List as L
 import Data.Maybe (fromJust)
-import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger (
   RecordKey,
   allFiles,
   allTags,
-  close,
   insertTags,
-  open,
   queryForDescriptorByPattern,
   queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf,
  )
 import Database.Tagger.Connection (query)
 import Database.Tagger.Query (
-  flatQueryForFileByTagDescriptorPattern,
-  flatQueryForFileOnMetaRelationPattern,
   queryForFileByPattern,
   queryForTagBySubTagTriple,
  )
+import Database.Tagger.Query.Type (TaggerQuery)
 import Database.Tagger.Type (
   File,
   Tag (tagId, tagSubtagOfId),
   TaggedConnection,
   descriptorId,
  )
-import Lens.Micro (Lens', lens, (%~), (&), (.~), (?~), (^.))
+import Lens.Micro (Lens', lens, (%~), (&), (.~), (^.))
 import Text.Parsec.Error (errorMessages, messageString)
 import Text.RawString.QQ (r)
-import Text.TaggerQL.Expression.AST
-import Text.TaggerQL.Expression.Parser (parseExpr, parseFExpr, parseTagExpr)
+import Text.TaggerQL.Expression.AST (
+  BinaryOperation (..),
+  DTerm (..),
+  Endomorphism (..),
+  Expression (..),
+  FExpression,
+  FileTerm,
+  Lng (..),
+  Pattern (..),
+  SubExpression (..),
+  TExpression (TValue),
+  TagTerm (..),
+  TagTermExtension (..),
+  distribute,
+  evalDistribute,
+  evaluateTExpression,
+  evaluateUExpression,
+  extensionL,
+  liftFExpressionA,
+ )
+import Text.TaggerQL.Expression.Parser (parseFExpr, parseTagExpr)
 import Prelude hiding (lookup, (!!))
 
 {- |
@@ -195,68 +207,6 @@ runExpressionInterpreter itr@(ExpressionInterpreter ift itt itte ibo setr) expr 
       rhsR <- runExpressionInterpreter itr rhs
       ibo $ BinaryOperation lhsR so rhsR
 
-{- |
- Defines an 'Interpreter` that queries the given connection for a set of 'File`.
-
- The 'SubExpression` evaluates to a function accepting a set of 'Tag` that are defined
- by the outer scope of any given 'SubExpression`. Meaning that a set of 'Tag`
- is created from the bottom-up of a given tag-subtag hierarchy.
--}
-queryer ::
-  ExpressionInterpreter
-    (ReaderT TaggedConnection IO)
-    (HashSet Tag -> HashSet Tag)
-    (HashSet File)
-queryer =
-  ExpressionInterpreter
-    { interpretFileTerm = \(FileTerm t) ->
-        ask
-          >>= liftIO
-            . fmap HS.fromList
-            . queryForFileByPattern t
-    , interpretTagTerm = \tt ->
-        ask
-          >>= liftIO
-            . fmap HS.fromList
-            . ( case tt of
-                  DescriptorTerm txt -> flatQueryForFileByTagDescriptorPattern txt
-                  MetaDescriptorTerm txt -> flatQueryForFileOnMetaRelationPattern txt
-              )
-    , interpretBinaryExpression = \(BinaryOperation lhs so rhs) ->
-        return $ hsOp so lhs rhs
-    , interpretTagExpression = \(TagTermExtension tt se) -> do
-        c <- ask
-        supertags <- liftIO . fmap HS.fromList $ queryTags tt c
-        joinSubTagsTo <- se
-        liftIO $ toFileSet (joinSubTagsTo supertags) c
-    , subExpressionInterpreter =
-        SubExpressionInterpreter
-          { interpretSubTag = \tt ->
-              flip joinSubtags
-                <$> ( ask
-                        >>= liftIO
-                          . fmap (HS.fromList . map tagSubtagOfId)
-                          . queryTags tt
-                    )
-          , interpretBinarySubExpression = \(BinaryOperation lhs so rhs) ->
-              return $ \higherEnv -> hsOp so (lhs higherEnv) (rhs higherEnv)
-          , interpretSubExpression = \(TagTermExtension tt se) -> do
-              c <- ask
-              supertags <- liftIO . fmap HS.fromList $ queryTags tt c
-              joinLowerEnv <- se
-              return $ \higherEnv ->
-                joinSubtags
-                  higherEnv
-                  (HS.map tagSubtagOfId $ joinLowerEnv supertags)
-          }
-    }
- where
-  hsOp so =
-    case so of
-      Union -> HS.union
-      Intersect -> HS.intersection
-      Difference -> HS.difference
-
 joinSubtags :: HashSet Tag -> HashSet (Maybe (RecordKey Tag)) -> HashSet Tag
 joinSubtags supertags subtags =
   HS.filter (\(Just . tagId -> supertagId) -> HS.member supertagId subtags) supertags
@@ -266,7 +216,7 @@ joinSubtags supertags subtags =
 -}
 runQuery :: TaggedConnection -> Text -> ExceptT [Text] IO (HashSet File)
 runQuery c t =
-  let result = parseExpr t
+  let result = parseFExpr t
    in case result of
         Left pe -> throwE . map (T.pack . messageString) . errorMessages $ pe
         Right ex -> liftIO . flip runExpr c $ ex
@@ -274,18 +224,15 @@ runQuery c t =
 {- |
  Query an 'Expression`
 -}
-runExpr :: Expression -> TaggedConnection -> IO (HashSet File)
-runExpr expr = runReaderT (evalExpr expr)
-
-evalExpr :: Expression -> ReaderT TaggedConnection IO (HashSet File)
-evalExpr = runExpressionInterpreter queryer
+runExpr :: FExpression (DTerm Pattern) Pattern -> TaggedConnection -> IO (HashSet File)
+runExpr expr = runReaderT (interpretQuery expr)
 
 {- |
- Given a 'SubExpression` and a set of 'Tag`, compute the set of 'Tag` that
- is defined by the 'SubExpression` and filter the argument by those that are subtags.
+ To the given set of tags, join all tags computed by the given TExpression by those that
+ are subtags.
 -}
 evalSubExpression ::
-  SubExpression ->
+  TExpression (DTerm Pattern) ->
   -- | The current 'Tag` environment. Any set of 'Tag` computed by this function
   -- will be a subset of this argument.
   HashSet Tag ->
@@ -293,9 +240,13 @@ evalSubExpression ::
     TaggedConnection
     IO
     (HashSet Tag)
-evalSubExpression subExpr supertags = do
-  joinSubTagsTo <- runSubExpressionInterpreter (subExpressionInterpreter queryer) subExpr
-  return . joinSubTagsTo $ supertags
+evalSubExpression subExpr supertags =
+  runTagSet
+    . evalDistribute
+    . evaluateTExpression
+    . fmap distribute
+    . ((TValue . TagSet $ supertags) @>)
+    <$> traverse queryTagSet subExpr
 
 toFileSet :: HashSet Tag -> TaggedConnection -> IO (HashSet File)
 toFileSet (map tagId . HS.toList -> ts) conn = do
@@ -312,12 +263,7 @@ JOIN Tag t ON f.id = t.fileId
 WHERE t.id = ?
     |]
 
-queryTags :: TagTerm -> TaggedConnection -> IO [Tag]
-queryTags tt c =
-  case tt of
-    DescriptorTerm txt -> query c tagQueryOnDescriptorPattern [txt]
-    MetaDescriptorTerm txt -> query c tagQueryOnMetaDescriptorPattern [txt]
-
+tagQueryOnDescriptorPattern :: TaggerQuery
 tagQueryOnDescriptorPattern =
   [r|
     SELECT
@@ -329,6 +275,8 @@ tagQueryOnDescriptorPattern =
     JOIN Descriptor d ON t.descriptorId = d.id
     WHERE d.descriptor LIKE ? ESCAPE '\'
     |]
+
+tagQueryOnMetaDescriptorPattern :: TaggerQuery
 tagQueryOnMetaDescriptorPattern =
   [r|
     SELECT
@@ -612,15 +560,16 @@ lowerExpression expr = case expr of
     BinarySubExpression
       <$> (BinaryOperation <$> lowerExpression lhs <*> pure so <*> lowerExpression rhs)
 
-interpretQuery ::
-  FExpression (DTerm Pattern) Pattern ->
-  ReaderT TaggedConnection IO (HashSet File)
-interpretQuery =
-  fmap (runFileSet . evaluateUExpression) . liftFExpressionA resolveTagSet
-    <=< bitraverse queryTagSet queryFilePattern
+-- FExpression interpreter
 
+{- |
+ Wrapper to define an 'Lng` instance.
+-}
 newtype FileSet = FileSet {runFileSet :: HashSet File} deriving (Show)
 
+{- |
+ Lng over the Ring of 'HashSet File`
+-}
 instance Lng FileSet where
   (<+>) :: FileSet -> FileSet -> FileSet
   (FileSet x) <+> (FileSet y) = FileSet $ HS.union x y
@@ -628,6 +577,44 @@ instance Lng FileSet where
   (FileSet x) <^> (FileSet y) = FileSet $ HS.intersection x y
   (<->) :: FileSet -> FileSet -> FileSet
   (FileSet x) <-> (FileSet y) = FileSet $ HS.difference x y
+
+{- |
+ Wrapper to define an 'Lng` and 'Endomorphism` instance.
+-}
+newtype TagSet = TagSet {runTagSet :: HashSet Tag} deriving (Show)
+
+{- |
+ Lng over the Ring of 'HashSet Tag`
+-}
+instance Lng TagSet where
+  (<+>) :: TagSet -> TagSet -> TagSet
+  (<+>) = tagSetWithSetOp HS.union
+  (<^>) :: TagSet -> TagSet -> TagSet
+  (<^>) = tagSetWithSetOp HS.intersection
+  (<->) :: TagSet -> TagSet -> TagSet
+  (<->) = tagSetWithSetOp HS.difference
+
+tagSetWithSetOp ::
+  (HashSet Tag -> HashSet Tag -> HashSet Tag) ->
+  TagSet ->
+  TagSet ->
+  TagSet
+tagSetWithSetOp so (TagSet x) (TagSet y) = TagSet $ x `so` y
+
+{- |
+ Filters the left-hand set of tags if there is a subtag in the right-hand.
+-}
+instance Endomorphism TagSet where
+  (@>) :: TagSet -> TagSet -> TagSet
+  (TagSet x) @> (TagSet y) = TagSet $ joinSubtags x (HS.map tagSubtagOfId y)
+
+interpretQuery ::
+  FExpression (DTerm Pattern) Pattern ->
+  ReaderT TaggedConnection IO (HashSet File)
+interpretQuery =
+  fmap (runFileSet . evaluateUExpression)
+    . liftFExpressionA resolveTagSet
+    <=< bitraverse queryTagSet queryFilePattern
 
 queryFilePattern :: Pattern -> ReaderT TaggedConnection IO FileSet
 queryFilePattern p =
@@ -650,9 +637,7 @@ resolveTagSet texpr = do
     $ texpr
 
 queryTagSet :: DTerm Pattern -> ReaderT TaggedConnection IO TagSet
-queryTagSet dt = do
-  !res <- queryTagSet' dt
-  return . TagSet $ res
+queryTagSet = fmap TagSet . queryTagSet'
 
 queryTagSet' :: DTerm Pattern -> ReaderT TaggedConnection IO (HashSet Tag)
 queryTagSet' dt = case dt of
@@ -666,24 +651,3 @@ queryTagSet' dt = case dt of
     PatternText t -> do
       c <- ask
       liftIO . fmap HS.fromList $ query c tagQueryOnMetaDescriptorPattern [t]
-
-newtype TagSet = TagSet {runTagSet :: HashSet Tag}
-
-instance Lng TagSet where
-  (<+>) :: TagSet -> TagSet -> TagSet
-  (<+>) = withSO HS.union
-  (<^>) :: TagSet -> TagSet -> TagSet
-  (<^>) = withSO HS.intersection
-  (<->) :: TagSet -> TagSet -> TagSet
-  (<->) = withSO HS.difference
-
-withSO ::
-  (HashSet Tag -> HashSet Tag -> HashSet Tag) ->
-  TagSet ->
-  TagSet ->
-  TagSet
-withSO so (TagSet x) (TagSet y) = TagSet $ x `so` y
-
-instance Endomorphism TagSet where
-  (@>) :: TagSet -> TagSet -> TagSet
-  (TagSet x) @> (TagSet y) = TagSet $ joinSubtags x (HS.map tagSubtagOfId y)
