@@ -6,6 +6,8 @@ module Test.Text.TaggerQL.Expression.Parser (
 ) where
 
 import Data.Either (isLeft)
+import qualified Data.List as L
+import Data.String (fromString)
 import Data.Tagger (SetOp (..))
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -255,6 +257,67 @@ fParserTests =
                         (parseFExpr "a | b ")
                     )
                 ]
+            , testGroup
+                "Mixed FExpressions and Lifted TExpressions"
+                ( let p = parseFExpr
+                   in [ testCase
+                            "Trivial FValue"
+                            (assertEqual "" (Right (FValue "test")) (p "p.test"))
+                      , testCase
+                            "Trivial Lifted TValue"
+                            (assertEqual "" (Right (l . dmt $ "test")) (p "test"))
+                      , testCase
+                            "Trivial Lifted DTerm TValue"
+                            (assertEqual "" (Right . l . TValue . DTerm $ "test") (p "d.test"))
+                      , testCase
+                            "Fvalue then TValue"
+                            ( assertEqual
+                                ""
+                                (Right (FValue "hello" <^> (l . dmt $ "goodbye")))
+                                (p "p.hello goodbye")
+                            )
+                      , testCase
+                            "TValue then FValue"
+                            ( assertEqual
+                                ""
+                                (Right ((l . dmt $ "goodbye") <^> FValue "hello"))
+                                (p "goodbye p.hello")
+                            )
+                      , testCase
+                            "Parenthesized mixed cases"
+                            ( assertEqual
+                                ""
+                                ( Right
+                                    ( (l . dmt $ "a") <^> ((l . dmt $ "b") <^> FValue "c") <^> (l . dmt $ "d")
+                                    )
+                                )
+                                (p "a (b p.c) d")
+                            )
+                      , testCase
+                            "Parenthesized lifted cases"
+                            ( assertEqual
+                                ""
+                                ( Right
+                                    ( (l . dmt $ "a") <^> ((l . dmt $ "b") <^> (l . dmt $ "c")) <^> (l . dmt $ "d")
+                                    )
+                                )
+                                (p "a (b c) d")
+                            )
+                      , testGroup
+                            "Permutations - 1"
+                            ( let x = FValue "x"
+                                  a = l . dmt $ "a"
+                                  b = l . dmt $ "b"
+                                  c = l . dmt $ "c"
+                               in (\(assertion, str) -> testCase "" (assertEqual "" (Right assertion) (p str)))
+                                    <$> [ (a <^> b <^> c <^> x, "a b c p.x")
+                                        , (a <^> b <^> x <^> c, "a b p.x c")
+                                        , (a <^> x <^> b <^> c, "a p.x b c")
+                                        , (x <^> a <^> b <^> c, "p.x a b c")
+                                        ]
+                            )
+                      ]
+                )
             ]
         , testGroup
             "SubExpression Parser Tests"
