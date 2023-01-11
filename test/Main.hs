@@ -14,15 +14,14 @@ import Test.Resources (
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Text.TaggerQL.Expression.Engine (queryEngineASTTests)
-import Test.Text.TaggerQL.Expression.Parser (fParserTests, parserTests)
+import Test.Text.TaggerQL.Expression.Parser (fParserTests)
 
 main :: IO ()
 main =
     defaultMain
         ( testGroup
             "Test"
-            [ parserTests
-            , fParserTests
+            [ fParserTests
             , withResource secureResource removeResource $
                 \conn ->
                     testGroup
