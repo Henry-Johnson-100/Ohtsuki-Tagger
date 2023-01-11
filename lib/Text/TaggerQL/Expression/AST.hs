@@ -71,16 +71,22 @@ module Text.TaggerQL.Expression.AST (
   patternL,
   DTerm (..),
 
+  -- * Interpretation Modifiers
+  Distribute (..),
+  distribute,
+  evalDistribute,
+  runDistribute,
+
   -- * Classes
   Lng (..),
   Ling (..),
-  RightAssoc (..),
+  Endomorphism (..),
 ) where
 
 import Control.Monad (ap)
 import Data.Bifoldable (Bifoldable (bifoldr))
 import Data.Bifunctor (Bifunctor (bimap, first, second))
-import Data.Bitraversable (Bitraversable)
+import Data.Bitraversable (Bitraversable, bitraverse)
 import Data.Functor.Identity (Identity (Identity), runIdentity)
 import Data.String (IsString (fromString))
 import Data.Tagger (SetOp (..))
@@ -296,8 +302,8 @@ data DTerm a
 data TExpression a
   = TValue a
   | BinaryTExpression (BinaryOperation (TExpression a))
-  | -- | A 'TExpression` can be applied to another 'TExpression` in some way.
-    TExpressionApplication (Application (TExpression a) (TExpression a))
+  | -- | The type in a 'TExpression` can be distributively applied over a 'TExpression`
+    TExpressionDistribution (Application a (TExpression a))
   deriving (Show, Eq)
 
 instance Functor TExpression where
@@ -305,7 +311,7 @@ instance Functor TExpression where
   fmap f texpr = case texpr of
     TValue tt -> TValue (f tt)
     BinaryTExpression bo -> BinaryTExpression (fmap (fmap f) bo)
-    TExpressionApplication a -> TExpressionApplication (bimap (fmap f) (fmap f) a)
+    TExpressionDistribution a -> TExpressionDistribution (bimap f (fmap f) a)
 
 instance Applicative TExpression where
   pure :: a -> TExpression a
@@ -321,7 +327,7 @@ instance Monad TExpression where
     TValue a -> f a
     BinaryTExpression (BinaryOperation lhs so rhs) ->
       dispatchLng so (lhs >>= f) (rhs >>= f)
-    TExpressionApplication (Application x y) -> (x >>= f) |-> (y >>= f)
+    TExpressionDistribution (Application x y) -> f x @> (y >>= f)
 
 {- |
  Folding a TExpression is 'SetOp` agnostic and largely structure agnostic
@@ -337,7 +343,7 @@ instance Foldable TExpression where
   foldr f acc texpr = case texpr of
     TValue a -> f a acc
     BinaryTExpression (BinaryOperation lhs _ rhs) -> foldr f (foldr f acc rhs) lhs
-    TExpressionApplication (Application x y) -> foldr f (foldr f acc y) x
+    TExpressionDistribution (Application x y) -> f x (foldr f acc y)
 
 instance Traversable TExpression where
   traverse :: Applicative f => (a -> f b) -> TExpression a -> f (TExpression b)
@@ -345,7 +351,8 @@ instance Traversable TExpression where
     TValue a -> TValue <$> f a
     BinaryTExpression (BinaryOperation lhs so rhs) ->
       dispatchLng so <$> traverse f lhs <*> traverse f rhs
-    TExpressionApplication (Application x y) -> (|->) <$> traverse f x <*> traverse f y
+    TExpressionDistribution (Application x y) ->
+      (\x' y' -> TExpressionDistribution (x' :$ y')) <$> f x <*> traverse f y
 
 instance Lng (TExpression a) where
   (<+>) :: TExpression a -> TExpression a -> TExpression a
@@ -361,25 +368,105 @@ instance Ling (TExpression (DTerm Pattern)) where
   aid :: TExpression (DTerm Pattern)
   aid = mid <-> mid
 
-instance RightAssoc (TExpression a) where
-  (|->) :: TExpression a -> TExpression a -> TExpression a
-  x |-> y = TExpressionApplication $ x :$ y
+{- |
+ Distributes leaves of an expression over the given 'TExpression`.
+-}
+instance Endomorphism (TExpression a) where
+  (@>) :: TExpression a -> TExpression a -> TExpression a
+  x @> y = case x of
+    TValue a -> TExpressionDistribution (a :$ y)
+    BinaryTExpression bn -> BinaryTExpression $ fmap (@> y) bn
+    TExpressionDistribution (Application lhs rhs) ->
+      TExpressionDistribution (Application lhs (rhs @> y))
 
-evaluateTExpression :: (Lng a, RightAssoc a) => TExpression a -> a
+{- |
+ Using the definitions provided by 'Lng` and 'Endomorphism`, operate over all
+ values in a 'TExpression`.
+
+ Note that if @Endomorphism a@ is distributive then for any constrained expression t,
+ the following is true:
+ > evaluateTExpression t = evalDistribute . evaluateTExpression . fmap distribute $ t
+
+ Otherwise, if @Endomorphism a@ is not distributive, then the operation of 'TExpressionDistribution`
+ can be automatically distributed over subsequent 'TExpression`s by evaluating the 'TExpression`
+ after mapping it to a 'Distribute` if so desired.
+-}
+evaluateTExpression :: (Lng a, Endomorphism a) => TExpression a -> a
 evaluateTExpression texpr = case texpr of
   TValue a -> a
   BinaryTExpression bn -> runBinaryOperation . fmap evaluateTExpression $ bn
-  TExpressionApplication a ->
-    runApplication
-      . bimap ((|->) . evaluateTExpression) evaluateTExpression
-      $ a
+  TExpressionDistribution (Application lhs rhs) ->
+    lhs @> evaluateTExpression rhs
+
+{- |
+ A newtype wrapper for an 'Lng` and 'Endomorphism` that is *NOT* distributive.
+ This newtype manually distributes a future computation over the operands of the
+ 'Lng` operations.
+
+ Wrap a type in this if distribution is desired and the supplied 'Endomorphism` function
+  is not innately distributive.
+
+ Which is to say, for a function @f :: a -> a -> a@ and @(+) :: a -> a -> a@
+ if @f x (y + z) /= (f x y + f x z)@ and you would like @f x@ to be distributed over
+ @y + z@ then this newtype is what you're looking for.
+-}
+newtype Distribute a = Distribute ((a -> a) -> a)
+
+runDistribute :: Distribute a -> (a -> a) -> a
+runDistribute (Distribute x) = x
+
+evalDistribute :: Distribute a -> a
+evalDistribute x = runDistribute x id
+
+distribute :: a -> Distribute a
+distribute x = Distribute $ \ret -> ret x
+
+distributeOverBinary ::
+  (t -> t -> t) ->
+  Distribute t ->
+  Distribute t ->
+  Distribute t
+distributeOverBinary
+  f
+  (Distribute x)
+  (Distribute y) =
+    Distribute $ \ret -> x ret `f` y ret
+
+instance Lng a => Lng (Distribute a) where
+  (<+>) ::
+    Lng a =>
+    Distribute a ->
+    Distribute a ->
+    Distribute a
+  (<+>) = distributeOverBinary (<+>)
+  (<^>) ::
+    Lng a =>
+    Distribute a ->
+    Distribute a ->
+    Distribute a
+  (<^>) = distributeOverBinary (<^>)
+  (<->) ::
+    Lng a =>
+    Distribute a ->
+    Distribute a ->
+    Distribute a
+  (<->) = distributeOverBinary (<->)
+
+instance Endomorphism a => Endomorphism (Distribute a) where
+  (@>) ::
+    Endomorphism a =>
+    Distribute a ->
+    Distribute a ->
+    Distribute a
+  (Distribute x) @> (Distribute y) =
+    Distribute $ \ret -> ret $ y (x id @>)
 
 {- | A constrained sequence of an Applicative action over
  a 'TExpression`. The constraints define how the structure of the 'TExpression`
  effects evaluation.
 -}
 interpretTExpression ::
-  (Applicative f, Lng b, RightAssoc b) =>
+  (Applicative f, Lng b, Endomorphism b) =>
   (a -> f b) ->
   TExpression a ->
   f b
@@ -443,7 +530,17 @@ instance Bifoldable FExpression where
       bifoldr lf rf (bifoldr lf rf acc rhs) lhs
     LiftTExpression te -> foldr lf acc te
 
-instance Bitraversable FExpression
+instance Bitraversable FExpression where
+  bitraverse ::
+    Applicative f =>
+    (a -> f c) ->
+    (b -> f d) ->
+    FExpression a b ->
+    f (FExpression c d)
+  bitraverse f g fexpr = case fexpr of
+    FValue b -> FValue <$> g b
+    BinaryFExpression bo -> BinaryFExpression <$> traverse (bitraverse f g) bo
+    LiftTExpression te -> LiftTExpression <$> traverse f te
 
 {- |
  Given an applicative morphism for the inner 'TExpression` from type @a -> f b@,
@@ -473,7 +570,7 @@ liftFExpression f = runIdentity . liftFExpressionA (Identity . f)
  Representing an 'FExpression` after evaluating the inner type along with
  some lifting function f :: @a -> b@.
 
- @(Lng a, RightAssoc a) => (a -> b) -> FExpression a b -> FExpression b b@
+ @(Lng a, Endomorphism a) => (a -> b) -> FExpression a b -> FExpression b b@
  therefore, since each inner 'TExpression` is evaluated,
  it can be reduced to a single 'FValue`
 
@@ -553,7 +650,7 @@ interpretUExpression f = fmap evaluateUExpression . traverse f
 
  TExpressions are a subset of FExpressions which map to a different domain.
  In order to finally evaluate any given expression to the ultimate domain U, there
- first has to be an evaluation of a TExpression its domain T.
+ first has to be an evaluation of a TExpression to its domain T.
  At the same time, an FExpression can be evaluated to its domain F.
  Finally, an additional morphism must be supplied to any given FExpression that
  transforms its inner TExpressions from T -> F so that the entire FExpression can
@@ -562,7 +659,7 @@ interpretUExpression f = fmap evaluateUExpression . traverse f
  The reason for this is that TExpressions rely on a right associative operation that
  the domain of an FExpression is not obligated to satisfy. Therefore, an FExpression
  must be parameterized over two distinct types and it's final evaluation is separated
- into two distinct steps to avoid the constraint @RightAssoc f => FExpression f -> f@
+ into two distinct steps to avoid the constraint @Endomorphism f => FExpression f -> f@
  that would arise from evaluation.
 
  Instead, the structure of an FExpression is not examined during its interpretation.
@@ -578,13 +675,14 @@ dispatchLng Difference = (<->)
 runBinaryOperation :: Lng a => BinaryOperation a -> a
 runBinaryOperation (BinaryOperation lhs so rhs) = dispatchLng so lhs rhs
 
-infixr 7 |->
+infixr 7 @>
 
 {- |
- Class for a right associative operation.
+ A class for any endomorphism.
 -}
-class RightAssoc r where
-  (|->) :: r -> r -> r
+class Endomorphism r where
+  -- | A binary, right-associative endomorphism.
+  (@>) :: r -> r -> r
 
 infixl 7 <+>
 infixl 7 <^>

@@ -2,6 +2,8 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
+{-# HLINT ignore "Use lambda-case" #-}
+
 {- |
 Module      : Text.TaggerQL.Expression.Parser
 Description : Parsers for the expression-based TaggerQL query language.
@@ -13,6 +15,8 @@ module Text.TaggerQL.Expression.Parser (
   parseExpr,
   parseTagExpr,
   ParseError,
+  parseFExpr,
+  parseTExpr,
 
   -- * For Testing
   parse,
@@ -32,6 +36,7 @@ module Text.TaggerQL.Expression.Parser (
 ) where
 
 import Control.Applicative ((<**>))
+import Data.Bifunctor (second)
 import Data.Char (toLower, toUpper)
 import Data.Functor (($>), (<&>))
 import Data.Tagger (SetOp (..))
@@ -53,14 +58,7 @@ import Text.Parsec (
   try,
   (<|>),
  )
-import Text.TaggerQL.Expression.AST (
-  BinaryOperation (BinaryOperation),
-  Expression (..),
-  FileTerm (..),
-  SubExpression (..),
-  TagTerm (..),
-  TagTermExtension (TagTermExtension),
- )
+import Text.TaggerQL.Expression.AST
 
 type Parser a = Parsec Text () a
 
@@ -69,6 +67,12 @@ type Parser a = Parsec Text () a
 -}
 parseExpr :: Text -> Either ParseError Expression
 parseExpr = parse expressionParser "TaggerQL"
+
+parseFExpr :: Text -> Either ParseError (FExpression (DTerm Pattern) Pattern)
+parseFExpr = parse fExpressionParser "TaggerQL"
+
+parseTExpr :: Text -> Either ParseError (TExpression (DTerm Pattern))
+parseTExpr = parse tExpressionParser "TaggerQL"
 
 {- |
  Parse a 'SubExpression` from a TaggerQL query.
@@ -116,6 +120,95 @@ expressionParser =
 
 fileTermValueParser :: Parser Expression
 fileTermValueParser = FileTermValue <$> fileTermParser
+
+fExpressionParser :: Parser (FExpression (DTerm Pattern) Pattern)
+fExpressionParser =
+  spaces
+    *> ( try
+          ( myChainl1
+              lhsFExpressionParser
+              (dispatchLng <$> (spaces *> setOpParser))
+              pure
+          )
+          <|> lhsFExpressionParser
+       )
+
+lhsFExpressionParser :: Parser (FExpression (DTerm Pattern) Pattern)
+lhsFExpressionParser =
+  spaces
+    *> ( liftTExpressionParser
+          <|> between (char '(') (spaces *> char ')') fExpressionParser
+          <|> fmap FValue fValueParser
+       )
+
+{- |
+ A lifting function that is distributive over BinaryTExpressions
+-}
+liftBinaryTExpression :: TExpression a -> FExpression a b
+liftBinaryTExpression texpr = case texpr of
+  BinaryTExpression bo -> BinaryFExpression . fmap LiftTExpression $ bo
+  _simpleLift -> LiftTExpression texpr
+
+liftTExpressionParser :: Parser (FExpression (DTerm Pattern) Pattern)
+liftTExpressionParser =
+  liftDTerm
+    <|> liftBinaryTExpression
+      <$> try
+        ( between
+            (char '(')
+            (spaces *> char ')')
+            tExpressionParser
+            <**> reverseApplicationTExpressionParser
+        )
+ where
+  liftDTerm =
+    LiftTExpression
+      <$> ( fmap TValue dTermPatternParser
+              <**> (reverseApplicationTExpressionParser <|> pure id)
+          )
+
+lhsTExpressionParser :: Parser (TExpression (DTerm Pattern))
+lhsTExpressionParser =
+  lhsTExpressionParserNotApplied
+    <**> ( reverseApplicationTExpressionParser
+            <|> pure id
+         )
+
+tExpressionParser :: Parser (TExpression (DTerm Pattern))
+tExpressionParser =
+  spaces
+    *> ( try
+          ( myChainl1
+              lhsTExpressionParser
+              (dispatchLng <$> (spaces *> setOpParser))
+              pure
+          )
+          <|> lhsTExpressionParser
+       )
+
+{- |
+ A lhs TExpression parser that does not check for right application
+-}
+lhsTExpressionParserNotApplied :: Parser (TExpression (DTerm Pattern))
+lhsTExpressionParserNotApplied =
+  spaces
+    *> ( (try fValueParser *> fail "")
+          <|> between (char '(') (spaces *> char ')') tExpressionParser
+          <|> fmap TValue dTermPatternParser
+       )
+
+reverseApplicationTExpressionParser ::
+  Parser
+    (TExpression (DTerm Pattern) -> TExpression (DTerm Pattern))
+reverseApplicationTExpressionParser =
+  flip (@>)
+    <$> between
+      (try (spaces *> char '{'))
+      (spaces *> char '}')
+      tExpressionParser
+
+fValueParser :: Parser Pattern
+fValueParser = ichar 'p' *> char '.' *> patternParser'
 
 subExpressionParser :: Parser SubExpression
 subExpressionParser =
@@ -197,6 +290,18 @@ tagTermParser =
       <|> pure MetaDescriptorTerm
   )
     <*> patternParser
+
+dTermPatternParser :: Parser (DTerm Pattern)
+dTermPatternParser =
+  ( ( try (ichar 'r' *> char '.' $> DMetaTerm)
+        <|> try (ichar 'd' *> char '.' $> DTerm)
+    )
+      <|> pure DMetaTerm
+  )
+    <*> patternParser'
+
+patternParser' :: Parser Pattern
+patternParser' = Pattern <$> patternParser
 
 patternParser :: Parser Text
 patternParser =
