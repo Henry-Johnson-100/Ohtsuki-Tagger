@@ -446,6 +446,40 @@ fParserTests =
                                 )
                                 (parseSE "b{\n c&d\n}\n&e")
                             )
+                        , testCase
+                            "Distributive syntax sugar"
+                            ( assertEqual
+                                ""
+                                ( Right
+                                    ( TExpressionDistribution (DMetaTerm "a" :$ dmt "c") <^> TExpressionDistribution (DMetaTerm "b" :$ dmt "c")
+                                    )
+                                )
+                                (parseSE "(a b){c}")
+                            )
+                        , testCase
+                            "Distributive syntax sugar - 2"
+                            ( assertEqual
+                                ""
+                                ( Right
+                                    ( let innerDistribution = TExpressionDistribution (DMetaTerm "c" :$ dmt "f") <^> TExpressionDistribution (DMetaTerm "e" :$ dmt "f")
+                                       in TExpressionDistribution (DMetaTerm "a" :$ innerDistribution) <^> TExpressionDistribution (DMetaTerm "b" :$ innerDistribution)
+                                    )
+                                )
+                                (parseSE "(a b){(c e){f}}")
+                            )
+                        , testCase
+                            "Distributive syntax sugar - 3"
+                            ( assertEqual
+                                ""
+                                ( Right
+                                    ( let d0 = dmt "c" <^> d1t1
+                                          d1t1 = TExpressionDistribution (DMetaTerm "d" :$ d2) <^> TExpressionDistribution (DMetaTerm "e" :$ d2)
+                                          d2 = dmt "f" <^> dmt "g"
+                                       in TExpressionDistribution (DMetaTerm "a" :$ d0) <^> TExpressionDistribution (DMetaTerm "b" :$ d0)
+                                    )
+                                )
+                                (parseSE "(a b){c (d e){f g}}")
+                            )
                         ]
                   ]
             )
