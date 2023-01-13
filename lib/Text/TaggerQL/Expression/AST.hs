@@ -1,6 +1,8 @@
 {-# LANGUAGE DeriveFoldable #-}
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
@@ -78,6 +80,19 @@ module Text.TaggerQL.Expression.AST (
   evalDistribute,
   runDistribute,
 
+  -- * Other
+  QueryExpression,
+  TagExpression,
+  FilePattern,
+  DescriptorPattern,
+  ModifyComputation (..),
+  step,
+  runModification,
+  bimapHomo,
+  bitraverseHomo,
+  YExpression (..),
+  evaluateYExpression,
+
   -- * Classes
   Lng (..),
   Ling (..),
@@ -85,10 +100,14 @@ module Text.TaggerQL.Expression.AST (
 ) where
 
 import Control.Monad (ap)
-import Data.Bifoldable (Bifoldable (bifoldr))
+import Data.Bifoldable (Bifoldable (bifoldMap, bifoldr))
 import Data.Bifunctor (Bifunctor (bimap, first, second))
-import Data.Bitraversable (Bitraversable, bitraverse)
+import Data.Bitraversable (Bitraversable, bifoldMapDefault, bitraverse)
 import Data.Functor.Identity (Identity (Identity), runIdentity)
+import Data.HashSet (HashSet)
+import qualified Data.HashSet as HS
+import Data.Hashable (Hashable)
+import qualified Data.List as L
 import Data.String (IsString (fromString))
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
@@ -706,6 +725,30 @@ class Lng r where
   -- | A left associative operation
   (<->) :: r -> r -> r
 
+instance Hashable a => Lng (HashSet a) where
+  (<+>) :: Hashable a => HashSet a -> HashSet a -> HashSet a
+  (<+>) = HS.union
+  (<^>) :: Hashable a => HashSet a -> HashSet a -> HashSet a
+  (<^>) = HS.intersection
+  (<->) :: Hashable a => HashSet a -> HashSet a -> HashSet a
+  (<->) = HS.difference
+
+instance Eq a => Lng [a] where
+  (<+>) :: Eq a => [a] -> [a] -> [a]
+  (<+>) = (++)
+  (<^>) :: Eq a => [a] -> [a] -> [a]
+  (<^>) = L.intersect
+  (<->) :: Eq a => [a] -> [a] -> [a]
+  (<->) = (L.\\)
+
+instance Lng Int where
+  (<+>) :: Int -> Int -> Int
+  (<+>) = (+)
+  (<^>) :: Int -> Int -> Int
+  (<^>) = (*)
+  (<->) :: Int -> Int -> Int
+  (<->) = (-)
+
 {- |
  Providing identities for 'Lng` operations.
 
@@ -755,3 +798,169 @@ instance Ling Expression where
               Intersect
               dUniverse
           )
+
+type QueryExpression = YExpression (Either Pattern TagExpression)
+
+type TagExpression =
+  ModifyComputation
+    (YExpression (DTerm Pattern))
+    (YExpression (DTerm Pattern))
+
+type FilePattern = Pattern
+
+type DescriptorPattern = DTerm Pattern
+
+data YExpression a
+  = YValue a
+  | BinaryYExpression (BinaryOperation (YExpression a))
+  deriving (Show, Eq, Functor, Foldable)
+
+evaluateYExpression :: Lng a => YExpression a -> a
+evaluateYExpression yexpr = case yexpr of
+  YValue a -> a
+  BinaryYExpression bo -> runBinaryOperation . fmap evaluateYExpression $ bo
+
+instance Lng (YExpression a) where
+  (<+>) :: YExpression a -> YExpression a -> YExpression a
+  x <+> y = BinaryYExpression $ BinaryOperation x Union y
+  (<^>) :: YExpression a -> YExpression a -> YExpression a
+  x <^> y = BinaryYExpression $ BinaryOperation x Intersect y
+  (<->) :: YExpression a -> YExpression a -> YExpression a
+  x <-> y = BinaryYExpression $ BinaryOperation x Difference y
+
+instance Traversable YExpression where
+  traverse :: Applicative f => (a -> f b) -> YExpression a -> f (YExpression b)
+  traverse f yexpr = case yexpr of
+    YValue a -> YValue <$> f a
+    BinaryYExpression bo -> BinaryYExpression <$> traverse (traverse f) bo
+
+instance Applicative YExpression where
+  pure :: a -> YExpression a
+  pure = return
+  (<*>) :: YExpression (a -> b) -> YExpression a -> YExpression b
+  (<*>) = ap
+
+instance Monad YExpression where
+  return :: a -> YExpression a
+  return = YValue
+  (>>=) :: YExpression a -> (a -> YExpression b) -> YExpression b
+  yexpr >>= f = case yexpr of
+    YValue a -> f a
+    BinaryYExpression (BinaryOperation lhs so rhs) ->
+      dispatchLng
+        so
+        (lhs >>= f)
+        (rhs >>= f)
+
+{- |
+ A data type modeling a right-associative fold.
+
+ The accumulator is the bottom computation and each successive modification
+ applies some morphism (a -> b -> b) to affect successive computations, b, below it.
+-}
+data ModifyComputation a b
+  = Computation b
+  | ModifyComputation a (ModifyComputation a b)
+  deriving (Show, Eq)
+
+{- |
+ Append a modification step to the computation.
+-}
+step :: a -> ModifyComputation a b -> ModifyComputation a b
+step = ModifyComputation
+
+instance Bifunctor ModifyComputation where
+  first :: (a -> b) -> ModifyComputation a c -> ModifyComputation b c
+  first f m = case m of
+    Computation c -> Computation c
+    ModifyComputation a mc -> ModifyComputation (f a) (first f mc)
+  second :: (b -> c) -> ModifyComputation a b -> ModifyComputation a c
+  second f m = case m of
+    Computation b -> Computation (f b)
+    ModifyComputation a mc -> ModifyComputation a (second f mc)
+
+bimapHomo :: Bifunctor p => (a -> d) -> p a a -> p d d
+bimapHomo f = bimap f f
+
+bitraverseHomo ::
+  (Bitraversable t, Applicative f) =>
+  (a -> f d) ->
+  t a a ->
+  f (t d d)
+bitraverseHomo f = bitraverse f f
+
+instance Bifoldable ModifyComputation where
+  bifoldMap :: Monoid m => (a -> m) -> (b -> m) -> ModifyComputation a b -> m
+  bifoldMap = bifoldMapDefault
+
+instance Bitraversable ModifyComputation where
+  bitraverse ::
+    Applicative f =>
+    (a -> f c) ->
+    (b -> f d) ->
+    ModifyComputation a b ->
+    f (ModifyComputation c d)
+  bitraverse f g m = case m of
+    Computation b -> Computation <$> g b
+    ModifyComputation a mc -> ModifyComputation <$> f a <*> bitraverse f g mc
+
+instance Functor (ModifyComputation a) where
+  fmap :: (a2 -> b) -> ModifyComputation a1 a2 -> ModifyComputation a1 b
+  fmap = second
+
+instance Applicative (ModifyComputation a) where
+  pure :: a2 -> ModifyComputation a1 a2
+  pure = return
+  (<*>) ::
+    ModifyComputation a1 (a2 -> b) ->
+    ModifyComputation a1 a2 ->
+    ModifyComputation a1 b
+  (<*>) = ap
+
+{- |
+ Applies a static modification to the computation at each step.
+-}
+instance Monad (ModifyComputation a) where
+  return :: a2 -> ModifyComputation a1 a2
+  return = Computation
+  (>>=) ::
+    ModifyComputation a1 a2 ->
+    (a2 -> ModifyComputation a1 b) ->
+    ModifyComputation a1 b
+  m >>= f = case m of
+    Computation a -> f a
+    ModifyComputation a mc -> ModifyComputation a (mc >>= f)
+
+{-# INLINE runModification #-}
+
+{- |
+ A right-associative fold over a computation.
+ Successively applying a modification function until the terminal computation
+ is reached.
+-}
+runModification :: (t1 -> t2 -> t2) -> ModifyComputation t1 t2 -> t2
+runModification f m =
+  case m of
+    Computation b -> b
+    ModifyComputation a mb -> f a (runModification f mb)
+
+newtype DefaultLng a = DefaultLng {runDefaultLng :: a}
+  deriving
+    ( Show
+    , Eq
+    , Functor
+    , Foldable
+    , Traversable
+    , Semigroup
+    )
+
+{- |
+ Defaulting each operation in 'Lng` to '(<>)`
+-}
+instance Semigroup a => Lng (DefaultLng a) where
+  (<+>) :: Semigroup a => DefaultLng a -> DefaultLng a -> DefaultLng a
+  (<+>) = (<>)
+  (<^>) :: Semigroup a => DefaultLng a -> DefaultLng a -> DefaultLng a
+  (<^>) = (<>)
+  (<->) :: Semigroup a => DefaultLng a -> DefaultLng a -> DefaultLng a
+  (<->) = (<>)

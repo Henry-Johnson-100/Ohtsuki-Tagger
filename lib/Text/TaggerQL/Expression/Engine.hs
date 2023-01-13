@@ -62,8 +62,8 @@ module Text.TaggerQL.Expression.Engine (
   queryTagSet',
 ) where
 
-import Control.Applicative ((<|>))
-import Control.Monad (guard, void, when, (<=<))
+import Control.Applicative (Applicative (liftA2), (<|>))
+import Control.Monad (guard, liftM2, void, when, (<=<))
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Trans.Except (ExceptT, throwE)
 import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask)
@@ -76,6 +76,7 @@ import qualified Data.List as L
 import Data.Maybe (fromJust)
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Traversable (for)
 import Database.Tagger.Connection (query)
 import Database.Tagger.Query (
   allFiles,
@@ -105,18 +106,23 @@ import Text.TaggerQL.Expression.AST (
   FExpression,
   FileTerm,
   Lng (..),
+  ModifyComputation,
   Pattern (..),
   SubExpression (..),
   TExpression (TValue),
   TagTerm (..),
   TagTermExtension (..),
+  YExpression,
+  bitraverseHomo,
   distribute,
   evalDistribute,
   evaluateTExpression,
   evaluateUExpression,
+  evaluateYExpression,
   extensionL,
   liftFExpressionA,
   runDTerm,
+  runModification,
  )
 import Text.TaggerQL.Expression.Parser (parseFExpr, parseTExpr)
 import Prelude hiding (lookup, (!!))
@@ -646,17 +652,51 @@ resolveTagSet texpr = do
     $ texpr
 
 queryTagSet :: DTerm Pattern -> ReaderT TaggedConnection IO TagSet
-queryTagSet = fmap TagSet . queryTagSet'
+queryTagSet d = ask >>= liftIO . fmap TagSet . flip queryTagSet' d
 
-queryTagSet' :: DTerm Pattern -> ReaderT TaggedConnection IO (HashSet Tag)
-queryTagSet' dt = case dt of
+askYui ::
+  YExpression
+    ( Either
+        Pattern
+        ( ModifyComputation
+            (YExpression (DTerm Pattern))
+            (YExpression (DTerm Pattern))
+        )
+    ) ->
+  TaggedConnection ->
+  IO (HashSet File)
+askYui yexpr c =
+  fmap evaluateYExpression . for yexpr $
+    either
+      ( \p -> case p of
+          WildCard -> HS.fromList <$> allFiles c
+          PatternText txt -> HS.fromList <$> queryForFileByPattern txt c
+      )
+      (`askYuiTags` c)
+
+askYuiTags ::
+  ModifyComputation
+    (YExpression (DTerm Pattern))
+    (YExpression (DTerm Pattern)) ->
+  TaggedConnection ->
+  IO (HashSet File)
+askYuiTags modYExpr c = do
+  queriedModification <-
+    bitraverseHomo
+      (traverse (queryTagSet' c))
+      modYExpr
+  let distributedTagExpressions =
+        runModification
+          (\upper lower -> joinSubtags <$> upper <*> fmap (HS.map tagSubtagOfId) lower)
+          queriedModification
+  fileExpression <- traverse (`toFileSet` c) distributedTagExpressions
+  return . evaluateYExpression $ fileExpression
+
+queryTagSet' :: TaggedConnection -> DTerm Pattern -> IO (HashSet Tag)
+queryTagSet' c dt = case dt of
   DTerm p -> case p of
-    WildCard -> ask >>= liftIO . fmap HS.fromList . allTags
-    PatternText t -> do
-      c <- ask
-      liftIO . fmap HS.fromList $ query c tagQueryOnDescriptorPattern [t]
+    WildCard -> fmap HS.fromList . allTags $ c
+    PatternText t -> HS.fromList <$> query c tagQueryOnDescriptorPattern [t]
   DMetaTerm p -> case p of
-    WildCard -> ask >>= liftIO . fmap HS.fromList . allTags
-    PatternText t -> do
-      c <- ask
-      liftIO . fmap HS.fromList $ query c tagQueryOnMetaDescriptorPattern [t]
+    WildCard -> liftIO . fmap HS.fromList . allTags $ c
+    PatternText t -> HS.fromList <$> query c tagQueryOnMetaDescriptorPattern [t]
