@@ -3,6 +3,7 @@
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -34,10 +35,16 @@ module Text.TaggerQL.Expression.AST (
   -- * Language Expressions
   RingExpression (..),
   evaluateRing,
+  RightDistributiveExpression (..),
+  distribute,
+  over,
+  evaluateRightDistributiveExpression',
+  evaluateRightDistributiveExpression,
 
   -- * Classes
   Rng (..),
   Ring (..),
+  RightDistributive (..),
 ) where
 
 import Control.Monad (ap)
@@ -164,6 +171,14 @@ class Rng r => Ring r where
   -- | Identity over '(<^>)`
   mid :: r
 
+infixl 6 @>
+
+{- |
+ Class for structures with a right-distributive operation.
+-}
+class RightDistributive a where
+  (@>) :: a -> a -> a
+
 instance Rng SubExpression where
   (<+>) :: SubExpression -> SubExpression -> SubExpression
   x <+> y = BinarySubExpression $ BinaryOperation x Union y
@@ -242,3 +257,86 @@ evaluateRing r = case r of
   re :+ re' -> evaluateRing re <+> evaluateRing re'
   re :^ re' -> evaluateRing re <^> evaluateRing re'
   re :- re' -> evaluateRing re <-> evaluateRing re'
+
+{- |
+ A data type representing an expression of a right-distributive magma.
+-}
+data RightDistributiveExpression a
+  = RDistValue a
+  | (RightDistributiveExpression a) :$ a
+  deriving (Show, Eq, Functor, Foldable, Traversable)
+
+instance Semigroup (RightDistributiveExpression a) where
+  (<>) ::
+    RightDistributiveExpression a ->
+    RightDistributiveExpression a ->
+    RightDistributiveExpression a
+  r <> d = case r of
+    RDistValue a -> distribute a d
+    _leftDistTerm -> case d of
+      RDistValue a -> r :$ a
+      rd :$ a -> (r <> rd) :$ a
+
+{- |
+ Prepend a value to an expression, distributing it over
+ all subsequent values.
+
+ @
+  let x = RDistValue 0
+    in distribute 1 x == RDistValue 1 :$ 0
+ @
+-}
+distribute :: a -> RightDistributiveExpression a -> RightDistributiveExpression a
+distribute x rdx = case rdx of
+  RDistValue a -> RDistValue x :$ a
+  rd :$ a -> distribute x rd :$ a
+
+{- |
+ Append a value to the distribution. Where the previous bottom value is
+ now distributed over the given pure value, after all previous distributions have taken
+ place.
+
+ @
+  let x = RDistValue 0
+    in x `over` 1 == RDistValue 0 :$ 1
+ @
+-}
+over :: RightDistributiveExpression a -> a -> RightDistributiveExpression a
+over = (:$)
+
+{- |
+  Left-associative fold over a right-distributive expression.
+-}
+evaluateRightDistributiveExpression' ::
+  (a -> a -> a) ->
+  RightDistributiveExpression a ->
+  a
+evaluateRightDistributiveExpression' f rd = case rd of
+  RDistValue a -> a
+  rd' :$ a -> evaluateRightDistributiveExpression' f rd' `f` a
+
+evaluateRightDistributiveExpression ::
+  RightDistributive a =>
+  RightDistributiveExpression a ->
+  a
+evaluateRightDistributiveExpression = evaluateRightDistributiveExpression' (@>)
+
+instance Applicative RightDistributiveExpression where
+  pure :: a -> RightDistributiveExpression a
+  pure = return
+  (<*>) ::
+    RightDistributiveExpression (a -> b) ->
+    RightDistributiveExpression a ->
+    RightDistributiveExpression b
+  (<*>) = ap
+
+instance Monad RightDistributiveExpression where
+  return :: a -> RightDistributiveExpression a
+  return = RDistValue
+  (>>=) ::
+    RightDistributiveExpression a ->
+    (a -> RightDistributiveExpression b) ->
+    RightDistributiveExpression b
+  rd >>= f = case rd of
+    RDistValue a -> f a
+    rd' :$ a -> (rd' >>= f) <> f a
