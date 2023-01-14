@@ -1,3 +1,5 @@
+{-# HLINT ignore "Use camelCase" #-}
+{-# LANGUAGE BangPatterns #-}
 {-# HLINT ignore "Use lambda-case" #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# HLINT ignore "Use newtype instead of data" #-}
@@ -9,6 +11,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -44,23 +47,26 @@ module Text.TaggerQL.Expression.AST (
   -- * Language Expressions
   RingExpression (..),
   evaluateRing,
-  RightDistributiveExpression (..),
-  distribute,
+  MagmaExpression (..),
+  foldMagmaExpression,
+  appliedTo,
   over,
-  evaluateRightDistributiveExpression',
-  evaluateRightDistributiveExpression,
+  DistributedRingExpression (..),
+  evaluateDistributedRingExpression,
 
   -- * Classes
   Rng (..),
   Ring (..),
-  RightDistributive (..),
 ) where
 
 import Control.Monad (ap)
+import qualified Data.Foldable as F
+import Data.Functor ((<&>))
 import Data.String (IsString, fromString)
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
+import GHC.Exts (IsList (..))
 import Lens.Micro (Lens', lens)
 
 {- |
@@ -181,14 +187,6 @@ class Rng r => Ring r where
   -- | Identity over '(<^>)`
   mid :: r
 
-infixl 6 @>
-
-{- |
- Class for structures with a right-distributive operation.
--}
-class RightDistributive a where
-  (@>) :: a -> a -> a
-
 instance Rng SubExpression where
   (<+>) :: SubExpression -> SubExpression -> SubExpression
   x <+> y = BinarySubExpression $ BinaryOperation x Union y
@@ -269,22 +267,65 @@ evaluateRing r = case r of
   re :- re' -> evaluateRing re <-> evaluateRing re'
 
 {- |
- A data type representing an expression of a right-distributive magma.
--}
-data RightDistributiveExpression a
-  = RDistValue a
-  | (RightDistributiveExpression a) :$ a
-  deriving (Show, Eq, Functor, Foldable, Traversable)
+ A data type representing an expression over a magma. A sequence of operations can
+ be concatenated and composed before or after another sequence.
 
-instance Semigroup (RightDistributiveExpression a) where
+ All expressions can be evaluated with the '1' variant of a foldable function,
+ since they are non-empty.
+
+ This type is more efficiently folded with a right-to-left fold. Therefore, foldr'
+ is the most optimal.
+
+ It is essentially a reversed, non-empty list.
+-}
+data MagmaExpression a
+  = MagmaValue a
+  | (MagmaExpression a) :$ a
+  deriving (Show, Eq, Functor)
+
+instance IsList (MagmaExpression a) where
+  type Item (MagmaExpression a) = a
+  fromList :: [Item (MagmaExpression a)] -> MagmaExpression a
+  fromList [] = error "Empty list in fromList :: [a] -> MagmaExpression a"
+  fromList (x : xs) = F.foldl' over (return x) xs
+  toList :: MagmaExpression a -> [Item (MagmaExpression a)]
+  toList = foldr (:) []
+
+instance Foldable MagmaExpression where
+  foldr :: (a -> b -> b) -> b -> MagmaExpression a -> b
+  foldr f acc me = case me of
+    MagmaValue a -> f a acc
+    dme :$ a -> foldr f (f a acc) dme
+
+{- |
+ An alias for a fold @foldr1'@ over a 'MagmaExpression`
+-}
+foldMagmaExpression :: (a -> a -> a) -> MagmaExpression a -> a
+foldMagmaExpression _ (MagmaValue x) = x
+foldMagmaExpression f (dme :$ x) = F.foldr' f x dme
+
+instance Traversable MagmaExpression where
+  traverse ::
+    Applicative f =>
+    (a -> f b) ->
+    MagmaExpression a ->
+    f (MagmaExpression b)
+  traverse f me = case me of
+    MagmaValue a -> MagmaValue <$> f a
+    dme :$ a -> (traverse f dme <&> (:$)) <*> f a
+
+{- |
+ Left-to-right composition of a 'MagmaExpression`
+-}
+instance Semigroup (MagmaExpression a) where
   (<>) ::
-    RightDistributiveExpression a ->
-    RightDistributiveExpression a ->
-    RightDistributiveExpression a
+    MagmaExpression a ->
+    MagmaExpression a ->
+    MagmaExpression a
   r <> d = case r of
-    RDistValue a -> distribute a d
+    MagmaValue a -> a `appliedTo` d
     _leftDistTerm -> case d of
-      RDistValue a -> r :$ a
+      MagmaValue a -> r :$ a
       rd :$ a -> (r <> rd) :$ a
 
 {- |
@@ -292,14 +333,14 @@ instance Semigroup (RightDistributiveExpression a) where
  all subsequent values.
 
  @
-  let x = RDistValue 0
-    in distribute 1 x == RDistValue 1 :$ 0
+  let x = MagmaValue 0
+    in appliedTo 1 x == MagmaValue 1 :$ 0
  @
 -}
-distribute :: a -> RightDistributiveExpression a -> RightDistributiveExpression a
-distribute x rdx = case rdx of
-  RDistValue a -> RDistValue x :$ a
-  rd :$ a -> distribute x rd :$ a
+appliedTo :: a -> MagmaExpression a -> MagmaExpression a
+x `appliedTo` rdx = case rdx of
+  MagmaValue a -> MagmaValue x :$ a
+  rd :$ a -> x `appliedTo` rd :$ a
 
 {- |
  Append a value to the distribution. Where the previous bottom value is
@@ -307,48 +348,31 @@ distribute x rdx = case rdx of
  place.
 
  @
-  let x = RDistValue 0
-    in x `over` 1 == RDistValue 0 :$ 1
+  let x = MagmaValue 0
+    in x `over` 1 == MagmaValue 0 :$ 1
  @
 -}
-over :: RightDistributiveExpression a -> a -> RightDistributiveExpression a
+over :: MagmaExpression a -> a -> MagmaExpression a
 over = (:$)
 
-{- |
-  Left-associative fold over a right-distributive expression.
--}
-evaluateRightDistributiveExpression' ::
-  (a -> a -> a) ->
-  RightDistributiveExpression a ->
-  a
-evaluateRightDistributiveExpression' f rd = case rd of
-  RDistValue a -> a
-  rd' :$ a -> evaluateRightDistributiveExpression' f rd' `f` a
-
-evaluateRightDistributiveExpression ::
-  RightDistributive a =>
-  RightDistributiveExpression a ->
-  a
-evaluateRightDistributiveExpression = evaluateRightDistributiveExpression' (@>)
-
-instance Applicative RightDistributiveExpression where
-  pure :: a -> RightDistributiveExpression a
+instance Applicative MagmaExpression where
+  pure :: a -> MagmaExpression a
   pure = return
   (<*>) ::
-    RightDistributiveExpression (a -> b) ->
-    RightDistributiveExpression a ->
-    RightDistributiveExpression b
+    MagmaExpression (a -> b) ->
+    MagmaExpression a ->
+    MagmaExpression b
   (<*>) = ap
 
-instance Monad RightDistributiveExpression where
-  return :: a -> RightDistributiveExpression a
-  return = RDistValue
+instance Monad MagmaExpression where
+  return :: a -> MagmaExpression a
+  return = MagmaValue
   (>>=) ::
-    RightDistributiveExpression a ->
-    (a -> RightDistributiveExpression b) ->
-    RightDistributiveExpression b
+    MagmaExpression a ->
+    (a -> MagmaExpression b) ->
+    MagmaExpression b
   rd >>= f = case rd of
-    RDistValue a -> f a
+    MagmaValue a -> f a
     rd' :$ a -> (rd' >>= f) <> f a
 
 {- |
@@ -405,3 +429,50 @@ instance Monad DTerm where
   d >>= f = case d of
     DTerm a -> f a >>= DTerm
     DMetaTerm a -> f a
+
+{- |
+ A data type corresponding to expressions of a Ring with an additional
+ right-distributive operation.
+
+ Where an operation is expressed as a distribution expression over a ring expression.
+-}
+data DistributedRingExpression a
+  = DistributedRingValue a
+  | DistributedRingExpression
+      ( MagmaExpression
+          ( RingExpression
+              (DistributedRingExpression a)
+          )
+      )
+  deriving (Show, Eq, Functor, Foldable, Traversable)
+
+instance Applicative DistributedRingExpression where
+  pure :: a -> DistributedRingExpression a
+  pure = return
+  (<*>) ::
+    DistributedRingExpression (a -> b) ->
+    DistributedRingExpression a ->
+    DistributedRingExpression b
+  (<*>) = ap
+
+instance Monad DistributedRingExpression where
+  return :: a -> DistributedRingExpression a
+  return = DistributedRingValue
+  (>>=) ::
+    DistributedRingExpression a ->
+    (a -> DistributedRingExpression b) ->
+    DistributedRingExpression b
+  dr >>= f = case dr of
+    DistributedRingValue a -> f a
+    DistributedRingExpression rde ->
+      let x = fmap (fmap (>>= f)) rde
+       in DistributedRingExpression x
+
+evaluateDistributedRingExpression ::
+  (MagmaExpression (RingExpression a) -> a) ->
+  DistributedRingExpression a ->
+  a
+evaluateDistributedRingExpression f rde = case rde of
+  DistributedRingValue a -> a
+  DistributedRingExpression rde' ->
+    f . fmap (fmap (evaluateDistributedRingExpression f)) $ rde'
