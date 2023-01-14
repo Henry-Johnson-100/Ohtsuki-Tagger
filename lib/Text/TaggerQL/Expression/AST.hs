@@ -33,6 +33,7 @@ module Text.TaggerQL.Expression.AST (
 
   -- * Language Expressions
   RingExpression (..),
+  evaluateRing,
 
   -- * Classes
   Rng (..),
@@ -231,3 +232,13 @@ instance Rng (RingExpression a) where
   (<^>) = (:^)
   (<->) :: RingExpression a -> RingExpression a -> RingExpression a
   (<->) = (:-)
+
+{- |
+ Run the computation defined by a 'RingExpression`
+-}
+evaluateRing :: Rng a => RingExpression a -> a
+evaluateRing r = case r of
+  Ring a -> a
+  re :+ re' -> evaluateRing re <+> evaluateRing re'
+  re :^ re' -> evaluateRing re <^> evaluateRing re'
+  re :- re' -> evaluateRing re <-> evaluateRing re'
