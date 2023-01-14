@@ -85,13 +85,12 @@ module Text.TaggerQL.Expression.AST (
   TagExpression,
   FilePattern,
   DescriptorPattern,
-  ModifyComputation (..),
-  step,
-  runModification,
-  bimapHomo,
-  bitraverseHomo,
+  EndoModify (..),
+  runEndoModify,
   YExpression (..),
   evaluateYExpression,
+  TagLValue (..),
+  collapseLValue,
 
   -- * Classes
   Lng (..),
@@ -99,6 +98,7 @@ module Text.TaggerQL.Expression.AST (
   Endomorphism (..),
 ) where
 
+import Control.Applicative (liftA2)
 import Control.Monad (ap)
 import Data.Bifoldable (Bifoldable (bifoldMap, bifoldr))
 import Data.Bifunctor (Bifunctor (bimap, first, second))
@@ -108,6 +108,7 @@ import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
 import qualified Data.List as L
+import Data.List.NonEmpty (NonEmpty)
 import Data.String (IsString (fromString))
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
@@ -292,6 +293,15 @@ data Pattern
 instance IsString Pattern where
   fromString :: String -> Pattern
   fromString ts = if all (== '%') ts then WildCard else PatternText (fromString ts)
+
+instance Semigroup Pattern where
+  (<>) :: Pattern -> Pattern -> Pattern
+  (Pattern x) <> (Pattern y) = Pattern (x <> y)
+  _ <> _ = undefined
+
+instance Monoid Pattern where
+  mempty :: Pattern
+  mempty = PatternText ""
 
 pattern Pattern :: Text -> Pattern
 pattern Pattern t <-
@@ -699,7 +709,7 @@ dispatchLng Difference = (<->)
 runBinaryOperation :: Lng a => BinaryOperation a -> a
 runBinaryOperation (BinaryOperation lhs so rhs) = dispatchLng so lhs rhs
 
-infixr 7 @>
+infixl 6 @>
 
 {- |
  A class for any endomorphism.
@@ -802,13 +812,78 @@ instance Ling Expression where
 type QueryExpression = YExpression (Either Pattern TagExpression)
 
 type TagExpression =
-  ModifyComputation
-    (YExpression (DTerm Pattern))
+  EndoModify
     (YExpression (DTerm Pattern))
 
 type FilePattern = Pattern
 
 type DescriptorPattern = DTerm Pattern
+
+data TagLValue a
+  = TagLValue a
+  | TagLMod (EndoModify (TagLValue a))
+  | TagLYExpr (YExpression (TagLValue a))
+  deriving (Show, Eq)
+
+instance Lng (TagLValue a) where
+  (<+>) :: TagLValue a -> TagLValue a -> TagLValue a
+  x <+> y = TagLYExpr (YValue x <+> YValue y)
+  x <^> y = TagLYExpr (YValue x <^> YValue y)
+  x <-> y = TagLYExpr (YValue x <-> YValue y)
+
+instance Endomorphism (TagLValue a) where
+  (@>) :: TagLValue a -> TagLValue a -> TagLValue a
+  x @> y = case x of
+    TagLValue _ -> TagLMod (return x <> return y)
+    TagLMod em -> TagLMod (em <> return y)
+    TagLYExpr ye -> TagLYExpr $ do
+      ye' <- ye
+      return (ye' @> y)
+
+instance Functor TagLValue where
+  fmap :: (a -> b) -> TagLValue a -> TagLValue b
+  fmap f tlv = case tlv of
+    TagLValue a -> TagLValue (f a)
+    TagLMod mc -> TagLMod . fmap (fmap f) $ mc
+    TagLYExpr ye -> TagLYExpr (fmap (fmap f) ye)
+
+instance Foldable TagLValue where
+  foldr :: (a -> b -> b) -> b -> TagLValue a -> b
+  foldr f acc tlv = case tlv of
+    TagLValue a -> f a acc
+    TagLMod mc -> foldr (\v b -> foldr f b v) acc mc
+    TagLYExpr ye -> foldr (\v b -> foldr f b v) acc ye
+
+instance Traversable TagLValue where
+  traverse :: Applicative f => (a -> f b) -> TagLValue a -> f (TagLValue b)
+  traverse f tlv = case tlv of
+    TagLValue a -> TagLValue <$> f a
+    TagLMod mc -> TagLMod <$> traverse (traverse f) mc
+    TagLYExpr ye -> TagLYExpr <$> traverse (traverse f) ye
+
+instance Applicative TagLValue where
+  pure = return
+  (<*>) = ap
+
+instance Monad TagLValue where
+  return :: a -> TagLValue a
+  return = TagLValue
+  (>>=) :: TagLValue a -> (a -> TagLValue b) -> TagLValue b
+  tlv >>= f = case tlv of
+    TagLValue a -> f a
+    TagLMod mc -> TagLMod . fmap (>>= f) $ mc
+    TagLYExpr ye -> TagLYExpr . fmap (>>= f) $ ye
+
+{- |
+ Provide a right-associative operation to modify the operation of type a with itself.
+-}
+collapseLValue :: _ -> TagLValue a -> YExpression a
+collapseLValue f tlv = case tlv of
+  TagLValue a -> YValue a
+  TagLMod mc -> collapseLValue f . runEndoModify (liftA2 f) $ mc
+  TagLYExpr ye -> do
+    ye' <- ye
+    collapseLValue f ye'
 
 data YExpression a
   = YValue a
@@ -852,97 +927,107 @@ instance Monad YExpression where
         (lhs >>= f)
         (rhs >>= f)
 
-{- |
- A data type modeling a right-associative fold.
+newtype EndoModify a = EndoModify (NonEmpty a)
+  deriving newtype (Show, Eq, Functor, Applicative, Monad, Foldable, Semigroup)
 
- The accumulator is the bottom computation and each successive modification
- applies some morphism (a -> b -> b) to affect successive computations, b, below it.
--}
-data ModifyComputation a b
-  = Computation b
-  | ModifyComputation a (ModifyComputation a b)
-  deriving (Show, Eq)
+instance Traversable EndoModify where
+  traverse :: Applicative f => (a -> f b) -> EndoModify a -> f (EndoModify b)
+  traverse f (EndoModify xs) = EndoModify <$> traverse f xs
 
-{- |
- Append a modification step to the computation.
--}
-step :: a -> ModifyComputation a b -> ModifyComputation a b
-step = ModifyComputation
+runEndoModify :: (a -> a -> a) -> EndoModify a -> a
+runEndoModify = foldr1
 
-instance Bifunctor ModifyComputation where
-  first :: (a -> b) -> ModifyComputation a c -> ModifyComputation b c
-  first f m = case m of
-    Computation c -> Computation c
-    ModifyComputation a mc -> ModifyComputation (f a) (first f mc)
-  second :: (b -> c) -> ModifyComputation a b -> ModifyComputation a c
-  second f m = case m of
-    Computation b -> Computation (f b)
-    ModifyComputation a mc -> ModifyComputation a (second f mc)
+-- {- |
+--  A data type modeling a right-associative fold.
 
-bimapHomo :: Bifunctor p => (a -> d) -> p a a -> p d d
-bimapHomo f = bimap f f
+--  The accumulator is the bottom computation and each successive modification
+--  applies some morphism (a -> b -> b) to affect successive computations, b, below it.
+-- -}
+-- data ModifyComputation a b
+--   = Computation b
+--   | ModifyComputation a (ModifyComputation a b)
+--   deriving (Show, Eq)
 
-bitraverseHomo ::
-  (Bitraversable t, Applicative f) =>
-  (a -> f d) ->
-  t a a ->
-  f (t d d)
-bitraverseHomo f = bitraverse f f
+-- {- |
+--  Append a modification step to the computation.
+-- -}
+-- step :: a -> ModifyComputation a b -> ModifyComputation a b
+-- step = ModifyComputation
 
-instance Bifoldable ModifyComputation where
-  bifoldMap :: Monoid m => (a -> m) -> (b -> m) -> ModifyComputation a b -> m
-  bifoldMap = bifoldMapDefault
+-- instance Bifunctor ModifyComputation where
+--   first :: (a -> b) -> ModifyComputation a c -> ModifyComputation b c
+--   first f m = case m of
+--     Computation c -> Computation c
+--     ModifyComputation a mc -> ModifyComputation (f a) (first f mc)
+--   second :: (b -> c) -> ModifyComputation a b -> ModifyComputation a c
+--   second f m = case m of
+--     Computation b -> Computation (f b)
+--     ModifyComputation a mc -> ModifyComputation a (second f mc)
 
-instance Bitraversable ModifyComputation where
-  bitraverse ::
-    Applicative f =>
-    (a -> f c) ->
-    (b -> f d) ->
-    ModifyComputation a b ->
-    f (ModifyComputation c d)
-  bitraverse f g m = case m of
-    Computation b -> Computation <$> g b
-    ModifyComputation a mc -> ModifyComputation <$> f a <*> bitraverse f g mc
+-- bimapHomo :: Bifunctor p => (a -> d) -> p a a -> p d d
+-- bimapHomo f = bimap f f
 
-instance Functor (ModifyComputation a) where
-  fmap :: (a2 -> b) -> ModifyComputation a1 a2 -> ModifyComputation a1 b
-  fmap = second
+-- bitraverseHomo ::
+--   (Bitraversable t, Applicative f) =>
+--   (a -> f d) ->
+--   t a a ->
+--   f (t d d)
+-- bitraverseHomo f = bitraverse f f
 
-instance Applicative (ModifyComputation a) where
-  pure :: a2 -> ModifyComputation a1 a2
-  pure = return
-  (<*>) ::
-    ModifyComputation a1 (a2 -> b) ->
-    ModifyComputation a1 a2 ->
-    ModifyComputation a1 b
-  (<*>) = ap
+-- instance Bifoldable ModifyComputation where
+--   bifoldMap :: Monoid m => (a -> m) -> (b -> m) -> ModifyComputation a b -> m
+--   bifoldMap = bifoldMapDefault
 
-{- |
- Applies a static modification to the computation at each step.
--}
-instance Monad (ModifyComputation a) where
-  return :: a2 -> ModifyComputation a1 a2
-  return = Computation
-  (>>=) ::
-    ModifyComputation a1 a2 ->
-    (a2 -> ModifyComputation a1 b) ->
-    ModifyComputation a1 b
-  m >>= f = case m of
-    Computation a -> f a
-    ModifyComputation a mc -> ModifyComputation a (mc >>= f)
+-- instance Bitraversable ModifyComputation where
+--   bitraverse ::
+--     Applicative f =>
+--     (a -> f c) ->
+--     (b -> f d) ->
+--     ModifyComputation a b ->
+--     f (ModifyComputation c d)
+--   bitraverse f g m = case m of
+--     Computation b -> Computation <$> g b
+--     ModifyComputation a mc -> ModifyComputation <$> f a <*> bitraverse f g mc
 
-{-# INLINE runModification #-}
+-- instance Functor (ModifyComputation a) where
+--   fmap :: (a2 -> b) -> ModifyComputation a1 a2 -> ModifyComputation a1 b
+--   fmap = second
 
-{- |
- A right-associative fold over a computation.
- Successively applying a modification function until the terminal computation
- is reached.
--}
-runModification :: (t1 -> t2 -> t2) -> ModifyComputation t1 t2 -> t2
-runModification f m =
-  case m of
-    Computation b -> b
-    ModifyComputation a mb -> f a (runModification f mb)
+-- instance Applicative (ModifyComputation a) where
+--   pure :: a2 -> ModifyComputation a1 a2
+--   pure = return
+--   (<*>) ::
+--     ModifyComputation a1 (a2 -> b) ->
+--     ModifyComputation a1 a2 ->
+--     ModifyComputation a1 b
+--   (<*>) = ap
+
+-- {- |
+--  Applies a static modification to the computation at each step.
+-- -}
+-- instance Monad (ModifyComputation a) where
+--   return :: a2 -> ModifyComputation a1 a2
+--   return = Computation
+--   (>>=) ::
+--     ModifyComputation a1 a2 ->
+--     (a2 -> ModifyComputation a1 b) ->
+--     ModifyComputation a1 b
+--   m >>= f = case m of
+--     Computation a -> f a
+--     ModifyComputation a mc -> ModifyComputation a (mc >>= f)
+
+-- {-# INLINE runModification #-}
+
+-- {- |
+--  A right-associative fold over a computation.
+--  Successively applying a modification function until the terminal computation
+--  is reached.
+-- -}
+-- runModification :: (t1 -> t2 -> t2) -> ModifyComputation t1 t2 -> t2
+-- runModification f m =
+--   case m of
+--     Computation b -> b
+--     ModifyComputation a mb -> f a (runModification f mb)
 
 newtype DefaultLng a = DefaultLng {runDefaultLng :: a}
   deriving

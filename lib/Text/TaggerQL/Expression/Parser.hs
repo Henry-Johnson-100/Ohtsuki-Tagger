@@ -76,6 +76,41 @@ parseFExpr = parse fExpressionParser "TaggerQL"
 parseTExpr :: Text -> Either ParseError (TExpression (DTerm Pattern))
 parseTExpr = parse tExpressionParser "TaggerQL"
 
+-- tagExpressionParser ::
+--   Parser
+--     ( ModifyComputation
+--         (YExpression DescriptorPattern)
+--         (YExpression DescriptorPattern)
+--     )
+-- tagExpressionParser = spaces *> undefined
+
+-- lhsTagExpressionParser =
+--   spaces
+--     *> ( (undefined :: Parser (YExpression DescriptorPattern))
+--           <**> ( ( undefined
+--                     <|> pure Computation
+--                  ) ::
+--                   Parser
+--                     ( YExpression DescriptorPattern ->
+--                       ModifyComputation
+--                         (YExpression DescriptorPattern)
+--                         (YExpression DescriptorPattern)
+--                     )
+--                )
+--        )
+
+{-
+Things appearing on the lhs :: TagExpression == YExpression (ModifyComputation TagExpression TagExpression)
+a             :: DescriptorPattern
+a{b}          :: ModifyComputation DescriptorPattern DescriptorPattern
+a{b c}        :: ModifyComputation DescriptorPattern (YExpression DescriptorPattern)
+(a b)         :: YExpression DescriptorPattern
+(a{b} c)      :: YExpression (ModifyComputation DescriptorPattern DescriptorPattern)
+(a b){c}      :: ModifyComputation (YExpression DescriptorPattern) DescriptorPattern
+(a b){c d}    :: ModifyComputation (YExpression DescriptorPattern) (YExpression DescriptorPattern)
+(a{b} c){d e} :: ModifyComputation (YExpression (ModifyComputation DescriptorPattern DescriptorPattern)) (YExpression DescriptorPattern)
+-}
+
 {- |
  Parse a 'SubExpression` from a TaggerQL query.
 

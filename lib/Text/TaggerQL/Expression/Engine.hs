@@ -65,7 +65,7 @@ module Text.TaggerQL.Expression.Engine (
 import Control.Applicative (Applicative (liftA2), (<|>))
 import Control.Monad (guard, liftM2, void, when, (<=<))
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Trans.Except (ExceptT, throwE)
+import Control.Monad.Trans.Except (ExceptT, runExceptT, throwE)
 import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask)
 import Control.Monad.Trans.State.Strict (StateT, evalState, get, gets, modify, runState)
 import Data.Bifunctor (Bifunctor (first, second))
@@ -77,7 +77,7 @@ import Data.Maybe (fromJust)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Traversable (for)
-import Database.Tagger.Connection (query)
+import Database.Tagger.Connection (close, open, query)
 import Database.Tagger.Query (
   allFiles,
   allTags,
@@ -101,19 +101,21 @@ import Text.RawString.QQ (r)
 import Text.TaggerQL.Expression.AST (
   BinaryOperation (..),
   DTerm (..),
+  DescriptorPattern,
+  EndoModify,
   Endomorphism (..),
   Expression (..),
   FExpression,
   FileTerm,
   Lng (..),
-  ModifyComputation,
   Pattern (..),
   SubExpression (..),
   TExpression (TValue),
+  TagLValue (..),
   TagTerm (..),
   TagTermExtension (..),
-  YExpression,
-  bitraverseHomo,
+  YExpression (..),
+  collapseLValue,
   distribute,
   evalDistribute,
   evaluateTExpression,
@@ -122,7 +124,7 @@ import Text.TaggerQL.Expression.AST (
   extensionL,
   liftFExpressionA,
   runDTerm,
-  runModification,
+  runEndoModify,
  )
 import Text.TaggerQL.Expression.Parser (parseFExpr, parseTExpr)
 import Prelude hiding (lookup, (!!))
@@ -658,8 +660,7 @@ askYui ::
   YExpression
     ( Either
         Pattern
-        ( ModifyComputation
-            (YExpression (DTerm Pattern))
+        ( EndoModify
             (YExpression (DTerm Pattern))
         )
     ) ->
@@ -675,18 +676,17 @@ askYui yexpr c =
       (`askYuiTags` c)
 
 askYuiTags ::
-  ModifyComputation
-    (YExpression (DTerm Pattern))
+  EndoModify
     (YExpression (DTerm Pattern)) ->
   TaggedConnection ->
   IO (HashSet File)
 askYuiTags modYExpr c = do
   queriedModification <-
-    bitraverseHomo
+    traverse
       (traverse (queryTagSet' c))
       modYExpr
   let distributedTagExpressions =
-        runModification
+        runEndoModify
           (\upper lower -> joinSubtags <$> upper <*> fmap (HS.map tagSubtagOfId) lower)
           queriedModification
   fileExpression <- traverse (`toFileSet` c) distributedTagExpressions
@@ -700,3 +700,63 @@ queryTagSet' c dt = case dt of
   DMetaTerm p -> case p of
     WildCard -> liftIO . fmap HS.fromList . allTags $ c
     PatternText t -> HS.fromList <$> query c tagQueryOnMetaDescriptorPattern [t]
+
+oyui :: TagLValue DescriptorPattern
+oyui = return (DMetaTerm "o%yui")
+
+yriamu :: TagLValue DescriptorPattern
+yriamu = return (DMetaTerm "y%riamu")
+
+swimsuit :: TagLValue DescriptorPattern
+swimsuit = return (DMetaTerm "swimsuit")
+
+outerwear :: TagLValue DescriptorPattern
+outerwear = return (DMetaTerm "outerwear")
+
+color :: TagLValue DescriptorPattern
+color = return (DMetaTerm "color")
+
+black :: TagLValue DescriptorPattern
+black = return (DMetaTerm "black")
+
+r' :: Pattern -> TagLValue DescriptorPattern
+r' = return . DMetaTerm
+
+prevTest :: TagLValue DescriptorPattern
+prevTest =
+  ( r' "o%yui"
+      @> ( ( r' "cute"
+              <^> r' "portrait"
+              <^> ( r' "kimono"
+                      <+> ( r' "dress"
+                              <-> ( r' "dress"
+                                      @> ( r' "blue"
+                                            <+> r' "plaid"
+                                         )
+                                  )
+                          )
+                  )
+           )
+            <-> ( r' "sweetie_cute_new_year"
+                    @> r' "+"
+                )
+         )
+  )
+    <-> r' "suggestive"
+
+t' q' = do
+  c <- fmap (either (error . T.unpack) id) $ runExceptT $ open "/home/monax/Fossil/tagger/dev-leaf/scratch/yui.db"
+  r <- lValueQuery c q'
+  print r
+  print (HS.size r)
+  close c
+
+lValueQuery :: TaggedConnection -> TagLValue DescriptorPattern -> IO (HashSet File)
+lValueQuery c tlv = do
+  queryValues <- traverse (queryTagSet' c) tlv
+  let modifiedTagSets =
+        collapseLValue
+          ( \supers subs -> joinSubtags supers (HS.map tagSubtagOfId subs)
+          )
+          queryValues
+  evaluateYExpression <$> traverse (`toFileSet` c) modifiedTagSets
