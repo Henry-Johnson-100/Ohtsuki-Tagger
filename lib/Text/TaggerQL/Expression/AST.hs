@@ -7,7 +7,9 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
@@ -32,6 +34,11 @@ module Text.TaggerQL.Expression.AST (
   SubExpression (..),
   Expression (..),
 
+  -- * Components
+  Pattern (..),
+  pattern Pattern,
+  patternText,
+
   -- * Language Expressions
   RingExpression (..),
   evaluateRing,
@@ -48,9 +55,10 @@ module Text.TaggerQL.Expression.AST (
 ) where
 
 import Control.Monad (ap)
-import Data.String (IsString)
+import Data.String (IsString, fromString)
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
+import qualified Data.Text as T
 import Lens.Micro (Lens', lens)
 
 {- |
@@ -340,3 +348,35 @@ instance Monad RightDistributiveExpression where
   rd >>= f = case rd of
     RDistValue a -> f a
     rd' :$ a -> (rd' >>= f) <> f a
+
+{- |
+ A string used for searching with SQL LIKE expressions. Where a wildcard is a
+ non-zero length sequence of the % character.
+-}
+data Pattern
+  = WildCard
+  | PatternText Text
+  deriving (Show, Eq)
+
+instance IsString Pattern where
+  fromString :: String -> Pattern
+  fromString = Pattern . T.pack
+
+instance Semigroup Pattern where
+  (<>) :: Pattern -> Pattern -> Pattern
+  WildCard <> WildCard = WildCard
+  (patternText -> x) <> (patternText -> y) = Pattern (x <> y)
+
+instance Monoid Pattern where
+  mempty :: Pattern
+  mempty = PatternText mempty
+
+pattern Pattern :: Text -> Pattern
+pattern Pattern t <-
+  (patternText -> t)
+  where
+    Pattern t = if T.all (== '%') t then WildCard else PatternText t
+
+patternText :: Pattern -> Text
+patternText WildCard = "%"
+patternText (PatternText t) = t
