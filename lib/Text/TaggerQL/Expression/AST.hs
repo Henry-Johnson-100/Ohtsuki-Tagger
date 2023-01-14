@@ -38,6 +38,8 @@ module Text.TaggerQL.Expression.AST (
   Pattern (..),
   pattern Pattern,
   patternText,
+  DTerm (..),
+  runDTerm,
 
   -- * Language Expressions
   RingExpression (..),
@@ -380,3 +382,26 @@ pattern Pattern t <-
 patternText :: Pattern -> Text
 patternText WildCard = "%"
 patternText (PatternText t) = t
+
+data DTerm a
+  = DTerm a
+  | DMetaTerm a
+  deriving (Show, Eq, Functor, Foldable, Traversable)
+
+runDTerm :: DTerm p -> p
+runDTerm (DTerm x) = x
+runDTerm (DMetaTerm x) = x
+
+instance Applicative DTerm where
+  pure :: a -> DTerm a
+  pure = return
+  (<*>) :: DTerm (a -> b) -> DTerm a -> DTerm b
+  (<*>) = ap
+
+instance Monad DTerm where
+  return :: a -> DTerm a
+  return = DMetaTerm
+  (>>=) :: DTerm a -> (a -> DTerm b) -> DTerm b
+  d >>= f = case d of
+    DTerm a -> f a >>= DTerm
+    DMetaTerm a -> f a
