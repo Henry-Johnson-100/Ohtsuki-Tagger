@@ -1,12 +1,14 @@
+{-# HLINT ignore "Use lambda-case" #-}
+{-# LANGUAGE DeriveFoldable #-}
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use lambda-case" #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.AST
@@ -29,10 +31,15 @@ module Text.TaggerQL.Expression.AST (
   SubExpression (..),
   Expression (..),
 
+  -- * Language Expressions
+  RingExpression (..),
+
   -- * Classes
+  Rng (..),
   Ring (..),
 ) where
 
+import Control.Monad (ap)
 import Data.String (IsString)
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
@@ -139,13 +146,7 @@ extensionL =
     (\(TagTermExtension _ se) -> se)
     (flip (<$))
 
-class Ring r where
-  -- | Identity over '(<+>)`
-  aid :: r
-
-  -- | Identity over '(<^>)`
-  mid :: r
-
+class Rng r where
   -- | An associative operation
   (<+>) :: r -> r -> r
 
@@ -155,17 +156,34 @@ class Ring r where
   -- | The inverse of '(<+>)`
   (<->) :: r -> r -> r
 
-instance Ring SubExpression where
-  mid :: SubExpression
-  mid = SubTag . DescriptorTerm $ "%"
-  aid :: SubExpression
-  aid = BinarySubExpression $ BinaryOperation mid Difference mid
+class Rng r => Ring r where
+  -- | Identity over '(<+>)`
+  aid :: r
+
+  -- | Identity over '(<^>)`
+  mid :: r
+
+instance Rng SubExpression where
   (<+>) :: SubExpression -> SubExpression -> SubExpression
   x <+> y = BinarySubExpression $ BinaryOperation x Union y
   (<^>) :: SubExpression -> SubExpression -> SubExpression
   x <^> y = BinarySubExpression $ BinaryOperation x Intersect y
   (<->) :: SubExpression -> SubExpression -> SubExpression
   x <-> y = BinarySubExpression $ BinaryOperation x Difference y
+
+instance Ring SubExpression where
+  mid :: SubExpression
+  mid = SubTag . DescriptorTerm $ "%"
+  aid :: SubExpression
+  aid = BinarySubExpression $ BinaryOperation mid Difference mid
+
+instance Rng Expression where
+  (<+>) :: Expression -> Expression -> Expression
+  x <+> y = BinaryExpression $ BinaryOperation x Union y
+  (<^>) :: Expression -> Expression -> Expression
+  x <^> y = BinaryExpression $ BinaryOperation x Intersect y
+  (<->) :: Expression -> Expression -> Expression
+  x <-> y = BinaryExpression $ BinaryOperation x Difference y
 
 instance Ring Expression where
   mid :: Expression
@@ -179,9 +197,37 @@ instance Ring Expression where
               Intersect
               dUniverse
           )
-  (<+>) :: Expression -> Expression -> Expression
-  x <+> y = BinaryExpression $ BinaryOperation x Union y
-  (<^>) :: Expression -> Expression -> Expression
-  x <^> y = BinaryExpression $ BinaryOperation x Intersect y
-  (<->) :: Expression -> Expression -> Expression
-  x <-> y = BinaryExpression $ BinaryOperation x Difference y
+
+{- |
+ A data type representing an expression of any Ring.
+-}
+data RingExpression a
+  = Ring a
+  | RingExpression a :+ RingExpression a
+  | RingExpression a :^ RingExpression a
+  | RingExpression a :- RingExpression a
+  deriving (Show, Eq, Functor, Foldable, Traversable)
+
+instance Applicative RingExpression where
+  pure :: a -> RingExpression a
+  pure = return
+  (<*>) :: RingExpression (a -> b) -> RingExpression a -> RingExpression b
+  (<*>) = ap
+
+instance Monad RingExpression where
+  return :: a -> RingExpression a
+  return = Ring
+  (>>=) :: RingExpression a -> (a -> RingExpression b) -> RingExpression b
+  r >>= f = case r of
+    Ring a -> f a
+    re :+ re' -> (re >>= f) :+ (re' >>= f)
+    re :^ re' -> (re >>= f) :^ (re' >>= f)
+    re :- re' -> (re >>= f) :- (re' >>= f)
+
+instance Rng (RingExpression a) where
+  (<+>) :: RingExpression a -> RingExpression a -> RingExpression a
+  (<+>) = (:+)
+  (<^>) :: RingExpression a -> RingExpression a -> RingExpression a
+  (<^>) = (:^)
+  (<->) :: RingExpression a -> RingExpression a -> RingExpression a
+  (<->) = (:-)
