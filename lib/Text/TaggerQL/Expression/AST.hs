@@ -10,6 +10,11 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# HLINT ignore "Use <$>" #-}
+{-# HLINT ignore "Use =<<" #-}
+{-# HLINT ignore "Use traverse" #-}
+{-# HLINT ignore "Use join" #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -45,29 +50,37 @@ module Text.TaggerQL.Expression.AST (
   runDTerm,
 
   -- * Language Expressions
+  RingExpressionT (..),
+  returnRingExpression,
+  bindRingExpression,
   RingExpression (..),
   evaluateRing,
   MagmaExpression (..),
   foldMagmaExpression,
   appliedTo,
   over,
-  DistributedRingExpression (..),
-  evaluateDistributedRingExpression,
+  RecT (..),
+  runRecT,
+  runRec,
 
   -- * Classes
   Rng (..),
   Ring (..),
 ) where
 
-import Control.Monad (ap)
+import Control.Monad (ap, join, (<=<))
+import Control.Monad.Trans.Class
 import qualified Data.Foldable as F
 import Data.Functor ((<&>))
+import Data.Functor.Identity (Identity (runIdentity))
 import Data.String (IsString, fromString)
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
 import GHC.Exts (IsList (..))
 import Lens.Micro (Lens', lens)
+
+-- type TagExpression = RecT (RingExpressionT MagmaExpression) (DTerm Pattern)
 
 {- |
  Data structure representing search terms over the set of 'Descriptor`.
@@ -266,6 +279,65 @@ evaluateRing r = case r of
   re :^ re' -> evaluateRing re <^> evaluateRing re'
   re :- re' -> evaluateRing re <-> evaluateRing re'
 
+newtype RingExpressionT m a = RingExpressionT
+  {runRingExpressionT :: m (RingExpression a)}
+  deriving (Functor, Foldable, Traversable)
+
+deriving instance Show a => Show (RingExpressionT Identity a)
+deriving instance Eq a => Eq (RingExpressionT Identity a)
+deriving instance Show a => Show (RingExpressionT MagmaExpression a)
+deriving instance Eq a => Eq (RingExpressionT MagmaExpression a)
+
+instance Monad m => Applicative (RingExpressionT m) where
+  pure :: Monad m => a -> RingExpressionT m a
+  pure = return
+  (<*>) ::
+    Monad m =>
+    RingExpressionT m (a -> b) ->
+    RingExpressionT m a ->
+    RingExpressionT m b
+  (<*>) = ap
+
+instance Monad m => Monad (RingExpressionT m) where
+  return :: Monad m => a -> RingExpressionT m a
+  return = RingExpressionT . return . return
+  (>>=) ::
+    Monad m =>
+    RingExpressionT m a ->
+    (a -> RingExpressionT m b) ->
+    RingExpressionT m b
+  (RingExpressionT re) >>= f = RingExpressionT $ do
+    re' <- re
+    case re' of
+      Ring a -> runRingExpressionT . f $ a
+      re_a :+ re'' -> go (:+) re_a re''
+      re_a :^ re'' -> go (:^) re_a re''
+      re_a :- re'' -> go (:-) re_a re''
+   where
+    go c l r = do
+      l' <- join <$> traverse (runRingExpressionT . f) l
+      r' <- join <$> traverse (runRingExpressionT . f) r
+      return (l' `c` r')
+
+instance MonadTrans RingExpressionT where
+  lift :: Monad m => m a -> RingExpressionT m a
+  lift = RingExpressionT . fmap pure
+
+returnRingExpression :: Monad m => RingExpression a -> RingExpressionT m a
+returnRingExpression = RingExpressionT . return
+
+bindRingExpression ::
+  Monad m =>
+  RingExpressionT m a ->
+  (RingExpression a -> m (RingExpression b)) ->
+  RingExpressionT m b
+bindRingExpression re f =
+  RingExpressionT
+    . ( f
+          <=< runRingExpressionT
+      )
+    $ re
+
 {- |
  A data type representing an expression over a magma. A sequence of operations can
  be concatenated and composed before or after another sequence.
@@ -431,48 +503,42 @@ instance Monad DTerm where
     DMetaTerm a -> f a
 
 {- |
- A data type corresponding to expressions of a Ring with an additional
- right-distributive operation.
-
- Where an operation is expressed as a distribution expression over a ring expression.
+ Data type that turns the type (r a) into a self recursive structure.
 -}
-data DistributedRingExpression a
-  = DistributedRingValue a
-  | DistributedRingExpression
-      ( MagmaExpression
-          ( RingExpression
-              (DistributedRingExpression a)
-          )
-      )
-  deriving (Show, Eq, Functor, Foldable, Traversable)
+data RecT r a
+  = Terminal a
+  | RecT (r (RecT r a))
+  deriving (Functor, Foldable, Traversable)
 
-instance Applicative DistributedRingExpression where
-  pure :: a -> DistributedRingExpression a
+deriving instance Show a => Show (RecT Identity a)
+deriving instance Eq a => Eq (RecT Identity a)
+deriving instance Show a => Show (RecT (RingExpressionT MagmaExpression) a)
+deriving instance Eq a => Eq (RecT (RingExpressionT MagmaExpression) a)
+
+type Rec a = RecT Identity a
+
+instance Monad r => Applicative (RecT r) where
+  pure :: Monad r => a -> RecT r a
   pure = return
-  (<*>) ::
-    DistributedRingExpression (a -> b) ->
-    DistributedRingExpression a ->
-    DistributedRingExpression b
+  (<*>) :: Monad r => RecT r (a -> b) -> RecT r a -> RecT r b
   (<*>) = ap
 
-instance Monad DistributedRingExpression where
-  return :: a -> DistributedRingExpression a
-  return = DistributedRingValue
-  (>>=) ::
-    DistributedRingExpression a ->
-    (a -> DistributedRingExpression b) ->
-    DistributedRingExpression b
-  dr >>= f = case dr of
-    DistributedRingValue a -> f a
-    DistributedRingExpression rde ->
-      let x = fmap (fmap (>>= f)) rde
-       in DistributedRingExpression x
+instance Monad r => Monad (RecT r) where
+  return :: Monad r => a -> RecT r a
+  return = Terminal
+  (>>=) :: Monad r => RecT r a -> (a -> RecT r b) -> RecT r b
+  r >>= f = case r of
+    Terminal a -> f a
+    RecT r' -> RecT (fmap (>>= f) r')
 
-evaluateDistributedRingExpression ::
-  (MagmaExpression (RingExpression a) -> a) ->
-  DistributedRingExpression a ->
-  a
-evaluateDistributedRingExpression f rde = case rde of
-  DistributedRingValue a -> a
-  DistributedRingExpression rde' ->
-    f . fmap (fmap (evaluateDistributedRingExpression f)) $ rde'
+instance MonadTrans RecT where
+  lift :: Monad m => m a -> RecT m a
+  lift = RecT . fmap Terminal
+
+runRecT :: Functor r => RecT r a -> (r a -> a) -> a
+runRecT r f = case r of
+  Terminal a -> a
+  RecT r' -> f . fmap (`runRecT` f) $ r'
+
+runRec :: Rec a -> a
+runRec = flip runRecT runIdentity
