@@ -82,6 +82,10 @@ import Control.Monad.Trans.Class
 import qualified Data.Foldable as F
 import Data.Functor ((<&>))
 import Data.Functor.Identity (Identity (runIdentity))
+import Data.HashSet (HashSet)
+import qualified Data.HashSet as HS
+import Data.Hashable (Hashable)
+import qualified Data.List as L
 import Data.String (IsString, fromString)
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
@@ -202,12 +206,42 @@ class Rng r where
   -- | The inverse of '(<+>)`
   (<->) :: r -> r -> r
 
+instance Hashable a => Rng (HashSet a) where
+  (<+>) :: Hashable a => HashSet a -> HashSet a -> HashSet a
+  (<+>) = HS.union
+  (<^>) :: Hashable a => HashSet a -> HashSet a -> HashSet a
+  (<^>) = HS.intersection
+  (<->) :: Hashable a => HashSet a -> HashSet a -> HashSet a
+  (<->) = HS.difference
+
+instance Eq a => Rng [a] where
+  (<+>) :: Eq a => [a] -> [a] -> [a]
+  (<+>) = (++)
+  (<^>) :: Eq a => [a] -> [a] -> [a]
+  (<^>) = L.intersect
+  (<->) :: Eq a => [a] -> [a] -> [a]
+  (<->) = (L.\\)
+
+instance Rng Int where
+  (<+>) :: Int -> Int -> Int
+  (<+>) = (+)
+  (<^>) :: Int -> Int -> Int
+  (<^>) = (*)
+  (<->) :: Int -> Int -> Int
+  (<->) = (-)
+
 class Rng r => Ring r where
   -- | Identity over '(<+>)`
   aid :: r
 
   -- | Identity over '(<^>)`
   mid :: r
+
+instance Ring Int where
+  aid :: Int
+  aid = 0
+  mid :: Int
+  mid = 1
 
 infix 9 @@
 
