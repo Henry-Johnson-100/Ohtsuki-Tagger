@@ -9,6 +9,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# HLINT ignore "Use <$>" #-}
 {-# HLINT ignore "Use =<<" #-}
@@ -20,6 +21,8 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use const" #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.AST
@@ -59,13 +62,12 @@ module Text.TaggerQL.Expression.AST (
   foldMagmaExpression,
   appliedTo,
   over,
-  RecT (..),
-  runRecT,
-  runRec,
+  -- RecT (..),
 
   -- * Classes
   Rng (..),
   Ring (..),
+  Magma (..),
 ) where
 
 import Control.Monad (ap, join, (<=<))
@@ -200,6 +202,15 @@ class Rng r => Ring r where
   -- | Identity over '(<^>)`
   mid :: r
 
+infix 9 @@
+
+{- |
+ Class for any magma.
+-}
+class Magma m where
+  -- | A binary operation.
+  (@@) :: m -> m -> m
+
 instance Rng SubExpression where
   (<+>) :: SubExpression -> SubExpression -> SubExpression
   x <+> y = BinarySubExpression $ BinaryOperation x Union y
@@ -323,6 +334,33 @@ instance MonadTrans RingExpressionT where
   lift :: Monad m => m a -> RingExpressionT m a
   lift = RingExpressionT . fmap pure
 
+instance Applicative m => Rng (RingExpressionT m a) where
+  (<+>) ::
+    Applicative m =>
+    RingExpressionT m a ->
+    RingExpressionT m a ->
+    RingExpressionT m a
+  (RingExpressionT x) <+> (RingExpressionT y) = RingExpressionT ((<+>) <$> x <*> y)
+  (<^>) ::
+    Applicative m =>
+    RingExpressionT m a ->
+    RingExpressionT m a ->
+    RingExpressionT m a
+  (RingExpressionT x) <^> (RingExpressionT y) = RingExpressionT ((<^>) <$> x <*> y)
+  (<->) ::
+    Applicative m =>
+    RingExpressionT m a ->
+    RingExpressionT m a ->
+    RingExpressionT m a
+  (RingExpressionT x) <-> (RingExpressionT y) = RingExpressionT ((<->) <$> x <*> y)
+
+instance Magma (RingExpressionT MagmaExpression a) where
+  (@@) ::
+    RingExpressionT MagmaExpression a ->
+    RingExpressionT MagmaExpression a ->
+    RingExpressionT MagmaExpression a
+  (RingExpressionT x) @@ (RingExpressionT y) = RingExpressionT (x @@ y)
+
 returnRingExpression :: Monad m => RingExpression a -> RingExpressionT m a
 returnRingExpression = RingExpressionT . return
 
@@ -354,6 +392,10 @@ data MagmaExpression a
   = MagmaValue a
   | (MagmaExpression a) :$ a
   deriving (Show, Eq, Functor)
+
+instance Magma (MagmaExpression a) where
+  (@@) :: MagmaExpression a -> MagmaExpression a -> MagmaExpression a
+  (@@) = (<>)
 
 instance IsList (MagmaExpression a) where
   type Item (MagmaExpression a) = a
@@ -503,19 +545,29 @@ instance Monad DTerm where
     DMetaTerm a -> f a
 
 {- |
- Data type that turns the type (r a) into a self recursive structure.
+ A higher order monad turning any type of kind @(* -> *)@ into a self-recursive type with
+ terminal values @a@.
+
+ It is a higher order monad in the sense that inner recursions of type @(r (RecT r a))@
+ can be bound to functions @(r (RecT r a) -> RecT p b)@ to produce @RecT p b@
+
+ Therefore, any function for \'r\' that is generic in its value like @(r a -> r a)@
+ can be lifted into 'RecT` as @(r (RecT r a) -> r (RecT r a))@.
 -}
 data RecT r a
-  = Terminal a
-  | RecT (r (RecT r a))
+  = -- | The terminal leaf of a recursive tree.
+    Terminal a
+  | -- | A single recursion, where the structure of specific 'Recursion` is invisible to
+    -- to another.
+    Recursion (r (RecT r a))
   deriving (Functor, Foldable, Traversable)
 
-deriving instance Show a => Show (RecT Identity a)
-deriving instance Eq a => Eq (RecT Identity a)
-deriving instance Show a => Show (RecT (RingExpressionT MagmaExpression) a)
-deriving instance Eq a => Eq (RecT (RingExpressionT MagmaExpression) a)
-
 type Rec a = RecT Identity a
+
+deriving instance Show a => Show (RecT Identity a)
+deriving instance Show a => Show (RecT (RingExpressionT MagmaExpression) a)
+deriving instance Eq a => Eq (RecT Identity a)
+deriving instance Eq a => Eq (RecT (RingExpressionT MagmaExpression) a)
 
 instance Monad r => Applicative (RecT r) where
   pure :: Monad r => a -> RecT r a
@@ -529,16 +581,99 @@ instance Monad r => Monad (RecT r) where
   (>>=) :: Monad r => RecT r a -> (a -> RecT r b) -> RecT r b
   r >>= f = case r of
     Terminal a -> f a
-    RecT r' -> RecT (fmap (>>= f) r')
+    Recursion r' -> Recursion . fmap (>>= f) $ r'
 
 instance MonadTrans RecT where
   lift :: Monad m => m a -> RecT m a
-  lift = RecT . fmap Terminal
+  lift = returnR
 
-runRecT :: Functor r => RecT r a -> (r a -> a) -> a
-runRecT r f = case r of
-  Terminal a -> a
-  RecT r' -> f . fmap (`runRecT` f) $ r'
+{- |
+ Map the inner values of a flat structure to the termination of a recursion.
+-}
+terminate :: Functor r => r a -> r (RecT r a)
+terminate = fmap Terminal
+
+returnR :: Functor r => r a -> RecT r a
+returnR = Recursion . terminate
+
+bindR :: Monad r => RecT r a -> (r (RecT r a) -> RecT p b) -> RecT p b
+bindR r f = case r of
+  Terminal a -> f . terminate . pure $ a
+  Recursion r' -> f . recurse $ r'
+
+infixl 1 >>>=
+(>>>=) :: Monad r => RecT r a -> (r (RecT r a) -> RecT p b) -> RecT p b
+r >>>= f = bindR r f
+
+{- |
+ Produce another layer in recursion, turning the current structure into a single leaf.
+
+ Where the structure of r can no longer be affected by subsequent operation.
+
+ Note that for any @rec :: r (RecT r a)@ and a function @f :: (r a -> a)@:
+
+ @runRecT (Recursion . id $ rec) f@ = @runRecT (Recursion . recurse $ rec) f@
+
+ BUT
+
+ @Recursion . id $ rec@ /= @Recursion . recurse $ rec@.
+-}
+recurse :: Applicative r => r (RecT r a) -> r (RecT r a)
+recurse = pure . Recursion
+
+{- |
+ Given an applicative action over r,
+ lift it into function operating on the current recursions.
+-}
+liftR2 ::
+  Monad r =>
+  (r (RecT r a) -> r (RecT r a) -> r (RecT r a)) ->
+  RecT r a ->
+  RecT r a ->
+  RecT r a
+liftR2 f lhs rhs =
+  lhs
+    >>>= ( \l ->
+            rhs >>>= \r ->
+              Recursion (l `f` r)
+         )
+
+runRecT :: Applicative r => RecT r a -> (r a -> a) -> a
+runRecT r ret = case r of
+  Terminal a -> ret . pure $ a
+  Recursion r' -> ret . fmap (`runRecT` ret) $ r'
 
 runRec :: Rec a -> a
 runRec = flip runRecT runIdentity
+
+newtype YuiExpression a = YuiExpression
+  { runYuiExpression :: RecT (RingExpressionT MagmaExpression) a
+  }
+  deriving (Show, Eq, Functor, Foldable, Traversable, Applicative, Monad)
+
+instance Rng (YuiExpression a) where
+  (<+>) :: YuiExpression a -> YuiExpression a -> YuiExpression a
+  (YuiExpression x) <+> (YuiExpression y) = YuiExpression $ liftR2 (<+>) x y
+  (<^>) :: YuiExpression a -> YuiExpression a -> YuiExpression a
+  (YuiExpression x) <^> (YuiExpression y) = YuiExpression $ liftR2 (<^>) x y
+  (<->) :: YuiExpression a -> YuiExpression a -> YuiExpression a
+  (YuiExpression x) <-> (YuiExpression y) = YuiExpression $ liftR2 (<->) x y
+
+instance Magma (YuiExpression a) where
+  (@@) :: YuiExpression a -> YuiExpression a -> YuiExpression a
+  (YuiExpression x) @@ (YuiExpression y) = YuiExpression $ liftR2 (@@) x y
+
+apple :: YuiExpression Text
+apple = pure "Apple"
+
+orange :: YuiExpression Text
+orange = pure "Orange"
+
+peel :: YuiExpression Text
+peel = pure "Peel"
+
+red :: YuiExpression Text
+red = pure "Red"
+
+green :: YuiExpression Text
+green = pure "Green"
