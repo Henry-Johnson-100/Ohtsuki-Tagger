@@ -62,7 +62,14 @@ module Text.TaggerQL.Expression.AST (
   foldMagmaExpression,
   appliedTo,
   over,
-  -- RecT (..),
+  RecT (..),
+  returnR,
+  bindR,
+  (>>>=),
+  liftR2,
+  runRecT,
+  runRec,
+  YuiExpression (..),
 
   -- * Classes
   Rng (..),
@@ -662,18 +669,3 @@ instance Rng (YuiExpression a) where
 instance Magma (YuiExpression a) where
   (@@) :: YuiExpression a -> YuiExpression a -> YuiExpression a
   (YuiExpression x) @@ (YuiExpression y) = YuiExpression $ liftR2 (@@) x y
-
-apple :: YuiExpression Text
-apple = pure "Apple"
-
-orange :: YuiExpression Text
-orange = pure "Orange"
-
-peel :: YuiExpression Text
-peel = pure "Peel"
-
-red :: YuiExpression Text
-red = pure "Red"
-
-green :: YuiExpression Text
-green = pure "Green"
