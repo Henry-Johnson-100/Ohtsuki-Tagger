@@ -70,6 +70,7 @@ module Text.TaggerQL.Expression.AST (
   runRecT,
   runRec,
   YuiExpression (..),
+  DefaultRng (..),
 
   -- * Classes
   Rng (..),
@@ -205,6 +206,26 @@ class Rng r where
 
   -- | The inverse of '(<+>)`
   (<->) :: r -> r -> r
+
+newtype DefaultRng a = DefaultRng {runDefaultRng :: a}
+  deriving
+    ( Show
+    , Eq
+    , Semigroup
+    , Monoid
+    , Functor
+    , Foldable
+    , Traversable
+    )
+
+-- | Uses the semigroup operation for all ring operations.
+instance Semigroup a => Rng (DefaultRng a) where
+  (<+>) :: Semigroup a => DefaultRng a -> DefaultRng a -> DefaultRng a
+  (<+>) = (<>)
+  (<^>) :: Semigroup a => DefaultRng a -> DefaultRng a -> DefaultRng a
+  (<^>) = (<>)
+  (<->) :: Semigroup a => DefaultRng a -> DefaultRng a -> DefaultRng a
+  (<->) = (<>)
 
 instance Hashable a => Rng (HashSet a) where
   (<+>) :: Hashable a => HashSet a -> HashSet a -> HashSet a
