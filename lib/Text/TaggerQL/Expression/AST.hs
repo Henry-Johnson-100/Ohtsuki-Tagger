@@ -1,20 +1,9 @@
-{-# HLINT ignore "Use camelCase" #-}
-{-# LANGUAGE BangPatterns #-}
-{-# HLINT ignore "Use lambda-case" #-}
-{-# LANGUAGE DeriveFoldable #-}
-{-# HLINT ignore "Use newtype instead of data" #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# HLINT ignore "Use <$>" #-}
-{-# HLINT ignore "Use =<<" #-}
-{-# HLINT ignore "Use traverse" #-}
-{-# HLINT ignore "Use join" #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -22,8 +11,7 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Use const" #-}
-{-# HLINT ignore "Use section" #-}
+{-# HLINT ignore "Use lambda-case" #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.AST
@@ -54,22 +42,20 @@ module Text.TaggerQL.Expression.AST (
   runDTerm,
 
   -- * Language Expressions
+  QueryExpression (..),
+  QueryLeaf (..),
+  YuiExpression (..),
+  simplifyYuiExpression,
   RingExpressionT (..),
   returnRingExpression,
   bindRingExpression,
   RingExpression (..),
   evaluateRing,
+  MagmaExpressionT (..),
   MagmaExpression (..),
   foldMagmaExpression,
   appliedTo,
   over,
-  RecT (..),
-  returnR,
-  bindR,
-  (>>>=),
-  liftR2,
-  runRecT,
-  runRec,
   DefaultRng (..),
 
   -- * Classes
@@ -78,12 +64,11 @@ module Text.TaggerQL.Expression.AST (
   Magma (..),
 ) where
 
-import Control.Applicative (liftA2)
 import Control.Monad (ap, join, (<=<))
-import Control.Monad.Trans.Class
+import Control.Monad.Trans.Class (MonadTrans (..))
 import qualified Data.Foldable as F
 import Data.Functor ((<&>))
-import Data.Functor.Identity (Identity (runIdentity))
+import Data.Functor.Identity (Identity)
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
@@ -609,109 +594,9 @@ instance Monad DTerm where
     DTerm a -> f a >>= DTerm
     DMetaTerm a -> f a
 
-{- |
- A higher order monad turning any type of kind @(* -> *)@ into a self-recursive type with
- terminal values @a@.
-
- It is a higher order monad in the sense that inner recursions of type @(r (RecT r a))@
- can be bound to functions @(r (RecT r a) -> RecT p b)@ to produce @RecT p b@
-
- Therefore, any function for \'r\' that is generic in its value like @(r a -> r a)@
- can be lifted into 'RecT` as @(r (RecT r a) -> r (RecT r a))@.
--}
-data RecT r a
-  = -- | The terminal leaf of a recursive tree.
-    Terminal a
-  | -- | A single recursion, where the structure of specific 'Recursion` is invisible to
-    -- to another.
-    Recursion (r (RecT r a))
-  deriving (Functor, Foldable, Traversable)
-
-type Rec a = RecT Identity a
-
-deriving instance Show a => Show (RecT Identity a)
-deriving instance Show a => Show (RecT (RingExpressionT MagmaExpression) a)
-deriving instance Eq a => Eq (RecT Identity a)
-deriving instance Eq a => Eq (RecT (RingExpressionT MagmaExpression) a)
-
-instance Monad r => Applicative (RecT r) where
-  pure :: Monad r => a -> RecT r a
-  pure = return
-  (<*>) :: Monad r => RecT r (a -> b) -> RecT r a -> RecT r b
-  (<*>) = ap
-
-instance Monad r => Monad (RecT r) where
-  return :: Monad r => a -> RecT r a
-  return = Terminal
-  (>>=) :: Monad r => RecT r a -> (a -> RecT r b) -> RecT r b
-  r >>= f = case r of
-    Terminal a -> f a
-    Recursion r' -> Recursion . fmap (>>= f) $ r'
-
-instance MonadTrans RecT where
-  lift :: Monad m => m a -> RecT m a
-  lift = returnR
-
-{- |
- Map the inner values of a flat structure to the termination of a recursion.
--}
-terminate :: Functor r => r a -> r (RecT r a)
-terminate = fmap Terminal
-
-returnR :: Functor r => r a -> RecT r a
-returnR = Recursion . terminate
-
-bindR :: Monad r => RecT r a -> (r (RecT r a) -> RecT p b) -> RecT p b
-bindR r f = case r of
-  Terminal a -> f . terminate . pure $ a
-  Recursion r' -> f . recurse $ r'
-
-infixl 1 >>>=
-(>>>=) :: Monad r => RecT r a -> (r (RecT r a) -> RecT p b) -> RecT p b
-r >>>= f = bindR r f
-
-{- |
- Produce another layer in recursion, turning the current structure into a single leaf.
-
- Where the structure of r can no longer be affected by subsequent operation.
-
- Note that for any @rec :: r (RecT r a)@ and a function @f :: (r a -> a)@:
-
- @runRecT (Recursion . id $ rec) f@ = @runRecT (Recursion . recurse $ rec) f@
-
- BUT
-
- @Recursion . id $ rec@ /= @Recursion . recurse $ rec@.
--}
-recurse :: Applicative r => r (RecT r a) -> r (RecT r a)
-recurse = pure . Recursion
-
-{- |
- Given an applicative action over r,
- lift it into function operating on the current recursions.
--}
-liftR2 ::
-  Monad r =>
-  (r (RecT r a) -> r (RecT r a) -> r (RecT r a)) ->
-  RecT r a ->
-  RecT r a ->
-  RecT r a
-liftR2 f lhs rhs =
-  lhs
-    >>>= ( \l ->
-            rhs >>>= \r ->
-              Recursion (l `f` r)
-         )
-
-runRecT :: Applicative r => RecT r a -> (r a -> a) -> a
-runRecT r ret = case r of
-  Terminal a -> ret . pure $ a
-  Recursion r' -> ret . fmap (`runRecT` ret) $ r'
-
-runRec :: Rec a -> a
-runRec = flip runRecT runIdentity
-
-newtype MagmaExpressionT m a = MagmaExpressionT {runMagmaExpressionT :: m (MagmaExpression a)}
+newtype MagmaExpressionT m a = MagmaExpressionT
+  { runMagmaExpressionT :: m (MagmaExpression a)
+  }
   deriving (Functor, Foldable, Traversable)
 
 deriving instance Show a => Show (MagmaExpressionT Identity a)
@@ -747,10 +632,17 @@ instance Monad m => Monad (MagmaExpressionT m) where
           a' <- runMagmaExpressionT . f $ a
           return (lmR <> a')
 
+{- |
+ A recursive expression that is ultimately resolvable to a ring expression
+ of magma expressions.
+-}
 data YuiExpression a
-  = YuiExpression (RingExpression (MagmaExpression a))
-  | YuiRing (RingExpression (YuiExpression a))
-  | YuiMagma (MagmaExpression (YuiExpression a))
+  = -- | The termination of a 'YuiExpression`
+    YuiExpression (RingExpression (MagmaExpression a))
+  | -- | A 'RingExpression` of 'YuiExpression`
+    YuiRing (RingExpression (YuiExpression a))
+  | -- | A 'MagmaExpression` of 'YuiExpression`
+    YuiMagma (MagmaExpression (YuiExpression a))
   deriving (Show, Eq, Functor, Foldable, Traversable)
 
 instance Applicative YuiExpression where
@@ -772,8 +664,9 @@ instance Monad YuiExpression where
     YuiRing re -> YuiRing . fmap (>>= f) $ re
     YuiMagma me -> YuiMagma . fmap (>>= f) $ me
 
--- not technically a Rng as of right now.
--- the constructors are not associative.
+{- |
+ Not technically a rng as the constructors are not associative.
+-}
 instance Rng (YuiExpression a) where
   (<+>) :: YuiExpression a -> YuiExpression a -> YuiExpression a
   x <+> y = YuiRing $ pure x <+> pure y
@@ -782,10 +675,17 @@ instance Rng (YuiExpression a) where
   (<->) :: YuiExpression a -> YuiExpression a -> YuiExpression a
   x <-> y = YuiRing $ pure x <-> pure y
 
+{- |
+ A non-associative, distributive function.
+-}
 instance Magma (YuiExpression a) where
   (@@) :: YuiExpression a -> YuiExpression a -> YuiExpression a
   x @@ y = YuiMagma $ pure x :$ y
 
+{- |
+ Distributes the magma operation associatively through the structure
+ and joins ring expressions together.
+-}
 simplifyYuiExpression :: YuiExpression a -> RingExpression (MagmaExpression a)
 simplifyYuiExpression ye = case ye of
   YuiExpression re -> re
@@ -794,36 +694,18 @@ simplifyYuiExpression ye = case ye of
     simplifyYuiExpression re'
   YuiMagma me -> fmap join . traverse simplifyYuiExpression $ me
 
-resolveMagmas :: (b -> b -> b) -> YuiExpression b -> RingExpression b
-resolveMagmas f = fmap (foldMagmaExpression f) . simplifyYuiExpression
+{- |
+ Newtype wrapper for a query expression, which is a ring expression of leaves
+ where each leaf is resolvable to a set of files.
+-}
+newtype QueryExpression = QueryExpression {runQueryExpression :: RingExpression QueryLeaf}
+  deriving (Show, Eq, Rng)
 
-printDist' :: YuiExpression (DTerm Pattern) -> RingExpression Pattern
-printDist' =
-  resolveMagmas
-    (\outer inner -> outer <> "{" <> inner <> "}")
-    . fmap runDTerm
-
-mk :: Pattern -> YuiExpression (DTerm Pattern)
-mk = pure . pure
-
-a = mk "a"
-b = mk "b"
-c = mk "c"
-d = mk "d"
-e = mk "e"
-f = mk "f"
-g = mk "g"
-h = mk "h"
-
-problem :: YuiExpression (DTerm Pattern)
-problem =
-  ( a
-      <^> ( b
-              @@ (c <+> d)
-          )
-  )
-    @@ ( (e <-> f)
-          @@ (g <^> h)
-       )
-
-p = (a <+> (b @@ c)) @@ d
+{- |
+ A disjunction between filepath patterns and tag expressions that are resolvable
+ to an expression of file sets.
+-}
+data QueryLeaf
+  = FileLeaf Pattern
+  | TagLeaf (YuiExpression (DTerm Pattern))
+  deriving (Show, Eq)
