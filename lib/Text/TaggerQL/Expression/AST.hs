@@ -46,12 +46,8 @@ module Text.TaggerQL.Expression.AST (
   QueryLeaf (..),
   YuiExpression (..),
   simplifyYuiExpression,
-  RingExpressionT (..),
-  returnRingExpression,
-  bindRingExpression,
   RingExpression (..),
   evaluateRing,
-  MagmaExpressionT (..),
   MagmaExpression (..),
   foldMagmaExpression,
   appliedTo,
@@ -64,11 +60,9 @@ module Text.TaggerQL.Expression.AST (
   Magma (..),
 ) where
 
-import Control.Monad (ap, join, (<=<))
-import Control.Monad.Trans.Class (MonadTrans (..))
+import Control.Monad (ap, join)
 import qualified Data.Foldable as F
 import Data.Functor ((<&>))
-import Data.Functor.Identity (Identity)
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
@@ -229,65 +223,6 @@ evaluateRing r = case r of
   re :+ re' -> evaluateRing re <+> evaluateRing re'
   re :^ re' -> evaluateRing re <^> evaluateRing re'
   re :- re' -> evaluateRing re <-> evaluateRing re'
-
-newtype RingExpressionT m a = RingExpressionT
-  {runRingExpressionT :: m (RingExpression a)}
-  deriving (Functor, Foldable, Traversable)
-
-deriving instance Show a => Show (RingExpressionT Identity a)
-deriving instance Eq a => Eq (RingExpressionT Identity a)
-deriving instance Show a => Show (RingExpressionT MagmaExpression a)
-deriving instance Eq a => Eq (RingExpressionT MagmaExpression a)
-
-instance Monad m => Applicative (RingExpressionT m) where
-  pure :: Monad m => a -> RingExpressionT m a
-  pure = return
-  (<*>) ::
-    Monad m =>
-    RingExpressionT m (a -> b) ->
-    RingExpressionT m a ->
-    RingExpressionT m b
-  (<*>) = ap
-
-instance Monad m => Monad (RingExpressionT m) where
-  return :: Monad m => a -> RingExpressionT m a
-  return = RingExpressionT . return . return
-  (>>=) ::
-    Monad m =>
-    RingExpressionT m a ->
-    (a -> RingExpressionT m b) ->
-    RingExpressionT m b
-  (RingExpressionT re) >>= f = RingExpressionT $ do
-    re' <- re
-    case re' of
-      Ring a -> runRingExpressionT . f $ a
-      re_a :+ re'' -> go (:+) re_a re''
-      re_a :^ re'' -> go (:^) re_a re''
-      re_a :- re'' -> go (:-) re_a re''
-   where
-    go c l r = do
-      l' <- join <$> traverse (runRingExpressionT . f) l
-      r' <- join <$> traverse (runRingExpressionT . f) r
-      return (l' `c` r')
-
-instance MonadTrans RingExpressionT where
-  lift :: Monad m => m a -> RingExpressionT m a
-  lift = RingExpressionT . fmap pure
-
-returnRingExpression :: Monad m => RingExpression a -> RingExpressionT m a
-returnRingExpression = RingExpressionT . return
-
-bindRingExpression ::
-  Monad m =>
-  RingExpressionT m a ->
-  (RingExpression a -> m (RingExpression b)) ->
-  RingExpressionT m b
-bindRingExpression re f =
-  RingExpressionT
-    . ( f
-          <=< runRingExpressionT
-      )
-    $ re
 
 {- |
  A data type representing an expression over a magma. A sequence of operations can
@@ -455,44 +390,6 @@ instance Monad DTerm where
     DTerm a -> f a >>= DTerm
     DMetaTerm a -> f a
 
-newtype MagmaExpressionT m a = MagmaExpressionT
-  { runMagmaExpressionT :: m (MagmaExpression a)
-  }
-  deriving (Functor, Foldable, Traversable)
-
-deriving instance Show a => Show (MagmaExpressionT Identity a)
-deriving instance Eq a => Eq (MagmaExpressionT Identity a)
-
-instance Monad m => Applicative (MagmaExpressionT m) where
-  pure :: Monad m => a -> MagmaExpressionT m a
-  pure = return
-  (<*>) ::
-    Monad m =>
-    MagmaExpressionT m (a -> b) ->
-    MagmaExpressionT m a ->
-    MagmaExpressionT m b
-  (<*>) = ap
-
-instance Monad m => Monad (MagmaExpressionT m) where
-  return :: Monad m => a -> MagmaExpressionT m a
-  return = MagmaExpressionT . pure . pure
-  (>>=) ::
-    Monad m =>
-    MagmaExpressionT m a ->
-    (a -> MagmaExpressionT m b) ->
-    MagmaExpressionT m b
-  (MagmaExpressionT met) >>= f = MagmaExpressionT $ do
-    met' <- met
-    go met'
-   where
-    go m =
-      case m of
-        MagmaValue a -> runMagmaExpressionT . f $ a
-        lm :$ a -> do
-          lmR <- go lm
-          a' <- runMagmaExpressionT . f $ a
-          return (lmR <> a')
-
 {- |
  A recursive expression that is ultimately resolvable to a ring expression
  of magma expressions.
@@ -620,26 +517,6 @@ instance Rng (RingExpression a) where
   (<->) :: RingExpression a -> RingExpression a -> RingExpression a
   (<->) = (:-)
 
-instance Applicative m => Rng (RingExpressionT m a) where
-  (<+>) ::
-    Applicative m =>
-    RingExpressionT m a ->
-    RingExpressionT m a ->
-    RingExpressionT m a
-  (RingExpressionT x) <+> (RingExpressionT y) = RingExpressionT ((<+>) <$> x <*> y)
-  (<^>) ::
-    Applicative m =>
-    RingExpressionT m a ->
-    RingExpressionT m a ->
-    RingExpressionT m a
-  (RingExpressionT x) <^> (RingExpressionT y) = RingExpressionT ((<^>) <$> x <*> y)
-  (<->) ::
-    Applicative m =>
-    RingExpressionT m a ->
-    RingExpressionT m a ->
-    RingExpressionT m a
-  (RingExpressionT x) <-> (RingExpressionT y) = RingExpressionT ((<->) <$> x <*> y)
-
 {- |
  Not technically a rng as the constructors are not associative.
 -}
@@ -704,13 +581,6 @@ class Magma m where
 instance Magma (MagmaExpression a) where
   (@@) :: MagmaExpression a -> MagmaExpression a -> MagmaExpression a
   (@@) = (<>)
-
-instance Magma (RingExpressionT MagmaExpression a) where
-  (@@) ::
-    RingExpressionT MagmaExpression a ->
-    RingExpressionT MagmaExpression a ->
-    RingExpressionT MagmaExpression a
-  (RingExpressionT x) @@ (RingExpressionT y) = RingExpressionT (x @@ y)
 
 {- |
  A non-associative, distributive function.
