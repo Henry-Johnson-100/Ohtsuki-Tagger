@@ -389,13 +389,13 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
               then
                 [ let action modelExpr = case T.splitAt 1 rawQuery of
                         ("!", r) ->
-                          either (const modelExpr) (modelExpr <->) . parseExpr $ r
+                          either (const modelExpr) (modelExpr -.) . parseExpr $ r
                         ("&", r) ->
-                          either (const modelExpr) (modelExpr <^>) . parseExpr $ r
+                          either (const modelExpr) (modelExpr *.) . parseExpr $ r
                         ("|", r) ->
-                          either (const modelExpr) (modelExpr <+>) . parseExpr $ r
+                          either (const modelExpr) (modelExpr +.) . parseExpr $ r
                         (_defaultAction, _) ->
-                          either (const modelExpr) (modelExpr <^>) . parseExpr $ rawQuery
+                          either (const modelExpr) (modelExpr *.) . parseExpr $ rawQuery
                    in Model $
                         model
                           & fileSelectionModel . queryModel . expression %~ action
@@ -421,7 +421,7 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
           return . DoFileSelectionEvent . PutFilesNoCombine $ r
       ]
     RingProduct l r ->
-      [Model $ model & fileSelectionModel . queryModel . l %~ (<^> r)]
+      [Model $ model & fileSelectionModel . queryModel . l %~ (*. r)]
     UpdateExpression n expr ->
       [Model $ model & fileSelectionModel . queryModel . expression . exprAt n ?~ expr]
     UpdateSubExpression exprIx seIx se ->
