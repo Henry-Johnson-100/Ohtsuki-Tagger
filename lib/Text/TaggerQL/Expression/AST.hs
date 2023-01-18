@@ -795,26 +795,29 @@ instance Rng (YuiExpression a) where
 
 instance Magma (YuiExpression a) where
   (@@) :: YuiExpression a -> YuiExpression a -> YuiExpression a
-  (YuiMagma x) @@ y = YuiMagma $ case y of
-    YuiValue a -> x `over` YuiValue a
-    YuiRing re -> x `over` YuiRing re
-    YuiMagma me -> x @@ me
-    YuiExpression ye -> x `over` ye
-  x @@ (YuiMagma y) = YuiMagma $ case x of
-    YuiValue a -> YuiValue a `appliedTo` y
-    YuiRing re -> YuiRing re `appliedTo` y
-    YuiMagma me -> me @@ y
-    YuiExpression ye -> ye `appliedTo` y
-  x @@ y = YuiMagma $ x `appliedTo` MagmaValue y
-
--- x @@ (MagmaValue . YuiExpression -> y) = YuiMagma $
---   case x of
---     YuiValue a ->
---       (YuiExpression . YuiValue $ a)
---         `appliedTo` y
---     YuiRing re -> (MagmaValue . YuiExpression . YuiRing $ re) <> y
---     YuiMagma me -> (MagmaValue . YuiExpression . YuiMagma $ me) <> y
---     YuiExpression ye -> ye `appliedTo` y
+  -- Case describing how a left-hand magma expression is distributed over a normal
+  -- expression on the right hand side.
+  (YuiMagma x) @@ rhs = YuiMagma $ case rhs of
+    -- Two magma expressions are catted together from left to right. Creating a new
+    -- bottom value that the expression is distributed over.
+    YuiMagma rhsme -> x <> rhsme
+    -- Recursive constructor, so building a magma simply applies the magma to the inner
+    -- expressions rather than its wrapper.
+    YuiExpression rhsye -> x :$ rhsye
+    -- Normal expressions that are appended as the bottom of the magma expression
+    -- without being wrapped in a recursive YuiExpression leaf.
+    _applyPureExpression -> x :$ rhs
+  -- Case describing how a normal left-hand expression is added to a magma expression
+  -- on the right-hand side.
+  lhs @@ (YuiMagma y) = YuiMagma $ case lhs of
+    -- Just as the left-hand case, two magma expressions are simple catted together.
+    YuiMagma lhsme -> lhsme <> y
+    -- An unwrapped recursive expression is applied to the right-hand side.
+    YuiExpression lhsye -> lhsye `appliedTo` y
+    -- Normal expressions are just applied to the right without any wrapping.
+    _applyPureExpression -> lhs `appliedTo` y
+  -- Any other case produces a brand new magma expression from two pure expressions.
+  x @@ y = YuiMagma $ MagmaValue x :$ y
 
 {- |
  Resolves the inner magma expressions using the given right-associative function.
