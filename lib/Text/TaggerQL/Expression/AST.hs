@@ -183,16 +183,6 @@ extensionL =
     (\(TagTermExtension _ se) -> se)
     (flip (<$))
 
-class Rng r where
-  -- | An associative operation
-  (<+>) :: r -> r -> r
-
-  -- | An associative operation
-  (<^>) :: r -> r -> r
-
-  -- | The inverse of '(<+>)`
-  (<->) :: r -> r -> r
-
 newtype DefaultRng a = DefaultRng {runDefaultRng :: a}
   deriving
     ( Show
@@ -203,96 +193,6 @@ newtype DefaultRng a = DefaultRng {runDefaultRng :: a}
     , Foldable
     , Traversable
     )
-
--- | Uses the semigroup operation for all ring operations.
-instance Semigroup a => Rng (DefaultRng a) where
-  (<+>) :: Semigroup a => DefaultRng a -> DefaultRng a -> DefaultRng a
-  (<+>) = (<>)
-  (<^>) :: Semigroup a => DefaultRng a -> DefaultRng a -> DefaultRng a
-  (<^>) = (<>)
-  (<->) :: Semigroup a => DefaultRng a -> DefaultRng a -> DefaultRng a
-  (<->) = (<>)
-
-instance Hashable a => Rng (HashSet a) where
-  (<+>) :: Hashable a => HashSet a -> HashSet a -> HashSet a
-  (<+>) = HS.union
-  (<^>) :: Hashable a => HashSet a -> HashSet a -> HashSet a
-  (<^>) = HS.intersection
-  (<->) :: Hashable a => HashSet a -> HashSet a -> HashSet a
-  (<->) = HS.difference
-
-instance Eq a => Rng [a] where
-  (<+>) :: Eq a => [a] -> [a] -> [a]
-  (<+>) = (++)
-  (<^>) :: Eq a => [a] -> [a] -> [a]
-  (<^>) = L.intersect
-  (<->) :: Eq a => [a] -> [a] -> [a]
-  (<->) = (L.\\)
-
-instance Rng Int where
-  (<+>) :: Int -> Int -> Int
-  (<+>) = (+)
-  (<^>) :: Int -> Int -> Int
-  (<^>) = (*)
-  (<->) :: Int -> Int -> Int
-  (<->) = (-)
-
-class Rng r => Ring r where
-  -- | Identity over '(<+>)`
-  aid :: r
-
-  -- | Identity over '(<^>)`
-  mid :: r
-
-instance Ring Int where
-  aid :: Int
-  aid = 0
-  mid :: Int
-  mid = 1
-
-infix 9 @@
-
-{- |
- Class for any magma.
--}
-class Magma m where
-  -- | A binary operation.
-  (@@) :: m -> m -> m
-
-instance Rng SubExpression where
-  (<+>) :: SubExpression -> SubExpression -> SubExpression
-  x <+> y = BinarySubExpression $ BinaryOperation x Union y
-  (<^>) :: SubExpression -> SubExpression -> SubExpression
-  x <^> y = BinarySubExpression $ BinaryOperation x Intersect y
-  (<->) :: SubExpression -> SubExpression -> SubExpression
-  x <-> y = BinarySubExpression $ BinaryOperation x Difference y
-
-instance Ring SubExpression where
-  mid :: SubExpression
-  mid = SubTag . DescriptorTerm $ "%"
-  aid :: SubExpression
-  aid = BinarySubExpression $ BinaryOperation mid Difference mid
-
-instance Rng Expression where
-  (<+>) :: Expression -> Expression -> Expression
-  x <+> y = BinaryExpression $ BinaryOperation x Union y
-  (<^>) :: Expression -> Expression -> Expression
-  x <^> y = BinaryExpression $ BinaryOperation x Intersect y
-  (<->) :: Expression -> Expression -> Expression
-  x <-> y = BinaryExpression $ BinaryOperation x Difference y
-
-instance Ring Expression where
-  mid :: Expression
-  mid = FileTermValue "%"
-  aid :: Expression
-  aid =
-    let dUniverse = TagTermValue . DescriptorTerm $ "%"
-     in BinaryExpression
-          ( BinaryOperation
-              (BinaryExpression (BinaryOperation mid Difference dUniverse))
-              Intersect
-              dUniverse
-          )
 
 {- |
  A data type representing an expression of any Ring.
@@ -319,14 +219,6 @@ instance Monad RingExpression where
     re :+ re' -> (re >>= f) :+ (re' >>= f)
     re :^ re' -> (re >>= f) :^ (re' >>= f)
     re :- re' -> (re >>= f) :- (re' >>= f)
-
-instance Rng (RingExpression a) where
-  (<+>) :: RingExpression a -> RingExpression a -> RingExpression a
-  (<+>) = (:+)
-  (<^>) :: RingExpression a -> RingExpression a -> RingExpression a
-  (<^>) = (:^)
-  (<->) :: RingExpression a -> RingExpression a -> RingExpression a
-  (<->) = (:-)
 
 {- |
  Run the computation defined by a 'RingExpression`
@@ -382,33 +274,6 @@ instance MonadTrans RingExpressionT where
   lift :: Monad m => m a -> RingExpressionT m a
   lift = RingExpressionT . fmap pure
 
-instance Applicative m => Rng (RingExpressionT m a) where
-  (<+>) ::
-    Applicative m =>
-    RingExpressionT m a ->
-    RingExpressionT m a ->
-    RingExpressionT m a
-  (RingExpressionT x) <+> (RingExpressionT y) = RingExpressionT ((<+>) <$> x <*> y)
-  (<^>) ::
-    Applicative m =>
-    RingExpressionT m a ->
-    RingExpressionT m a ->
-    RingExpressionT m a
-  (RingExpressionT x) <^> (RingExpressionT y) = RingExpressionT ((<^>) <$> x <*> y)
-  (<->) ::
-    Applicative m =>
-    RingExpressionT m a ->
-    RingExpressionT m a ->
-    RingExpressionT m a
-  (RingExpressionT x) <-> (RingExpressionT y) = RingExpressionT ((<->) <$> x <*> y)
-
-instance Magma (RingExpressionT MagmaExpression a) where
-  (@@) ::
-    RingExpressionT MagmaExpression a ->
-    RingExpressionT MagmaExpression a ->
-    RingExpressionT MagmaExpression a
-  (RingExpressionT x) @@ (RingExpressionT y) = RingExpressionT (x @@ y)
-
 returnRingExpression :: Monad m => RingExpression a -> RingExpressionT m a
 returnRingExpression = RingExpressionT . return
 
@@ -442,10 +307,6 @@ data MagmaExpression a
   -- proposed additional constructor
   --  a :& (MagmaExpression a)
   deriving (Show, Eq, Functor)
-
-instance Magma (MagmaExpression a) where
-  (@@) :: MagmaExpression a -> MagmaExpression a -> MagmaExpression a
-  (@@) = (<>)
 
 instance IsList (MagmaExpression a) where
   type Item (MagmaExpression a) = a
@@ -665,24 +526,6 @@ instance Monad YuiExpression where
     YuiMagma me -> YuiMagma . fmap (>>= f) $ me
 
 {- |
- Not technically a rng as the constructors are not associative.
--}
-instance Rng (YuiExpression a) where
-  (<+>) :: YuiExpression a -> YuiExpression a -> YuiExpression a
-  x <+> y = YuiRing $ pure x <+> pure y
-  (<^>) :: YuiExpression a -> YuiExpression a -> YuiExpression a
-  x <^> y = YuiRing $ pure x <^> pure y
-  (<->) :: YuiExpression a -> YuiExpression a -> YuiExpression a
-  x <-> y = YuiRing $ pure x <-> pure y
-
-{- |
- A non-associative, distributive function.
--}
-instance Magma (YuiExpression a) where
-  (@@) :: YuiExpression a -> YuiExpression a -> YuiExpression a
-  x @@ y = YuiMagma $ pure x :$ y
-
-{- |
  Distributes the magma operation associatively through the structure
  and joins ring expressions together.
 -}
@@ -709,3 +552,169 @@ data QueryLeaf
   = FileLeaf Pattern
   | TagLeaf (YuiExpression (DTerm Pattern))
   deriving (Show, Eq)
+
+class Rng r where
+  -- | An associative operation
+  (<+>) :: r -> r -> r
+
+  -- | An associative operation
+  (<^>) :: r -> r -> r
+
+  -- | The inverse of '(<+>)`
+  (<->) :: r -> r -> r
+
+-- | Uses the semigroup operation for all ring operations.
+instance Semigroup a => Rng (DefaultRng a) where
+  (<+>) :: Semigroup a => DefaultRng a -> DefaultRng a -> DefaultRng a
+  (<+>) = (<>)
+  (<^>) :: Semigroup a => DefaultRng a -> DefaultRng a -> DefaultRng a
+  (<^>) = (<>)
+  (<->) :: Semigroup a => DefaultRng a -> DefaultRng a -> DefaultRng a
+  (<->) = (<>)
+
+instance Hashable a => Rng (HashSet a) where
+  (<+>) :: Hashable a => HashSet a -> HashSet a -> HashSet a
+  (<+>) = HS.union
+  (<^>) :: Hashable a => HashSet a -> HashSet a -> HashSet a
+  (<^>) = HS.intersection
+  (<->) :: Hashable a => HashSet a -> HashSet a -> HashSet a
+  (<->) = HS.difference
+
+instance Eq a => Rng [a] where
+  (<+>) :: Eq a => [a] -> [a] -> [a]
+  (<+>) = (++)
+  (<^>) :: Eq a => [a] -> [a] -> [a]
+  (<^>) = L.intersect
+  (<->) :: Eq a => [a] -> [a] -> [a]
+  (<->) = (L.\\)
+
+instance Rng Int where
+  (<+>) :: Int -> Int -> Int
+  (<+>) = (+)
+  (<^>) :: Int -> Int -> Int
+  (<^>) = (*)
+  (<->) :: Int -> Int -> Int
+  (<->) = (-)
+
+instance Rng SubExpression where
+  (<+>) :: SubExpression -> SubExpression -> SubExpression
+  x <+> y = BinarySubExpression $ BinaryOperation x Union y
+  (<^>) :: SubExpression -> SubExpression -> SubExpression
+  x <^> y = BinarySubExpression $ BinaryOperation x Intersect y
+  (<->) :: SubExpression -> SubExpression -> SubExpression
+  x <-> y = BinarySubExpression $ BinaryOperation x Difference y
+
+instance Rng Expression where
+  (<+>) :: Expression -> Expression -> Expression
+  x <+> y = BinaryExpression $ BinaryOperation x Union y
+  (<^>) :: Expression -> Expression -> Expression
+  x <^> y = BinaryExpression $ BinaryOperation x Intersect y
+  (<->) :: Expression -> Expression -> Expression
+  x <-> y = BinaryExpression $ BinaryOperation x Difference y
+
+instance Rng (RingExpression a) where
+  (<+>) :: RingExpression a -> RingExpression a -> RingExpression a
+  (<+>) = (:+)
+  (<^>) :: RingExpression a -> RingExpression a -> RingExpression a
+  (<^>) = (:^)
+  (<->) :: RingExpression a -> RingExpression a -> RingExpression a
+  (<->) = (:-)
+
+instance Applicative m => Rng (RingExpressionT m a) where
+  (<+>) ::
+    Applicative m =>
+    RingExpressionT m a ->
+    RingExpressionT m a ->
+    RingExpressionT m a
+  (RingExpressionT x) <+> (RingExpressionT y) = RingExpressionT ((<+>) <$> x <*> y)
+  (<^>) ::
+    Applicative m =>
+    RingExpressionT m a ->
+    RingExpressionT m a ->
+    RingExpressionT m a
+  (RingExpressionT x) <^> (RingExpressionT y) = RingExpressionT ((<^>) <$> x <*> y)
+  (<->) ::
+    Applicative m =>
+    RingExpressionT m a ->
+    RingExpressionT m a ->
+    RingExpressionT m a
+  (RingExpressionT x) <-> (RingExpressionT y) = RingExpressionT ((<->) <$> x <*> y)
+
+{- |
+ Not technically a rng as the constructors are not associative.
+-}
+instance Rng (YuiExpression a) where
+  (<+>) :: YuiExpression a -> YuiExpression a -> YuiExpression a
+  x <+> y = YuiRing $ pure x <+> pure y
+  (<^>) :: YuiExpression a -> YuiExpression a -> YuiExpression a
+  x <^> y = YuiRing $ pure x <^> pure y
+  (<->) :: YuiExpression a -> YuiExpression a -> YuiExpression a
+  x <-> y = YuiRing $ pure x <-> pure y
+
+class Rng r => Ring r where
+  -- | Identity over '(<+>)`
+  aid :: r
+
+  -- | Identity over '(<^>)`
+  mid :: r
+
+instance Ring Int where
+  aid :: Int
+  aid = 0
+  mid :: Int
+  mid = 1
+
+instance Ring SubExpression where
+  mid :: SubExpression
+  mid = SubTag . DescriptorTerm $ "%"
+  aid :: SubExpression
+  aid = BinarySubExpression $ BinaryOperation mid Difference mid
+
+instance Ring Expression where
+  mid :: Expression
+  mid = FileTermValue "%"
+  aid :: Expression
+  aid =
+    let dUniverse = TagTermValue . DescriptorTerm $ "%"
+     in BinaryExpression
+          ( BinaryOperation
+              (BinaryExpression (BinaryOperation mid Difference dUniverse))
+              Intersect
+              dUniverse
+          )
+
+instance Ring QueryExpression where
+  -- The set of all files
+  mid :: QueryExpression
+  mid = QueryExpression . Ring . FileLeaf $ WildCard
+
+  -- The set of all files minus itself, an empty set.
+  aid :: QueryExpression
+  aid = mid <-> mid
+
+infix 9 @@
+
+{- |
+ Class for any magma.
+-}
+class Magma m where
+  -- | A binary operation.
+  (@@) :: m -> m -> m
+
+instance Magma (MagmaExpression a) where
+  (@@) :: MagmaExpression a -> MagmaExpression a -> MagmaExpression a
+  (@@) = (<>)
+
+instance Magma (RingExpressionT MagmaExpression a) where
+  (@@) ::
+    RingExpressionT MagmaExpression a ->
+    RingExpressionT MagmaExpression a ->
+    RingExpressionT MagmaExpression a
+  (RingExpressionT x) @@ (RingExpressionT y) = RingExpressionT (x @@ y)
+
+{- |
+ A non-associative, distributive function.
+-}
+instance Magma (YuiExpression a) where
+  (@@) :: YuiExpression a -> YuiExpression a -> YuiExpression a
+  x @@ y = YuiMagma $ pure x :$ y
