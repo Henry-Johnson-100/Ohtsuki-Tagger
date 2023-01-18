@@ -748,10 +748,9 @@ instance Monad m => Monad (MagmaExpressionT m) where
           return (lmR <> a')
 
 data YuiExpression a
-  = YuiValue a
+  = YuiExpression (RingExpression (MagmaExpression a))
   | YuiRing (RingExpression (YuiExpression a))
   | YuiMagma (MagmaExpression (YuiExpression a))
-  | YuiExpression (YuiExpression a)
   deriving (Show, Eq, Functor, Foldable, Traversable)
 
 instance Applicative YuiExpression where
@@ -762,90 +761,50 @@ instance Applicative YuiExpression where
 
 instance Monad YuiExpression where
   return :: a -> YuiExpression a
-  return = YuiValue
+  return = YuiExpression . pure . pure
   (>>=) :: YuiExpression a -> (a -> YuiExpression b) -> YuiExpression b
   ye >>= f = case ye of
-    YuiValue a -> f a
+    YuiExpression re -> YuiRing $ do
+      re' <- re
+      pure . YuiMagma $ do
+        re'' <- re'
+        pure . f $ re''
     YuiRing re -> YuiRing . fmap (>>= f) $ re
     YuiMagma me -> YuiMagma . fmap (>>= f) $ me
-    YuiExpression ye' -> ye' >>= f
 
+-- not technically a Rng as of right now.
+-- the constructors are not associative.
 instance Rng (YuiExpression a) where
   (<+>) :: YuiExpression a -> YuiExpression a -> YuiExpression a
-  x <+> (Ring . YuiExpression -> y) = YuiRing $
-    case x of
-      YuiValue a -> (Ring . YuiExpression . YuiValue $ a) <+> y
-      YuiRing re -> (Ring . YuiExpression . YuiRing $ re) <+> y
-      YuiMagma me -> (Ring . YuiExpression . YuiMagma $ me) <+> y
-      YuiExpression ye -> Ring ye <+> y
+  x <+> y = YuiRing $ pure x <+> pure y
   (<^>) :: YuiExpression a -> YuiExpression a -> YuiExpression a
-  x <^> (Ring . YuiExpression -> y) = YuiRing $
-    case x of
-      YuiValue a -> (Ring . YuiExpression . YuiValue $ a) <^> y
-      YuiRing re -> (Ring . YuiExpression . YuiRing $ re) <^> y
-      YuiMagma me -> (Ring . YuiExpression . YuiMagma $ me) <^> y
-      YuiExpression ye -> Ring ye <^> y
+  x <^> y = YuiRing $ pure x <^> pure y
   (<->) :: YuiExpression a -> YuiExpression a -> YuiExpression a
-  x <-> (Ring . YuiExpression -> y) = YuiRing $
-    case x of
-      YuiValue a -> (Ring . YuiExpression . YuiValue $ a) <-> y
-      YuiRing re -> (Ring . YuiExpression . YuiRing $ re) <-> y
-      YuiMagma me -> (Ring . YuiExpression . YuiMagma $ me) <-> y
-      YuiExpression ye -> Ring ye <-> y
+  x <-> y = YuiRing $ pure x <-> pure y
 
 instance Magma (YuiExpression a) where
   (@@) :: YuiExpression a -> YuiExpression a -> YuiExpression a
-  -- Case describing how a left-hand magma expression is distributed over a normal
-  -- expression on the right hand side.
-  (YuiMagma x) @@ rhs = YuiMagma $ case rhs of
-    -- Two magma expressions are catted together from left to right. Creating a new
-    -- bottom value that the expression is distributed over.
-    YuiMagma rhsme -> x <> rhsme
-    -- Recursive constructor, so building a magma simply applies the magma to the inner
-    -- expressions rather than its wrapper.
-    YuiExpression rhsye -> x :$ rhsye
-    -- Normal expressions that are appended as the bottom of the magma expression
-    -- without being wrapped in a recursive YuiExpression leaf.
-    _applyPureExpression -> x :$ rhs
-  -- Case describing how a normal left-hand expression is added to a magma expression
-  -- on the right-hand side.
-  lhs @@ (YuiMagma y) = YuiMagma $ case lhs of
-    -- Just as the left-hand case, two magma expressions are simple catted together.
-    YuiMagma lhsme -> lhsme <> y
-    -- An unwrapped recursive expression is applied to the right-hand side.
-    YuiExpression lhsye -> lhsye `appliedTo` y
-    -- Normal expressions are just applied to the right without any wrapping.
-    _applyPureExpression -> lhs `appliedTo` y
-  -- Any other case produces a brand new magma expression from two pure expressions.
-  x @@ y = YuiMagma $ MagmaValue x :$ y
+  x @@ y = YuiMagma $ pure x :$ y
 
-{- |
- Resolves the inner magma expressions using the given right-associative function.
+simplifyYuiExpression :: YuiExpression a -> RingExpression (MagmaExpression a)
+simplifyYuiExpression ye = case ye of
+  YuiExpression re -> re
+  YuiRing re -> do
+    re' <- re
+    simplifyYuiExpression re'
+  YuiMagma me -> fmap join . traverse simplifyYuiExpression $ me
 
- Essentially distributes the magma operation through each relevant expression,
- leaving the structure of the ring expressions intact.
-
- Use when the magma is not distributive.
--}
-resolveMagmas :: YuiExpression a -> (a -> a -> a) -> RingExpression a
-resolveMagmas ye f = case ye of
-  YuiValue a -> pure a
-  YuiRing re -> re >>= flip resolveMagmas f
-  YuiMagma me ->
-    foldMagmaExpression (liftA2 f)
-      . fmap (flip resolveMagmas f)
-      $ me
-  YuiExpression ye' -> resolveMagmas ye' f
+resolveMagmas :: (b -> b -> b) -> YuiExpression b -> RingExpression b
+resolveMagmas f = fmap (foldMagmaExpression f) . simplifyYuiExpression
 
 printDist' :: YuiExpression (DTerm Pattern) -> RingExpression Pattern
 printDist' =
-  flip
-    resolveMagmas
+  resolveMagmas
     (\outer inner -> outer <> "{" <> inner <> "}")
     . fmap runDTerm
 
 mk :: Pattern -> YuiExpression (DTerm Pattern)
-mk = YuiValue . pure
+mk = pure . pure
 
 a = mk "a"
 b = mk "b"
@@ -859,10 +818,12 @@ h = mk "h"
 problem :: YuiExpression (DTerm Pattern)
 problem =
   ( a
-      <+> ( b
-              @@ (c <^> d)
+      <^> ( b
+              @@ (c <+> d)
           )
   )
-    @@ ( (e <^> f)
-          @@ (g <-> h)
+    @@ ( (e <-> f)
+          @@ (g <^> h)
        )
+
+p = (a <+> (b @@ c)) @@ d
