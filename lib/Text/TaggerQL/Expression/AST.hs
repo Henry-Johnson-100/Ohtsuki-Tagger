@@ -480,6 +480,10 @@ data QueryLeaf
   | TagLeaf (YuiExpression (DTerm Pattern))
   deriving (Show, Eq)
 
+infixl 7 +.
+infixl 7 *.
+infixl 7 -.
+
 class Rng r where
   -- | An associative operation
   (+.) :: r -> r -> r
