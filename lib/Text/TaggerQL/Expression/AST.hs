@@ -23,6 +23,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use const" #-}
+{-# HLINT ignore "Use section" #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.AST
@@ -69,7 +70,6 @@ module Text.TaggerQL.Expression.AST (
   liftR2,
   runRecT,
   runRec,
-  YuiExpression (..),
   DefaultRng (..),
 
   -- * Classes
@@ -78,6 +78,7 @@ module Text.TaggerQL.Expression.AST (
   Magma (..),
 ) where
 
+import Control.Applicative (liftA2)
 import Control.Monad (ap, join, (<=<))
 import Control.Monad.Trans.Class
 import qualified Data.Foldable as F
@@ -453,6 +454,8 @@ bindRingExpression re f =
 data MagmaExpression a
   = MagmaValue a
   | (MagmaExpression a) :$ a
+  -- proposed additional constructor
+  --  a :& (MagmaExpression a)
   deriving (Show, Eq, Functor)
 
 instance Magma (MagmaExpression a) where
@@ -708,19 +711,155 @@ runRecT r ret = case r of
 runRec :: Rec a -> a
 runRec = flip runRecT runIdentity
 
-newtype YuiExpression a = YuiExpression
-  { runYuiExpression :: RecT (RingExpressionT MagmaExpression) a
-  }
-  deriving (Show, Eq, Functor, Foldable, Traversable, Applicative, Monad)
+newtype MagmaExpressionT m a = MagmaExpressionT {runMagmaExpressionT :: m (MagmaExpression a)}
+  deriving (Functor, Foldable, Traversable)
+
+deriving instance Show a => Show (MagmaExpressionT Identity a)
+deriving instance Eq a => Eq (MagmaExpressionT Identity a)
+
+instance Monad m => Applicative (MagmaExpressionT m) where
+  pure :: Monad m => a -> MagmaExpressionT m a
+  pure = return
+  (<*>) ::
+    Monad m =>
+    MagmaExpressionT m (a -> b) ->
+    MagmaExpressionT m a ->
+    MagmaExpressionT m b
+  (<*>) = ap
+
+instance Monad m => Monad (MagmaExpressionT m) where
+  return :: Monad m => a -> MagmaExpressionT m a
+  return = MagmaExpressionT . pure . pure
+  (>>=) ::
+    Monad m =>
+    MagmaExpressionT m a ->
+    (a -> MagmaExpressionT m b) ->
+    MagmaExpressionT m b
+  (MagmaExpressionT met) >>= f = MagmaExpressionT $ do
+    met' <- met
+    go met'
+   where
+    go m =
+      case m of
+        MagmaValue a -> runMagmaExpressionT . f $ a
+        lm :$ a -> do
+          lmR <- go lm
+          a' <- runMagmaExpressionT . f $ a
+          return (lmR <> a')
+
+data YuiExpression a
+  = YuiValue a
+  | YuiRing (RingExpression (YuiExpression a))
+  | YuiMagma (MagmaExpression (YuiExpression a))
+  | YuiExpression (YuiExpression a)
+  deriving (Show, Eq, Functor, Foldable, Traversable)
+
+instance Applicative YuiExpression where
+  pure :: a -> YuiExpression a
+  pure = return
+  (<*>) :: YuiExpression (a -> b) -> YuiExpression a -> YuiExpression b
+  (<*>) = ap
+
+instance Monad YuiExpression where
+  return :: a -> YuiExpression a
+  return = YuiValue
+  (>>=) :: YuiExpression a -> (a -> YuiExpression b) -> YuiExpression b
+  ye >>= f = case ye of
+    YuiValue a -> f a
+    YuiRing re -> YuiRing . fmap (>>= f) $ re
+    YuiMagma me -> YuiMagma . fmap (>>= f) $ me
+    YuiExpression ye' -> ye' >>= f
 
 instance Rng (YuiExpression a) where
   (<+>) :: YuiExpression a -> YuiExpression a -> YuiExpression a
-  (YuiExpression x) <+> (YuiExpression y) = YuiExpression $ liftR2 (<+>) x y
+  x <+> (Ring . YuiExpression -> y) = YuiRing $
+    case x of
+      YuiValue a -> (Ring . YuiExpression . YuiValue $ a) <+> y
+      YuiRing re -> (Ring . YuiExpression . YuiRing $ re) <+> y
+      YuiMagma me -> (Ring . YuiExpression . YuiMagma $ me) <+> y
+      YuiExpression ye -> Ring ye <+> y
   (<^>) :: YuiExpression a -> YuiExpression a -> YuiExpression a
-  (YuiExpression x) <^> (YuiExpression y) = YuiExpression $ liftR2 (<^>) x y
+  x <^> (Ring . YuiExpression -> y) = YuiRing $
+    case x of
+      YuiValue a -> (Ring . YuiExpression . YuiValue $ a) <^> y
+      YuiRing re -> (Ring . YuiExpression . YuiRing $ re) <^> y
+      YuiMagma me -> (Ring . YuiExpression . YuiMagma $ me) <^> y
+      YuiExpression ye -> Ring ye <^> y
   (<->) :: YuiExpression a -> YuiExpression a -> YuiExpression a
-  (YuiExpression x) <-> (YuiExpression y) = YuiExpression $ liftR2 (<->) x y
+  x <-> (Ring . YuiExpression -> y) = YuiRing $
+    case x of
+      YuiValue a -> (Ring . YuiExpression . YuiValue $ a) <-> y
+      YuiRing re -> (Ring . YuiExpression . YuiRing $ re) <-> y
+      YuiMagma me -> (Ring . YuiExpression . YuiMagma $ me) <-> y
+      YuiExpression ye -> Ring ye <-> y
 
 instance Magma (YuiExpression a) where
   (@@) :: YuiExpression a -> YuiExpression a -> YuiExpression a
-  (YuiExpression x) @@ (YuiExpression y) = YuiExpression $ liftR2 (@@) x y
+  (YuiMagma x) @@ y = YuiMagma $ case y of
+    YuiValue a -> x `over` YuiValue a
+    YuiRing re -> x `over` YuiRing re
+    YuiMagma me -> x @@ me
+    YuiExpression ye -> x `over` ye
+  x @@ (YuiMagma y) = YuiMagma $ case x of
+    YuiValue a -> YuiValue a `appliedTo` y
+    YuiRing re -> YuiRing re `appliedTo` y
+    YuiMagma me -> me @@ y
+    YuiExpression ye -> ye `appliedTo` y
+  x @@ y = YuiMagma $ x `appliedTo` MagmaValue y
+
+-- x @@ (MagmaValue . YuiExpression -> y) = YuiMagma $
+--   case x of
+--     YuiValue a ->
+--       (YuiExpression . YuiValue $ a)
+--         `appliedTo` y
+--     YuiRing re -> (MagmaValue . YuiExpression . YuiRing $ re) <> y
+--     YuiMagma me -> (MagmaValue . YuiExpression . YuiMagma $ me) <> y
+--     YuiExpression ye -> ye `appliedTo` y
+
+{- |
+ Resolves the inner magma expressions using the given right-associative function.
+
+ Essentially distributes the magma operation through each relevant expression,
+ leaving the structure of the ring expressions intact.
+
+ Use when the magma is not distributive.
+-}
+resolveMagmas :: YuiExpression a -> (a -> a -> a) -> RingExpression a
+resolveMagmas ye f = case ye of
+  YuiValue a -> pure a
+  YuiRing re -> re >>= flip resolveMagmas f
+  YuiMagma me ->
+    foldMagmaExpression (liftA2 f)
+      . fmap (flip resolveMagmas f)
+      $ me
+  YuiExpression ye' -> resolveMagmas ye' f
+
+printDist' :: YuiExpression (DTerm Pattern) -> RingExpression Pattern
+printDist' =
+  flip
+    resolveMagmas
+    (\outer inner -> outer <> "{" <> inner <> "}")
+    . fmap runDTerm
+
+mk :: Pattern -> YuiExpression (DTerm Pattern)
+mk = YuiValue . pure
+
+a = mk "a"
+b = mk "b"
+c = mk "c"
+d = mk "d"
+e = mk "e"
+f = mk "f"
+g = mk "g"
+h = mk "h"
+
+problem :: YuiExpression (DTerm Pattern)
+problem =
+  ( a
+      <+> ( b
+              @@ (c <^> d)
+          )
+  )
+    @@ ( (e <^> f)
+          @@ (g <-> h)
+       )
