@@ -74,7 +74,13 @@ import qualified Data.Text as T
 import GHC.Exts (IsList (..))
 import Lens.Micro (Lens', lens)
 
--- type TagExpression = RecT (RingExpressionT MagmaExpression) (DTerm Pattern)
+{-
+ ____  _____ ____  ____  _____ ____    _  _____ _____ ____
+|  _ \| ____|  _ \|  _ \| ____/ ___|  / \|_   _| ____|  _ \
+| | | |  _| | |_) | |_) |  _|| |     / _ \ | | |  _| | | | |
+| |_| | |___|  __/|  _ <| |__| |___ / ___ \| | | |___| |_| |
+|____/|_____|_|   |_| \_\_____\____/_/   \_\_| |_____|____/
+-}
 
 {- |
  Data structure representing search terms over the set of 'Descriptor`.
@@ -177,6 +183,20 @@ extensionL =
     (\(TagTermExtension _ se) -> se)
     (flip (<$))
 
+{-
+ _____ _   _ ____
+| ____| \ | |  _ \
+|  _| |  \| | | | |
+| |___| |\  | |_| |
+|_____|_| \_|____/
+
+ ____  _____ ____  ____  _____ ____    _  _____ _____ ____
+|  _ \| ____|  _ \|  _ \| ____/ ___|  / \|_   _| ____|  _ \
+| | | |  _| | |_) | |_) |  _|| |     / _ \ | | |  _| | | | |
+| |_| | |___|  __/|  _ <| |__| |___ / ___ \| | | |___| |_| |
+|____/|_____|_|   |_| \_\_____\____/_/   \_\_| |_____|____/
+-}
+
 newtype DefaultRng a = DefaultRng {runDefaultRng :: a}
   deriving
     ( Show
@@ -239,8 +259,6 @@ evaluateRing r = case r of
 data MagmaExpression a
   = MagmaValue a
   | (MagmaExpression a) :$ a
-  -- proposed additional constructor
-  --  a :& (MagmaExpression a)
   deriving (Show, Eq, Functor)
 
 instance IsList (MagmaExpression a) where
@@ -294,7 +312,7 @@ instance Semigroup (MagmaExpression a) where
 
  @
   let x = MagmaValue 0
-    in appliedTo 1 x == MagmaValue 1 :$ 0
+    in 1 \`appliedTo\` x == MagmaValue 1 :$ 0
  @
 -}
 appliedTo :: a -> MagmaExpression a -> MagmaExpression a
@@ -309,7 +327,7 @@ x `appliedTo` rdx = case rdx of
 
  @
   let x = MagmaValue 0
-    in x `over` 1 == MagmaValue 0 :$ 1
+    in x \`over\` 1 == MagmaValue 0 :$ 1
  @
 -}
 over :: MagmaExpression a -> a -> MagmaExpression a
