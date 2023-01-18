@@ -1,3 +1,5 @@
+{-# HLINT ignore "Use lambda-case" #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -10,8 +12,6 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use lambda-case" #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.AST
@@ -61,6 +61,7 @@ module Text.TaggerQL.Expression.AST (
 ) where
 
 import Control.Monad (ap, join)
+import Data.Bifunctor (bimap)
 import qualified Data.Foldable as F
 import Data.Functor ((<&>))
 import Data.HashSet (HashSet)
@@ -72,6 +73,7 @@ import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
 import GHC.Exts (IsList (..))
+import GHC.Generics (Generic)
 import Lens.Micro (Lens', lens)
 
 {-
@@ -216,7 +218,9 @@ data RingExpression a
   | RingExpression a :+ RingExpression a
   | RingExpression a :^ RingExpression a
   | RingExpression a :- RingExpression a
-  deriving (Show, Eq, Functor, Foldable, Traversable)
+  deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
+
+instance Hashable a => Hashable (RingExpression a)
 
 instance Applicative RingExpression where
   pure :: a -> RingExpression a
@@ -259,7 +263,9 @@ evaluateRing r = case r of
 data MagmaExpression a
   = MagmaValue a
   | (MagmaExpression a) :$ a
-  deriving (Show, Eq, Functor)
+  deriving (Show, Eq, Functor, Generic)
+
+instance Hashable a => Hashable (MagmaExpression a)
 
 instance IsList (MagmaExpression a) where
   type Item (MagmaExpression a) = a
@@ -360,7 +366,7 @@ instance Monad MagmaExpression where
 data Pattern
   = WildCard
   | PatternText Text
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
 
 instance IsString Pattern where
   fromString :: String -> Pattern
@@ -375,6 +381,8 @@ instance Monoid Pattern where
   mempty :: Pattern
   mempty = PatternText mempty
 
+instance Hashable Pattern
+
 pattern Pattern :: Text -> Pattern
 pattern Pattern t <-
   (patternText -> t)
@@ -388,11 +396,9 @@ patternText (PatternText t) = t
 data DTerm a
   = DTerm a
   | DMetaTerm a
-  deriving (Show, Eq, Functor, Foldable, Traversable)
+  deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
 
-runDTerm :: DTerm p -> p
-runDTerm (DTerm x) = x
-runDTerm (DMetaTerm x) = x
+instance Hashable a => Hashable (DTerm a)
 
 instance Applicative DTerm where
   pure :: a -> DTerm a
@@ -408,6 +414,10 @@ instance Monad DTerm where
     DTerm a -> f a >>= DTerm
     DMetaTerm a -> f a
 
+runDTerm :: DTerm p -> p
+runDTerm (DTerm x) = x
+runDTerm (DMetaTerm x) = x
+
 {- |
  A recursive expression that is ultimately resolvable to a ring expression
  of magma expressions.
@@ -419,7 +429,9 @@ data YuiExpression a
     YuiRing (RingExpression (YuiExpression a))
   | -- | A 'MagmaExpression` of 'YuiExpression`
     YuiMagma (MagmaExpression (YuiExpression a))
-  deriving (Show, Eq, Functor, Foldable, Traversable)
+  deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
+
+instance Hashable a => Hashable (YuiExpression a)
 
 instance Applicative YuiExpression where
   pure :: a -> YuiExpression a
@@ -546,12 +558,26 @@ instance Rng (YuiExpression a) where
   (<->) :: YuiExpression a -> YuiExpression a -> YuiExpression a
   x <-> y = YuiRing $ pure x <-> pure y
 
+instance (Rng a, Rng b) => Rng (a, b) where
+  (<+>) :: (Rng a, Rng b) => (a, b) -> (a, b) -> (a, b)
+  x <+> (a, b) = bimap (<+> a) (<+> b) x
+  (<^>) :: (Rng a, Rng b) => (a, b) -> (a, b) -> (a, b)
+  x <^> (a, b) = bimap (<^> a) (<^> b) x
+  (<->) :: (Rng a, Rng b) => (a, b) -> (a, b) -> (a, b)
+  x <-> (a, b) = bimap (<-> a) (<-> b) x
+
 class Rng r => Ring r where
   -- | Identity over '(<+>)`
   aid :: r
 
   -- | Identity over '(<^>)`
   mid :: r
+
+instance (Ring a, Ring b) => Ring (a, b) where
+  mid :: (Ring a, Ring b) => (a, b)
+  mid = (mid, mid)
+  aid :: (Ring a, Ring b) => (a, b)
+  aid = (aid, aid)
 
 instance Ring Int where
   aid :: Int
@@ -595,6 +621,10 @@ infix 9 @@
 class Magma m where
   -- | A binary operation.
   (@@) :: m -> m -> m
+
+instance (Magma a, Magma b) => Magma (a, b) where
+  (@@) :: (Magma a, Magma b) => (a, b) -> (a, b) -> (a, b)
+  x @@ (a, b) = bimap (@@ a) (@@ b) x
 
 instance Magma (MagmaExpression a) where
   (@@) :: MagmaExpression a -> MagmaExpression a -> MagmaExpression a
