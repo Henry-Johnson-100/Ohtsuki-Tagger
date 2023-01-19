@@ -2,6 +2,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# HLINT ignore "Redundant if" #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -12,8 +14,6 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Redundant if" #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.AST
@@ -52,6 +52,7 @@ module Text.TaggerQL.Expression.AST (
   evaluateRing,
   MagmaExpression (..),
   foldMagmaExpression,
+  foldMagmaExpressionL,
   appliedTo,
   over,
   DefaultRng (..),
@@ -278,6 +279,12 @@ instance Foldable MagmaExpression where
 foldMagmaExpression :: (a -> a -> a) -> MagmaExpression a -> a
 foldMagmaExpression _ (MagmaValue x) = x
 foldMagmaExpression f (dme :$ x) = F.foldr' f x dme
+
+{- |
+ Lazy, left-associative fold over a 'MagmaExpression`
+-}
+foldMagmaExpressionL :: (a -> a -> a) -> MagmaExpression a -> a
+foldMagmaExpressionL = F.foldl1
 
 -- Commented because I don't need it right now but may want it in the future.
 --
