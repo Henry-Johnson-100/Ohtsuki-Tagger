@@ -1,4 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
+{-# HLINT ignore "Use lambda-case" #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PartialTypeSignatures #-}
@@ -14,7 +16,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_HADDOCK prune #-}
 
-{-# HLINT ignore "Use lambda-case" #-}
+{-# HLINT ignore "Replace case with maybe" #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.Engine
@@ -61,6 +63,9 @@ module Text.TaggerQL.Expression.Engine (
   runSubExprOnFile,
   evalSubExpression,
   queryTags,
+
+  -- * New
+  queryQueryExpression,
 ) where
 
 import Control.Applicative ((<|>))
@@ -80,6 +85,8 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger (
   RecordKey,
+  allFiles,
+  allTags,
   insertTags,
   queryForDescriptorByPattern,
   queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf,
@@ -91,24 +98,17 @@ import Database.Tagger.Query (
   queryForFileByPattern,
   queryForTagBySubTagTriple,
  )
+import Database.Tagger.Query.Type (TaggerQuery)
 import Database.Tagger.Type (
   File,
   Tag (tagId, tagSubtagOfId),
   TaggedConnection,
   descriptorId,
  )
-import Lens.Micro (Lens', lens, (%~), (&), (.~), (?~), (^.))
+import Lens.Micro (Lens', lens, (%~), (&), (.~), (^.))
 import Text.Parsec.Error (errorMessages, messageString)
 import Text.RawString.QQ (r)
-import Text.TaggerQL.Expression.AST (
-  BinaryOperation (BinaryOperation),
-  Expression (..),
-  FileTerm (FileTerm),
-  SubExpression (..),
-  TagTerm (..),
-  TagTermExtension (TagTermExtension),
-  extensionL,
- )
+import Text.TaggerQL.Expression.AST
 import Text.TaggerQL.Expression.Parser (parseExpr, parseTagExpr)
 import Prelude hiding (lookup, (!!))
 
@@ -252,13 +252,15 @@ queryer =
           }
     }
  where
-  joinSubtags supertags subtags =
-    HS.filter (\(Just . tagId -> supertagId) -> HS.member supertagId subtags) supertags
   hsOp so =
     case so of
       Union -> HS.union
       Intersect -> HS.intersection
       Difference -> HS.difference
+
+joinSubtags :: HashSet Tag -> HashSet (Maybe (RecordKey Tag)) -> HashSet Tag
+joinSubtags supertags subtags =
+  HS.filter (\(Just . tagId -> supertagId) -> HS.member supertagId subtags) supertags
 
 {- |
  Run a TaggerQL query on the given database.
@@ -316,38 +318,41 @@ queryTags tt c =
   case tt of
     DescriptorTerm txt -> query c tagQueryOnDescriptorPattern [txt]
     MetaDescriptorTerm txt -> query c tagQueryOnMetaDescriptorPattern [txt]
- where
-  tagQueryOnDescriptorPattern =
-    [r|
-      SELECT
-        t.id,
-        t.fileId,
-        t.descriptorId,
-        t.subTagOfId
-      FROM Tag t
-      JOIN Descriptor d ON t.descriptorId = d.id
-      WHERE d.descriptor LIKE ? ESCAPE '\'
-      |]
-  tagQueryOnMetaDescriptorPattern =
-    [r|
-      SELECT
-        t.id
-        ,t.fileId
-        ,t.descriptorId
-        ,t.subTagOfId
-      FROM Tag t
-      JOIN (
-        WITH RECURSIVE r(id) AS (
-          SELECT id
-          FROM Descriptor
-          WHERE descriptor LIKE ? ESCAPE '\'
-          UNION
-          SELECT infraDescriptorId
-          FROM MetaDescriptor md
-          JOIN r ON md.metaDescriptorId = r.id
-        )
-        SELECT id FROM r
-      ) AS d ON t.descriptorId = d.id|]
+
+tagQueryOnDescriptorPattern :: TaggerQuery
+tagQueryOnDescriptorPattern =
+  [r|
+    SELECT
+      t.id,
+      t.fileId,
+      t.descriptorId,
+      t.subTagOfId
+    FROM Tag t
+    JOIN Descriptor d ON t.descriptorId = d.id
+    WHERE d.descriptor LIKE ? ESCAPE '\'
+    |]
+
+tagQueryOnMetaDescriptorPattern :: TaggerQuery
+tagQueryOnMetaDescriptorPattern =
+  [r|
+    SELECT
+      t.id
+      ,t.fileId
+      ,t.descriptorId
+      ,t.subTagOfId
+    FROM Tag t
+    JOIN (
+      WITH RECURSIVE r(id) AS (
+        SELECT id
+        FROM Descriptor
+        WHERE descriptor LIKE ? ESCAPE '\'
+        UNION
+        SELECT infraDescriptorId
+        FROM MetaDescriptor md
+        JOIN r ON md.metaDescriptorId = r.id
+      )
+      SELECT id FROM r
+    ) AS d ON t.descriptorId = d.id|]
 
 -- Tagging Engine
 
@@ -610,3 +615,49 @@ lowerExpression expr = case expr of
   BinaryExpression (BinaryOperation lhs so rhs) ->
     BinarySubExpression
       <$> (BinaryOperation <$> lowerExpression lhs <*> pure so <*> lowerExpression rhs)
+
+queryQueryExpression :: TaggedConnection -> QueryExpression -> IO (HashSet File)
+queryQueryExpression c =
+  fmap evaluateRing
+    . traverse (queryQueryLeaf c)
+    . runQueryExpression
+
+queryQueryLeaf :: TaggedConnection -> QueryLeaf -> IO (HashSet File)
+queryQueryLeaf c ql = case ql of
+  FileLeaf pat ->
+    case pat of
+      WildCard -> HS.fromList <$> allFiles c
+      PatternText t -> HS.fromList <$> queryForFileByPattern t c
+  TagLeaf te -> queryTagExpression c te
+
+queryTagExpression ::
+  TaggedConnection ->
+  TagExpression (DTerm Pattern) ->
+  IO (HashSet File)
+queryTagExpression c = fmap evaluateRing . evaluateTagExpression c
+
+-- A naive query interpreter, with no caching.
+evaluateTagExpression ::
+  TaggedConnection ->
+  TagExpression (DTerm Pattern) ->
+  IO (RingExpression (HashSet File))
+evaluateTagExpression c te = do
+  populatedExpression <- traverse (queryDTerm c) te
+
+  let distributedRing = distribute populatedExpression
+
+      tagRing = foldMagmaExpression foldTagSetMagma <$> distributedRing
+
+  traverse (`toFileSet` c) tagRing
+ where
+  foldTagSetMagma outer inner = joinSubtags outer (HS.map tagSubtagOfId inner)
+
+queryDTerm :: TaggedConnection -> DTerm Pattern -> IO (HashSet Tag)
+queryDTerm c dt = case dt of
+  DTerm (PatternText t) ->
+    HS.fromList
+      <$> query c tagQueryOnDescriptorPattern [t]
+  DMetaTerm (PatternText t) ->
+    HS.fromList
+      <$> query c tagQueryOnMetaDescriptorPattern [t]
+  _wildcard -> HS.fromList <$> allTags c
