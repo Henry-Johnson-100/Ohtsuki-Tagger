@@ -13,6 +13,8 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
+{-# HLINT ignore "Redundant if" #-}
+
 {- |
 Module      : Text.TaggerQL.Expression.AST
 Description : The syntax tree for the TaggerQL query language.
@@ -44,8 +46,8 @@ module Text.TaggerQL.Expression.AST (
   -- * Language Expressions
   QueryExpression (..),
   QueryLeaf (..),
-  YuiExpression (..),
-  simplifyYuiExpression,
+  TagExpression (..),
+  distribute,
   RingExpression (..),
   evaluateRing,
   MagmaExpression (..),
@@ -199,17 +201,6 @@ extensionL =
 |____/|_____|_|   |_| \_\_____\____/_/   \_\_| |_____|____/
 -}
 
-newtype DefaultRng a = DefaultRng {runDefaultRng :: a}
-  deriving
-    ( Show
-    , Eq
-    , Semigroup
-    , Monoid
-    , Functor
-    , Foldable
-    , Traversable
-    )
-
 {- |
  A data type representing an expression of any Ring.
 -}
@@ -287,6 +278,17 @@ instance Foldable MagmaExpression where
 foldMagmaExpression :: (a -> a -> a) -> MagmaExpression a -> a
 foldMagmaExpression _ (MagmaValue x) = x
 foldMagmaExpression f (dme :$ x) = F.foldr' f x dme
+
+-- Commented because I don't need it right now but may want it in the future.
+--
+-- partitionLeft :: MagmaExpression a -> (a, Maybe (MagmaExpression a))
+-- partitionLeft me = case me of
+--   MagmaValue a -> (a, Nothing)
+--   me' :$ a -> case me' of
+--     MagmaValue a' -> (a', Just . pure $ a)
+--     (partitionLeft -> (l, mea)) :$ a' ->
+--       let rm = a' `appliedTo` pure a
+--        in (l, Just $ maybe rm (<> rm) mea)
 
 instance Traversable MagmaExpression where
   traverse ::
@@ -422,47 +424,56 @@ runDTerm (DMetaTerm x) = x
  A recursive expression that is ultimately resolvable to a ring expression
  of magma expressions.
 -}
-data YuiExpression a
-  = -- | The termination of a 'YuiExpression`
-    YuiExpression (RingExpression (MagmaExpression a))
-  | -- | A 'RingExpression` of 'YuiExpression`
-    YuiRing (RingExpression (YuiExpression a))
-  | -- | A 'MagmaExpression` of 'YuiExpression`
-    YuiMagma (MagmaExpression (YuiExpression a))
+data TagExpression a
+  = DistributedTerms (RingExpression (MagmaExpression a))
+  | TagRingExpression (RingExpression (TagExpression a))
+  | TagFactorExpression (MagmaExpression (TagExpression a))
   deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
 
-instance Hashable a => Hashable (YuiExpression a)
+instance Hashable a => Hashable (TagExpression a)
 
-instance Applicative YuiExpression where
-  pure :: a -> YuiExpression a
+instance Applicative TagExpression where
+  pure :: a -> TagExpression a
   pure = return
-  (<*>) :: YuiExpression (a -> b) -> YuiExpression a -> YuiExpression b
+  (<*>) :: TagExpression (a -> b) -> TagExpression a -> TagExpression b
   (<*>) = ap
 
-instance Monad YuiExpression where
-  return :: a -> YuiExpression a
-  return = YuiExpression . pure . pure
-  (>>=) :: YuiExpression a -> (a -> YuiExpression b) -> YuiExpression b
+instance Monad TagExpression where
+  return :: a -> TagExpression a
+  return = DistributedTerms . pure . pure
+  (>>=) :: TagExpression a -> (a -> TagExpression b) -> TagExpression b
   ye >>= f = case ye of
-    YuiExpression re -> YuiRing $ do
+    DistributedTerms re -> TagRingExpression $ do
       re' <- re
-      pure . YuiMagma $ do
+      pure . TagFactorExpression $ do
         re'' <- re'
         pure . f $ re''
-    YuiRing re -> YuiRing . fmap (>>= f) $ re
-    YuiMagma me -> YuiMagma . fmap (>>= f) $ me
+    TagRingExpression re -> TagRingExpression . fmap (>>= f) $ re
+    TagFactorExpression me -> TagFactorExpression . fmap (>>= f) $ me
 
 {- |
  Distributes the magma operation associatively through the structure
  and joins ring expressions together.
 -}
-simplifyYuiExpression :: YuiExpression a -> RingExpression (MagmaExpression a)
-simplifyYuiExpression ye = case ye of
-  YuiExpression re -> re
-  YuiRing re -> do
+distribute :: TagExpression a -> RingExpression (MagmaExpression a)
+distribute ye = case ye of
+  DistributedTerms re -> re
+  TagRingExpression re -> do
     re' <- re
-    simplifyYuiExpression re'
-  YuiMagma me -> fmap join . traverse simplifyYuiExpression $ me
+    distribute re'
+  TagFactorExpression me -> fmap join . traverse distribute $ me
+
+-- mk :: Pattern -> TagExpression Pattern
+-- mk = pure
+
+-- a = mk "a"
+-- b = mk "b"
+-- c = mk "c"
+-- d = mk "d"
+-- e = mk "e"
+-- f = mk "f"
+-- g = mk "g"
+-- h = mk "h"
 
 {- |
  Newtype wrapper for a query expression, which is a ring expression of leaves
@@ -477,8 +488,19 @@ newtype QueryExpression = QueryExpression {runQueryExpression :: RingExpression 
 -}
 data QueryLeaf
   = FileLeaf Pattern
-  | TagLeaf (YuiExpression (DTerm Pattern))
+  | TagLeaf (TagExpression (DTerm Pattern))
   deriving (Show, Eq)
+
+newtype DefaultRng a = DefaultRng {runDefaultRng :: a}
+  deriving
+    ( Show
+    , Eq
+    , Semigroup
+    , Monoid
+    , Functor
+    , Foldable
+    , Traversable
+    )
 
 infixl 7 +.
 infixl 7 *.
@@ -554,13 +576,13 @@ instance Rng (RingExpression a) where
 {- |
  Not technically a rng as the constructors are not associative.
 -}
-instance Rng (YuiExpression a) where
-  (+.) :: YuiExpression a -> YuiExpression a -> YuiExpression a
-  x +. y = YuiRing $ pure x +. pure y
-  (*.) :: YuiExpression a -> YuiExpression a -> YuiExpression a
-  x *. y = YuiRing $ pure x *. pure y
-  (-.) :: YuiExpression a -> YuiExpression a -> YuiExpression a
-  x -. y = YuiRing $ pure x -. pure y
+instance Rng (TagExpression a) where
+  (+.) :: TagExpression a -> TagExpression a -> TagExpression a
+  x +. y = TagRingExpression $ pure x +. pure y
+  (*.) :: TagExpression a -> TagExpression a -> TagExpression a
+  x *. y = TagRingExpression $ pure x *. pure y
+  (-.) :: TagExpression a -> TagExpression a -> TagExpression a
+  x -. y = TagRingExpression $ pure x -. pure y
 
 instance (Rng a, Rng b) => Rng (a, b) where
   (+.) :: (Rng a, Rng b) => (a, b) -> (a, b) -> (a, b)
@@ -637,6 +659,6 @@ instance Magma (MagmaExpression a) where
 {- |
  A non-associative, distributive function.
 -}
-instance Magma (YuiExpression a) where
-  (#) :: YuiExpression a -> YuiExpression a -> YuiExpression a
-  x # y = YuiMagma $ pure x :$ y
+instance Magma (TagExpression a) where
+  (#) :: TagExpression a -> TagExpression a -> TagExpression a
+  x # y = TagFactorExpression $ pure x :$ y
