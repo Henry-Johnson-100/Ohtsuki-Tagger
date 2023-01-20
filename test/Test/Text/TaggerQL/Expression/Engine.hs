@@ -29,10 +29,490 @@ queryEngineASTTests c =
   testGroup
     "Query Engine AST Tests"
     [ basicQueryFunctionality c
+    , queryExpressionBasicFunctionality c
     , queryEdgeCases c
     , taggingEngineTests c
     , enginePropertyTests
     ]
+
+fe :: Pattern -> QueryExpression
+fe = QueryExpression . pure . FileLeaf
+
+tle :: TagExpression (DTerm Pattern) -> QueryExpression
+tle = QueryExpression . pure . TagLeaf
+
+tedp :: DTerm Pattern -> TagExpression (DTerm Pattern)
+tedp = pure
+
+dtr :: Pattern -> TagExpression (DTerm Pattern)
+dtr = tedp . d
+
+rtr :: Pattern -> TagExpression (DTerm Pattern)
+rtr = tedp . rt
+
+d :: a -> DTerm a
+d = DTerm
+
+rt :: a -> DTerm a
+rt = DMetaTerm
+
+des :: Int -> Pattern
+des n = PatternText $ "descriptor_" <> (T.pack . show $ n)
+
+fil :: Int -> Pattern
+fil n = PatternText $ "file_" <> (T.pack . show $ n)
+
+queryExpressionBasicFunctionality :: IO TaggedConnection -> TestTree
+queryExpressionBasicFunctionality c =
+  let qqe = flip queryQueryExpression
+   in testGroup
+        "Query Engine AST Tests - Basic"
+        [ testCase "Pattern Wildcard" $ do
+            r <- c >>= qqe (fe WildCard)
+            -- (FileTermValue "%")
+            a <- c >>= allFiles
+            assertEqual
+              "FileTermValue \"%\" matches all files"
+              (HS.fromList a)
+              r
+        , testCase "Untagged Files" $ do
+            r <-
+              c
+                >>= qqe
+                  (fe WildCard -. (tle . tedp . d $ WildCard))
+            -- ( BinaryExpression $
+            --     BinaryOperation
+            --       (FileTermValue "%")
+            --       Difference
+            --       (TagTermValue (DescriptorTerm "%"))
+            -- )
+            a <- c >>= queryForUntaggedFiles
+            assertEqual
+              "Untagged Constant"
+              (HS.fromList a)
+              r
+        , testCase "TagTermValue Expression - Descriptor" $ do
+            r <- c >>= qqe (tle . tedp . d . des $ 5)
+            -- runExpr (TagTermValue (DescriptorTerm "descriptor_5"))
+            a <- c >>= flatQueryForFileByTagDescriptorPattern "descriptor_5"
+            assertEqual
+              "A TagTermValue performs a flat query"
+              (HS.fromList a)
+              r
+        , testCase "TagTermValue Expression - Descriptor - Flat Query" $ do
+            r <- c >>= qqe (tle . tedp . d . des $ 6)
+            -- runExpr (TagTermValue (DescriptorTerm "descriptor_6"))
+            a <- c >>= flatQueryForFileByTagDescriptorPattern "descriptor_6"
+            assertEqual
+              "A TagTermValue performs a flat query"
+              (HS.fromList a)
+              r
+        , testCase "TagTermValue Expression - MetaDescriptor" $ do
+            r <- c >>= qqe (tle . tedp . rt . des $ 12)
+            -- runExpr (TagTermValue (MetaDescriptorTerm "descriptor_12"))
+            a <- c >>= flatQueryForFileOnMetaRelationPattern "descriptor_12"
+            assertEqual
+              "A TagTermValue performs a flat query"
+              (HS.fromList a)
+              r
+        , testCase "TagTermValue Expression - MetaDescriptor - Manual" $ do
+            r <- c >>= qqe (tle . tedp . rt . des $ 12)
+            -- runExpr (TagTermValue (MetaDescriptorTerm "descriptor_12"))
+            assertEqual
+              "Should match the case: \"TagTermValue Expression - MetaDescriptor\""
+              [file 8, file 9, file 10]
+              r
+        , testGroup
+            "Binary Expressions"
+            [ testCase "Union" $ do
+                r <-
+                  c
+                    >>= qqe ((fe . fil $ 1) +. (fe . fil $ 2))
+                -- runExpr
+                -- ( BinaryExpression $
+                --     BinaryOperation
+                --       (FileTermValue "file_1")
+                --       Union
+                --       (FileTermValue "file_2")
+                -- )
+                assertEqual
+                  "Union wa union dayo"
+                  [file 1, file 2]
+                  r
+            , testCase "Intersect - Simple Operands" $ do
+                r <-
+                  c
+                    >>= qqe
+                      ( (tle . tedp . d . des $ 5)
+                          *. (tle . tedp . d . des $ 6)
+                      )
+                -- runExpr
+                -- ( BinaryExpression $
+                --     BinaryOperation
+                --       (TagTermValue (DescriptorTerm "descriptor_5"))
+                --       Intersect
+                --       (TagTermValue (DescriptorTerm "descriptor_6"))
+                -- )
+                assertEqual
+                  ""
+                  [file 4, file 5]
+                  r
+            , testCase "Intersect - Complex Operand" $ do
+                r <-
+                  c
+                    >>= qqe
+                      ( (tle . tedp . d . des $ 5)
+                          +. (fe . fil $ 3)
+                          *. (tle . tedp . d . des $ 6)
+                      )
+                -- runExpr
+                -- ( BinaryExpression $
+                --     BinaryOperation
+                --       ( BinaryExpression $
+                --           BinaryOperation
+                --             (TagTermValue (DescriptorTerm "descriptor_5"))
+                --             Union
+                --             (FileTermValue "file_3")
+                --       )
+                --       Intersect
+                --       (TagTermValue (DescriptorTerm "descriptor_6"))
+                -- )
+                assertEqual
+                  "Binary Operations should be nestable."
+                  [file 3, file 4, file 5]
+                  r
+            , testCase "Intersect - Complex Operand - left-associative" $ do
+                r <-
+                  c
+                    >>= qqe
+                      ( ( (tle . tedp . d . des $ 5)
+                            +. (fe . fil $ 3)
+                        )
+                          *. (tle . tedp . d . des $ 6)
+                      )
+                -- runExpr
+                -- ( BinaryExpression $
+                --     BinaryOperation
+                --       ( BinaryExpression $
+                --           BinaryOperation
+                --             (TagTermValue (DescriptorTerm "descriptor_5"))
+                --             Union
+                --             (FileTermValue "file_3")
+                --       )
+                --       Intersect
+                --       (TagTermValue (DescriptorTerm "descriptor_6"))
+                -- )
+                assertEqual
+                  "Binary Operations should be nestable."
+                  [file 3, file 4, file 5]
+                  r
+            , testCase "Difference" $ do
+                r <-
+                  c
+                    >>= qqe
+                      ( ( (tle . tedp . d . des $ 4)
+                            +. ( (tle . tedp . d . des $ 5)
+                                  +. (tle . tedp . d . des $ 6)
+                               )
+                        )
+                          -. (tle . tedp . d . des $ 5)
+                      )
+                -- runExpr
+                -- ( BinaryExpression $
+                --     BinaryOperation
+                --       ( BinaryExpression $
+                --           BinaryOperation
+                --             (TagTermValue (DescriptorTerm "descriptor_4"))
+                --             Union
+                --             ( BinaryExpression $
+                --                 BinaryOperation
+                --                   (TagTermValue (DescriptorTerm "descriptor_5"))
+                --                   Union
+                --                   (TagTermValue (DescriptorTerm "descriptor_6"))
+                --             )
+                --       )
+                --       Difference
+                --       (TagTermValue (DescriptorTerm "descriptor_5"))
+                -- )
+                assertEqual
+                  "Difference wa difference dayo"
+                  [file 1, file 3]
+                  r
+            ]
+        , testGroup
+            "TagExpressions"
+            [ testCase "Simple TagExpression" $ do
+                r <-
+                  c
+                    >>= qqe
+                      ( tle
+                          ( (tedp . d . des $ 5)
+                              # (tedp . d . des $ 6)
+                          )
+                      )
+                -- runExpr
+                -- ( TagExpression $
+                --     TagTermExtension
+                --       (DescriptorTerm "descriptor_5")
+                --       (SubTag (DescriptorTerm "descriptor_6"))
+                -- )
+                assertEqual
+                  "Simple subtag 4{5} should find files with 4{5} tags."
+                  [file 4, file 5]
+                  r
+            , testCase "Flat SubTag TagExpression" $ do
+                r <-
+                  c
+                    >>= qqe
+                      ( tle
+                          ( (tedp . d . des $ 6)
+                              # (tedp . d . des $ 7)
+                          )
+                      )
+                -- runExpr
+                -- ( TagExpression $
+                --     TagTermExtension
+                --       (DescriptorTerm "descriptor_6")
+                --       (SubTag (DescriptorTerm "descriptor_7"))
+                -- )
+                assertEqual
+                  "SubTag queries are a flat operation."
+                  [file 5]
+                  r
+            , testCase "Complex Nested SubTag" $ do
+                r <-
+                  c
+                    >>= qqe
+                      ( tle
+                          ( (tedp . d . des $ 17)
+                              # ( (tedp . d . des $ 18)
+                                    # (tedp . d . des $ 20)
+                                )
+                          )
+                      )
+                -- runExpr
+                -- ( TagExpression $
+                --     TagTermExtension
+                --       (DescriptorTerm "descriptor_17")
+                --       ( SubExpression $
+                --           TagTermExtension
+                --             (DescriptorTerm "descriptor_18")
+                --             (SubTag (DescriptorTerm "descriptor_20"))
+                --       )
+                -- )
+                assertEqual
+                  "SubExpressions modify the supertag environment for lower depths."
+                  [file 15]
+                  r
+            , testCase "SubTag Expression - 1" $ do
+                r <-
+                  c
+                    >>= qqe
+                      ( tle
+                          ( (tedp . d . des $ 17)
+                              # (tedp . d . des $ 18)
+                          )
+                      )
+                --  runExpr
+                -- ( TagExpression $
+                --     TagTermExtension
+                --       (DescriptorTerm "descriptor_17")
+                --       (SubTag (DescriptorTerm "descriptor_18"))
+                -- )
+                assertEqual
+                  "The LHS of the below test."
+                  [ file 11
+                  , file 13
+                  , file 15
+                  , file 16
+                  ]
+                  r
+            , testCase "SubExpression Tags - 0" $ do
+                h <- c >>= queryTags (DescriptorTerm "descriptor_17")
+                r <-
+                  c
+                    >>= runReaderT
+                      ( evalSubExpression
+                          (SubTag (DescriptorTerm "descriptor_18"))
+                          (HS.fromList h)
+                      )
+                assertEqual
+                  "Matches the tags returned by the LHS of the \
+                  \\"TagExpressions - SubBinary Sub Union\" test."
+                  [ Tag 28 11 17 Nothing
+                  , Tag 32 13 17 Nothing
+                  , Tag 38 15 17 Nothing
+                  , Tag 41 16 17 Nothing
+                  ]
+                  r
+            , testCase "SubExpression Tags - 1" $ do
+                h <- c >>= queryTags (DescriptorTerm "descriptor_17")
+                r <-
+                  c
+                    >>= runReaderT
+                      ( evalSubExpression
+                          (SubTag (DescriptorTerm "descriptor_19"))
+                          (HS.fromList h)
+                      )
+                assertEqual
+                  "Matches the tags returned by the RHS of the \
+                  \\"TagExpressions - SubBinary Sub Union\" test."
+                  [ Tag 30 12 17 Nothing
+                  , Tag 32 13 17 Nothing
+                  ]
+                  r
+            , testGroup
+                "TagExpressions - SubBinary"
+                [ testCase "Sub Union" $ do
+                    r <-
+                      c
+                        >>= qqe
+                          ( tle
+                              ( (tedp . d . des $ 17)
+                                  # ( (tedp . d . des $ 18)
+                                        +. (tedp . d . des $ 19)
+                                    )
+                              )
+                          )
+                    -- runExpr
+                    -- ( TagExpression $
+                    --     TagTermExtension
+                    --       (DescriptorTerm "descriptor_17")
+                    --       ( BinarySubExpression $
+                    --           BinaryOperation
+                    --             (SubTag (DescriptorTerm "descriptor_18"))
+                    --             Union
+                    --             (SubTag (DescriptorTerm "descriptor_19"))
+                    --       )
+                    -- )
+                    assertEqual
+                      "SubUnion filters supertags if the supertag\
+                      \ is subtagged by either one or the other subtag sets."
+                      [ file 11
+                      , file 12
+                      , file 13
+                      , file 15
+                      , file 16
+                      ]
+                      r
+                , testCase "Sub Intersection" $ do
+                    r <-
+                      c
+                        >>= qqe
+                          ( tle
+                              ( (tedp . d . des $ 17)
+                                  # ( (tedp . d . des $ 18)
+                                        *. (tedp . d . des $ 19)
+                                    )
+                              )
+                          )
+                    -- runExpr
+                    -- ( TagExpression $
+                    --     TagTermExtension
+                    --       (DescriptorTerm "descriptor_17")
+                    --       ( BinarySubExpression $
+                    --           BinaryOperation
+                    --             (SubTag (DescriptorTerm "descriptor_18"))
+                    --             Intersect
+                    --             (SubTag (DescriptorTerm "descriptor_19"))
+                    --       )
+                    -- )
+                    assertEqual
+                      "SubUnion filters supertags if the supertag\
+                      \ is a member of both subtag sets."
+                      [ file 13
+                      ]
+                      r
+                , testCase "Sub Difference" $ do
+                    r <-
+                      c
+                        >>= qqe
+                          ( tle
+                              ( (tedp . d . des $ 17)
+                                  # ( (tedp . d . des $ 18)
+                                        -. (tedp . d . des $ 19)
+                                    )
+                              )
+                          )
+                    -- runExpr
+                    -- ( TagExpression $
+                    --     TagTermExtension
+                    --       (DescriptorTerm "descriptor_17")
+                    --       ( BinarySubExpression $
+                    --           BinaryOperation
+                    --             (SubTag (DescriptorTerm "descriptor_18"))
+                    --             Difference
+                    --             (SubTag (DescriptorTerm "descriptor_19"))
+                    --       )
+                    -- )
+                    assertEqual
+                      "SubUnion filters supertags if the supertag\
+                      \ is a member of the first and not the second subtag set."
+                      [ file 11
+                      , file 15
+                      , file 16
+                      ]
+                      r
+                ]
+            ]
+        , testGroup
+            "Misc queries"
+            [ testCase "Descriptor Wildcard and SubExpressions - 0" $ do
+                r <-
+                  c
+                    >>= qqe
+                      ( tle
+                          ( (tedp . d $ WildCard)
+                              # ( (tedp . d . des $ 20)
+                                    -. (tedp . d . des $ 18)
+                                )
+                          )
+                      )
+                -- runExpr
+                -- ( TagExpression $
+                --     TagTermExtension
+                --       (DescriptorTerm "%")
+                --       ( BinarySubExpression $
+                --           BinaryOperation
+                --             (SubTag (DescriptorTerm "descriptor_20"))
+                --             Difference
+                --             (SubTag (DescriptorTerm "descriptor_18"))
+                --       )
+                -- )
+                assertEqual
+                  ""
+                  [ file 14
+                  , file 15
+                  -- , file 16 This file is removed by difference
+                  ]
+                  r
+            , testCase "Descriptor Wildcard and SubExpressions - 1" $ do
+                r <-
+                  c
+                    >>= qqe
+                      ( tle ((tedp . d $ WildCard) # (tedp . d . des $ 20))
+                          -. tle ((tedp . d $ WildCard) # (tedp . d . des $ 18))
+                      )
+                -- runExpr
+                -- ( TagExpression $
+                --     TagTermExtension
+                --       (DescriptorTerm "%")
+                --       ( BinarySubExpression $
+                --           BinaryOperation
+                --             (SubTag (DescriptorTerm "descriptor_20"))
+                --             Difference
+                --             (SubTag (DescriptorTerm "descriptor_18"))
+                --       )
+                -- )
+                assertEqual
+                  ""
+                  [ file 14
+                  , file 15
+                  -- , file 16 This file is removed by difference
+                  ]
+                  r
+            ]
+        ]
 
 basicQueryFunctionality :: IO TaggedConnection -> TestTree
 basicQueryFunctionality c =
@@ -674,8 +1154,8 @@ enginePropertyTests =
                   suchThat
                     arbitrary
                     (\n' -> isJust . Text.TaggerQL.Expression.Engine.lookup n' $ expr)
-                let exprAt = fromJust $ Text.TaggerQL.Expression.Engine.lookup n expr
-                    replaceResult = replace n exprAt expr
+                let exprAt' = fromJust $ Text.TaggerQL.Expression.Engine.lookup n expr
+                    replaceResult = replace n exprAt' expr
                 let tr = expr == replaceResult
                 return $
                   whenFail
