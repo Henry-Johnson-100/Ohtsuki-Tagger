@@ -628,27 +628,22 @@ queryQueryLeaf c ql = case ql of
     case pat of
       WildCard -> HS.fromList <$> allFiles c
       PatternText t -> HS.fromList <$> queryForFileByPattern t c
-  TagLeaf te -> queryTagExpression c te
-
-queryTagExpression ::
-  TaggedConnection ->
-  TagExpression (DTerm Pattern) ->
-  IO (HashSet File)
-queryTagExpression c = fmap evaluateRing . evaluateTagExpression c
+  TagLeaf te -> evaluateTagExpression c te >>= (`toFileSet` c)
 
 -- A naive query interpreter, with no caching.
 evaluateTagExpression ::
   TaggedConnection ->
   TagExpression (DTerm Pattern) ->
-  IO (RingExpression (HashSet File))
+  IO (HashSet Tag)
 evaluateTagExpression c te = do
   populatedExpression <- traverse (queryDTerm c) te
 
   let distributedRing = distribute populatedExpression
 
       tagRing = foldMagmaExpression foldTagSetMagma <$> distributedRing
-
-  traverse (`toFileSet` c) tagRing
+  
+  pure . evaluateRing $ tagRing
+  -- traverse (`toFileSet` c) tagRing
  where
   foldTagSetMagma outer inner = joinSubtags outer (HS.map tagSubtagOfId inner)
 

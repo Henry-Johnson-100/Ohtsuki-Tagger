@@ -45,12 +45,6 @@ tle = QueryExpression . pure . TagLeaf
 tedp :: DTerm Pattern -> TagExpression (DTerm Pattern)
 tedp = pure
 
-dtr :: Pattern -> TagExpression (DTerm Pattern)
-dtr = tedp . d
-
-rtr :: Pattern -> TagExpression (DTerm Pattern)
-rtr = tedp . rt
-
 d :: a -> DTerm a
 d = DTerm
 
@@ -655,23 +649,9 @@ queryExpressionBasicFunctionality c =
                       ( tle ((tedp . d $ WildCard) # (tedp . d . des $ 20))
                           -. tle ((tedp . d $ WildCard) # (tedp . d . des $ 18))
                       )
-                -- runExpr
-                -- ( TagExpression $
-                --     TagTermExtension
-                --       (DescriptorTerm "%")
-                --       ( BinarySubExpression $
-                --           BinaryOperation
-                --             (SubTag (DescriptorTerm "descriptor_20"))
-                --             Difference
-                --             (SubTag (DescriptorTerm "descriptor_18"))
-                --       )
-                -- )
                 assertEqual
                   ""
-                  [ file 14
-                  , file 15
-                  -- , file 16 This file is removed by difference
-                  ]
+                  [file 14]
                   r
             ]
         ]
