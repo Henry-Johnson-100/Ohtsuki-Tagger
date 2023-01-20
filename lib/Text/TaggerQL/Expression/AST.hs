@@ -1,6 +1,7 @@
 {-# HLINT ignore "Use lambda-case" #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# HLINT ignore "Redundant if" #-}
 {-# LANGUAGE GADTs #-}
@@ -13,6 +14,8 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use infix" #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.AST
@@ -64,18 +67,21 @@ module Text.TaggerQL.Expression.AST (
   Magma (..),
 ) where
 
+import Control.Applicative (liftA2)
 import Control.Monad (ap, join)
-import Data.Bifunctor (bimap)
+import Data.Bifunctor (bimap, second)
 import qualified Data.Foldable as F
 import Data.Functor ((<&>))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
 import qualified Data.List as L
+import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
 import Data.String (IsString, fromString)
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
+import Debug.Trace
 import GHC.Exts (IsList (..))
 import GHC.Generics (Generic)
 import Lens.Micro (Lens', lens)
@@ -287,16 +293,14 @@ foldMagmaExpression f (dme :$ x) = F.foldr' f x dme
 foldMagmaExpressionL :: (a -> a -> a) -> MagmaExpression a -> a
 foldMagmaExpressionL = F.foldl1
 
--- Commented because I don't need it right now but may want it in the future.
---
--- partitionLeft :: MagmaExpression a -> (a, Maybe (MagmaExpression a))
--- partitionLeft me = case me of
---   Magma a -> (a, Nothing)
---   me' :$ a -> case me' of
---     Magma a' -> (a', Just . pure $ a)
---     (partitionLeft -> (l, mea)) :$ a' ->
---       let rm = a' `appliedTo` pure a
---        in (l, Just $ maybe rm (<> rm) mea)
+partitionLeft :: MagmaExpression a -> (a, Maybe (MagmaExpression a))
+partitionLeft me = case me of
+  Magma a -> (a, Nothing)
+  me' :$ a -> case me' of
+    Magma a' -> (a', Just . pure $ a)
+    (partitionLeft -> (l, mea)) :$ a' ->
+      let rm = a' `appliedTo` pure a
+       in (l, Just $ maybe rm (<> rm) mea)
 
 instance Traversable MagmaExpression where
   traverse ::
@@ -471,6 +475,182 @@ distribute = TagRing . fmap (TagMagma . fmap pure) . toNonRecursive
     TagValue a -> Ring . Magma $ a
     TagRing re -> re >>= toNonRecursive
     TagMagma me -> fmap join . traverse toNonRecursive $ me
+
+{-
+How would this factor?
+
+right factor
+a{c} | b{c} -> (a | b){c}
+
+left factor
+a{b} | a{c} -> a{b | c}
+
+left-right factor
+a{b{c}} | a{d{c}} -> a{(b | d){c}}
+
+right factor
+a{b{c}} | d{b{c}} -> (a | d){b{c}}
+
+Simplify then factor?
+
+right factoring involves comparing the bottom magma of two operands in a ring.
+There is no point in factoring a single term.
+(a | b{c}){d} -> a{d} | b{c{d}} -> (a | b{c}){d}
+
+left factoring is looking at the top magma value of two operands.
+a{b | c{d}} -> a{b} | a{c{d}} -> a{b | c{d}}
+
+(a | b){(c & d){e ! f}} -> (a{c{e}} ! a{c{f}} & (a{d{e}} ! a{d{f}})) | (b{c{e}} ! b{c{f}} & (b{d{e}} ! b{d{f}}))
+    'or' left operator:
+  -> a{(c{e} ! c{f}) & (d{e} ! d{f})} -> a{c{e ! f} & d{e ! f}} -> a{(c & d){e ! f}}
+-}
+
+-- factor :: Eq a => TagExpression a -> TagExpression a
+-- factor = undefined
+--  where
+--   factor' te =
+--     case te of
+--       TagValue a -> _
+--       TagRing re -> case re of
+--         Ring te' -> factor' te'
+--         lhs :+ rhs -> _
+--         re' :* re2 -> _
+--         re' :- re2 -> _
+--       TagMagma me -> _
+--   factorRing re =
+--     case re of
+--       Ring a -> Magma . Ring $ a
+--       lhs :+ rhs ->
+--         let lhsFact = factorRing lhs
+--             rhsFact = factorRing rhs
+--             (mLeft, (lRem, rRem), mRight) = factorMagma lhsFact rhsFact
+--          in undefined
+--       _undefined -> undefined
+
+constructFactorResults ::
+  Semigroup t1 =>
+  (t1 -> t1 -> t2) ->
+  (Maybe t1, (t1, t1), Maybe t1) ->
+  t2
+constructFactorResults c (mLeft, (l, r), mRight) = withEnds l `c` withEnds r
+ where
+  withEnds m =
+    let leftFactorCons = maybe m (<> m) mLeft
+        rightFactorCons = maybe leftFactorCons (leftFactorCons <>) mRight
+     in rightFactorCons
+
+{- |
+ Separate factors that have been produced from left and right distribution
+ if there are any.
+
+ Return the left and right remainders of the factored expressions.
+-}
+factorMagma ::
+  Eq a =>
+  MagmaExpression a ->
+  MagmaExpression a ->
+  ( -- Factors that are distributed with right-distribution
+    Maybe (MagmaExpression a)
+  , -- The remaining terms of the expression that are not factorable.
+    ( MagmaExpression a
+    , MagmaExpression a
+    )
+  , -- Factors that are distributed with left-distribution
+    Maybe (MagmaExpression a)
+  )
+factorMagma l r =
+  let lList = F.foldr (:) [] l
+      rList = F.foldr (:) [] r
+      safeFromList xs = case xs of
+        [] -> Nothing
+        (x : xs') -> Just $ F.foldl' over (Magma x) xs'
+
+      -- Left factors are a product of right-distribution
+      ( mapMaybe fst ->
+          lFactors
+        , unzip -> lFactorRemainders
+        ) =
+          L.span (fromMaybe False . uncurry (liftA2 (==))) $ zipLongest [] lList rList
+
+      -- Right factors are a product of left-distribution and are taken the same
+      -- way as left factors, only over a reversed list.
+      ( mapMaybe fst . reverse ->
+          rFactors
+        , bimap reverse reverse . unzip ->
+            (xlRem, ylRem)
+        ) =
+          L.span (fromMaybe False . uncurry (liftA2 (==)))
+            . uncurry (zipLongest [])
+            . bimap (reverse . catMaybes) (reverse . catMaybes)
+            $ lFactorRemainders
+
+      remainders = bimap catMaybes catMaybes (xlRem, ylRem)
+   in if l == r
+        then (Nothing, (l, r), Nothing)
+        else case remainders of
+          -- inputs are already fully factored so they are returned.
+          -- Simply a case match for the above if-expr that skips these computations.
+          ([], []) -> (Nothing, (l, r), Nothing)
+          (l' : ls, r' : rs) ->
+            ( safeFromList lFactors
+            ,
+              ( F.foldl' over (pure l') ls
+              , F.foldl' over (pure r') rs
+              )
+            , safeFromList rFactors
+            )
+          _oneRemIsEmpty ->
+            -- One remainder is empty, so in order to return a Magma expression remainder,
+            -- it attempts to borrow a factor, first from the left side.
+            case safeFromList lFactors of
+              Just me -> case me of
+                Magma _ ->
+                  ( Nothing
+                  , bimap
+                      (F.foldl' over me)
+                      (F.foldl' over me)
+                      remainders
+                  , safeFromList rFactors
+                  )
+                me' :$ a ->
+                  ( Just me'
+                  , bimap
+                      (F.foldl' over (pure a))
+                      (F.foldl' over (pure a))
+                      remainders
+                  , safeFromList rFactors
+                  )
+              -- There are no left factors so it tries the right side.
+              _noLFactors -> case safeFromList rFactors of
+                Just me -> case me of
+                  Magma _ ->
+                    ( Nothing
+                    , bimap
+                        (F.foldr appliedTo me)
+                        (F.foldr appliedTo me)
+                        remainders
+                    , Nothing
+                    )
+                  (partitionLeft -> (lhead, lMag)) ->
+                    ( Nothing
+                    , bimap
+                        (F.foldr appliedTo (pure lhead))
+                        (F.foldr appliedTo (pure lhead))
+                        remainders
+                    , lMag
+                    )
+                -- This scenario should absolutely never happen. It means that
+                -- one remainder is empty and yet there are no factors.
+                -- Which means that a remainder was removed when it should not have been.
+                -- To avoid a partial function, this returns the input as unfactorable.
+                Nothing -> (Nothing, (l, r), Nothing)
+
+zipLongest :: [(Maybe a, Maybe a)] -> [a] -> [a] -> [(Maybe a, Maybe a)]
+zipLongest acc [] [] = reverse acc
+zipLongest acc (part' -> (x, xs)) (part' -> (y, ys)) = zipLongest ((x, y) : acc) xs ys
+
+part' [] = (Nothing, [])
+part' (x : xs) = (Just x, xs)
 
 {- |
  Evaluate a 'TagExpression` with a right-associative function over its 'MagmaExpression`.
