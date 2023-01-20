@@ -31,6 +31,7 @@ queryEngineASTTests c =
     [ basicQueryFunctionality c
     , queryExpressionBasicFunctionality c
     , queryEdgeCases c
+    , queryExpressionEdgeCases c
     , taggingEngineTests c
     , enginePropertyTests
     ]
@@ -61,6 +62,167 @@ des n = PatternText $ "descriptor_" <> (T.pack . show $ n)
 
 fil :: Int -> Pattern
 fil n = PatternText $ "file_" <> (T.pack . show $ n)
+
+queryExpressionEdgeCases :: IO TaggedConnection -> TestTree
+queryExpressionEdgeCases c =
+  let qqe = flip queryQueryExpression
+   in testGroup
+        "Query Engine AST - Edge Cases"
+        [ testGroup
+            "Tech-note f02a13240b for files, A: a{b{c}} and B: a{b} d{b{c}}"
+            [ testCase "Return A for query a{b{c}}" $ do
+                r <-
+                  c
+                    >>= qqe
+                      ( tle
+                          ( (tedp . d . des $ 8)
+                              # ( (tedp . d . des $ 9)
+                                    # (tedp . d . des $ 10)
+                                )
+                          )
+                      )
+                -- runExpr
+                -- ( TagExpression $
+                --     TagTermExtension
+                --       (DescriptorTerm "descriptor_8")
+                --       ( SubExpression $
+                --           TagTermExtension
+                --             (DescriptorTerm "descriptor_9")
+                --             (SubTag (DescriptorTerm "descriptor_10"))
+                --       )
+                -- )
+                assertEqual
+                  ""
+                  [file 6]
+                  r
+            , testCase "Return A, B for a{b}" $ do
+                r <-
+                  c
+                    >>= qqe
+                      (tle ((tedp . d . des $ 8) # (tedp . d . des $ 9)))
+                -- runExpr
+                -- ( TagExpression $
+                --     TagTermExtension
+                --       (DescriptorTerm "descriptor_8")
+                --       (SubTag (DescriptorTerm "descriptor_9"))
+                -- )
+                assertEqual
+                  ""
+                  [file 6, file 7]
+                  r
+            , testCase "Return A, B for b{c}" $ do
+                r <-
+                  c
+                    >>= qqe
+                      (tle ((tedp . d . des $ 9) # (tedp . d . des $ 10)))
+                -- runExpr
+                -- ( TagExpression $
+                --     TagTermExtension
+                --       (DescriptorTerm "descriptor_9")
+                --       (SubTag (DescriptorTerm "descriptor_10"))
+                -- )
+                assertEqual
+                  ""
+                  [file 6, file 7]
+                  r
+            , testCase "Return B for d{b}" $ do
+                r <-
+                  c
+                    >>= qqe
+                      (tle ((tedp . d . des $ 11) # (tedp . d . des $ 9)))
+                -- runExpr
+                -- ( TagExpression $
+                --     TagTermExtension
+                --       (DescriptorTerm "descriptor_11")
+                --       (SubTag (DescriptorTerm "descriptor_9"))
+                -- )
+                assertEqual
+                  ""
+                  [file 7]
+                  r
+            ]
+        , testGroup
+            "Ticket a50b7d8"
+            [ testCase "Relational subqueries are not disjoint" $ do
+                r <-
+                  c
+                    >>= qqe
+                      ( tle
+                          ( (tedp . rt . des $ 12)
+                              # ( (tedp . d . des $ 15)
+                                    *. (tedp . d . des $ 16)
+                                )
+                          )
+                      )
+                -- runExpr
+                -- ( TagExpression $
+                --     TagTermExtension
+                --       (MetaDescriptorTerm "descriptor_12")
+                --       ( BinarySubExpression $
+                --           BinaryOperation
+                --             (SubTag (DescriptorTerm "descriptor_15"))
+                --             Intersect
+                --             (SubTag (DescriptorTerm "descriptor_16"))
+                --       )
+                -- )
+                assertEqual
+                  ""
+                  [file 8, file 9]
+                  r
+            , testCase "Disjoint, single arity, relational subqueries are a superset" $ do
+                r <-
+                  c
+                    >>= qqe
+                      ( tle ((tedp . rt . des $ 12) # (tedp . d . des $ 15))
+                          *. tle ((tedp . rt . des $ 12) # (tedp . d . des $ 16))
+                      )
+                -- runExpr
+                -- ( BinaryExpression $
+                --     BinaryOperation
+                --       ( TagExpression $
+                --           TagTermExtension
+                --             (MetaDescriptorTerm "descriptor_12")
+                --             (SubTag (DescriptorTerm "descriptor_15"))
+                --       )
+                --       Intersect
+                --       ( TagExpression $
+                --           TagTermExtension
+                --             (MetaDescriptorTerm "descriptor_12")
+                --             (SubTag (DescriptorTerm "descriptor_16"))
+                --       )
+                -- )
+                assertEqual
+                  ""
+                  [file 8, file 9, file 10]
+                  r
+            , testCase "Descriptor subqueries are not disjoint" $ do
+                r <-
+                  c
+                    >>= qqe
+                      ( tle
+                          ( (tedp . d . des $ 13)
+                              # ( (tedp . d . des $ 15)
+                                    *. (tedp . d . des $ 16)
+                                )
+                          )
+                      )
+                -- runExpr
+                -- ( TagExpression $
+                --     TagTermExtension
+                --       (DescriptorTerm "descriptor_13")
+                --       ( BinarySubExpression $
+                --           BinaryOperation
+                --             (SubTag (DescriptorTerm "descriptor_15"))
+                --             Intersect
+                --             (SubTag (DescriptorTerm "descriptor_16"))
+                --       )
+                -- )
+                assertEqual
+                  ""
+                  [file 8]
+                  r
+            ]
+        ]
 
 queryExpressionBasicFunctionality :: IO TaggedConnection -> TestTree
 queryExpressionBasicFunctionality c =
