@@ -476,19 +476,24 @@ distribute = TagRing . fmap (TagMagma . fmap pure) . toNonRecursive
  Evaluate a 'TagExpression` with a right-associative function over its 'MagmaExpression`.
 -}
 evaluateTagExpressionR :: Rng a => (a -> a -> a) -> TagExpression a -> a
-evaluateTagExpressionR f te = case te of
-  TagValue a -> a
-  TagRing re -> evaluateRing . fmap (evaluateTagExpressionR f) $ re
-  TagMagma me -> foldMagmaExpression f . fmap (evaluateTagExpressionR f) $ me
+evaluateTagExpressionR f = evaluateTagExpressionWithMagma (foldMagmaExpression f)
 
 {- |
  Evaluate a 'TagExpression` with a left-associative function over its 'MagmaExpression`.
 -}
 evaluateTagExpressionL :: Rng a => (a -> a -> a) -> TagExpression a -> a
-evaluateTagExpressionL f te = case te of
-  TagValue a -> a
-  TagRing re -> evaluateRing . fmap (evaluateTagExpressionL f) $ re
-  TagMagma me -> foldMagmaExpressionL f . fmap (evaluateTagExpressionL f) $ me
+evaluateTagExpressionL f = evaluateTagExpressionWithMagma (foldMagmaExpressionL f)
+
+evaluateTagExpressionWithMagma ::
+  Rng b =>
+  (MagmaExpression b -> b) ->
+  TagExpression b ->
+  b
+evaluateTagExpressionWithMagma mf te =
+  case te of
+    TagValue a -> a
+    TagRing re -> evaluateRing . fmap (evaluateTagExpressionWithMagma mf) $ re
+    TagMagma me -> mf . fmap (evaluateTagExpressionWithMagma mf) $ me
 
 -- mk :: Pattern -> TagExpression Pattern
 -- mk = pure
