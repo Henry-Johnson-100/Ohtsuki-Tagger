@@ -635,17 +635,13 @@ evaluateTagExpression ::
   TaggedConnection ->
   TagExpression (DTerm Pattern) ->
   IO (HashSet Tag)
-evaluateTagExpression c te = do
-  populatedExpression <- traverse (queryDTerm c) te
-
-  let distributedRing = distribute populatedExpression
-
-      tagRing = foldMagmaExpression foldTagSetMagma <$> distributedRing
-  
-  pure . evaluateRing $ tagRing
-  -- traverse (`toFileSet` c) tagRing
- where
-  foldTagSetMagma outer inner = joinSubtags outer (HS.map tagSubtagOfId inner)
+evaluateTagExpression c =
+  fmap
+    ( evaluateTagExpressionR
+        (\outer inner -> joinSubtags outer (HS.map tagSubtagOfId inner))
+        . distribute
+    )
+    . traverse (queryDTerm c)
 
 queryDTerm :: TaggedConnection -> DTerm Pattern -> IO (HashSet Tag)
 queryDTerm c dt = case dt of

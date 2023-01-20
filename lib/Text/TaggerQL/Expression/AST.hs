@@ -46,6 +46,8 @@ module Text.TaggerQL.Expression.AST (
   QueryExpression (..),
   QueryLeaf (..),
   TagExpression (..),
+  evaluateTagExpressionR,
+  evaluateTagExpressionL,
   distribute,
   RingExpression (..),
   evaluateRing,
@@ -252,7 +254,7 @@ evaluateRing r = case r of
  It is essentially a reversed, non-empty list.
 -}
 data MagmaExpression a
-  = MagmaValue a
+  = Magma a
   | (MagmaExpression a) :$ a
   deriving (Show, Eq, Functor, Generic)
 
@@ -269,14 +271,14 @@ instance IsList (MagmaExpression a) where
 instance Foldable MagmaExpression where
   foldr :: (a -> b -> b) -> b -> MagmaExpression a -> b
   foldr f acc me = case me of
-    MagmaValue a -> f a acc
+    Magma a -> f a acc
     dme :$ a -> foldr f (f a acc) dme
 
 {- |
  An alias for a fold @foldr1'@ over a 'MagmaExpression`
 -}
 foldMagmaExpression :: (a -> a -> a) -> MagmaExpression a -> a
-foldMagmaExpression _ (MagmaValue x) = x
+foldMagmaExpression _ (Magma x) = x
 foldMagmaExpression f (dme :$ x) = F.foldr' f x dme
 
 {- |
@@ -289,9 +291,9 @@ foldMagmaExpressionL = F.foldl1
 --
 -- partitionLeft :: MagmaExpression a -> (a, Maybe (MagmaExpression a))
 -- partitionLeft me = case me of
---   MagmaValue a -> (a, Nothing)
+--   Magma a -> (a, Nothing)
 --   me' :$ a -> case me' of
---     MagmaValue a' -> (a', Just . pure $ a)
+--     Magma a' -> (a', Just . pure $ a)
 --     (partitionLeft -> (l, mea)) :$ a' ->
 --       let rm = a' `appliedTo` pure a
 --        in (l, Just $ maybe rm (<> rm) mea)
@@ -303,7 +305,7 @@ instance Traversable MagmaExpression where
     MagmaExpression a ->
     f (MagmaExpression b)
   traverse f me = case me of
-    MagmaValue a -> MagmaValue <$> f a
+    Magma a -> Magma <$> f a
     dme :$ a -> (traverse f dme <&> (:$)) <*> f a
 
 {- |
@@ -315,9 +317,9 @@ instance Semigroup (MagmaExpression a) where
     MagmaExpression a ->
     MagmaExpression a
   r <> d = case r of
-    MagmaValue a -> a `appliedTo` d
+    Magma a -> a `appliedTo` d
     _leftDistTerm -> case d of
-      MagmaValue a -> r :$ a
+      Magma a -> r :$ a
       rd :$ a -> (r <> rd) :$ a
 
 {- |
@@ -325,13 +327,13 @@ instance Semigroup (MagmaExpression a) where
  all subsequent values.
 
  @
-  let x = MagmaValue 0
-    in 1 \`appliedTo\` x == MagmaValue 1 :$ 0
+  let x = Magma 0
+    in 1 \`appliedTo\` x == Magma 1 :$ 0
  @
 -}
 appliedTo :: a -> MagmaExpression a -> MagmaExpression a
 x `appliedTo` rdx = case rdx of
-  MagmaValue a -> MagmaValue x :$ a
+  Magma a -> Magma x :$ a
   rd :$ a -> x `appliedTo` rd :$ a
 
 {- |
@@ -340,8 +342,8 @@ x `appliedTo` rdx = case rdx of
  place.
 
  @
-  let x = MagmaValue 0
-    in x \`over\` 1 == MagmaValue 0 :$ 1
+  let x = Magma 0
+    in x \`over\` 1 == Magma 0 :$ 1
  @
 -}
 over :: MagmaExpression a -> a -> MagmaExpression a
@@ -358,13 +360,13 @@ instance Applicative MagmaExpression where
 
 instance Monad MagmaExpression where
   return :: a -> MagmaExpression a
-  return = MagmaValue
+  return = Magma
   (>>=) ::
     MagmaExpression a ->
     (a -> MagmaExpression b) ->
     MagmaExpression b
   rd >>= f = case rd of
-    MagmaValue a -> f a
+    Magma a -> f a
     rd' :$ a -> (rd' >>= f) <> f a
 
 {- |
@@ -431,9 +433,9 @@ runDTerm (DMetaTerm x) = x
  of magma expressions.
 -}
 data TagExpression a
-  = DistributedTerms (RingExpression (MagmaExpression a))
-  | TagRingExpression (RingExpression (TagExpression a))
-  | TagFactorExpression (MagmaExpression (TagExpression a))
+  = TagValue a
+  | TagRing (RingExpression (TagExpression a))
+  | TagMagma (MagmaExpression (TagExpression a))
   deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
 
 instance Hashable a => Hashable (TagExpression a)
@@ -446,28 +448,47 @@ instance Applicative TagExpression where
 
 instance Monad TagExpression where
   return :: a -> TagExpression a
-  return = DistributedTerms . pure . pure
+  return = TagValue
   (>>=) :: TagExpression a -> (a -> TagExpression b) -> TagExpression b
   ye >>= f = case ye of
-    DistributedTerms re -> TagRingExpression $ do
-      re' <- re
-      pure . TagFactorExpression $ do
-        re'' <- re'
-        pure . f $ re''
-    TagRingExpression re -> TagRingExpression . fmap (>>= f) $ re
-    TagFactorExpression me -> TagFactorExpression . fmap (>>= f) $ me
+    TagValue a -> f a
+    TagRing re -> TagRing . fmap (>>= f) $ re
+    TagMagma me -> TagMagma . fmap (>>= f) $ me
 
 {- |
- Distributes the magma operation associatively through the structure
- and joins ring expressions together.
+ Distribute all magma expressions over ring expressions.
+ This alters the structure of the 'TagExpression` and if the function used to
+ evaluate the expression is not distributive, then this function will effect the
+ outcome of that as well.
 -}
-distribute :: TagExpression a -> RingExpression (MagmaExpression a)
-distribute ye = case ye of
-  DistributedTerms re -> re
-  TagRingExpression re -> do
-    re' <- re
-    distribute re'
-  TagFactorExpression me -> fmap join . traverse distribute $ me
+distribute :: TagExpression a -> TagExpression a
+distribute = TagRing . fmap (TagMagma . fmap pure) . toNonRecursive
+ where
+  -- Distribute all magma expressions through a non-recursive intermediate structure
+  -- then convert back to a TagExpression.
+  toNonRecursive :: TagExpression a -> RingExpression (MagmaExpression a)
+  toNonRecursive te = case te of
+    TagValue a -> Ring . Magma $ a
+    TagRing re -> re >>= toNonRecursive
+    TagMagma me -> fmap join . traverse toNonRecursive $ me
+
+{- |
+ Evaluate a 'TagExpression` with a right-associative function over its 'MagmaExpression`.
+-}
+evaluateTagExpressionR :: Rng a => (a -> a -> a) -> TagExpression a -> a
+evaluateTagExpressionR f te = case te of
+  TagValue a -> a
+  TagRing re -> evaluateRing . fmap (evaluateTagExpressionR f) $ re
+  TagMagma me -> foldMagmaExpression f . fmap (evaluateTagExpressionR f) $ me
+
+{- |
+ Evaluate a 'TagExpression` with a left-associative function over its 'MagmaExpression`.
+-}
+evaluateTagExpressionL :: Rng a => (a -> a -> a) -> TagExpression a -> a
+evaluateTagExpressionL f te = case te of
+  TagValue a -> a
+  TagRing re -> evaluateRing . fmap (evaluateTagExpressionL f) $ re
+  TagMagma me -> foldMagmaExpressionL f . fmap (evaluateTagExpressionL f) $ me
 
 -- mk :: Pattern -> TagExpression Pattern
 -- mk = pure
@@ -584,11 +605,11 @@ instance Rng (RingExpression a) where
 -}
 instance Rng (TagExpression a) where
   (+.) :: TagExpression a -> TagExpression a -> TagExpression a
-  x +. y = TagRingExpression $ pure x +. pure y
+  x +. y = TagRing $ pure x +. pure y
   (*.) :: TagExpression a -> TagExpression a -> TagExpression a
-  x *. y = TagRingExpression $ pure x *. pure y
+  x *. y = TagRing $ pure x *. pure y
   (-.) :: TagExpression a -> TagExpression a -> TagExpression a
-  x -. y = TagRingExpression $ pure x -. pure y
+  x -. y = TagRing $ pure x -. pure y
 
 instance (Rng a, Rng b) => Rng (a, b) where
   (+.) :: (Rng a, Rng b) => (a, b) -> (a, b) -> (a, b)
@@ -667,4 +688,4 @@ instance Magma (MagmaExpression a) where
 -}
 instance Magma (TagExpression a) where
   (#) :: TagExpression a -> TagExpression a -> TagExpression a
-  x # y = TagFactorExpression $ pure x :$ y
+  x # y = TagMagma $ pure x :$ y
