@@ -68,9 +68,11 @@ module Text.TaggerQL.Expression.AST (
 ) where
 
 import Control.Applicative (liftA2)
+import Control.Arrow ((<<<), (>>>))
 import Control.Monad (ap, join)
-import Data.Bifunctor (bimap, second)
+import Data.Bifunctor (Bifunctor, bimap, second)
 import qualified Data.Foldable as F
+import Data.Function ((&))
 import Data.Functor ((<&>))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
@@ -81,7 +83,6 @@ import Data.String (IsString, fromString)
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
-import Debug.Trace
 import GHC.Exts (IsList (..))
 import GHC.Generics (Generic)
 import Lens.Micro (Lens', lens)
@@ -527,12 +528,25 @@ a{b | c{d}} -> a{b} | a{c{d}} -> a{b | c{d}}
 --          in undefined
 --       _undefined -> undefined
 
+data MagmaFactorization a = MagmaFactorization
+  { -- | Left factors are from right distribution.
+    leftFactors :: Maybe (MagmaExpression a)
+  , -- | Right factors are from left distribution.
+    rightFactors :: Maybe (MagmaExpression a)
+  , -- | The remaining terms that cannot be factored in comparison with the right
+    -- quotient.
+    leftQuotient :: MagmaExpression a
+  , -- | The remaining terms that cannot be factored in comparison with the left
+    -- quotient.
+    rightQuotient :: MagmaExpression a
+  }
+  deriving (Show, Eq, Functor)
+
 constructFactorResults ::
-  Semigroup t1 =>
-  (t1 -> t1 -> t2) ->
-  (Maybe t1, (t1, t1), Maybe t1) ->
-  t2
-constructFactorResults c (mLeft, (l, r), mRight) = withEnds l `c` withEnds r
+  (MagmaExpression a -> MagmaExpression a -> t) ->
+  MagmaFactorization a ->
+  t
+constructFactorResults c (MagmaFactorization mLeft mRight l r) = withEnds l `c` withEnds r
  where
   withEnds m =
     let leftFactorCons = maybe m (<> m) mLeft
@@ -544,20 +558,14 @@ constructFactorResults c (mLeft, (l, r), mRight) = withEnds l `c` withEnds r
  if there are any.
 
  Return the left and right remainders of the factored expressions.
+
+ This function assumes that the magma is a non-associative, non-commutative operation.
 -}
 factorMagma ::
   Eq a =>
   MagmaExpression a ->
   MagmaExpression a ->
-  ( -- Factors that are distributed with right-distribution
-    Maybe (MagmaExpression a)
-  , -- The remaining terms of the expression that are not factorable.
-    ( MagmaExpression a
-    , MagmaExpression a
-    )
-  , -- Factors that are distributed with left-distribution
-    Maybe (MagmaExpression a)
-  )
+  MagmaFactorization a
 factorMagma l r =
   let lList = F.foldr (:) [] l
       rList = F.foldr (:) [] r
@@ -576,79 +584,71 @@ factorMagma l r =
       -- way as left factors, only over a reversed list.
       ( mapMaybe fst . reverse ->
           rFactors
-        , bimap reverse reverse . unzip ->
+        , both reverse . unzip ->
             (xlRem, ylRem)
         ) =
           L.span (fromMaybe False . uncurry (liftA2 (==)))
             . uncurry (zipLongest [])
-            . bimap (reverse . catMaybes) (reverse . catMaybes)
+            . both (reverse . catMaybes)
             $ lFactorRemainders
 
-      remainders = bimap catMaybes catMaybes (xlRem, ylRem)
+      remainders = both catMaybes (xlRem, ylRem)
    in if l == r
-        then (Nothing, (l, r), Nothing)
+        then MagmaFactorization Nothing Nothing l r
         else case remainders of
           -- inputs are already fully factored so they are returned.
           -- Simply a case match for the above if-expr that skips these computations.
-          ([], []) -> (Nothing, (l, r), Nothing)
+          ([], []) ->
+            MagmaFactorization Nothing Nothing l r
           (l' : ls, r' : rs) ->
-            ( safeFromList lFactors
-            ,
-              ( F.foldl' over (pure l') ls
-              , F.foldl' over (pure r') rs
-              )
-            , safeFromList rFactors
-            )
+            MagmaFactorization
+              { leftFactors = safeFromList lFactors
+              , rightFactors = safeFromList rFactors
+              , leftQuotient = F.foldl' over (pure l') ls
+              , rightQuotient = F.foldl' over (pure r') rs
+              }
           _oneRemIsEmpty ->
-            -- One remainder is empty, so in order to return a Magma expression remainder,
-            -- it attempts to borrow a factor, first from the left side.
-            case safeFromList lFactors of
-              Just me -> case me of
-                Magma _ ->
-                  ( Nothing
-                  , bimap
-                      (F.foldl' over me)
-                      (F.foldl' over me)
-                      remainders
-                  , safeFromList rFactors
-                  )
-                me' :$ a ->
-                  ( Just me'
-                  , bimap
-                      (F.foldl' over (pure a))
-                      (F.foldl' over (pure a))
-                      remainders
-                  , safeFromList rFactors
-                  )
-              -- There are no left factors so it tries the right side.
-              _noLFactors -> case safeFromList rFactors of
-                Just me -> case me of
-                  Magma _ ->
-                    ( Nothing
-                    , bimap
-                        (F.foldr appliedTo me)
-                        (F.foldr appliedTo me)
-                        remainders
-                    , Nothing
-                    )
-                  (partitionLeft -> (lhead, lMag)) ->
-                    ( Nothing
-                    , bimap
-                        (F.foldr appliedTo (pure lhead))
-                        (F.foldr appliedTo (pure lhead))
-                        remainders
-                    , lMag
-                    )
-                -- This scenario should absolutely never happen. It means that
-                -- one remainder is empty and yet there are no factors.
-                -- Which means that a remainder was removed when it should not have been.
-                -- To avoid a partial function, this returns the input as unfactorable.
-                Nothing -> (Nothing, (l, r), Nothing)
+            remainders
+              &
+              -- One remainder is empty, so in order to return a
+              -- Magma expression remainder, it attempts to borrow a factor,
+              -- first from the left side.
+              case safeFromList lFactors of
+                Just me ->
+                  let foldFactorInto fact = both (F.foldl' over fact)
+                   in case me of
+                        Magma _ ->
+                          uncurry (MagmaFactorization Nothing (safeFromList rFactors))
+                            . foldFactorInto me
+                        me' :$ a ->
+                          uncurry (MagmaFactorization (Just me') (safeFromList rFactors))
+                            . foldFactorInto (pure a)
+                -- There are no left factors so it tries the right side.
+                Nothing -> case safeFromList rFactors of
+                  Just me ->
+                    let foldFactorInto fact = both (F.foldr appliedTo fact)
+                     in case me of
+                          Magma _ ->
+                            uncurry (MagmaFactorization Nothing Nothing)
+                              . foldFactorInto me
+                          (partitionLeft -> (lhead, lMag)) ->
+                            uncurry (MagmaFactorization Nothing lMag)
+                              . foldFactorInto (pure lhead)
+                  -- This scenario should absolutely never happen. It means that
+                  -- one remainder is empty and yet there are no factors.
+                  -- Which means that a remainder was removed
+                  -- when it should not have been.
+                  -- To avoid a partial function, this returns the input as unfactorable.
+                  Nothing -> const (uncurry (MagmaFactorization Nothing Nothing) (l, r))
 
 zipLongest :: [(Maybe a, Maybe a)] -> [a] -> [a] -> [(Maybe a, Maybe a)]
 zipLongest acc [] [] = reverse acc
 zipLongest acc (part' -> (x, xs)) (part' -> (y, ys)) = zipLongest ((x, y) : acc) xs ys
 
+both :: Bifunctor p => (a -> d) -> p a a -> p d d
+both f = bimap f f
+
+part' :: [a] -> (Maybe a, [a])
 part' [] = (Nothing, [])
 part' (x : xs) = (Just x, xs)
 
