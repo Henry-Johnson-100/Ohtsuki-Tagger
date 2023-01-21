@@ -57,6 +57,7 @@ module Text.TaggerQL.Expression.AST (
   MagmaExpression (..),
   foldMagmaExpression,
   foldMagmaExpressionL,
+  partitionLeft,
   appliedTo,
   over,
   DefaultRng (..),
@@ -68,9 +69,8 @@ module Text.TaggerQL.Expression.AST (
 ) where
 
 import Control.Applicative (liftA2)
-import Control.Arrow ((<<<), (>>>))
 import Control.Monad (ap, join)
-import Data.Bifunctor (Bifunctor, bimap, second)
+import Data.Bifunctor (Bifunctor, bimap)
 import qualified Data.Foldable as F
 import Data.Function ((&))
 import Data.Functor ((<&>))
@@ -294,6 +294,10 @@ foldMagmaExpression f (dme :$ x) = F.foldr' f x dme
 foldMagmaExpressionL :: (a -> a -> a) -> MagmaExpression a -> a
 foldMagmaExpressionL = F.foldl1
 
+{- |
+ Separates the left-most term in a 'MagmaExpression` from the
+ rest of the expression.
+-}
 partitionLeft :: MagmaExpression a -> (a, Maybe (MagmaExpression a))
 partitionLeft me = case me of
   Magma a -> (a, Nothing)
@@ -478,6 +482,9 @@ distribute = TagRing . fmap (TagMagma . fmap pure) . toNonRecursive
     TagMagma me -> fmap join . traverse toNonRecursive $ me
 
 {-
+BEGIN Factoring - An experimental set of functions meant to be the inverse of
+  distribute.
+
 How would this factor?
 
 right factor
@@ -505,28 +512,6 @@ a{b | c{d}} -> a{b} | a{c{d}} -> a{b | c{d}}
     'or' left operator:
   -> a{(c{e} ! c{f}) & (d{e} ! d{f})} -> a{c{e ! f} & d{e ! f}} -> a{(c & d){e ! f}}
 -}
-
--- factor :: Eq a => TagExpression a -> TagExpression a
--- factor = undefined
---  where
---   factor' te =
---     case te of
---       TagValue a -> _
---       TagRing re -> case re of
---         Ring te' -> factor' te'
---         lhs :+ rhs -> _
---         re' :* re2 -> _
---         re' :- re2 -> _
---       TagMagma me -> _
---   factorRing re =
---     case re of
---       Ring a -> Magma . Ring $ a
---       lhs :+ rhs ->
---         let lhsFact = factorRing lhs
---             rhsFact = factorRing rhs
---             (mLeft, (lRem, rRem), mRight) = factorMagma lhsFact rhsFact
---          in undefined
---       _undefined -> undefined
 
 data MagmaFactorization a = MagmaFactorization
   { -- | Left factors are from right distribution.
@@ -651,6 +636,10 @@ both f = bimap f f
 part' :: [a] -> (Maybe a, [a])
 part' [] = (Nothing, [])
 part' (x : xs) = (Just x, xs)
+
+{-
+END Factoring
+-}
 
 {- |
  Evaluate a 'TagExpression` with a right-associative function over its 'MagmaExpression`.
