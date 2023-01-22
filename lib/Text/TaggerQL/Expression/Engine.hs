@@ -66,10 +66,11 @@ module Text.TaggerQL.Expression.Engine (
 
   -- * New
   queryQueryExpression,
+  insertTagExpression,
 ) where
 
-import Control.Applicative ((<|>))
-import Control.Monad (guard, void, when)
+import Control.Applicative (liftA2, (<|>))
+import Control.Monad (foldM, guard, void, when, (>=>))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (ExceptT, throwE)
 import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask, asks)
@@ -89,16 +90,17 @@ import Database.Tagger (
   allTags,
   insertTags,
   queryForDescriptorByPattern,
+  queryForFileByTagId,
+  queryForTagByDescriptorPattern,
   queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf,
+  queryForTagByMetaDescriptorPattern,
  )
-import Database.Tagger.Connection (query)
 import Database.Tagger.Query (
   flatQueryForFileByTagDescriptorPattern,
   flatQueryForFileOnMetaRelationPattern,
   queryForFileByPattern,
   queryForTagBySubTagTriple,
  )
-import Database.Tagger.Query.Type (TaggerQuery)
 import Database.Tagger.Type (
   File,
   Tag (tagId, tagSubtagOfId),
@@ -107,7 +109,6 @@ import Database.Tagger.Type (
  )
 import Lens.Micro (Lens', lens, (%~), (&), (.~), (^.))
 import Text.Parsec.Error (errorMessages, messageString)
-import Text.RawString.QQ (r)
 import Text.TaggerQL.Expression.AST
 import Text.TaggerQL.Expression.Parser (parseExpr, parseTagExpr)
 import Prelude hiding (lookup, (!!))
@@ -229,7 +230,7 @@ queryer =
         c <- ask
         supertags <- liftIO . fmap HS.fromList $ queryTags tt c
         joinSubTagsTo <- se
-        liftIO $ toFileSet (joinSubTagsTo supertags) c
+        liftIO . toFileSet c $ joinSubTagsTo supertags
     , subExpressionInterpreter =
         SubExpressionInterpreter
           { interpretSubTag = \tt ->
@@ -298,61 +299,22 @@ evalSubExpression subExpr supertags = do
   joinSubTagsTo <- runSubExpressionInterpreter (subExpressionInterpreter queryer) subExpr
   return . joinSubTagsTo $ supertags
 
-toFileSet :: HashSet Tag -> TaggedConnection -> IO (HashSet File)
-toFileSet (map tagId . HS.toList -> ts) conn = do
-  results <- mapM (query conn q . (: [])) ts
-  return . HS.unions . map HS.fromList $ results
- where
-  q =
-    [r|
-SELECT
-  f.id
-  ,f.filePath
-FROM File f
-JOIN Tag t ON f.id = t.fileId
-WHERE t.id = ?
-    |]
+toFileSet :: TaggedConnection -> HashSet Tag -> IO (HashSet File)
+toFileSet conn =
+  foldM
+    ( \acc rt ->
+        maybe acc (`HS.insert` acc)
+          <$> queryForFileByTagId rt conn
+    )
+    HS.empty
+    . map tagId
+    . HS.toList
 
 queryTags :: TagTerm -> TaggedConnection -> IO [Tag]
 queryTags tt c =
   case tt of
-    DescriptorTerm txt -> query c tagQueryOnDescriptorPattern [txt]
-    MetaDescriptorTerm txt -> query c tagQueryOnMetaDescriptorPattern [txt]
-
-tagQueryOnDescriptorPattern :: TaggerQuery
-tagQueryOnDescriptorPattern =
-  [r|
-    SELECT
-      t.id,
-      t.fileId,
-      t.descriptorId,
-      t.subTagOfId
-    FROM Tag t
-    JOIN Descriptor d ON t.descriptorId = d.id
-    WHERE d.descriptor LIKE ? ESCAPE '\'
-    |]
-
-tagQueryOnMetaDescriptorPattern :: TaggerQuery
-tagQueryOnMetaDescriptorPattern =
-  [r|
-    SELECT
-      t.id
-      ,t.fileId
-      ,t.descriptorId
-      ,t.subTagOfId
-    FROM Tag t
-    JOIN (
-      WITH RECURSIVE r(id) AS (
-        SELECT id
-        FROM Descriptor
-        WHERE descriptor LIKE ? ESCAPE '\'
-        UNION
-        SELECT infraDescriptorId
-        FROM MetaDescriptor md
-        JOIN r ON md.metaDescriptorId = r.id
-      )
-      SELECT id FROM r
-    ) AS d ON t.descriptorId = d.id|]
+    DescriptorTerm txt -> queryForTagByDescriptorPattern txt c
+    MetaDescriptorTerm txt -> queryForTagByMetaDescriptorPattern txt c
 
 -- Tagging Engine
 
@@ -628,7 +590,7 @@ queryQueryLeaf c ql = case ql of
     case pat of
       WildCard -> HS.fromList <$> allFiles c
       PatternText t -> HS.fromList <$> queryForFileByPattern t c
-  TagLeaf te -> evaluateTagExpression c te >>= (`toFileSet` c)
+  TagLeaf te -> evaluateTagExpression c te >>= toFileSet c
 
 -- A naive query interpreter, with no caching.
 evaluateTagExpression ::
@@ -638,17 +600,96 @@ evaluateTagExpression ::
 evaluateTagExpression c =
   fmap
     ( evaluateTagExpressionR
-        (\outer inner -> joinSubtags outer (HS.map tagSubtagOfId inner))
+        rightAssocJoinTags
         . distribute
     )
     . traverse (queryDTerm c)
+ where
+  rightAssocJoinTags supers subs = joinSubtags supers (HS.map tagSubtagOfId subs)
 
 queryDTerm :: TaggedConnection -> DTerm Pattern -> IO (HashSet Tag)
 queryDTerm c dt = case dt of
   DTerm (PatternText t) ->
     HS.fromList
-      <$> query c tagQueryOnDescriptorPattern [t]
+      <$> queryForTagByDescriptorPattern t c
   DMetaTerm (PatternText t) ->
     HS.fromList
-      <$> query c tagQueryOnMetaDescriptorPattern [t]
+      <$> queryForTagByMetaDescriptorPattern t c
   _wildcard -> HS.fromList <$> allTags c
+
+{- |
+ A newtype used to provide a Rng instance when inserting tags defined by a
+ TagExpression.
+-}
+newtype TagInserter = TagInserter
+  {runTagInserter :: Maybe [RecordKey Tag] -> IO [RecordKey Tag]}
+
+{- |
+ Sequences two TagInserters and returns an empty list.
+-}
+instance Semigroup TagInserter where
+  (<>) :: TagInserter -> TagInserter -> TagInserter
+  (TagInserter x) <> (TagInserter y) =
+    TagInserter $ \mrkt -> (x mrkt *> y mrkt) $> mempty
+
+insertTagExpression ::
+  TaggedConnection ->
+  RecordKey File ->
+  TagExpression Pattern ->
+  IO ()
+insertTagExpression c fk =
+  void
+    . flip runTagInserter Nothing
+    . runDefaultRng
+    . evaluateTagExpressionL (liftA2 leftAssocInsertTags)
+    . fmap
+      ( DefaultRng
+          . TagInserter
+          . insertTagPattern c fk
+      )
+    . distribute
+ where
+  {-
+   Left-associative insertion of tags, where the TagInserter on the left
+   is inserted first and its output is fed into the right TagInserter.
+  -}
+  leftAssocInsertTags (TagInserter x) (TagInserter y) = TagInserter (x >=> (y . Just))
+
+{- |
+ Insert descriptors matching the given pattern as Tags on the given file.
+ If a list of Tag ID's is supplied then the new tags are inserted as subtags of those.
+
+ Returns a list of Tag ID's corresponding to the descriptors matching the given pattern
+ on the file that are subtags of the given list if one is provided.
+
+ Does nothing if the given pattern is a wildcard.
+-}
+insertTagPattern ::
+  TaggedConnection ->
+  RecordKey File ->
+  Pattern ->
+  Maybe [RecordKey Tag] ->
+  IO [RecordKey Tag]
+insertTagPattern _ _ WildCard _ = pure mempty
+insertTagPattern c fk (PatternText t) mrts = do
+  withDescriptors <- queryForDescriptorByPattern t c
+  let tagTriples =
+        (fk,,) <$> map descriptorId withDescriptors <*> maybe [Nothing] (map Just) mrts
+
+  void $ insertTags tagTriples c
+
+  -- Tag insertion may fail because some tags of the same form already exist.
+  -- This query gets all of those pre-existing tags,
+  -- and returns them as if they were just made.
+  case mrts of
+    -- If nothing, then these are top-level tags
+    Nothing ->
+      map tagId <$> queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf fk t c
+    -- If just, these are subtags of existing tags.
+    Just _ ->
+      let unions xs = if null xs then [] else L.foldl' L.union [] xs
+          third f (x, y, z) = (x, y, f z)
+       in map tagId . unions
+            <$> mapM
+              (`queryForTagBySubTagTriple` c)
+              (third fromJust <$> tagTriples)

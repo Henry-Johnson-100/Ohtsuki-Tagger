@@ -703,6 +703,18 @@ newtype DefaultRng a = DefaultRng {runDefaultRng :: a}
     , Traversable
     )
 
+instance Applicative DefaultRng where
+  pure :: a -> DefaultRng a
+  pure = DefaultRng
+  (<*>) :: DefaultRng (a -> b) -> DefaultRng a -> DefaultRng b
+  (DefaultRng f) <*> (DefaultRng x) = DefaultRng (f x)
+
+instance Monad DefaultRng where
+  return :: a -> DefaultRng a
+  return = pure
+  (>>=) :: DefaultRng a -> (a -> DefaultRng b) -> DefaultRng b
+  (DefaultRng x) >>= f = f x
+
 infixl 7 +.
 infixl 7 *.
 infixl 7 -.
