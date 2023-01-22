@@ -860,6 +860,51 @@ taggingEngineTests c =
                   expectedResults
               )
               f
+        , after AllSucceed "Tagging Engine - 4" . testCase "Tagging Engine - 5" $ do
+            let se =
+                  ( (pure . des $ 35)
+                      *. (pure . des $ 36)
+                  )
+                    # (pure . des $ 37)
+                fk = 20
+                expectedResults =
+                  [ Tag 59 20 35 Nothing
+                  , Tag 60 20 37 (Just 59)
+                  , Tag 61 20 36 Nothing
+                  , Tag 62 20 37 (Just 61)
+                  ]
+            c >>= insert se fk
+            f <-
+              fmap taggedFileTags
+                <$> (c >>= runMaybeT . queryForTaggedFileWithFileId fk)
+            assertEqual
+              "Tagging should work with a lift-distributive expression."
+              (Just expectedResults)
+              f
+        , after AllSucceed "Tagging Engine - 5" . testCase "Tagging Engine - 6" $ do
+            let se =
+                  ( (pure . des $ 38)
+                      *. ( (pure . des $ 39)
+                            # (pure . des $ 40)
+                         )
+                  )
+                    # (pure . des $ 41)
+                fk = 21
+                expectedResults =
+                  [ Tag 63 21 38 Nothing
+                  , Tag 64 21 41 (Just 63)
+                  , Tag 65 21 39 Nothing
+                  , Tag 66 21 40 (Just 65)
+                  , Tag 67 21 41 (Just 66)
+                  ]
+            c >>= insert se fk
+            f <-
+              fmap taggedFileTags
+                <$> (c >>= runMaybeT . queryForTaggedFileWithFileId fk)
+            assertEqual
+              "Tagging should work with a lift-distributive expression."
+              (Just expectedResults)
+              f
         ]
 
 file :: RecordKey File -> File
