@@ -642,12 +642,12 @@ insertTagExpression c fk =
     . flip runTagInserter Nothing
     . runDefaultRng
     . evaluateTagExpressionL (liftA2 leftAssocInsertTags)
+    . distribute
     . fmap
       ( DefaultRng
           . TagInserter
           . insertTagPattern c fk
       )
-    . distribute
  where
   {-
    Left-associative insertion of tags, where the TagInserter on the left
