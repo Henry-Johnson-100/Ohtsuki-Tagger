@@ -803,7 +803,7 @@ taggingEngineTests c =
         , after AllSucceed "Tagging Engine - 2" . testCase "Tagging Engine - 3" $ do
             let se =
                   ( (pure . des $ 32)
-                      # (pure . des $ 33)
+                      *. (pure . des $ 33)
                   )
                     *. (pure . des $ 34)
                 -- BinarySubExpression $
