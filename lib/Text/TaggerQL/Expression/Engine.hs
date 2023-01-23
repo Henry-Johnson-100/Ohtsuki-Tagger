@@ -1,4 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
+{-# HLINT ignore "Replace case with maybe" #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# HLINT ignore "Use lambda-case" #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
@@ -15,8 +17,6 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_HADDOCK prune #-}
-
-{-# HLINT ignore "Replace case with maybe" #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.Engine
@@ -74,7 +74,7 @@ import Control.Monad (foldM, guard, void, when, (>=>))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (ExceptT, throwE)
 import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask, asks)
-import Control.Monad.Trans.State.Strict (StateT, evalState, get, gets, modify, runState)
+import Control.Monad.Trans.State.Strict (State, StateT, evalState, execState, get, gets, modify, runState)
 import Data.Bifunctor (Bifunctor (first, second))
 import Data.Functor (($>))
 import Data.HashSet (HashSet)
@@ -693,3 +693,53 @@ insertTagPattern c fk (PatternText t) mrts = do
             <$> mapM
               (`queryForTagBySubTagTriple` c)
               (third fromJust <$> tagTriples)
+
+indexQueryExpression :: Int -> QueryExpression -> Maybe QueryExpression
+indexQueryExpression ix =
+  snd
+    . flip execState (1, Nothing)
+    . indexQueryExpressionSt
+ where
+  indexQueryExpressionSt ::
+    QueryExpression ->
+    State (Int, Maybe QueryExpression) ()
+  indexQueryExpressionSt qe'@(QueryExpression qe) = do
+    _innerMembers <-
+      let indexOperands x y = mapM_ (indexQueryExpressionSt . QueryExpression) [x, y]
+       in case qe of
+            Ring ql ->
+              case ql of
+                TagLeaf te ->
+                  case te of
+                    TagRing re ->
+                      let construct = QueryExpression . Ring . TagLeaf . TagRing
+                          indexTagOperands x y =
+                            mapM_ (indexQueryExpressionSt . construct) [x, y]
+                       in case re of
+                            Ring te' ->
+                              indexQueryExpressionSt . construct . Ring $ te'
+                            re' :+ re3 -> indexTagOperands re' re3
+                            re' :* re3 -> indexTagOperands re' re3
+                            re' :- re3 -> indexTagOperands re' re3
+                    TagMagma me ->
+                      let construct = QueryExpression . Ring . TagLeaf . TagMagma . Magma
+                       in case me of
+                            Magma te' -> indexQueryExpressionSt . construct $ te'
+                            me' :$ a ->
+                              traverse (indexQueryExpressionSt . construct) me'
+                                *> (indexQueryExpressionSt . construct $ a)
+                    -- These leaf cases are handled by the last returnWhenIx
+                    _leaf -> pure ()
+                _leaf -> pure ()
+            -- Index inner leaves of a query ring expression
+            re :+ re' -> indexOperands re re'
+            re :* re' -> indexOperands re re'
+            re :- re' -> indexOperands re re'
+    -- Checks the given query expression.
+    returnWhenIx
+   where
+    -- When the given index matches the state,
+    -- put the given QueryExpression into the state.
+    returnWhenIx =
+      (gets fst <* modify (first (1 +)))
+        >>= flip when (modify . second . const . Just $ qe') . (== ix)
