@@ -7,6 +7,7 @@ module Test.Text.TaggerQL.Expression.AST (
     astTests,
 ) where
 
+import Control.Comonad
 import Control.Monad ((>=>))
 import qualified Data.Foldable as F
 import qualified Data.Text as T
@@ -22,6 +23,8 @@ instance Arbitrary Pattern where
 instance Arbitrary a => Arbitrary (DTerm a) where
     arbitrary :: Arbitrary a => Gen (DTerm a)
     arbitrary = oneof (pure <$> [DTerm, DMetaTerm]) <*> arbitrary
+
+instance CoArbitrary a => CoArbitrary (DTerm a)
 
 instance Function a => Function (DTerm a)
 
@@ -227,48 +230,106 @@ astProperties =
             ]
         , testGroup
             "DTerm properties"
-            [ testProperty
-                "Left Monad Identity"
-                ( do
-                    f <- arbitrary :: Gen (Int -> DTerm Int)
-                    i <- arbitrary :: Gen Int
-                    pure $ (pure i >>= f) == f i
-                )
-            , testProperty
-                "Right Monad Identity"
-                ( do
-                    dt <- arbitrary :: Gen (DTerm Int)
-                    pure $ (dt >>= pure) == dt
-                )
-            , testProperty
-                "Kleisli Arrow Associativity"
-                ( do
-                    let genF =
-                            suchThat
-                                -- Use relatively small functions so it doesn't
-                                -- take forever to run.
-                                (resize 35 arbitrary)
-                                -- Exclude functions that appear to be identities
-                                (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (DTerm Int))
-                    f <- genF
-                    g <- genF
-                    h <- genF
-                    dt <- resize 10 arbitrary :: Gen Int
-                    let testProp =
-                            ( applyFun f
-                                >=> ( applyFun g
-                                        >=> applyFun h
-                                    )
-                            )
-                                dt
-                                == ( ( applyFun f
-                                        >=> applyFun g
-                                     )
-                                        >=> applyFun h
-                                   )
+            [ testGroup
+                "Monad Laws"
+                [ testProperty
+                    "Left Monad Identity"
+                    ( do
+                        f <- arbitrary :: Gen (Int -> DTerm Int)
+                        i <- arbitrary :: Gen Int
+                        pure $ (pure i >>= f) == f i
+                    )
+                , testProperty
+                    "Right Monad Identity"
+                    ( do
+                        dt <- arbitrary :: Gen (DTerm Int)
+                        pure $ (dt >>= pure) == dt
+                    )
+                , testProperty
+                    "Kleisli Arrow Associativity"
+                    ( do
+                        let genF =
+                                suchThat
+                                    -- Use relatively small functions so it doesn't
+                                    -- take forever to run.
+                                    (resize 35 arbitrary)
+                                    -- Exclude functions that appear to be identities
+                                    (\(Fn fun) -> fun 1 /= pure 1) ::
+                                    Gen (Fun Int (DTerm Int))
+                        f <- genF
+                        g <- genF
+                        h <- genF
+                        dt <- resize 10 arbitrary :: Gen Int
+                        let testProp =
+                                ( applyFun f
+                                    >=> ( applyFun g
+                                            >=> applyFun h
+                                        )
+                                )
                                     dt
-                    pure testProp
-                )
+                                    == ( ( applyFun f
+                                            >=> applyFun g
+                                         )
+                                            >=> applyFun h
+                                       )
+                                        dt
+                        pure testProp
+                    )
+                ]
+            , testGroup
+                "Comonad Laws"
+                [ testProperty
+                    "Left Identity"
+                    ( do
+                        dt <- arbitrary :: Gen (DTerm Int)
+                        let testProp = extend extract dt == dt
+                        pure testProp
+                    )
+                , testProperty
+                    "Right Identity"
+                    ( do
+                        let genF =
+                                suchThat
+                                    (resize 35 arbitrary)
+                                    (\(Fn fun) -> fun (pure 1) /= 1) ::
+                                    Gen (Fun (DTerm Int) Int)
+                        f <- genF
+                        dt <- arbitrary :: Gen (DTerm Int)
+                        let testProp =
+                                (extract . extend (applyFun f) $ dt)
+                                    == applyFun f dt
+                        pure testProp
+                    )
+                , testProperty
+                    "Cokleisli associativty"
+                    ( do
+                        let genF =
+                                suchThat
+                                    -- Use relatively small functions so it doesn't
+                                    -- take forever to run.
+                                    (resize 35 arbitrary)
+                                    -- Exclude functions that appear to be identities
+                                    (\(Fn fun) -> fun (pure 1) /= 1) ::
+                                    Gen (Fun (DTerm Int) Int)
+                        f <- genF
+                        g <- genF
+                        h <- genF
+                        dt <- resize 10 arbitrary :: Gen (DTerm Int)
+                        let testProp =
+                                ( applyFun f
+                                    =>= ( applyFun g
+                                            =>= applyFun h
+                                        )
+                                )
+                                    dt
+                                    == ( ( applyFun f
+                                            =>= applyFun g
+                                         )
+                                            =>= applyFun h
+                                       )
+                                        dt
+                        pure testProp
+                    )
+                ]
             ]
         ]

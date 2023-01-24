@@ -69,6 +69,7 @@ module Text.TaggerQL.Expression.AST (
 ) where
 
 import Control.Applicative (liftA2)
+import Control.Comonad
 import Control.Monad (ap, join)
 import Data.Bifunctor (Bifunctor, bimap)
 import qualified Data.Foldable as F
@@ -417,12 +418,6 @@ data DTerm a
   | DMetaTerm a
   deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
 
-extractDTerm = runDTerm
-
-duplicateDTerm :: DTerm a -> DTerm (DTerm a)
-duplicateDTerm (DTerm x) = DTerm (DTerm x)
-duplicateDTerm (DMetaTerm x) = DMetaTerm (DMetaTerm x)
-
 instance Hashable a => Hashable (DTerm a)
 
 instance Applicative DTerm where
@@ -442,6 +437,14 @@ instance Monad DTerm where
             DTerm _ -> result
             DMetaTerm b -> DTerm b
     DMetaTerm a -> f a
+
+instance Comonad DTerm where
+  extract :: DTerm a -> a
+  extract = runDTerm
+  extend :: (DTerm a -> b) -> DTerm a -> DTerm b
+  extend f dt = case dt of
+    DTerm _ -> DTerm . f $ dt
+    DMetaTerm _ -> DMetaTerm . f $ dt
 
 runDTerm :: DTerm p -> p
 runDTerm (DTerm x) = x
