@@ -417,6 +417,12 @@ data DTerm a
   | DMetaTerm a
   deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
 
+extractDTerm = runDTerm
+
+duplicateDTerm :: DTerm a -> DTerm (DTerm a)
+duplicateDTerm (DTerm x) = DTerm (DTerm x)
+duplicateDTerm (DMetaTerm x) = DMetaTerm (DMetaTerm x)
+
 instance Hashable a => Hashable (DTerm a)
 
 instance Applicative DTerm where
@@ -430,7 +436,11 @@ instance Monad DTerm where
   return = DMetaTerm
   (>>=) :: DTerm a -> (a -> DTerm b) -> DTerm b
   d >>= f = case d of
-    DTerm a -> f a >>= DTerm
+    DTerm a ->
+      let result = f a
+       in case result of
+            DTerm _ -> result
+            DMetaTerm b -> DTerm b
     DMetaTerm a -> f a
 
 runDTerm :: DTerm p -> p
