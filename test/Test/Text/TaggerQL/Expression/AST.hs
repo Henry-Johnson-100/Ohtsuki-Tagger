@@ -57,8 +57,16 @@ instance Arbitrary a => Arbitrary (TagExpression a) where
         sizedExpr n
             | n <= 0 = TagValue <$> arbitrary
             | otherwise =
-                let tagRing = TagRing <$> resize (n `div` 2) arbitrary
-                    tagMagma = TagMagma <$> resize (n `div` 2) arbitrary
+                let tagRing =
+                        TagRing <$> do
+                            r <- arbitrary :: Gen (RingExpression ())
+                            let teG = sizedExpr (n `div` 2)
+                            sequenceA $ teG <$ r
+                    tagMagma =
+                        TagMagma <$> do
+                            r <- arbitrary :: Gen (MagmaExpression ())
+                            let teG = sizedExpr (n `div` 2)
+                            sequenceA $ teG <$ r
                  in oneof [tagRing, tagMagma]
 
 instance Function a => Function (TagExpression a)
@@ -149,6 +157,54 @@ astProperties =
                                 -- Exclude functions that appear to be identities
                                 (\(Fn fun) -> fun 1 /= pure 1) ::
                                 Gen (Fun Int (MagmaExpression Int))
+                    f <- genF
+                    g <- genF
+                    h <- genF
+                    dt <- arbitrary :: Gen Int
+                    let testProp =
+                            ( applyFun f
+                                >=> ( applyFun g
+                                        >=> applyFun h
+                                    )
+                            )
+                                dt
+                                == ( ( applyFun f
+                                        >=> applyFun g
+                                     )
+                                        >=> applyFun h
+                                   )
+                                    dt
+                    pure testProp
+                )
+            ]
+        , testGroup
+            "TagExpression Properties"
+            [ testProperty
+                "Left Monad Identity"
+                ( do
+                    f <- resize 3 arbitrary :: Gen (Int -> TagExpression Int)
+                    i <- arbitrary
+                    let testProp = (pure i >>= f) == f i
+                    pure testProp
+                )
+            , testProperty
+                "Right Monad Identity"
+                ( do
+                    re <- resize 3 arbitrary :: Gen (TagExpression Int)
+                    let testProp = (re >>= pure) == re
+                    pure testProp
+                )
+            , testProperty
+                "Kleisli Arrow Associativity"
+                ( do
+                    let genF =
+                            suchThat
+                                -- Use relatively small functions so it doesn't
+                                -- take forever to run.
+                                (resize 3 arbitrary)
+                                -- Exclude functions that appear to be identities
+                                (\(Fn fun) -> fun 1 /= pure 1) ::
+                                Gen (Fun Int (TagExpression Int))
                     f <- genF
                     g <- genF
                     h <- genF
