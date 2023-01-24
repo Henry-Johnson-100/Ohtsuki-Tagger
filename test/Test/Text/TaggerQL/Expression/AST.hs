@@ -21,10 +21,9 @@ instance Arbitrary Pattern where
 
 instance Arbitrary a => Arbitrary (DTerm a) where
     arbitrary :: Arbitrary a => Gen (DTerm a)
-    arbitrary = do
-        constructor <- oneof [pure DTerm, pure DMetaTerm]
-        value <- arbitrary
-        pure . constructor $ value
+    arbitrary = oneof (pure <$> [DTerm, DMetaTerm]) <*> arbitrary
+
+instance Function a => Function (DTerm a)
 
 instance Arbitrary a => Arbitrary (RingExpression a) where
     arbitrary :: Arbitrary a => Gen (RingExpression a)
@@ -39,6 +38,8 @@ instance Arbitrary a => Arbitrary (RingExpression a) where
                     , (:-) <$> sizedRing (n `div` 2) <*> sizedRing (n `div` 2)
                     ]
 
+instance Function a => Function (RingExpression a)
+
 instance Arbitrary a => Arbitrary (MagmaExpression a) where
     arbitrary :: Arbitrary a => Gen (MagmaExpression a)
     arbitrary = do
@@ -46,6 +47,8 @@ instance Arbitrary a => Arbitrary (MagmaExpression a) where
         case xs' of
             (x : xs) -> pure $ F.foldl' over (pure x) xs
             _emptyList -> Magma <$> arbitrary
+
+instance Function a => Function (MagmaExpression a)
 
 instance Arbitrary a => Arbitrary (TagExpression a) where
     arbitrary :: Arbitrary a => Gen (TagExpression a)
@@ -57,6 +60,8 @@ instance Arbitrary a => Arbitrary (TagExpression a) where
                 let tagRing = TagRing <$> resize (n `div` 2) arbitrary
                     tagMagma = TagMagma <$> resize (n `div` 2) arbitrary
                  in oneof [tagRing, tagMagma]
+
+instance Function a => Function (TagExpression a)
 
 astTests :: TestTree
 astTests =
@@ -88,11 +93,31 @@ astProperties =
             , testProperty
                 "Kleisli Arrow Associativity"
                 ( do
-                    let f n = pure (n `div` 2) :+ pure (n * n)
-                        g n = pure (n - (n * (-3))) :* pure n
-                        h n = pure n :- (pure (n + 23) :* pure (n * 1001))
+                    let genF =
+                            suchThat
+                                -- Use relatively small functions so it doesn't
+                                -- take forever to run.
+                                (resize 35 arbitrary)
+                                -- Exclude functions that appear to be identities
+                                (\(Fn fun) -> fun 1 /= pure 1) ::
+                                Gen (Fun Int (RingExpression Int))
+                    f <- genF
+                    g <- genF
+                    h <- genF
                     dt <- arbitrary :: Gen Int
-                    let testProp = (f >=> (g >=> h)) dt == ((f >=> g) >=> h) dt
+                    let testProp =
+                            ( applyFun f
+                                >=> ( applyFun g
+                                        >=> applyFun h
+                                    )
+                            )
+                                dt
+                                == ( ( applyFun f
+                                        >=> applyFun g
+                                     )
+                                        >=> applyFun h
+                                   )
+                                    dt
                     pure testProp
                 )
             ]
@@ -116,13 +141,32 @@ astProperties =
             , testProperty
                 "Kleisli Arrow Associativity"
                 ( do
-                    f <- arbitrary :: Gen (Int -> MagmaExpression Int)
-                    g <- arbitrary :: Gen (Int -> MagmaExpression Int)
-                    h <- arbitrary :: Gen (Int -> MagmaExpression Int)
+                    let genF =
+                            suchThat
+                                -- Use relatively small functions so it doesn't
+                                -- take forever to run.
+                                (resize 35 arbitrary)
+                                -- Exclude functions that appear to be identities
+                                (\(Fn fun) -> fun 1 /= pure 1) ::
+                                Gen (Fun Int (MagmaExpression Int))
+                    f <- genF
+                    g <- genF
+                    h <- genF
                     dt <- arbitrary :: Gen Int
-                    let testProp = (f >=> (g >=> h)) dt == ((f >=> g) >=> h) dt
-                        propTerminates = within (500 * (10 ^ (3 :: Integer))) testProp
-                    pure propTerminates
+                    let testProp =
+                            ( applyFun f
+                                >=> ( applyFun g
+                                        >=> applyFun h
+                                    )
+                            )
+                                dt
+                                == ( ( applyFun f
+                                        >=> applyFun g
+                                     )
+                                        >=> applyFun h
+                                   )
+                                    dt
+                    pure testProp
                 )
             ]
         , testGroup
@@ -143,11 +187,31 @@ astProperties =
             , testProperty
                 "Kleisli Arrow Associativity"
                 ( do
-                    let f n = pure (n `div` 2)
-                        g n = DTerm (n - (n * (-3)))
-                        h n = DMetaTerm (n * 1001)
-                    dt <- arbitrary :: Gen Int
-                    let testProp = (f >=> (g >=> h)) dt == ((f >=> g) >=> h) dt
+                    let genF =
+                            suchThat
+                                -- Use relatively small functions so it doesn't
+                                -- take forever to run.
+                                (resize 35 arbitrary)
+                                -- Exclude functions that appear to be identities
+                                (\(Fn fun) -> fun 1 /= pure 1) ::
+                                Gen (Fun Int (DTerm Int))
+                    f <- genF
+                    g <- genF
+                    h <- genF
+                    dt <- resize 10 arbitrary :: Gen Int
+                    let testProp =
+                            ( applyFun f
+                                >=> ( applyFun g
+                                        >=> applyFun h
+                                    )
+                            )
+                                dt
+                                == ( ( applyFun f
+                                        >=> applyFun g
+                                     )
+                                        >=> applyFun h
+                                   )
+                                    dt
                     pure testProp
                 )
             ]
