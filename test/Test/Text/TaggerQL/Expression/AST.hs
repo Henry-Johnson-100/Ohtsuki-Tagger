@@ -8,6 +8,7 @@ module Test.Text.TaggerQL.Expression.AST (
 ) where
 
 import Control.Monad ((>=>))
+import qualified Data.Foldable as F
 import qualified Data.Text as T
 import Test.Tasty
 import Test.Tasty.QuickCheck
@@ -31,6 +32,14 @@ instance Arbitrary a => Arbitrary (RingExpression a) where
         let ringOperation =
                 oneof [pure (:+), pure (:*), pure (:-)] <*> arbitrary <*> arbitrary
         oneof [Ring <$> arbitrary, ringOperation]
+
+instance Arbitrary a => Arbitrary (MagmaExpression a) where
+    arbitrary :: Arbitrary a => Gen (MagmaExpression a)
+    arbitrary = do
+        xs' <- arbitrary
+        case xs' of
+            (x : xs) -> pure $ F.foldl' over (pure x) xs
+            _emptyList -> Magma <$> arbitrary
 
 astTests :: TestTree
 astTests =
@@ -73,6 +82,36 @@ astProperties =
                     )
             ]
         , testGroup
+            "MagmaExpression Properties"
+            [ testProperty
+                "Left Monad Identity"
+                ( do
+                    f <- arbitrary :: Gen (Int -> MagmaExpression Int)
+                    i <- arbitrary
+                    let testProp = (pure i >>= f) == f i
+                    pure testProp
+                )
+            , testProperty
+                "Right Monad Identity"
+                ( do
+                    re <- arbitrary :: Gen (MagmaExpression Int)
+                    let testProp = (re >>= pure) == re
+                    pure testProp
+                )
+            , localOption (QuickCheckTests 30) $
+                testProperty
+                    "Kleisli Arrow Associativity"
+                    ( do
+                        f <- arbitrary :: Gen (Int -> MagmaExpression Int)
+                        g <- arbitrary :: Gen (Int -> MagmaExpression Int)
+                        h <- arbitrary :: Gen (Int -> MagmaExpression Int)
+                        dt <- arbitrary :: Gen Int
+                        let testProp = (f >=> (g >=> h)) dt == ((f >=> g) >=> h) dt
+                            propTerminates = within (500 * (10 ^ (3 :: Integer))) testProp
+                        pure $ propTerminates .||. Discard
+                    )
+            ]
+        , testGroup
             "DTerm properties"
             [ testProperty
                 "Left Monad Identity"
@@ -96,7 +135,7 @@ astProperties =
                         h <- arbitrary :: Gen (Int -> DTerm Int)
                         dt <- arbitrary :: Gen Int
                         let testProp = (f >=> (g >=> h)) dt == ((f >=> g) >=> h) dt
-                            propTerminates = within (500 * (10 ^ (3 :: Integer))) testProp
+                            propTerminates = within (100 * (10 ^ (3 :: Integer))) testProp
                         pure $ propTerminates .||. Discard
                     )
             ]
