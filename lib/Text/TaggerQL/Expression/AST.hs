@@ -239,6 +239,16 @@ instance Monad RingExpression where
     re :* re' -> (re >>= f) :* (re' >>= f)
     re :- re' -> (re >>= f) :- (re' >>= f)
 
+instance Comonad RingExpression where
+  extract :: RingExpression a -> a
+  extract re = case re of
+    Ring a -> a
+    re' :+ _ -> extract re'
+    re' :* _ -> extract re'
+    re' :- _ -> extract re'
+  duplicate :: RingExpression a -> RingExpression (RingExpression a)
+  duplicate re = re <$ re
+
 {- |
  Run the computation defined by a 'RingExpression`
 -}

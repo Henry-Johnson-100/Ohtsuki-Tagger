@@ -41,6 +41,8 @@ instance Arbitrary a => Arbitrary (RingExpression a) where
                     , (:-) <$> sizedRing (n `div` 2) <*> sizedRing (n `div` 2)
                     ]
 
+instance CoArbitrary a => CoArbitrary (RingExpression a)
+
 instance Function a => Function (RingExpression a)
 
 instance Arbitrary a => Arbitrary (MagmaExpression a) where
@@ -86,51 +88,109 @@ astProperties =
         "Expression Properties"
         [ testGroup
             "RingExpression Properties"
-            [ testProperty
-                "Left Monad Identity"
-                ( do
-                    f <- arbitrary :: Gen (Int -> RingExpression Int)
-                    i <- arbitrary
-                    let testProp = (pure i >>= f) == f i
-                    pure testProp
-                )
-            , testProperty
-                "Right Monad Identity"
-                ( do
-                    re <- arbitrary :: Gen (RingExpression Int)
-                    let testProp = (re >>= pure) == re
-                    pure testProp
-                )
-            , testProperty
-                "Kleisli Arrow Associativity"
-                ( do
-                    let genF =
-                            suchThat
-                                -- Use relatively small functions so it doesn't
-                                -- take forever to run.
-                                (resize 35 arbitrary)
-                                -- Exclude functions that appear to be identities
-                                (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (RingExpression Int))
-                    f <- genF
-                    g <- genF
-                    h <- genF
-                    dt <- arbitrary :: Gen Int
-                    let testProp =
-                            ( applyFun f
-                                >=> ( applyFun g
-                                        >=> applyFun h
-                                    )
-                            )
-                                dt
-                                == ( ( applyFun f
-                                        >=> applyFun g
-                                     )
-                                        >=> applyFun h
-                                   )
+            [ testGroup
+                "Monad Laws"
+                [ testProperty
+                    "Left Monad Identity"
+                    ( do
+                        f <- arbitrary :: Gen (Int -> RingExpression Int)
+                        i <- arbitrary
+                        let testProp = (pure i >>= f) == f i
+                        pure testProp
+                    )
+                , testProperty
+                    "Right Monad Identity"
+                    ( do
+                        re <- arbitrary :: Gen (RingExpression Int)
+                        let testProp = (re >>= pure) == re
+                        pure testProp
+                    )
+                , testProperty
+                    "Kleisli Arrow Associativity"
+                    ( do
+                        let genF =
+                                suchThat
+                                    -- Use relatively small functions so it doesn't
+                                    -- take forever to run.
+                                    (resize 35 arbitrary)
+                                    -- Exclude functions that appear to be identities
+                                    (\(Fn fun) -> fun 1 /= pure 1) ::
+                                    Gen (Fun Int (RingExpression Int))
+                        f <- genF
+                        g <- genF
+                        h <- genF
+                        dt <- arbitrary :: Gen Int
+                        let testProp =
+                                ( applyFun f
+                                    >=> ( applyFun g
+                                            >=> applyFun h
+                                        )
+                                )
                                     dt
-                    pure testProp
-                )
+                                    == ( ( applyFun f
+                                            >=> applyFun g
+                                         )
+                                            >=> applyFun h
+                                       )
+                                        dt
+                        pure testProp
+                    )
+                ]
+            , testGroup
+                "Comonad Laws"
+                [ testProperty
+                    "Left Identity"
+                    ( do
+                        dt <- arbitrary :: Gen (RingExpression Int)
+                        let testProp = extend extract dt == dt
+                        pure testProp
+                    )
+                , testProperty
+                    "Right Identity"
+                    ( do
+                        let genF =
+                                suchThat
+                                    (resize 35 arbitrary)
+                                    (\(Fn fun) -> fun (pure 1) /= 1) ::
+                                    Gen (Fun (RingExpression Int) Int)
+                        f <- genF
+                        dt <- arbitrary :: Gen (RingExpression Int)
+                        let testProp =
+                                (extract . extend (applyFun f) $ dt)
+                                    == applyFun f dt
+                        pure testProp
+                    )
+                , testProperty
+                    "Cokleisli associativty"
+                    ( do
+                        let genF =
+                                suchThat
+                                    -- Use relatively small functions so it doesn't
+                                    -- take forever to run.
+                                    (resize 35 arbitrary)
+                                    -- Exclude functions that appear to be identities
+                                    (\(Fn fun) -> fun (pure 1) /= 1) ::
+                                    Gen (Fun (RingExpression Int) Int)
+                        f <- genF
+                        g <- genF
+                        h <- genF
+                        dt <- resize 10 arbitrary :: Gen (RingExpression Int)
+                        let testProp =
+                                ( applyFun f
+                                    =>= ( applyFun g
+                                            =>= applyFun h
+                                        )
+                                )
+                                    dt
+                                    == ( ( applyFun f
+                                            =>= applyFun g
+                                         )
+                                            =>= applyFun h
+                                       )
+                                        dt
+                        pure testProp
+                    )
+                ]
             ]
         , testGroup
             "MagmaExpression Properties"
