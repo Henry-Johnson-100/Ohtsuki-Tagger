@@ -15,6 +15,7 @@ import Test.Tasty (
     testGroup,
     withResource,
  )
+import Test.Text.TaggerQL.Expression.AST (astTests)
 import Test.Text.TaggerQL.Expression.Engine (queryEngineASTTests)
 import Test.Text.TaggerQL.Expression.Parser (parserTests)
 
@@ -32,5 +33,6 @@ main =
                         , after AllSucceed "Setup 0" $ setup_1_TestInitialization conn
                         , after AllSucceed "Setup" $ queryEngineASTTests conn
                         ]
+            , astTests
             ]
         )

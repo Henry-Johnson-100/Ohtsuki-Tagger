@@ -417,6 +417,12 @@ data DTerm a
   | DMetaTerm a
   deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
 
+extractDTerm = runDTerm
+
+duplicateDTerm :: DTerm a -> DTerm (DTerm a)
+duplicateDTerm (DTerm x) = DTerm (DTerm x)
+duplicateDTerm (DMetaTerm x) = DMetaTerm (DMetaTerm x)
+
 instance Hashable a => Hashable (DTerm a)
 
 instance Applicative DTerm where
