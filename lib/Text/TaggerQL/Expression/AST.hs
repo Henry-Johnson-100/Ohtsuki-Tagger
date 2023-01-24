@@ -436,7 +436,11 @@ instance Monad DTerm where
   return = DMetaTerm
   (>>=) :: DTerm a -> (a -> DTerm b) -> DTerm b
   d >>= f = case d of
-    DTerm a -> f a >>= DTerm
+    DTerm a ->
+      let result = f a
+       in case result of
+            DTerm _ -> result
+            DMetaTerm b -> DTerm b
     DMetaTerm a -> f a
 
 runDTerm :: DTerm p -> p
