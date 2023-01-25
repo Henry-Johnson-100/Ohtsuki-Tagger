@@ -30,6 +30,24 @@ d = DTerm
 rt :: a -> DTerm a
 rt = DMetaTerm
 
+{- |
+ Run a series of equality assertions on varying inputs that all produce the same
+ output.
+-}
+battery :: (Eq a, Show a) => TestName -> String -> a -> [a] -> TestTree
+battery name failMsg expectedResult samples =
+    let tests = zip ([1 ..] :: [Int]) samples
+     in testGroup
+            name
+            ( fmap
+                ( \(testN, sample) ->
+                    testCase
+                        (name <> " - " <> show testN)
+                        (assertEqual failMsg expectedResult sample)
+                )
+                tests
+            )
+
 newParserTests :: TestTree
 newParserTests =
     let distrTEs (QueryExpression qe) =
@@ -48,6 +66,12 @@ newParserTests =
                     $ x
                 )
                 (distrTEs <$> parseQueryExpression y)
+        comBat name failMsg expect tsts =
+            battery
+                name
+                failMsg
+                (Right . distrTEs $ expect)
+                (fmap distrTEs . parseQueryExpression <$> tsts)
      in testGroup
             "Parser Tests"
             [ testGroup
@@ -59,17 +83,23 @@ newParserTests =
                             "p.apple"
                             (fe "apple")
                             "p.apple"
-                    , testCase "Ring Expression of FileLeaf" $
-                        com
-                            "p.apple | p.orange"
-                            (fe "apple" +. fe "orange")
-                            "p.apple | p.orange"
-                    , testCase "Left-Associative Simple Expression by Default" $
-                        com
-                            "(p.apple p.orange p.banana) \
-                            \All ring expressions should be left-associative by default"
-                            ((fe "apple" *. fe "orange") *. fe "banana")
-                            "p.apple p.orange p.banana"
+                    , comBat
+                        "Ring Expression of FileLeaf"
+                        ""
+                        (fe "apple" +. fe "orange")
+                        [ "p.apple | p.orange"
+                        , "p.apple| p.orange"
+                        , "p.apple |p.orange"
+                        , "p.apple|p.orange"
+                        , "p.apple   |   p.orange"
+                        ]
+                    , comBat
+                        "Left-Associative Simple Expression"
+                        ""
+                        ((fe "apple" *. fe "orange") *. fe "banana")
+                        [ "p.apple p.orange p.banana"
+                        , "(p.apple p.orange) p.banana"
+                        ]
                     , testCase "Explicit Right-Association" $
                         com
                             "p.apple (p.orange p.banana)"
@@ -84,46 +114,45 @@ newParserTests =
                             ( tle . tedp . rt $ "apple"
                             )
                             "apple"
-                    , testCase "Minimal Magma Expression" $
-                        com
-                            "apple {red}"
-                            (tle $ (tedp . rt $ "apple") # (tedp . rt $ "red"))
-                            "apple {red}"
-                    , testCase "Nested Minimal Magma Expression" $
-                        com
-                            "apple {peel {red}}"
-                            ( tle $
-                                (tedp . rt $ "apple")
-                                    # ( (tedp . rt $ "peel")
-                                            # (tedp . rt $ "red")
-                                      )
-                            )
-                            "apple {peel {red}}"
-                    , testCase "Minimal Magma Expression - Nonsignificant Whitespace" $
-                        com
-                            "apple{red}"
-                            (tle $ (tedp . rt $ "apple") # (tedp . rt $ "red"))
-                            "apple{red}"
-                    , testCase "Explicit MetaTerm" $
-                        com
-                            "r.apple"
-                            (tle . tedp . rt $ "apple")
-                            "r.apple"
-                    , testCase "Explicit MetaTerm - Case Insensitive" $
-                        com
-                            "R.apple"
-                            (tle . tedp . rt $ "apple")
-                            "R.apple"
-                    , testCase "Explicit Term" $
-                        com
-                            "d.apple"
-                            (tle . tedp . d $ "apple")
-                            "d.apple"
-                    , testCase "Explicit Term - Case Insensitive" $
-                        com
-                            "D.apple"
-                            (tle . tedp . d $ "apple")
-                            "D.apple"
+                    , comBat
+                        "Minimal Magma Expression"
+                        "apple {red}"
+                        (tle $ (tedp . rt $ "apple") # (tedp . rt $ "red"))
+                        [ "apple {red}"
+                        , "apple{red}"
+                        , "apple{ red}"
+                        , "apple { red}"
+                        , "apple{ red }"
+                        , "apple{red} "
+                        ]
+                    , comBat
+                        "Nested Minimal Magma Expression"
+                        "apple {peel {red}}"
+                        ( tle $
+                            (tedp . rt $ "apple")
+                                # ( (tedp . rt $ "peel")
+                                        # (tedp . rt $ "red")
+                                  )
+                        )
+                        [ "apple {peel {red}}"
+                        , "apple{peel{red}}"
+                        , "apple { peel { red } }"
+                        ]
+                    , comBat
+                        "Explicit MetaTerm"
+                        "r.apple"
+                        (tle . tedp . rt $ "apple")
+                        [ "r.apple"
+                        , "R.apple"
+                        , "apple"
+                        ]
+                    , comBat
+                        "Explicit Term"
+                        "d.apple"
+                        (tle . tedp . d $ "apple")
+                        [ "d.apple"
+                        , "D.apple"
+                        ]
                     ]
                 , testGroup
                     "Mixed Leaf Expressions"
