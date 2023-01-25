@@ -108,12 +108,16 @@ newParserTests =
                     ]
                 , testGroup
                     "TagLeaf Expressions"
-                    [ testCase "Minimal TagLeaf" $
-                        com
-                            "apple"
-                            ( tle . tedp . rt $ "apple"
-                            )
-                            "apple"
+                    [ comBat
+                        "Minimal TagLeaf"
+                        "apple"
+                        ( tle . tedp . rt $ "apple"
+                        )
+                        [ "apple"
+                        , " apple "
+                        , "apple "
+                        , " apple"
+                        ]
                     , comBat
                         "Minimal Magma Expression"
                         "apple {red}"
@@ -166,14 +170,16 @@ newParserTests =
                             "apple p.orange"
                             ((tle . tedp . rt $ "apple") *. fe "orange")
                             "apple p.orange"
-                    , testCase "Parenthesized Tag Leaves" $
-                        com
-                            "(apple orange banana)"
-                            ( (tle . tedp . rt $ "apple")
-                                *. (tle . tedp . rt $ "orange")
-                                *. (tle . tedp . rt $ "banana")
-                            )
-                            "(apple orange banana)"
+                    , comBat
+                        "Parenthesized Tag Leaves"
+                        "(apple orange banana)"
+                        ( (tle . tedp . rt $ "apple")
+                            *. (tle . tedp . rt $ "orange")
+                            *. (tle . tedp . rt $ "banana")
+                        )
+                        [ "(apple orange banana)"
+                        , "((apple orange) banana)"
+                        ]
                     , testCase "Mixed Parenthesized Tag Leaves" $
                         com
                             "[p.apple (orange banana)] - Should be three leaves in a \
@@ -194,58 +200,64 @@ newParserTests =
                                       )
                             )
                             "apple {red | yellow}"
-                    , testCase "Simple Right Distribution" $
-                        com
-                            "(apple | orange) {red}"
-                            ( tle $
-                                ( (tedp . rt $ "apple")
-                                    +. (tedp . rt $ "orange")
-                                )
-                                    # (tedp . rt $ "red")
+                    , comBat
+                        "Simple Right Distribution"
+                        "(apple | orange) {red}"
+                        ( tle $
+                            ( (tedp . rt $ "apple")
+                                +. (tedp . rt $ "orange")
                             )
-                            "(apple | orange) {red}"
-                    , testCase "Simple Right Distribution - Nonsignificant Whitespace" $
-                        com
-                            "(apple|orange){red}"
-                            ( tle $
-                                ( (tedp . rt $ "apple")
-                                    +. (tedp . rt $ "orange")
-                                )
-                                    # (tedp . rt $ "red")
+                                # (tedp . rt $ "red")
+                        )
+                        [ "(apple | orange) {red}"
+                        , "(apple|orange){red}"
+                        , "apple{red} | orange{red}"
+                        ]
+                    , comBat
+                        "Associative Right Distribution"
+                        "(apple | (orange{peel})) {red}"
+                        ( tle $
+                            ( (tedp . rt $ "apple")
+                                +. ( (tedp . rt $ "orange")
+                                        # (tedp . rt $ "peel")
+                                   )
                             )
-                            "(apple|orange){red}"
-                    , testCase "Associative Right Distribution" $
-                        com
-                            "(apple | (orange{peel})) {red}"
-                            ( tle $
-                                ( (tedp . rt $ "apple")
-                                    +. ( (tedp . rt $ "orange")
-                                            # (tedp . rt $ "peel")
-                                       )
-                                )
-                                    # (tedp . rt $ "red")
+                                # (tedp . rt $ "red")
+                        )
+                        [ "(apple | (orange{peel})) {red}"
+                        , "(apple | orange {peel}) {red}"
+                        , "(apple | orange{peel}){red}"
+                        ]
+                    , comBat
+                        "Associative Left Distribution"
+                        "apple{peel}{red}"
+                        ( tle $
+                            ( (tedp . rt $ "apple")
+                                # (tedp . rt $ "peel")
                             )
-                            "(apple | (orange{peel})) {red}"
-                    , testCase "Associative Left Distribution" $
-                        com
-                            "apple{peel}{red}"
-                            ( tle $
-                                ( (tedp . rt $ "apple")
-                                    # (tedp . rt $ "peel")
-                                )
-                                    # (tedp . rt $ "red")
+                                # (tedp . rt $ "red")
+                        )
+                        [ "apple{peel}{red}"
+                        , "apple {peel} {red}"
+                        , -- desugared
+                          "apple{peel{red}}"
+                        ]
+                    , comBat
+                        "Mixed Distribution"
+                        "(apple{skin} | orange{peel}){orange | red}"
+                        ( tle $
+                            ( ((tedp . rt $ "apple") # (tedp . rt $ "skin"))
+                                +. ((tedp . rt $ "orange") # (tedp . rt $ "peel"))
                             )
-                            "apple{peel}{red}"
-                    , testCase "Mixed Distribution" $
-                        com
-                            "(apple{skin} | orange{peel}){orange | red}"
-                            ( tle $
-                                ( ((tedp . rt $ "apple") # (tedp . rt $ "skin"))
-                                    +. ((tedp . rt $ "orange") # (tedp . rt $ "peel"))
-                                )
-                                    # ((tedp . rt $ "yellow") +. (tedp . rt $ "red"))
-                            )
-                            "(apple{skin} | orange{peel}){yellow | red}"
+                                # ((tedp . rt $ "yellow") +. (tedp . rt $ "red"))
+                        )
+                        [ "(apple{skin} | orange{peel}){yellow | red}"
+                        , -- intermediate desugaring
+                          "apple {skin{yellow | red}} | orange {peel{yellow | red}}"
+                        , -- desugared
+                          "apple {skin{yellow}} | apple {skin{red}} \
+                          \| orange {peel{yellow}} | orange {peel{red}}"
+                        ]
                     ]
                 ]
             ]
