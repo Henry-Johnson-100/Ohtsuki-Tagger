@@ -1,7 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# HLINT ignore "Use lambda-case" #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Test.Text.TaggerQL.Expression.Parser (
     parserTests,
+    newParserTests,
 ) where
 
 import Data.Either (isLeft)
@@ -10,6 +14,109 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Text.TaggerQL.Expression.AST
 import Text.TaggerQL.Expression.Parser
+
+fe :: Pattern -> QueryExpression
+fe = QueryExpression . pure . FileLeaf
+
+tle :: TagExpression (DTerm Pattern) -> QueryExpression
+tle = QueryExpression . pure . TagLeaf
+
+tedp :: DTerm Pattern -> TagExpression (DTerm Pattern)
+tedp = pure
+
+d :: a -> DTerm a
+d = DTerm
+
+rt :: a -> DTerm a
+rt = DMetaTerm
+
+newParserTests :: TestTree
+newParserTests =
+    let distrTEs (QueryExpression qe) =
+            QueryExpression
+                . fmap
+                    ( \ql -> case ql of
+                        FileLeaf pat -> FileLeaf pat
+                        TagLeaf te -> TagLeaf . distribute $ te
+                    )
+                $ qe
+        com msg x y =
+            assertEqual
+                msg
+                ( Right
+                    . distrTEs
+                    $ x
+                )
+                (distrTEs <$> parseQueryExpression y)
+     in testGroup
+            "Parser Tests"
+            [ testGroup
+                "QueryExpressionParser tests"
+                [ testGroup
+                    "FileLeaf Expressions"
+                    [ testCase "Single FileLeaf" $
+                        com
+                            "p.apple"
+                            (fe "apple")
+                            "p.apple"
+                    , testCase "Ring Expression of FileLeaf" $
+                        com
+                            "p.apple | p.orange"
+                            (fe "apple" +. fe "orange")
+                            "p.apple | p.orange"
+                    , testCase "Left-Associative Simple Expression by Default" $
+                        com
+                            "(p.apple p.orange p.banana) \
+                            \All ring expressions should be left-associative by default"
+                            ((fe "apple" *. fe "orange") *. fe "banana")
+                            "p.apple p.orange p.banana"
+                    , testCase "Explicit Right-Association" $
+                        com
+                            "p.apple (p.orange p.banana)"
+                            (fe "apple" *. (fe "orange" *. fe "banana"))
+                            "p.apple (p.orange p.banana)"
+                    ]
+                , testGroup
+                    "TagLeaf Expressions"
+                    [ testCase "Minimal TagLeaf" $
+                        com
+                            "apple"
+                            ( tle . tedp . rt $ "apple"
+                            )
+                            "apple"
+                    , testCase "Minimal Magma Expression" $
+                        com
+                            "apple {red}"
+                            (tle $ (tedp . rt $ "apple") # (tedp . rt $ "red"))
+                            "apple {red}"
+                    , testCase "Minimal Magma Expression - Nonsignificant Whitespace" $
+                        com
+                            "apple{red}"
+                            (tle $ (tedp . rt $ "apple") # (tedp . rt $ "red"))
+                            "apple{red}"
+                    , testCase "Explicit MetaTerm" $
+                        com
+                            "r.apple"
+                            (tle . tedp . rt $ "apple")
+                            "r.apple"
+                    , testCase "Explicit MetaTerm - Case Insensitive" $
+                        com
+                            "R.apple"
+                            (tle . tedp . rt $ "apple")
+                            "R.apple"
+                    , testCase "Explicit Term" $
+                        com
+                            "d.apple"
+                            (tle . tedp . d $ "apple")
+                            "d.apple"
+                    , testCase "Explicit Term - Case Insensitive" $
+                        com
+                            "D.apple"
+                            (tle . tedp . d $ "apple")
+                            "D.apple"
+                    ]
+                ]
+            ]
 
 parserTests :: TestTree
 parserTests =
