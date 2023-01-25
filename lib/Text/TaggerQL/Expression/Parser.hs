@@ -2,6 +2,8 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
+{-# HLINT ignore "Use lambda-case" #-}
+
 {- |
 Module      : Text.TaggerQL.Expression.Parser
 Description : Parsers for the expression-based TaggerQL query language.
@@ -12,6 +14,7 @@ Maintainer  : monawasensei@gmail.com
 module Text.TaggerQL.Expression.Parser (
   parseExpr,
   parseTagExpr,
+  parseQueryExpression,
   ParseError,
 
   -- * For Testing
@@ -37,30 +40,8 @@ import Data.Functor (($>), (<&>))
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
-import Text.Parsec (
-  ParseError,
-  Parsec,
-  ParsecT,
-  Stream,
-  anyChar,
-  between,
-  char,
-  many1,
-  noneOf,
-  optionMaybe,
-  parse,
-  spaces,
-  try,
-  (<|>),
- )
-import Text.TaggerQL.Expression.AST (
-  BinaryOperation (BinaryOperation),
-  Expression (..),
-  FileTerm (..),
-  SubExpression (..),
-  TagTerm (..),
-  TagTermExtension (TagTermExtension),
- )
+import Text.Parsec
+import Text.TaggerQL.Expression.AST
 
 type Parser a = Parsec Text () a
 
@@ -202,6 +183,9 @@ patternParser :: Parser Text
 patternParser =
   T.pack <$> many1 ((char '\\' *> anyChar) <|> notRestricted)
 
+patternParser' :: Parser Pattern
+patternParser' = Pattern <$> patternParser
+
 notRestricted :: Parser Char
 notRestricted = noneOf restrictedChars
 
@@ -220,3 +204,38 @@ ichar c = char (toUpper c) <|> char (toLower c)
 
 restrictedChars :: [Char]
 restrictedChars = "(){}!&|. \r\n"
+
+parseQueryExpression :: Text -> Either ParseError QueryExpression
+parseQueryExpression = parse queryExpressionParser "TaggerQL"
+
+queryExpressionParser :: Parser QueryExpression
+queryExpressionParser = undefined
+
+parenthesized :: Parser a -> Parser a
+parenthesized = between (spaces *> char '(') (spaces *> char ')')
+
+dTermConstructorParser :: Parser (a -> DTerm a)
+dTermConstructorParser =
+  ( try (ichar 'r' *> char '.' $> DMetaTerm)
+      <|> try (ichar 'd' *> char '.' $> DTerm)
+  )
+    <|> pure DMetaTerm
+
+ringExprParser :: Parser a -> Parser (RingExpression a)
+ringExprParser termP =
+  myChainl1
+    (pure <$> termP)
+    ringExprConstructorParser
+    pure
+
+ringExprConstructorParser ::
+  Parser
+    (RingExpression a -> RingExpression a -> RingExpression a)
+ringExprConstructorParser =
+  ( \so ->
+      case so of
+        Union -> (:+)
+        Intersect -> (:*)
+        Difference -> (:-)
+  )
+    <$> (spaces *> setOpParser)
