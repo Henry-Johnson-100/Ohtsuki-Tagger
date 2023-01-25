@@ -1,4 +1,8 @@
 {-# LANGUAGE BangPatterns #-}
+{-# HLINT ignore "Replace case with maybe" #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# HLINT ignore "Use lambda-case" #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PartialTypeSignatures #-}
@@ -13,8 +17,6 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_HADDOCK prune #-}
-
-{-# HLINT ignore "Use lambda-case" #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.Engine
@@ -61,14 +63,18 @@ module Text.TaggerQL.Expression.Engine (
   runSubExprOnFile,
   evalSubExpression,
   queryTags,
+
+  -- * New
+  queryQueryExpression,
+  insertTagExpression,
 ) where
 
-import Control.Applicative ((<|>))
-import Control.Monad (guard, void, when)
+import Control.Applicative (liftA2, (<|>))
+import Control.Monad (foldM, guard, void, when, (>=>))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (ExceptT, throwE)
 import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask, asks)
-import Control.Monad.Trans.State.Strict (StateT, evalState, get, gets, modify, runState)
+import Control.Monad.Trans.State.Strict (State, StateT, evalState, execState, get, gets, modify, runState)
 import Data.Bifunctor (Bifunctor (first, second))
 import Data.Functor (($>))
 import Data.HashSet (HashSet)
@@ -80,11 +86,15 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger (
   RecordKey,
+  allFiles,
+  allTags,
   insertTags,
   queryForDescriptorByPattern,
+  queryForFileByTagId,
+  queryForTagByDescriptorPattern,
   queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf,
+  queryForTagByMetaDescriptorPattern,
  )
-import Database.Tagger.Connection (query)
 import Database.Tagger.Query (
   flatQueryForFileByTagDescriptorPattern,
   flatQueryForFileOnMetaRelationPattern,
@@ -97,18 +107,9 @@ import Database.Tagger.Type (
   TaggedConnection,
   descriptorId,
  )
-import Lens.Micro (Lens', lens, (%~), (&), (.~), (?~), (^.))
+import Lens.Micro (Lens', lens, (%~), (&), (.~), (^.))
 import Text.Parsec.Error (errorMessages, messageString)
-import Text.RawString.QQ (r)
-import Text.TaggerQL.Expression.AST (
-  BinaryOperation (BinaryOperation),
-  Expression (..),
-  FileTerm (FileTerm),
-  SubExpression (..),
-  TagTerm (..),
-  TagTermExtension (TagTermExtension),
-  extensionL,
- )
+import Text.TaggerQL.Expression.AST
 import Text.TaggerQL.Expression.Parser (parseExpr, parseTagExpr)
 import Prelude hiding (lookup, (!!))
 
@@ -229,7 +230,7 @@ queryer =
         c <- ask
         supertags <- liftIO . fmap HS.fromList $ queryTags tt c
         joinSubTagsTo <- se
-        liftIO $ toFileSet (joinSubTagsTo supertags) c
+        liftIO . toFileSet c $ joinSubTagsTo supertags
     , subExpressionInterpreter =
         SubExpressionInterpreter
           { interpretSubTag = \tt ->
@@ -252,13 +253,15 @@ queryer =
           }
     }
  where
-  joinSubtags supertags subtags =
-    HS.filter (\(Just . tagId -> supertagId) -> HS.member supertagId subtags) supertags
   hsOp so =
     case so of
       Union -> HS.union
       Intersect -> HS.intersection
       Difference -> HS.difference
+
+joinSubtags :: HashSet Tag -> HashSet (Maybe (RecordKey Tag)) -> HashSet Tag
+joinSubtags supertags subtags =
+  HS.filter (\(Just . tagId -> supertagId) -> HS.member supertagId subtags) supertags
 
 {- |
  Run a TaggerQL query on the given database.
@@ -296,58 +299,22 @@ evalSubExpression subExpr supertags = do
   joinSubTagsTo <- runSubExpressionInterpreter (subExpressionInterpreter queryer) subExpr
   return . joinSubTagsTo $ supertags
 
-toFileSet :: HashSet Tag -> TaggedConnection -> IO (HashSet File)
-toFileSet (map tagId . HS.toList -> ts) conn = do
-  results <- mapM (query conn q . (: [])) ts
-  return . HS.unions . map HS.fromList $ results
- where
-  q =
-    [r|
-SELECT
-  f.id
-  ,f.filePath
-FROM File f
-JOIN Tag t ON f.id = t.fileId
-WHERE t.id = ?
-    |]
+toFileSet :: TaggedConnection -> HashSet Tag -> IO (HashSet File)
+toFileSet conn =
+  foldM
+    ( \acc rt ->
+        maybe acc (`HS.insert` acc)
+          <$> queryForFileByTagId rt conn
+    )
+    HS.empty
+    . map tagId
+    . HS.toList
 
 queryTags :: TagTerm -> TaggedConnection -> IO [Tag]
 queryTags tt c =
   case tt of
-    DescriptorTerm txt -> query c tagQueryOnDescriptorPattern [txt]
-    MetaDescriptorTerm txt -> query c tagQueryOnMetaDescriptorPattern [txt]
- where
-  tagQueryOnDescriptorPattern =
-    [r|
-      SELECT
-        t.id,
-        t.fileId,
-        t.descriptorId,
-        t.subTagOfId
-      FROM Tag t
-      JOIN Descriptor d ON t.descriptorId = d.id
-      WHERE d.descriptor LIKE ? ESCAPE '\'
-      |]
-  tagQueryOnMetaDescriptorPattern =
-    [r|
-      SELECT
-        t.id
-        ,t.fileId
-        ,t.descriptorId
-        ,t.subTagOfId
-      FROM Tag t
-      JOIN (
-        WITH RECURSIVE r(id) AS (
-          SELECT id
-          FROM Descriptor
-          WHERE descriptor LIKE ? ESCAPE '\'
-          UNION
-          SELECT infraDescriptorId
-          FROM MetaDescriptor md
-          JOIN r ON md.metaDescriptorId = r.id
-        )
-        SELECT id FROM r
-      ) AS d ON t.descriptorId = d.id|]
+    DescriptorTerm txt -> queryForTagByDescriptorPattern txt c
+    MetaDescriptorTerm txt -> queryForTagByMetaDescriptorPattern txt c
 
 -- Tagging Engine
 
@@ -610,3 +577,169 @@ lowerExpression expr = case expr of
   BinaryExpression (BinaryOperation lhs so rhs) ->
     BinarySubExpression
       <$> (BinaryOperation <$> lowerExpression lhs <*> pure so <*> lowerExpression rhs)
+
+queryQueryExpression :: TaggedConnection -> QueryExpression -> IO (HashSet File)
+queryQueryExpression c =
+  fmap evaluateRing
+    . traverse (queryQueryLeaf c)
+    . runQueryExpression
+
+queryQueryLeaf :: TaggedConnection -> QueryLeaf -> IO (HashSet File)
+queryQueryLeaf c ql = case ql of
+  FileLeaf pat ->
+    case pat of
+      WildCard -> HS.fromList <$> allFiles c
+      PatternText t -> HS.fromList <$> queryForFileByPattern t c
+  TagLeaf te -> evaluateTagExpression c te >>= toFileSet c
+
+-- A naive query interpreter, with no caching.
+evaluateTagExpression ::
+  TaggedConnection ->
+  TagExpression (DTerm Pattern) ->
+  IO (HashSet Tag)
+evaluateTagExpression c =
+  fmap
+    ( evaluateTagExpressionR
+        rightAssocJoinTags
+        . distribute
+    )
+    . traverse (queryDTerm c)
+ where
+  rightAssocJoinTags supers subs = joinSubtags supers (HS.map tagSubtagOfId subs)
+
+queryDTerm :: TaggedConnection -> DTerm Pattern -> IO (HashSet Tag)
+queryDTerm c dt = case dt of
+  DTerm (PatternText t) ->
+    HS.fromList
+      <$> queryForTagByDescriptorPattern t c
+  DMetaTerm (PatternText t) ->
+    HS.fromList
+      <$> queryForTagByMetaDescriptorPattern t c
+  _wildcard -> HS.fromList <$> allTags c
+
+{- |
+ A newtype used to provide a Rng instance when inserting tags defined by a
+ TagExpression.
+-}
+newtype TagInserter = TagInserter
+  {runTagInserter :: Maybe [RecordKey Tag] -> IO [RecordKey Tag]}
+
+{- |
+ Sequences two TagInserters and returns an empty list.
+-}
+instance Semigroup TagInserter where
+  (<>) :: TagInserter -> TagInserter -> TagInserter
+  (TagInserter x) <> (TagInserter y) =
+    TagInserter $ \mrkt -> (x mrkt *> y mrkt) $> mempty
+
+insertTagExpression ::
+  TaggedConnection ->
+  RecordKey File ->
+  TagExpression Pattern ->
+  IO ()
+insertTagExpression c fk =
+  void
+    . flip runTagInserter Nothing
+    . runDefaultRng
+    . evaluateTagExpressionL (liftA2 leftAssocInsertTags)
+    . distribute
+    . fmap
+      ( DefaultRng
+          . TagInserter
+          . insertTagPattern c fk
+      )
+ where
+  {-
+   Left-associative insertion of tags, where the TagInserter on the left
+   is inserted first and its output is fed into the right TagInserter.
+  -}
+  leftAssocInsertTags (TagInserter x) (TagInserter y) = TagInserter (x >=> (y . Just))
+
+{- |
+ Insert descriptors matching the given pattern as Tags on the given file.
+ If a list of Tag ID's is supplied then the new tags are inserted as subtags of those.
+
+ Returns a list of Tag ID's corresponding to the descriptors matching the given pattern
+ on the file that are subtags of the given list if one is provided.
+
+ Does nothing if the given pattern is a wildcard.
+-}
+insertTagPattern ::
+  TaggedConnection ->
+  RecordKey File ->
+  Pattern ->
+  Maybe [RecordKey Tag] ->
+  IO [RecordKey Tag]
+insertTagPattern _ _ WildCard _ = pure mempty
+insertTagPattern c fk (PatternText t) mrts = do
+  withDescriptors <- queryForDescriptorByPattern t c
+  let tagTriples =
+        (fk,,) <$> map descriptorId withDescriptors <*> maybe [Nothing] (map Just) mrts
+
+  void $ insertTags tagTriples c
+
+  -- Tag insertion may fail because some tags of the same form already exist.
+  -- This query gets all of those pre-existing tags,
+  -- and returns them as if they were just made.
+  case mrts of
+    -- If nothing, then these are top-level tags
+    Nothing ->
+      map tagId <$> queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf fk t c
+    -- If just, these are subtags of existing tags.
+    Just _ ->
+      let unions xs = if null xs then [] else L.foldl' L.union [] xs
+          third f (x, y, z) = (x, y, f z)
+       in map tagId . unions
+            <$> mapM
+              (`queryForTagBySubTagTriple` c)
+              (third fromJust <$> tagTriples)
+
+indexQueryExpression :: Int -> QueryExpression -> Maybe QueryExpression
+indexQueryExpression ix =
+  snd
+    . flip execState (1, Nothing)
+    . indexQueryExpressionSt
+ where
+  indexQueryExpressionSt ::
+    QueryExpression ->
+    State (Int, Maybe QueryExpression) ()
+  indexQueryExpressionSt qe'@(QueryExpression qe) = do
+    _innerMembers <-
+      let indexOperands x y = mapM_ (indexQueryExpressionSt . QueryExpression) [x, y]
+       in case qe of
+            Ring ql ->
+              case ql of
+                TagLeaf te ->
+                  case te of
+                    TagRing re ->
+                      let construct = QueryExpression . Ring . TagLeaf . TagRing
+                          indexTagOperands x y =
+                            mapM_ (indexQueryExpressionSt . construct) [x, y]
+                       in case re of
+                            Ring te' ->
+                              indexQueryExpressionSt . construct . Ring $ te'
+                            re' :+ re3 -> indexTagOperands re' re3
+                            re' :* re3 -> indexTagOperands re' re3
+                            re' :- re3 -> indexTagOperands re' re3
+                    TagMagma me ->
+                      let construct = QueryExpression . Ring . TagLeaf . TagMagma . Magma
+                       in case me of
+                            Magma te' -> indexQueryExpressionSt . construct $ te'
+                            me' :$ a ->
+                              traverse (indexQueryExpressionSt . construct) me'
+                                *> (indexQueryExpressionSt . construct $ a)
+                    -- These leaf cases are handled by the last returnWhenIx
+                    _leaf -> pure ()
+                _leaf -> pure ()
+            -- Index inner leaves of a query ring expression
+            re :+ re' -> indexOperands re re'
+            re :* re' -> indexOperands re re'
+            re :- re' -> indexOperands re re'
+    -- Checks the given query expression.
+    returnWhenIx
+   where
+    -- When the given index matches the state,
+    -- put the given QueryExpression into the state.
+    returnWhenIx =
+      (gets fst <* modify (first (1 +)))
+        >>= flip when (modify . second . const . Just $ qe') . (== ix)
