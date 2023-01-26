@@ -190,6 +190,24 @@ newParserTests =
                                    )
                             )
                             "p.apple (orange banana)"
+                    , testCase "Mixed Leaves and Simple Magmas" $
+                        com
+                            "apple{skin{red}} p.orange banana{peel{yellow}}"
+                            ( tle
+                                ( (tedp . rt $ "apple")
+                                    # ( (tedp . rt $ "skin")
+                                            # (tedp . rt $ "red")
+                                      )
+                                )
+                                *. fe "orange"
+                                *. tle
+                                    ( (tedp . rt $ "banana")
+                                        # ( (tedp . rt $ "peel")
+                                                # (tedp . rt $ "yellow")
+                                          )
+                                    )
+                            )
+                            "apple{skin{red}} p.orange banana{peel{yellow}}"
                     , testCase "Simple Left Distribution" $
                         com
                             "apple {red | yellow}"
@@ -200,6 +218,25 @@ newParserTests =
                                       )
                             )
                             "apple {red | yellow}"
+                    , comBat
+                        "Nested Left Distribution"
+                        ""
+                        ( tle $
+                            (tedp . rt $ "apple")
+                                # ( ( (tedp . rt $ "peel")
+                                        +. (tedp . rt $ "skin")
+                                    )
+                                        # ( (tedp . rt $ "red")
+                                                +. (tedp . rt $ "yellow")
+                                          )
+                                  )
+                        )
+                        [ "apple{(peel | skin){red | yellow}}"
+                        , "apple {peel {red | yellow}} | apple {skin {red | yellow}}"
+                        , -- desugared
+                          "apple {peel {red}} | apple {peel {yellow}} | \
+                          \apple {skin {red}} | apple {skin {yellow}}"
+                        ]
                     , comBat
                         "Simple Right Distribution"
                         "(apple | orange) {red}"
@@ -257,6 +294,31 @@ newParserTests =
                         , -- desugared
                           "apple {skin{yellow}} | apple {skin{red}} \
                           \| orange {peel{yellow}} | orange {peel{red}}"
+                        ]
+                    , comBat
+                        "Complex Query - 1"
+                        ""
+                        ( ( fe "apple"
+                                *. tle
+                                    ( (tedp . rt $ "orange")
+                                        # (tedp . rt $ "peel")
+                                    )
+                          )
+                            -. ( tle
+                                    ( ( ( (tedp . rt $ "coconut")
+                                            *. (tedp . rt $ "grape")
+                                        )
+                                            # (tedp . rt $ "smells")
+                                      )
+                                        # ( (tedp . rt $ "coconut")
+                                                # (tedp . rt $ "gun")
+                                          )
+                                    )
+                                    +. fe "lime"
+                               )
+                        )
+                        [ "p.apple orange{peel} ! \
+                          \(((coconut & grape) {smells} {coconut {gun}}) | p.lime)"
                         ]
                     ]
                 ]
