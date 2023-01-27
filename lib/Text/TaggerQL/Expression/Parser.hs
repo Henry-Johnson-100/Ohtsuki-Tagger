@@ -227,7 +227,7 @@ queryExpressionTermParser =
 queryLeafParser :: Parser QueryLeaf
 queryLeafParser =
   spaces
-    *> ( fileLeafParser
+    *> ( try fileLeafParser
           <|> tagLeafParser
        )
 
