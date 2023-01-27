@@ -208,7 +208,7 @@ restrictedChars :: [Char]
 restrictedChars = "(){}!&|. \r\n"
 
 parseQueryExpression :: Text -> Either ParseError QueryExpression
-parseQueryExpression = parse queryExpressionParser "TaggerQL"
+parseQueryExpression = parse (spaces *> queryExpressionParser <* spaces) "TaggerQL"
 
 queryExpressionParser :: Parser QueryExpression
 queryExpressionParser =
