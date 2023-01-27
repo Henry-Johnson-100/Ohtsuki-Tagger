@@ -210,7 +210,12 @@ parseQueryExpression :: Text -> Either ParseError QueryExpression
 parseQueryExpression = parse queryExpressionParser "TaggerQL"
 
 queryExpressionParser :: Parser QueryExpression
-queryExpressionParser = undefined
+queryExpressionParser = QueryExpression <$> ringExprParser queryLeafParser
+
+queryLeafParser :: Parser QueryLeaf
+queryLeafParser = spaces *> fileLeafParser
+ where
+  fileLeafParser = FileLeaf <$> (ichar 'p' *> char '.' *> termPatternParser)
 
 parenthesized :: Parser a -> Parser a
 parenthesized = between (spaces *> char '(') (spaces *> char ')')
