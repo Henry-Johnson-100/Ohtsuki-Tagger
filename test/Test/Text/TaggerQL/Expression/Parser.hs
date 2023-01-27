@@ -10,6 +10,7 @@ module Test.Text.TaggerQL.Expression.Parser (
 
 import Data.Either (isLeft)
 import Data.Tagger (SetOp (..))
+import Data.Text (Text)
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.TaggerQL.Expression.AST
@@ -34,7 +35,7 @@ rt = DMetaTerm
  Run a series of equality assertions on varying inputs that all produce the same
  output.
 -}
-battery :: (Eq a, Show a) => TestName -> String -> a -> [a] -> TestTree
+battery :: (Eq a, Show a, HasCallStack) => TestName -> String -> a -> [a] -> TestTree
 battery name failMsg expectedResult samples =
     let tests = zip ([1 ..] :: [Int]) samples
      in testGroup
@@ -48,17 +49,33 @@ battery name failMsg expectedResult samples =
                 tests
             )
 
+distrTEs :: QueryExpression -> QueryExpression
+distrTEs (QueryExpression qe) =
+    QueryExpression
+        . fmap
+            ( \ql -> case ql of
+                FileLeaf pat -> FileLeaf pat
+                TagLeaf te -> TagLeaf . distribute $ te
+            )
+        $ qe
+
+comBat ::
+    HasCallStack =>
+    TestName ->
+    String ->
+    QueryExpression ->
+    [Text] ->
+    TestTree
+comBat name failMsg expect tsts =
+    battery
+        name
+        failMsg
+        (Right . distrTEs $ expect)
+        (fmap distrTEs . parseQueryExpression <$> tsts)
+
 newParserTests :: TestTree
 newParserTests =
-    let distrTEs (QueryExpression qe) =
-            QueryExpression
-                . fmap
-                    ( \ql -> case ql of
-                        FileLeaf pat -> FileLeaf pat
-                        TagLeaf te -> TagLeaf . distribute $ te
-                    )
-                $ qe
-        com msg x y =
+    let com msg x y =
             assertEqual
                 msg
                 ( Right
@@ -66,12 +83,6 @@ newParserTests =
                     $ x
                 )
                 (distrTEs <$> parseQueryExpression y)
-        comBat name failMsg expect tsts =
-            battery
-                name
-                failMsg
-                (Right . distrTEs $ expect)
-                (fmap distrTEs . parseQueryExpression <$> tsts)
      in testGroup
             "Parser Tests"
             [ testGroup
@@ -89,9 +100,9 @@ newParserTests =
                           , -- This test doesn't work, but it's not a bug, it's a feature.
                             -- , testCase "Pattern 7" (assertBool "" (isLeft (parseP "a&a")))
                             testCase "Pattern 8" (assertEqual "" (Right "a&a") (parseP "a\\&a"))
-                            , testCase "Pattern 9" (assertEqual "" (Right WildCard) (parseP "%"))
-                            , testCase "Pattern 10" (assertEqual "" (Right WildCard) (parseP "%%%%"))
-                            , testCase "Pattern 11" (assertEqual "" (Right "%%test%%") (parseP "%%test%%"))
+                          , testCase "Pattern 9" (assertEqual "" (Right WildCard) (parseP "%"))
+                          , testCase "Pattern 10" (assertEqual "" (Right WildCard) (parseP "%%%%"))
+                          , testCase "Pattern 11" (assertEqual "" (Right "%%test%%") (parseP "%%test%%"))
                           ]
                     )
                 ]
@@ -119,6 +130,8 @@ newParserTests =
                         ""
                         ((fe "apple" *. fe "orange") *. fe "banana")
                         [ "p.apple p.orange p.banana"
+                        , "(p.apple&p.orange) p.banana"
+                        , "(p.apple & p.orange) p.banana"
                         , "(p.apple p.orange) p.banana"
                         ]
                     , testCase "Explicit Right-Association" $
