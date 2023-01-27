@@ -235,13 +235,16 @@ fileLeafParser :: Parser QueryLeaf
 fileLeafParser = FileLeaf <$> (ichar 'p' *> char '.' *> termPatternParser)
 
 tagLeafParser :: Parser QueryLeaf
-tagLeafParser = minimalTagLeafParser
+tagLeafParser = TagLeaf <$> tagExpressionParser
+
+tagExpressionParser :: Parser (TagExpression (DTerm Pattern))
+tagExpressionParser = minimalTagLeafParser
 
 {- |
  Parses a single term.
 -}
-minimalTagLeafParser :: Parser QueryLeaf
-minimalTagLeafParser = TagLeaf . pure <$> (dTermConstructorParser <*> termPatternParser)
+minimalTagLeafParser :: Parser (TagExpression (DTerm Pattern))
+minimalTagLeafParser = pure <$> (dTermConstructorParser <*> termPatternParser)
 
 parenthesized :: Parser a -> Parser a
 parenthesized = between (spaces *> char '(') (spaces *> char ')')
