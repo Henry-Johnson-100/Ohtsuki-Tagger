@@ -36,6 +36,7 @@ module Text.TaggerQL.Expression.Parser (
 ) where
 
 import Control.Applicative ((<**>))
+import Control.Monad (join)
 import Data.Char (toLower, toUpper)
 import Data.Functor (($>), (<&>))
 import Data.Tagger (SetOp (..))
@@ -210,7 +211,18 @@ parseQueryExpression :: Text -> Either ParseError QueryExpression
 parseQueryExpression = parse queryExpressionParser "TaggerQL"
 
 queryExpressionParser :: Parser QueryExpression
-queryExpressionParser = QueryExpression <$> ringExprParser queryLeafParser
+queryExpressionParser =
+  QueryExpression . (runQueryExpression =<<)
+    <$> ringExprParser queryExpressionTermParser
+
+{- |
+ A term in a 'QueryExpression` can be a 'QueryLeaf` or a parenthesized 'QueryExpression`
+ in which case, it must be joined as a monad.
+-}
+queryExpressionTermParser :: Parser QueryExpression
+queryExpressionTermParser =
+  parenthesized (spaces *> queryExpressionParser)
+    <|> QueryExpression <$> ringExprParser queryLeafParser
 
 queryLeafParser :: Parser QueryLeaf
 queryLeafParser = spaces *> fileLeafParser
