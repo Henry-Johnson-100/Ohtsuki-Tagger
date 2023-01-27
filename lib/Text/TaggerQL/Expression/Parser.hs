@@ -32,6 +32,7 @@ module Text.TaggerQL.Expression.Parser (
 
   -- ** Misc
   patternParser,
+  termPatternParser,
 ) where
 
 import Control.Applicative ((<**>))
@@ -183,8 +184,8 @@ patternParser :: Parser Text
 patternParser =
   T.pack <$> many1 ((char '\\' *> anyChar) <|> notRestricted)
 
-patternParser' :: Parser Pattern
-patternParser' = Pattern <$> patternParser
+termPatternParser :: Parser Pattern
+termPatternParser = Pattern <$> patternParser
 
 notRestricted :: Parser Char
 notRestricted = noneOf restrictedChars
