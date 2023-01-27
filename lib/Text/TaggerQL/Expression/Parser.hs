@@ -228,26 +228,37 @@ queryLeafParser :: Parser QueryLeaf
 queryLeafParser =
   spaces
     *> ( try fileLeafParser
-          <|> tagLeafParser
+          <|> try tagExpressionLeaf
+          -- A non-backtracking, terminal failure case.
+          <|> terminalTagLeaf
        )
+ where
+  tagExpressionLeaf = TagLeaf <$> tagExpressionParser
+  terminalTagLeaf = TagLeaf <$> minimalTagExpressionParser
 
 fileLeafParser :: Parser QueryLeaf
 fileLeafParser = FileLeaf <$> (ichar 'p' *> char '.' *> termPatternParser)
 
-tagLeafParser :: Parser QueryLeaf
-tagLeafParser = TagLeaf <$> tagExpressionParser
+{-
+ Inside the scope of a Magma or parenthesized TagExpression, this is the operative
+ parser.
 
+ If there is a FileLeaf anywhere inside a TagExpression then fail.
+-}
 tagExpressionParser :: Parser (TagExpression (DTerm Pattern))
-tagExpressionParser =
-  spaces
-    *> ( TagRing
-          <$> ringExprParser
-            ( spaces
-                *> ( (parenthesized tagExpressionParser <**> tagMagmaLookAheadParser)
-                      <|> (minimalTagLeafParser <**> tagMagmaLookAheadParser)
-                   )
-            )
-       )
+tagExpressionParser = spaces *> (TagRing <$> ringExprParser tagRingExprTerm)
+ where
+  tagRingExprTerm =
+    spaces
+      *> ( failIfFileLeaf
+            <|> ( compoundExpression
+                    <|> minimalTagExpressionParser
+                )
+         )
+   where
+    failIfFileLeaf =
+      try fileLeafParser *> unexpected "file pattern in tag expression"
+    compoundExpression = parenthesized tagExpressionParser <**> tagMagmaLookAheadParser
 
 {- |
  Parses a bracketed 'TagExpression` and returns a parser that applies another
@@ -265,10 +276,12 @@ tagMagmaLookAheadParser =
     <|> pure id
 
 {- |
- Parses a single term.
+ Parses a single term optionally followed by a Magma expression.
 -}
-minimalTagLeafParser :: Parser (TagExpression (DTerm Pattern))
-minimalTagLeafParser = pure <$> (dTermConstructorParser <*> termPatternParser)
+minimalTagExpressionParser :: Parser (TagExpression (DTerm Pattern))
+minimalTagExpressionParser =
+  (pure <$> (dTermConstructorParser <*> termPatternParser))
+    <**> tagMagmaLookAheadParser
 
 parenthesized :: Parser a -> Parser a
 parenthesized = between (spaces *> char '(') (spaces *> char ')')
