@@ -225,9 +225,23 @@ queryExpressionTermParser =
     <|> QueryExpression <$> ringExprParser queryLeafParser
 
 queryLeafParser :: Parser QueryLeaf
-queryLeafParser = spaces *> fileLeafParser
- where
-  fileLeafParser = FileLeaf <$> (ichar 'p' *> char '.' *> termPatternParser)
+queryLeafParser =
+  spaces
+    *> ( fileLeafParser
+          <|> tagLeafParser
+       )
+
+fileLeafParser :: Parser QueryLeaf
+fileLeafParser = FileLeaf <$> (ichar 'p' *> char '.' *> termPatternParser)
+
+tagLeafParser :: Parser QueryLeaf
+tagLeafParser = minimalTagLeafParser
+
+{- |
+ Parses a single term.
+-}
+minimalTagLeafParser :: Parser QueryLeaf
+minimalTagLeafParser = TagLeaf . pure <$> (dTermConstructorParser <*> termPatternParser)
 
 parenthesized :: Parser a -> Parser a
 parenthesized = between (spaces *> char '(') (spaces *> char ')')
