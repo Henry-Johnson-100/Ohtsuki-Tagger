@@ -73,290 +73,302 @@ comBat name failMsg expect tsts =
         (Right . distrTEs $ expect)
         (fmap distrTEs . parseQueryExpression <$> tsts)
 
+com :: HasCallStack => String -> QueryExpression -> Text -> Assertion
+com msg x y =
+    assertEqual
+        msg
+        ( Right
+            . distrTEs
+            $ x
+        )
+        (distrTEs <$> parseQueryExpression y)
+
 newParserTests :: TestTree
 newParserTests =
-    let com msg x y =
-            assertEqual
-                msg
-                ( Right
-                    . distrTEs
-                    $ x
-                )
-                (distrTEs <$> parseQueryExpression y)
-     in testGroup
-            "Parser Tests"
+    testGroup
+        "Parser Tests"
+        [ testGroup
+            "Primitive Parser Tests"
             [ testGroup
-                "Primitive Parser Tests"
-                [ testGroup
-                    "termPatternParser"
-                    ( let parseP = parse termPatternParser ""
-                       in [ testCase "Pattern 0" (assertEqual "" (Right "a") (parseP "a"))
-                          , testCase "Pattern 1" (assertEqual "" (Right "a") (parseP "\\a"))
-                          , testCase "Pattern 2" (assertBool "" (isLeft (parseP "&")))
-                          , testCase "Pattern 3" (assertEqual "" (Right "&") (parseP "\\&"))
-                          , testCase "Pattern 4" (assertEqual "" (Right "aa") (parseP "aa"))
-                          , testCase "Pattern 5" (assertEqual "" (Right "aa") (parseP "a\\a"))
-                          , testCase "Pattern 6" (assertEqual "" (Right "\\") (parseP "\\\\"))
-                          , -- This test doesn't work, but it's not a bug, it's a feature.
-                            -- , testCase "Pattern 7" (assertBool "" (isLeft (parseP "a&a")))
-                            testCase "Pattern 8" (assertEqual "" (Right "a&a") (parseP "a\\&a"))
-                          , testCase "Pattern 9" (assertEqual "" (Right WildCard) (parseP "%"))
-                          , testCase "Pattern 10" (assertEqual "" (Right WildCard) (parseP "%%%%"))
-                          , testCase "Pattern 11" (assertEqual "" (Right "%%test%%") (parseP "%%test%%"))
-                          ]
-                    )
+                "termPatternParser"
+                ( let parseP = parse termPatternParser ""
+                   in [ testCase "Pattern 0" (assertEqual "" (Right "a") (parseP "a"))
+                      , testCase "Pattern 1" (assertEqual "" (Right "a") (parseP "\\a"))
+                      , testCase "Pattern 2" (assertBool "" (isLeft (parseP "&")))
+                      , testCase "Pattern 3" (assertEqual "" (Right "&") (parseP "\\&"))
+                      , testCase "Pattern 4" (assertEqual "" (Right "aa") (parseP "aa"))
+                      , testCase "Pattern 5" (assertEqual "" (Right "aa") (parseP "a\\a"))
+                      , testCase "Pattern 6" (assertEqual "" (Right "\\") (parseP "\\\\"))
+                      , -- This test doesn't work, but it's not a bug, it's a feature.
+                        -- , testCase "Pattern 7" (assertBool "" (isLeft (parseP "a&a")))
+                        testCase "Pattern 8" (assertEqual "" (Right "a&a") (parseP "a\\&a"))
+                      , testCase "Pattern 9" (assertEqual "" (Right WildCard) (parseP "%"))
+                      , testCase "Pattern 10" (assertEqual "" (Right WildCard) (parseP "%%%%"))
+                      , testCase "Pattern 11" (assertEqual "" (Right "%%test%%") (parseP "%%test%%"))
+                      ]
+                )
+            ]
+        , testGroup
+            "QueryExpressionParser tests"
+            [ testGroup
+                "FileLeaf Expressions"
+                [ testCase "Single FileLeaf" $
+                    com
+                        "p.apple"
+                        (fe "apple")
+                        "p.apple"
+                , comBat
+                    "Ring Expression of FileLeaf"
+                    ""
+                    (fe "apple" +. fe "orange")
+                    [ "p.apple | p.orange"
+                    , "p.apple| p.orange"
+                    , "p.apple |p.orange"
+                    , "p.apple|p.orange"
+                    , "p.apple   |   p.orange"
+                    ]
+                , comBat
+                    "Left-Associative Simple Expression"
+                    ""
+                    ((fe "apple" *. fe "orange") *. fe "banana")
+                    [ "p.apple p.orange p.banana"
+                    , "(p.apple&p.orange) p.banana"
+                    , "(p.apple & p.orange) p.banana"
+                    , "(p.apple p.orange) p.banana"
+                    ]
+                , testCase "Explicit Right-Association" $
+                    com
+                        "p.apple (p.orange p.banana)"
+                        (fe "apple" *. (fe "orange" *. fe "banana"))
+                        "p.apple (p.orange p.banana)"
                 ]
             , testGroup
-                "QueryExpressionParser tests"
-                [ testGroup
-                    "FileLeaf Expressions"
-                    [ testCase "Single FileLeaf" $
-                        com
-                            "p.apple"
-                            (fe "apple")
-                            "p.apple"
-                    , comBat
-                        "Ring Expression of FileLeaf"
-                        ""
-                        (fe "apple" +. fe "orange")
-                        [ "p.apple | p.orange"
-                        , "p.apple| p.orange"
-                        , "p.apple |p.orange"
-                        , "p.apple|p.orange"
-                        , "p.apple   |   p.orange"
-                        ]
-                    , comBat
-                        "Left-Associative Simple Expression"
-                        ""
-                        ((fe "apple" *. fe "orange") *. fe "banana")
-                        [ "p.apple p.orange p.banana"
-                        , "(p.apple&p.orange) p.banana"
-                        , "(p.apple & p.orange) p.banana"
-                        , "(p.apple p.orange) p.banana"
-                        ]
-                    , testCase "Explicit Right-Association" $
-                        com
-                            "p.apple (p.orange p.banana)"
-                            (fe "apple" *. (fe "orange" *. fe "banana"))
-                            "p.apple (p.orange p.banana)"
+                "TagLeaf Expressions"
+                [ comBat
+                    "Minimal TagLeaf"
+                    "apple"
+                    ( tle . tedp . rt $ "apple"
+                    )
+                    [ "apple"
+                    , " apple "
+                    , "apple "
+                    , " apple"
                     ]
-                , testGroup
-                    "TagLeaf Expressions"
-                    [ comBat
-                        "Minimal TagLeaf"
-                        "apple"
-                        ( tle . tedp . rt $ "apple"
+                , comBat
+                    "Minimal Magma Expression"
+                    "apple {red}"
+                    (tle $ (tedp . rt $ "apple") # (tedp . rt $ "red"))
+                    [ "apple {red}"
+                    , "apple{red}"
+                    , "apple{ red}"
+                    , "apple { red}"
+                    , "apple{ red }"
+                    , "apple{red} "
+                    ]
+                , comBat
+                    "Nested Minimal Magma Expression"
+                    "apple {peel {red}}"
+                    ( tle $
+                        (tedp . rt $ "apple")
+                            # ( (tedp . rt $ "peel")
+                                    # (tedp . rt $ "red")
+                              )
+                    )
+                    [ "apple {peel {red}}"
+                    , "apple{peel{red}}"
+                    , "apple { peel { red } }"
+                    ]
+                , comBat
+                    "Explicit MetaTerm"
+                    "r.apple"
+                    (tle . tedp . rt $ "apple")
+                    [ "r.apple"
+                    , "R.apple"
+                    , "apple"
+                    ]
+                , comBat
+                    "Explicit Term"
+                    "d.apple"
+                    (tle . tedp . d $ "apple")
+                    [ "d.apple"
+                    , "D.apple"
+                    ]
+                ]
+            , testGroup
+                "Mixed Leaf Expressions"
+                [ testCase "Ambiguous Prefix - 1" $
+                    com
+                        "Terms with similar prefixes can be disambiguated."
+                        (tle . tedp . rt $ "pLooksLikeFileLeaf")
+                        "pLooksLikeFileLeaf"
+                , testCase "Ambiguous Prefix - 2" $
+                    com
+                        "Terms with similar prefixes can be disambiguated."
+                        (tle . tedp . rt $ "dLooksLikeDescriptorTerm")
+                        "dLooksLikeDescriptorTerm"
+                , testCase "File Then Tag Leaf" $
+                    com
+                        "p.apple orange"
+                        (fe "apple" *. (tle . tedp . rt $ "orange"))
+                        "p.apple orange"
+                , testCase "Tag Then File Leaf" $
+                    com
+                        "apple p.orange"
+                        ((tle . tedp . rt $ "apple") *. fe "orange")
+                        "apple p.orange"
+                , comBat
+                    "Parenthesized Tag Leaves"
+                    "(apple orange banana)"
+                    ( (tle . tedp . rt $ "apple")
+                        *. (tle . tedp . rt $ "orange")
+                        *. (tle . tedp . rt $ "banana")
+                    )
+                    [ "(apple orange banana)"
+                    , "((apple orange) banana)"
+                    ]
+                , testCase "Mixed Parenthesized Tag Leaves" $
+                    com
+                        "[p.apple (orange banana)] - Should be three leaves in a \
+                        \QueryExpression, not two."
+                        ( fe "apple"
+                            *. ( (tle . tedp . rt $ "orange")
+                                    *. (tle . tedp . rt $ "banana")
+                               )
                         )
-                        [ "apple"
-                        , " apple "
-                        , "apple "
-                        , " apple"
-                        ]
-                    , comBat
-                        "Minimal Magma Expression"
-                        "apple {red}"
-                        (tle $ (tedp . rt $ "apple") # (tedp . rt $ "red"))
-                        [ "apple {red}"
-                        , "apple{red}"
-                        , "apple{ red}"
-                        , "apple { red}"
-                        , "apple{ red }"
-                        , "apple{red} "
-                        ]
-                    , comBat
-                        "Nested Minimal Magma Expression"
-                        "apple {peel {red}}"
-                        ( tle $
-                            (tedp . rt $ "apple")
-                                # ( (tedp . rt $ "peel")
+                        "p.apple (orange banana)"
+                , testCase "Mixed Leaves and Simple Magmas" $
+                    com
+                        "apple{skin{red}} p.orange banana{peel{yellow}}"
+                        ( tle
+                            ( (tedp . rt $ "apple")
+                                # ( (tedp . rt $ "skin")
                                         # (tedp . rt $ "red")
                                   )
-                        )
-                        [ "apple {peel {red}}"
-                        , "apple{peel{red}}"
-                        , "apple { peel { red } }"
-                        ]
-                    , comBat
-                        "Explicit MetaTerm"
-                        "r.apple"
-                        (tle . tedp . rt $ "apple")
-                        [ "r.apple"
-                        , "R.apple"
-                        , "apple"
-                        ]
-                    , comBat
-                        "Explicit Term"
-                        "d.apple"
-                        (tle . tedp . d $ "apple")
-                        [ "d.apple"
-                        , "D.apple"
-                        ]
-                    ]
-                , testGroup
-                    "Mixed Leaf Expressions"
-                    [ testCase "File Then Tag Leaf" $
-                        com
-                            "p.apple orange"
-                            (fe "apple" *. (tle . tedp . rt $ "orange"))
-                            "p.apple orange"
-                    , testCase "Tag Then File Leaf" $
-                        com
-                            "apple p.orange"
-                            ((tle . tedp . rt $ "apple") *. fe "orange")
-                            "apple p.orange"
-                    , comBat
-                        "Parenthesized Tag Leaves"
-                        "(apple orange banana)"
-                        ( (tle . tedp . rt $ "apple")
-                            *. (tle . tedp . rt $ "orange")
-                            *. (tle . tedp . rt $ "banana")
-                        )
-                        [ "(apple orange banana)"
-                        , "((apple orange) banana)"
-                        ]
-                    , testCase "Mixed Parenthesized Tag Leaves" $
-                        com
-                            "[p.apple (orange banana)] - Should be three leaves in a \
-                            \QueryExpression, not two."
-                            ( fe "apple"
-                                *. ( (tle . tedp . rt $ "orange")
-                                        *. (tle . tedp . rt $ "banana")
-                                   )
                             )
-                            "p.apple (orange banana)"
-                    , testCase "Mixed Leaves and Simple Magmas" $
-                        com
-                            "apple{skin{red}} p.orange banana{peel{yellow}}"
-                            ( tle
-                                ( (tedp . rt $ "apple")
-                                    # ( (tedp . rt $ "skin")
-                                            # (tedp . rt $ "red")
+                            *. fe "orange"
+                            *. tle
+                                ( (tedp . rt $ "banana")
+                                    # ( (tedp . rt $ "peel")
+                                            # (tedp . rt $ "yellow")
                                       )
                                 )
-                                *. fe "orange"
-                                *. tle
-                                    ( (tedp . rt $ "banana")
-                                        # ( (tedp . rt $ "peel")
-                                                # (tedp . rt $ "yellow")
-                                          )
-                                    )
-                            )
-                            "apple{skin{red}} p.orange banana{peel{yellow}}"
-                    , testCase "Simple Left Distribution" $
-                        com
-                            "apple {red | yellow}"
-                            ( tle $
-                                (tedp . rt $ "apple")
+                        )
+                        "apple{skin{red}} p.orange banana{peel{yellow}}"
+                , testCase "Simple Left Distribution" $
+                    com
+                        "apple {red | yellow}"
+                        ( tle $
+                            (tedp . rt $ "apple")
+                                # ( (tedp . rt $ "red")
+                                        +. (tedp . rt $ "yellow")
+                                  )
+                        )
+                        "apple {red | yellow}"
+                , comBat
+                    "Nested Left Distribution"
+                    ""
+                    ( tle $
+                        (tedp . rt $ "apple")
+                            # ( ( (tedp . rt $ "peel")
+                                    +. (tedp . rt $ "skin")
+                                )
                                     # ( (tedp . rt $ "red")
                                             +. (tedp . rt $ "yellow")
                                       )
-                            )
-                            "apple {red | yellow}"
-                    , comBat
-                        "Nested Left Distribution"
-                        ""
-                        ( tle $
-                            (tedp . rt $ "apple")
-                                # ( ( (tedp . rt $ "peel")
-                                        +. (tedp . rt $ "skin")
-                                    )
-                                        # ( (tedp . rt $ "red")
-                                                +. (tedp . rt $ "yellow")
-                                          )
-                                  )
+                              )
+                    )
+                    [ "apple{(peel | skin){red | yellow}}"
+                    , "apple {peel {red | yellow}} | apple {skin {red | yellow}}"
+                    , -- desugared
+                      "apple {peel {red}} | apple {peel {yellow}} | \
+                      \apple {skin {red}} | apple {skin {yellow}}"
+                    ]
+                , comBat
+                    "Simple Right Distribution"
+                    "(apple | orange) {red}"
+                    ( tle $
+                        ( (tedp . rt $ "apple")
+                            +. (tedp . rt $ "orange")
                         )
-                        [ "apple{(peel | skin){red | yellow}}"
-                        , "apple {peel {red | yellow}} | apple {skin {red | yellow}}"
-                        , -- desugared
-                          "apple {peel {red}} | apple {peel {yellow}} | \
-                          \apple {skin {red}} | apple {skin {yellow}}"
-                        ]
-                    , comBat
-                        "Simple Right Distribution"
-                        "(apple | orange) {red}"
-                        ( tle $
-                            ( (tedp . rt $ "apple")
-                                +. (tedp . rt $ "orange")
-                            )
-                                # (tedp . rt $ "red")
-                        )
-                        [ "(apple | orange) {red}"
-                        , "(apple|orange){red}"
-                        , "apple{red} | orange{red}"
-                        ]
-                    , comBat
-                        "Associative Right Distribution"
-                        "(apple | (orange{peel})) {red}"
-                        ( tle $
-                            ( (tedp . rt $ "apple")
-                                +. ( (tedp . rt $ "orange")
-                                        # (tedp . rt $ "peel")
-                                   )
-                            )
-                                # (tedp . rt $ "red")
-                        )
-                        [ "(apple | (orange{peel})) {red}"
-                        , "(apple | orange {peel}) {red}"
-                        , "(apple | orange{peel}){red}"
-                        ]
-                    , comBat
-                        "Associative Left Distribution"
-                        "apple{peel}{red}"
-                        ( tle $
-                            ( (tedp . rt $ "apple")
-                                # (tedp . rt $ "peel")
-                            )
-                                # (tedp . rt $ "red")
-                        )
-                        [ "apple{peel}{red}"
-                        , "apple {peel} {red}"
-                        , -- desugared
-                          "apple{peel{red}}"
-                        ]
-                    , comBat
-                        "Mixed Distribution"
-                        "(apple{skin} | orange{peel}){orange | red}"
-                        ( tle $
-                            ( ((tedp . rt $ "apple") # (tedp . rt $ "skin"))
-                                +. ((tedp . rt $ "orange") # (tedp . rt $ "peel"))
-                            )
-                                # ((tedp . rt $ "yellow") +. (tedp . rt $ "red"))
-                        )
-                        [ "(apple{skin} | orange{peel}){yellow | red}"
-                        , -- intermediate desugaring
-                          "apple {skin{yellow | red}} | orange {peel{yellow | red}}"
-                        , -- desugared
-                          "apple {skin{yellow}} | apple {skin{red}} \
-                          \| orange {peel{yellow}} | orange {peel{red}}"
-                        ]
-                    , comBat
-                        "Complex Query - 1"
-                        ""
-                        ( ( fe "apple"
-                                *. tle
-                                    ( (tedp . rt $ "orange")
-                                        # (tedp . rt $ "peel")
-                                    )
-                          )
-                            -. ( tle
-                                    ( ( ( (tedp . rt $ "coconut")
-                                            *. (tedp . rt $ "grape")
-                                        )
-                                            # (tedp . rt $ "smells")
-                                      )
-                                        # ( (tedp . rt $ "coconut")
-                                                # (tedp . rt $ "gun")
-                                          )
-                                    )
-                                    +. fe "lime"
+                            # (tedp . rt $ "red")
+                    )
+                    [ "(apple | orange) {red}"
+                    , "(apple|orange){red}"
+                    , "apple{red} | orange{red}"
+                    ]
+                , comBat
+                    "Associative Right Distribution"
+                    "(apple | (orange{peel})) {red}"
+                    ( tle $
+                        ( (tedp . rt $ "apple")
+                            +. ( (tedp . rt $ "orange")
+                                    # (tedp . rt $ "peel")
                                )
                         )
-                        [ "p.apple orange{peel} ! \
-                          \(((coconut & grape) {smells} {coconut {gun}}) | p.lime)"
-                        ]
+                            # (tedp . rt $ "red")
+                    )
+                    [ "(apple | (orange{peel})) {red}"
+                    , "(apple | orange {peel}) {red}"
+                    , "(apple | orange{peel}){red}"
+                    ]
+                , comBat
+                    "Associative Left Distribution"
+                    "apple{peel}{red}"
+                    ( tle $
+                        ( (tedp . rt $ "apple")
+                            # (tedp . rt $ "peel")
+                        )
+                            # (tedp . rt $ "red")
+                    )
+                    [ "apple{peel}{red}"
+                    , "apple {peel} {red}"
+                    , -- desugared
+                      "apple{peel{red}}"
+                    ]
+                , comBat
+                    "Mixed Distribution"
+                    "(apple{skin} | orange{peel}){orange | red}"
+                    ( tle $
+                        ( ((tedp . rt $ "apple") # (tedp . rt $ "skin"))
+                            +. ((tedp . rt $ "orange") # (tedp . rt $ "peel"))
+                        )
+                            # ((tedp . rt $ "yellow") +. (tedp . rt $ "red"))
+                    )
+                    [ "(apple{skin} | orange{peel}){yellow | red}"
+                    , -- intermediate desugaring
+                      "apple {skin{yellow | red}} | orange {peel{yellow | red}}"
+                    , -- desugared
+                      "apple {skin{yellow}} | apple {skin{red}} \
+                      \| orange {peel{yellow}} | orange {peel{red}}"
+                    ]
+                , comBat
+                    "Complex Query - 1"
+                    ""
+                    ( ( fe "apple"
+                            *. tle
+                                ( (tedp . rt $ "orange")
+                                    # (tedp . rt $ "peel")
+                                )
+                      )
+                        -. ( tle
+                                ( ( ( (tedp . rt $ "coconut")
+                                        *. (tedp . rt $ "grape")
+                                    )
+                                        # (tedp . rt $ "smells")
+                                  )
+                                    # ( (tedp . rt $ "coconut")
+                                            # (tedp . rt $ "gun")
+                                      )
+                                )
+                                +. fe "lime"
+                           )
+                    )
+                    [ "p.apple orange{peel} ! \
+                      \(((coconut & grape) {smells} {coconut {gun}}) | p.lime)"
                     ]
                 ]
             ]
+        ]
 
 parserTests :: TestTree
 parserTests =
