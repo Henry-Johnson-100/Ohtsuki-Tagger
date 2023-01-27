@@ -238,7 +238,7 @@ tagLeafParser :: Parser QueryLeaf
 tagLeafParser = TagLeaf <$> tagExpressionParser
 
 tagExpressionParser :: Parser (TagExpression (DTerm Pattern))
-tagExpressionParser = minimalTagMagmaParser
+tagExpressionParser = spaces *> minimalTagMagmaParser
 
 {- |
  Parses either a minimal tag leaf or a minimal tag leaf magma over a tag expression.
@@ -246,6 +246,10 @@ tagExpressionParser = minimalTagMagmaParser
 minimalTagMagmaParser :: Parser (TagExpression (DTerm Pattern))
 minimalTagMagmaParser = minimalTagLeafParser <**> (tagMagmaLookAheadParser <|> pure id)
 
+{- |
+ Parses a bracketed 'TagExpression` and returns a parser that applies another
+ 'TagExpression` over it.
+-}
 tagMagmaLookAheadParser ::
   Parser
     (TagExpression (DTerm Pattern) -> TagExpression (DTerm Pattern))
