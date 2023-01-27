@@ -238,24 +238,31 @@ tagLeafParser :: Parser QueryLeaf
 tagLeafParser = TagLeaf <$> tagExpressionParser
 
 tagExpressionParser :: Parser (TagExpression (DTerm Pattern))
-tagExpressionParser = spaces *> minimalTagMagmaParser
-
-{- |
- Parses either a minimal tag leaf or a minimal tag leaf magma over a tag expression.
--}
-minimalTagMagmaParser :: Parser (TagExpression (DTerm Pattern))
-minimalTagMagmaParser = minimalTagLeafParser <**> (tagMagmaLookAheadParser <|> pure id)
+tagExpressionParser =
+  spaces
+    *> ( TagRing
+          <$> ringExprParser
+            ( spaces
+                *> ( (parenthesized tagExpressionParser <**> tagMagmaLookAheadParser)
+                      <|> (minimalTagLeafParser <**> tagMagmaLookAheadParser)
+                   )
+            )
+       )
 
 {- |
  Parses a bracketed 'TagExpression` and returns a parser that applies another
  'TagExpression` over it.
+
+ Or does nothing if there is no bracket.
 -}
 tagMagmaLookAheadParser ::
   Parser
     (TagExpression (DTerm Pattern) -> TagExpression (DTerm Pattern))
 tagMagmaLookAheadParser =
-  (\inBracket magmaOver -> TagMagma $ Magma magmaOver :$ inBracket)
-    <$> bracketed tagExpressionParser
+  ( (\inBracket magmaOver -> TagMagma $ Magma magmaOver :$ inBracket)
+      <$> between (try (spaces *> char '{')) (spaces *> char '}') tagExpressionParser
+  )
+    <|> pure id
 
 {- |
  Parses a single term.
@@ -265,12 +272,6 @@ minimalTagLeafParser = pure <$> (dTermConstructorParser <*> termPatternParser)
 
 parenthesized :: Parser a -> Parser a
 parenthesized = between (spaces *> char '(') (spaces *> char ')')
-
-{- |
- If the first bracket fails to be parsed then backtrack.
--}
-bracketed :: Parser a -> Parser a
-bracketed = between (try (spaces *> char '{')) (spaces *> char '}')
 
 dTermConstructorParser :: Parser (a -> DTerm a)
 dTermConstructorParser =
