@@ -316,10 +316,13 @@ newParserTests =
                       -- Or they could be rewritten using distributive expressions,
                       -- though there are already such tests, it probably wouldn't
                       -- hurt to have more.
-                      "apple {peel {red | yellow}} | apple {skin {red | yellow}}"
-                    , -- desugared
-                      "apple {peel {red}} | apple {peel {yellow}} | \
-                      \apple {skin {red}} | apple {skin {yellow}}"
+                      --   "apple {peel {red | yellow}} | apple {skin {red | yellow}}"
+                      -- , "apple {peel {red}} | apple {peel {yellow}} | \
+                      --   \apple {skin {red}} | apple {skin {yellow}}"
+                      --
+                      --
+                      "(apple{peel} | (apple{skin})) {red | yellow}"
+                    , "apple{peel{red | yellow} | skin {red | yellow}}"
                     ]
                 , comBatTE
                     "Nested Left TagExpression Distribution"
