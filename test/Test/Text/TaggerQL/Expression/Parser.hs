@@ -469,6 +469,49 @@ newParserTests =
                     [ "p.apple orange{peel} ! \
                       \((((coconut & grape) {smells}) {coconut {gun}}) | p.lime)"
                     ]
+                , testCase "Complex Query - 2" $
+                    com
+                        "p.a ! d.b | d.c {d.d} | r.c {r.d} & (d.e{f} p.g) (h | i{j{k}}){(l m){n}} p.o (q){r}"
+                        ( ( ( ( ( ( ( fe "a"
+                                        -. tle (tedp . d $ "b")
+                                    )
+                                        +. tle
+                                            ( (tedp . d $ "c")
+                                                # (tedp . d $ "d")
+                                            )
+                                  )
+                                    +. tle
+                                        ( (tedp . rt $ "c")
+                                            # (tedp . rt $ "d")
+                                        )
+                                )
+                                    *. ( tle
+                                            ( (tedp . d $ "e")
+                                                # (tedp . rt $ "f")
+                                            )
+                                            *. fe "g"
+                                       )
+                              )
+                                *. tle
+                                    ( ( (tedp . rt $ "h")
+                                            +. ( (tedp . rt $ "i")
+                                                    # ( (tedp . rt $ "j")
+                                                            # (tedp . rt $ "k")
+                                                      )
+                                               )
+                                      )
+                                        # ( ( (tedp . rt $ "l")
+                                                *. (tedp . rt $ "m")
+                                            )
+                                                # (tedp . rt $ "n")
+                                          )
+                                    )
+                            )
+                                *. fe "o"
+                          )
+                            *. tle ((tedp . rt $ "q") # (tedp . rt $ "r"))
+                        )
+                        "p.a ! d.b | d.c {d.d} | r.c {r.d} & (d.e{f} p.g) (h | i{j{k}}){(l m){n}} p.o (q){r}"
                 ]
             ]
         ]
