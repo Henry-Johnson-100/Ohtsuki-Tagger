@@ -321,7 +321,7 @@ newParserTests =
                       --   \apple {skin {red}} | apple {skin {yellow}}"
                       --
                       --
-                      "(apple{peel} | (apple{skin})) {red | yellow}"
+                      "(apple{peel} | apple{skin}) {red | yellow}"
                     , "apple{peel{red | yellow} | skin {red | yellow}}"
                     ]
                 , comBatTE
