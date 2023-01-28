@@ -17,6 +17,7 @@ module Text.TaggerQL.Expression.Parser (
   parseExpr,
   parseTagExpr,
   parseQueryExpression,
+  parseTagExpression,
   ParseError,
 
   -- * For Testing
@@ -211,6 +212,9 @@ restrictedChars = "(){}!&|. \r\n"
 
 parseQueryExpression :: Text -> Either ParseError QueryExpression
 parseQueryExpression = parse (queryExpressionParser <* spaces) "TaggerQL"
+
+parseTagExpression :: Text -> Either ParseError (TagExpression (DTerm Pattern))
+parseTagExpression = parse (tagExpressionParser <* spaces) "TaggerQL - Tag"
 
 queryExpressionParser :: Parser QueryExpression
 queryExpressionParser =

@@ -73,6 +73,20 @@ comBat name failMsg expect tsts =
         (Right . distrTEs $ expect)
         (fmap distrTEs . parseQueryExpression <$> tsts)
 
+comBatTE ::
+    HasCallStack =>
+    TestName ->
+    String ->
+    TagExpression (DTerm Pattern) ->
+    [Text] ->
+    TestTree
+comBatTE name failMsg expect tsts =
+    battery
+        name
+        failMsg
+        (Right . distribute $ expect)
+        (fmap distribute . parseTagExpression <$> tsts)
+
 com :: HasCallStack => String -> QueryExpression -> Text -> Assertion
 com msg x y =
     assertEqual
@@ -82,6 +96,16 @@ com msg x y =
             $ x
         )
         (distrTEs <$> parseQueryExpression y)
+
+comTE :: HasCallStack => String -> TagExpression (DTerm Pattern) -> Text -> Assertion
+comTE msg x y =
+    assertEqual
+        msg
+        ( Right
+            . distribute
+            $ x
+        )
+        (distribute <$> parseTagExpression y)
 
 newParserTests :: TestTree
 newParserTests =
@@ -278,10 +302,48 @@ newParserTests =
                               )
                     )
                     [ "apple{(peel | skin){red | yellow}}"
-                    , "apple {peel {red | yellow}} | apple {skin {red | yellow}}"
+                    , -- These two tests below are currently failing which makes sense
+                      -- given that these are meant to be QueryExpressions and not
+                      -- TagExpressions. So they do not desugar like this.
+                      --
+                      -- Instead, each top-level operand is being parsed as its own TagLeaf
+                      -- which is what is supposed to be happening.
+                      --
+                      -- So I need to either remove these tests or replace them with
+                      -- a testcase using a tag expression parser rather than a
+                      -- query expression parser.
+                      --
+                      -- Or they could be rewritten using distributive expressions,
+                      -- though there are already such tests, it probably wouldn't
+                      -- hurt to have more.
+                      "apple {peel {red | yellow}} | apple {skin {red | yellow}}"
                     , -- desugared
                       "apple {peel {red}} | apple {peel {yellow}} | \
                       \apple {skin {red}} | apple {skin {yellow}}"
+                    ]
+                , comBatTE
+                    "Nested Left TagExpression Distribution"
+                    ""
+                    ( (tedp . rt $ "apple")
+                        # ( ( (tedp . rt $ "peel")
+                                +. (tedp . rt $ "skin")
+                            )
+                                # ( (tedp . rt $ "red")
+                                        +. (tedp . rt $ "yellow")
+                                  )
+                          )
+                    )
+                    [ "apple{(peel | skin){red | yellow}}"
+                    , "apple {peel {red | yellow}} | apple {skin {red | yellow}}"
+                    , -- desugared
+                      -- Because "skin", which was previously one term is desugared into
+                      -- two, it's whole right side, after distribution, is still treated
+                      -- as one term, which is why the parentheses are there.
+                      --
+                      -- It is still a left-associative operation, but distribution
+                      -- expands terms in place.
+                      "apple {peel {red}} | apple {peel {yellow}} | \
+                      \(apple {skin {red}} | apple {skin {yellow}})"
                     ]
                 , comBat
                     "Simple Right Distribution"
