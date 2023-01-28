@@ -403,15 +403,15 @@ newParserTests =
                     ]
                 , comBat
                     "Associative Left Distribution"
-                    "apple{peel}{red}"
+                    "(apple{peel}){red}"
                     ( tle $
                         ( (tedp . rt $ "apple")
                             # (tedp . rt $ "peel")
                         )
                             # (tedp . rt $ "red")
                     )
-                    [ "apple{peel}{red}"
-                    , "apple {peel} {red}"
+                    [ "(apple{peel}){red}"
+                    , "(apple {peel}) {red}"
                     , -- desugared
                       "apple{peel{red}}"
                     ]
@@ -424,12 +424,25 @@ newParserTests =
                         )
                             # ((tedp . rt $ "yellow") +. (tedp . rt $ "red"))
                     )
-                    [ "(apple{skin} | orange{peel}){yellow | red}"
-                    , -- intermediate desugaring
-                      "apple {skin{yellow | red}} | orange {peel{yellow | red}}"
-                    , -- desugared
-                      "apple {skin{yellow}} | apple {skin{red}} \
-                      \| orange {peel{yellow}} | orange {peel{red}}"
+                    ["(apple{skin} | orange{peel}){yellow | red}"]
+                , comBatTE
+                    "Mixed Distribution - TagExpression Desugaring"
+                    "(apple {skin} | orange {peel}) {yellow | red}"
+                    ( ( ( (tedp . rt $ "apple")
+                            # (tedp . rt $ "skin")
+                        )
+                            +. ( (tedp . rt $ "orange")
+                                    # (tedp . rt $ "peel")
+                               )
+                      )
+                        # ( (tedp . rt $ "yellow")
+                                +. (tedp . rt $ "red")
+                          )
+                    )
+                    [ "(apple {skin} | orange {peel}) {yellow | red}"
+                    , "apple {skin {yellow | red}} | orange {peel {yellow | red}}"
+                    , "apple {skin {yellow}} | apple {skin {red}} |\
+                      \ (orange {peel {yellow}} | orange {peel {red}})"
                     ]
                 , comBat
                     "Complex Query - 1"
