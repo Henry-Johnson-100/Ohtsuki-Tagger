@@ -17,7 +17,7 @@ import Test.Tasty (
  )
 import Test.Text.TaggerQL.Expression.AST (astTests)
 import Test.Text.TaggerQL.Expression.Engine (queryEngineASTTests)
-import Test.Text.TaggerQL.Expression.Parser (parserTests)
+import Test.Text.TaggerQL.Expression.Parser (parserTests, newParserTests)
 
 main :: IO ()
 main =
@@ -25,6 +25,7 @@ main =
         ( testGroup
             "Test"
             [ parserTests
+            , newParserTests
             , withResource secureResource removeResource $
                 \conn ->
                     testGroup
