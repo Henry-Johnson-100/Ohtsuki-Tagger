@@ -467,7 +467,7 @@ newParserTests =
                            )
                     )
                     [ "p.apple orange{peel} ! \
-                      \(((coconut & grape) {smells} {coconut {gun}}) | p.lime)"
+                      \((((coconut & grape) {smells}) {coconut {gun}}) | p.lime)"
                     ]
                 ]
             ]
