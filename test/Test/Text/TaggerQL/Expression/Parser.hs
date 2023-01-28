@@ -359,7 +359,32 @@ newParserTests =
                     )
                     [ "(apple | orange) {red}"
                     , "(apple|orange){red}"
-                    , "apple{red} | orange{red}"
+                    ]
+                , testCase "Incorrect Test Case for \"Simple Right Distribution\"" $
+                    com
+                        "[apple{red} | orange{red}] should be parsed as two separate \
+                        \Query Leaves and not one TagExpression."
+                        ( tle
+                            ( (tedp . rt $ "apple")
+                                # (tedp . rt $ "red")
+                            )
+                            +. tle
+                                ( (tedp . rt $ "orange")
+                                    # (tedp . rt $ "red")
+                                )
+                        )
+                        "apple{red} | orange{red}"
+                , comBatTE
+                    "Simple Right TagExpression Distribution"
+                    "(apple | orange) {red}"
+                    ( ( (tedp . rt $ "apple")
+                            +. (tedp . rt $ "orange")
+                      )
+                        # (tedp . rt $ "red")
+                    )
+                    [ "(apple | orange) {red}"
+                    , "( apple|orange ){ red }"
+                    , "apple {red} | orange {red}"
                     ]
                 , comBat
                     "Associative Right Distribution"
