@@ -213,20 +213,34 @@ restrictedChars = "(){}!&|. \r\n"
 parseQueryExpression :: Text -> Either ParseError QueryExpression
 parseQueryExpression =
   parse
-    ( do
-        p <- queryExpressionParser
-        spaces
-        remains <- getInput
-        unless
-          (T.null remains)
-          . fail
-          $ "Failed to consume all text, remainder: \"" <> T.unpack remains <> "\""
-        pure p
-    )
+    allInput
     "TaggerQL"
+ where
+  allInput = do
+    p <- queryExpressionParser
+    spaces
+    remains <- getInput
+    unless
+      (T.null remains)
+      . fail
+      $ "Failed to consume all text, remainder: \"" <> T.unpack remains <> "\""
+    pure p
 
 parseTagExpression :: Text -> Either ParseError (TagExpression (DTerm Pattern))
-parseTagExpression = parse (tagExpressionParser <* spaces) "TaggerQL - Tag"
+parseTagExpression =
+  parse
+    allInput
+    "TaggerQL - Tag"
+ where
+  allInput = do
+    p <- tagExpressionParser
+    spaces
+    remains <- getInput
+    unless
+      (T.null remains)
+      . fail
+      $ "Failed to consume all text, remainder: \"" <> T.unpack remains <> "\""
+    pure p
 
 queryExpressionParser :: Parser QueryExpression
 queryExpressionParser =
