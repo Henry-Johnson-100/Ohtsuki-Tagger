@@ -8,7 +8,7 @@ module Test.Text.TaggerQL.Expression.Parser (
     newParserTests,
 ) where
 
-import Data.Either (isLeft)
+import Data.Either (isLeft, isRight)
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import Test.Tasty
@@ -512,6 +512,19 @@ newParserTests =
                             *. tle ((tedp . rt $ "q") # (tedp . rt $ "r"))
                         )
                         "p.a ! d.b | d.c {d.d} | r.c {r.d} & (d.e{f} p.g) (h | i{j{k}}){(l m){n}} p.o (q){r}"
+                ]
+            , testGroup
+                "Parser Failure Cases"
+                [ testCase
+                    "parseQueryExpression Fails When All Input Not Consumed"
+                    $ assertBool
+                        ""
+                        (isLeft . parseQueryExpression $ "a (p.b){c}")
+                , testCase
+                    "parseQueryExpression Does Not Fail For Trailing Whitespace"
+                    $ assertBool
+                        ""
+                        (isRight . parseQueryExpression $ "a ")
                 ]
             ]
         ]

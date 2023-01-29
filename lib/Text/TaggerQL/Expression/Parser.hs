@@ -39,7 +39,7 @@ module Text.TaggerQL.Expression.Parser (
 ) where
 
 import Control.Applicative ((<**>))
-import Control.Monad (join)
+import Control.Monad (join, unless)
 import Data.Char (toLower, toUpper)
 import Data.Functor (($>), (<&>))
 import Data.Tagger (SetOp (..))
@@ -211,7 +211,19 @@ restrictedChars :: [Char]
 restrictedChars = "(){}!&|. \r\n"
 
 parseQueryExpression :: Text -> Either ParseError QueryExpression
-parseQueryExpression = parse (queryExpressionParser <* spaces) "TaggerQL"
+parseQueryExpression =
+  parse
+    ( do
+        p <- queryExpressionParser
+        spaces
+        remains <- getInput
+        unless
+          (T.null remains)
+          . fail
+          $ "Failed to consume all text, remainder: \"" <> T.unpack remains <> "\""
+        pure p
+    )
+    "TaggerQL"
 
 parseTagExpression :: Text -> Either ParseError (TagExpression (DTerm Pattern))
 parseTagExpression = parse (tagExpressionParser <* spaces) "TaggerQL - Tag"
