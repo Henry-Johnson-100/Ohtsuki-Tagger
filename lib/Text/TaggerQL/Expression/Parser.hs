@@ -216,15 +216,20 @@ parseQueryExpression =
     allInput
     "TaggerQL"
  where
-  allInput = do
-    p <- queryExpressionParser
-    spaces
-    remains <- getInput
-    unless
-      (T.null remains)
-      . fail
-      $ "Failed to consume all text, remainder: \"" <> T.unpack remains <> "\""
-    pure p
+  allInput =
+    queryExpressionParser
+      <* spaces
+      <* ( \remainingInputParser ->
+            unlessM
+              (T.null <$> remainingInputParser)
+              ( remainingInputParser >>= \remains ->
+                  fail $
+                    "Failed to consume all text, remainder: \""
+                      <> T.unpack remains
+                      <> "\""
+              )
+         )
+        getInput
 
 parseTagExpression :: Text -> Either ParseError (TagExpression (DTerm Pattern))
 parseTagExpression =
@@ -232,15 +237,26 @@ parseTagExpression =
     allInput
     "TaggerQL - Tag"
  where
-  allInput = do
-    p <- tagExpressionParser
-    spaces
-    remains <- getInput
-    unless
-      (T.null remains)
-      . fail
-      $ "Failed to consume all text, remainder: \"" <> T.unpack remains <> "\""
-    pure p
+  allInput =
+    tagExpressionParser
+      <* spaces
+      <* ( \remainingInputParser ->
+            unlessM
+              (T.null <$> remainingInputParser)
+              ( remainingInputParser >>= \remains ->
+                  fail $
+                    "Failed to consume all text, remainder: \""
+                      <> T.unpack remains
+                      <> "\""
+              )
+         )
+        getInput
+
+{- |
+ Lift 'unless` to an applicative monad.
+-}
+unlessM :: Monad m => m Bool -> m () -> m ()
+unlessM b f = b >>= flip unless f
 
 queryExpressionParser :: Parser QueryExpression
 queryExpressionParser =
