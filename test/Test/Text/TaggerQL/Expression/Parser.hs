@@ -525,6 +525,32 @@ newParserTests =
                     $ assertBool
                         ""
                         (isRight . parseQueryExpression $ "a ")
+                , testCase "parseQueryExpression ignores line breaks" $
+                    com
+                        ""
+                        (fe "a" *. fe "b" *. fe "c")
+                        "p.a\np.b\np.c"
+                , testCase
+                    "parseTagExpression Fails When All Input Not Consumed"
+                    $ assertBool
+                        ""
+                        (isLeft . parseTagExpression $ "a a.b")
+                , testCase
+                    "parseTagExpression Does Not Fail For Trailing Whitespace"
+                    $ assertBool
+                        ""
+                        (isRight . parseTagExpression $ "a ")
+                , testCase "tagExpressionParser ignores line breaks" $
+                    comTE
+                        ""
+                        ( ( (tedp . rt $ "a")
+                                # ( (tedp . rt $ "b")
+                                        *. (tedp . rt $ "c")
+                                  )
+                          )
+                            *. (tedp . rt $ "d")
+                        )
+                        "a\n{\nb\nc\n}\nd"
                 ]
             ]
         ]
