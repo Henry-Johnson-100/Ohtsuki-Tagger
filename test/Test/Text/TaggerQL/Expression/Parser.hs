@@ -10,6 +10,7 @@ module Test.Text.TaggerQL.Expression.Parser (
 import Data.Either (isLeft, isRight)
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
+import qualified Data.Text as T
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.TaggerQL.Expression.AST
@@ -511,6 +512,38 @@ parserTests =
                             *. tle ((tedp . rt $ "q") # (tedp . rt $ "r"))
                         )
                         "p.a ! d.b | d.c {d.d} | r.c {r.d} & (d.e{f} p.g) (h | i{j{k}}){(l m){n}} p.o (q){r}"
+                , testGroup
+                    "Nested Ring Right Distribution"
+                    $ let t = "(a & (b | c)){d}"
+                       in [ testCase "Query Expression" $
+                                com
+                                    (T.unpack t)
+                                    ( tle
+                                        ( ( (tedp . rt $ "a")
+                                                *. ( (tedp . rt $ "b")
+                                                        +. (tedp . rt $ "c")
+                                                   )
+                                          )
+                                            # (tedp . rt $ "d")
+                                        )
+                                    )
+                                    t
+                          , testCase "Tag Expression" $
+                                comTE
+                                    (T.unpack t)
+                                    ( ( (tedp . rt $ "a")
+                                            # (tedp . rt $ "d")
+                                      )
+                                        *. ( ( (tedp . rt $ "b")
+                                                # (tedp . rt $ "d")
+                                             )
+                                                +. ( (tedp . rt $ "c")
+                                                        # (tedp . rt $ "d")
+                                                   )
+                                           )
+                                    )
+                                    t
+                          ]
                 ]
             , testGroup
                 "Parser Failure Cases"
