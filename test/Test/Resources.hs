@@ -153,6 +153,19 @@ testTags =
 
     -- tag file_19 "33{32}"
     Tag 58 19 32 (Just 56)
+
+    -- tag file_20 "(35 36){37}"
+    Tag 59 20 35 Nothing
+    Tag 60 20 37 (Just 59)
+    Tag 61 20 36 Nothing
+    Tag 62 20 37 (Just 61)
+
+    -- tag file_21 "(38 39{40}){41}"
+    Tag 63 21 38 Nothing
+    Tag 64 21 41 (Just 63)
+    Tag 65 21 39 Nothing
+    Tag 66 21 40 (Just 65)
+    Tag 67 21 41 (Just 66)
   -}
   ]
 
