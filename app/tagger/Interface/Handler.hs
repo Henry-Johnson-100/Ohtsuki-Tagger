@@ -389,41 +389,47 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
       let !rawQuery = T.strip $ model ^. fileSelectionModel . queryModel . input . text
        in ( if model ^. queryEditMode
               then
-                []
-              else -- let action modelExpr = case T.splitAt 1 rawQuery of
-              --       ("!", r) ->
-              --         either (const modelExpr) (modelExpr -.) . parseExpr $ r
-              --       ("&", r) ->
-              --         either (const modelExpr) (modelExpr *.) . parseExpr $ r
-              --       ("|", r) ->
-              --         either (const modelExpr) (modelExpr +.) . parseExpr $ r
-              --       (_defaultAction, _) ->
-              --         either (const modelExpr) (modelExpr *.) . parseExpr $ rawQuery
-              --  in Model $
-              --       model
-              --         & fileSelectionModel . queryModel . expression %~ action
-
-                []
+                [ let action modelExpr = case T.splitAt 1 rawQuery of
+                        ("!", r) ->
+                          either (const modelExpr) (modelExpr -.)
+                            . parseQueryExpression
+                            $ r
+                        ("&", r) ->
+                          either (const modelExpr) (modelExpr *.)
+                            . parseQueryExpression
+                            $ r
+                        ("|", r) ->
+                          either (const modelExpr) (modelExpr +.)
+                            . parseQueryExpression
+                            $ r
+                        (_defaultAction, _) ->
+                          either (const modelExpr) (modelExpr *.)
+                            . parseQueryExpression
+                            $ rawQuery
+                   in Model $
+                        model
+                          & fileSelectionModel . queryModel . expression %~ action
+                ]
+              else
+                [ Model $
+                    model
+                      & fileSelectionModel
+                        . queryModel
+                        . expression
+                        %~ flip fromRight (parseQueryExpression rawQuery)
+                , Event . DoQueryEvent $ RunQuery
+                ]
           )
-            --   Model $
-            --     model & fileSelectionModel . queryModel . expression
-            --       %~ flip fromRight (parseExpr rawQuery)
-            -- , Event . DoQueryEvent $ RunQuery
-
             ++ [ Event . Mempty $
                   TaggerLens $
                     fileSelectionModel . queryModel . input . text
                ]
     RunQuery ->
-      []
-    -- Task $ do
-    --   r <-
-    --     HS.foldl' (Seq.|>) Seq.empty
-    --       <$> runExpr
-    --         (model ^. fileSelectionModel . queryModel . expression)
-    --         conn
-    --   return . DoFileSelectionEvent . PutFilesNoCombine $ r
-
+      [ Task
+          . fmap (DoFileSelectionEvent . PutFilesNoCombine . HS.foldl' (Seq.|>) Seq.empty)
+          . queryQueryExpression conn
+          $ model ^. fileSelectionModel . queryModel . expression
+      ]
     RingProduct l r ->
       [Model $ model & fileSelectionModel . queryModel . l %~ (*. r)]
     UpdateExpression n expr ->
