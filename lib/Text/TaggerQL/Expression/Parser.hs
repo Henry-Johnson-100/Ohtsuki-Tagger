@@ -219,17 +219,7 @@ parseQueryExpression =
   allInput =
     queryExpressionParser
       <* spaces
-      <* ( \remainingInputParser ->
-            unlessM
-              (T.null <$> remainingInputParser)
-              ( remainingInputParser >>= \remains ->
-                  fail $
-                    "Failed to consume all text, remainder: \""
-                      <> T.unpack remains
-                      <> "\""
-              )
-         )
-        getInput
+      <* failIfNotConsumed
 
 parseTagExpression :: Text -> Either ParseError (TagExpression (DTerm Pattern))
 parseTagExpression =
@@ -240,23 +230,15 @@ parseTagExpression =
   allInput =
     tagExpressionParser
       <* spaces
-      <* ( \remainingInputParser ->
-            unlessM
-              (T.null <$> remainingInputParser)
-              ( remainingInputParser >>= \remains ->
-                  fail $
-                    "Failed to consume all text, remainder: \""
-                      <> T.unpack remains
-                      <> "\""
-              )
-         )
-        getInput
+      <* failIfNotConsumed
 
-{- |
- Lift 'unless` to an applicative monad.
--}
-unlessM :: Monad m => m Bool -> m () -> m ()
-unlessM b f = b >>= flip unless f
+failIfNotConsumed :: Parser ()
+failIfNotConsumed = do
+  remains <- getInput
+  unless (T.null remains) . fail $
+    "Failed to consume all text, remainder: \""
+      <> T.unpack remains
+      <> "\""
 
 queryExpressionParser :: Parser QueryExpression
 queryExpressionParser =
