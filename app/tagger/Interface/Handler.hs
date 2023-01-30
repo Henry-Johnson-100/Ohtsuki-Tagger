@@ -46,9 +46,9 @@ import System.FilePath
 import System.IO
 import Tagger.Info (taggerVersion)
 import Text.TaggerQL
-import Text.TaggerQL.Expression.AST (Expression (BinaryExpression), Rng (..), Ring (..), SubExpression (BinarySubExpression), soL)
-import Text.TaggerQL.Expression.Engine (exprAt, runExpr, subExprAtL)
-import Text.TaggerQL.Expression.Parser (parseExpr)
+import Text.TaggerQL.Expression.AST
+import Text.TaggerQL.Expression.Engine
+import Text.TaggerQL.Expression.Parser
 import Util
 
 taggerEventHandler ::
@@ -361,78 +361,85 @@ queryEventHandler ::
 queryEventHandler _wenv _node model@((^. connection) -> conn) event =
   case event of
     CycleExprSetOpAt n ->
-      [ Model $
-          model & fileSelectionModel . queryModel . expression . exprAt n
-            %~ ( \mexpr -> do
-                  expr <- mexpr
-                  case expr of
-                    BinaryExpression bn -> Just . BinaryExpression $ bn & soL %~ next
-                    _notBinary -> Nothing
-               )
-      ]
+      []
+    -- Model $
+    --   model & fileSelectionModel . queryModel . expression . exprAt n
+    --     %~ ( \mexpr -> do
+    --           expr <- mexpr
+    --           case expr of
+    --             BinaryExpression bn -> Just . BinaryExpression $ bn & soL %~ next
+    --             _notBinary -> Nothing
+    --        )
+
     CycleSubExprSetOpAt exprIx seIx ->
-      [ Model $
-          model
-            & fileSelectionModel
-              . queryModel
-              . expression
-              . subExprAtL exprIx seIx
-            %~ fmap
-              ( \se -> case se of
-                  BinarySubExpression bn -> BinarySubExpression $ bn & soL %~ next
-                  _notBN -> se
-              )
-      ]
+      []
+    -- Model $
+    --   model
+    --     & fileSelectionModel
+    --       . queryModel
+    --       . expression
+    --       . subExprAtL exprIx seIx
+    --     %~ fmap
+    --       ( \se -> case se of
+    --           BinarySubExpression bn -> BinarySubExpression $ bn & soL %~ next
+    --           _notBN -> se
+    --       )
+
     PushExpression ->
       let !rawQuery = T.strip $ model ^. fileSelectionModel . queryModel . input . text
        in ( if model ^. queryEditMode
               then
-                [ let action modelExpr = case T.splitAt 1 rawQuery of
-                        ("!", r) ->
-                          either (const modelExpr) (modelExpr -.) . parseExpr $ r
-                        ("&", r) ->
-                          either (const modelExpr) (modelExpr *.) . parseExpr $ r
-                        ("|", r) ->
-                          either (const modelExpr) (modelExpr +.) . parseExpr $ r
-                        (_defaultAction, _) ->
-                          either (const modelExpr) (modelExpr *.) . parseExpr $ rawQuery
-                   in Model $
-                        model
-                          & fileSelectionModel . queryModel . expression %~ action
-                ]
-              else
-                [ Model $
-                    model & fileSelectionModel . queryModel . expression
-                      %~ flip fromRight (parseExpr rawQuery)
-                , Event . DoQueryEvent $ RunQuery
-                ]
+                []
+              else -- let action modelExpr = case T.splitAt 1 rawQuery of
+              --       ("!", r) ->
+              --         either (const modelExpr) (modelExpr -.) . parseExpr $ r
+              --       ("&", r) ->
+              --         either (const modelExpr) (modelExpr *.) . parseExpr $ r
+              --       ("|", r) ->
+              --         either (const modelExpr) (modelExpr +.) . parseExpr $ r
+              --       (_defaultAction, _) ->
+              --         either (const modelExpr) (modelExpr *.) . parseExpr $ rawQuery
+              --  in Model $
+              --       model
+              --         & fileSelectionModel . queryModel . expression %~ action
+
+                []
           )
+            --   Model $
+            --     model & fileSelectionModel . queryModel . expression
+            --       %~ flip fromRight (parseExpr rawQuery)
+            -- , Event . DoQueryEvent $ RunQuery
+
             ++ [ Event . Mempty $
                   TaggerLens $
                     fileSelectionModel . queryModel . input . text
                ]
     RunQuery ->
-      [ Task $ do
-          r <-
-            HS.foldl' (Seq.|>) Seq.empty
-              <$> runExpr
-                (model ^. fileSelectionModel . queryModel . expression)
-                conn
-          return . DoFileSelectionEvent . PutFilesNoCombine $ r
-      ]
+      []
+    -- Task $ do
+    --   r <-
+    --     HS.foldl' (Seq.|>) Seq.empty
+    --       <$> runExpr
+    --         (model ^. fileSelectionModel . queryModel . expression)
+    --         conn
+    --   return . DoFileSelectionEvent . PutFilesNoCombine $ r
+
     RingProduct l r ->
       [Model $ model & fileSelectionModel . queryModel . l %~ (*. r)]
     UpdateExpression n expr ->
-      [Model $ model & fileSelectionModel . queryModel . expression . exprAt n ?~ expr]
+      []
+    -- Model $ model & fileSelectionModel . queryModel . expression . exprAt n ?~ expr
+
     UpdateSubExpression exprIx seIx se ->
-      [ Model $
-          model
-            & fileSelectionModel
-              . queryModel
-              . expression
-              . subExprAtL exprIx seIx
-            ?~ se
-      ]
+      []
+
+-- Model $
+--   model
+--     & fileSelectionModel
+--       . queryModel
+--       . expression
+--       . subExprAtL exprIx seIx
+--     ?~ se
 
 fileSelectionWidgetEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->

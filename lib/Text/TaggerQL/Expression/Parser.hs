@@ -14,24 +14,12 @@ License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL.Expression.Parser (
-  parseExpr,
-  parseTagExpr,
   parseQueryExpression,
   parseTagExpression,
   ParseError,
 
   -- * For Testing
   parse,
-
-  -- ** Expression Parsers
-  expressionParser,
-
-  -- ** SubExpression Parsers
-  subExpressionParser,
-
-  -- ** Term Parsers
-  tagTermParser,
-  fileTermParser,
 
   -- ** Misc
   patternParser,
@@ -41,104 +29,40 @@ module Text.TaggerQL.Expression.Parser (
 import Control.Applicative ((<**>))
 import Control.Monad (join, unless)
 import Data.Char (toLower, toUpper)
-import Data.Functor (($>), (<&>))
+import Data.Functor (($>))
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
-import Text.Parsec
-import Text.TaggerQL.Expression.AST
+import Text.Parsec (
+  ParseError,
+  Parsec,
+  ParsecT,
+  Stream,
+  anyChar,
+  between,
+  char,
+  getInput,
+  many1,
+  noneOf,
+  optionMaybe,
+  parse,
+  spaces,
+  try,
+  (<|>),
+ )
+import Text.TaggerQL.Expression.AST (
+  DTerm (..),
+  Magma,
+  MagmaExpression (Magma, (:$)),
+  Pattern (..),
+  QueryExpression (..),
+  QueryLeaf (..),
+  RingExpression (..),
+  Rng,
+  TagExpression (..),
+ )
 
 type Parser a = Parsec Text () a
-
-{- |
- Parse an 'Expression` from a TaggerQL query.
--}
-parseExpr :: Text -> Either ParseError Expression
-parseExpr = parse expressionParser "TaggerQL"
-
-{- |
- Parse a 'SubExpression` from a TaggerQL query.
-
- Used to parse expressions that tag images, rather than query.
--}
-parseTagExpr :: Text -> Either ParseError SubExpression
-parseTagExpr = parse subExpressionParser "TaggerQL"
-
-expressionParser :: Parser Expression
-expressionParser =
-  spaces
-    *> ( try
-          ( myChainl1
-              lhsExprParser
-              ( (\so lhs rhs -> BinaryExpression (BinaryOperation lhs so rhs))
-                  <$> (spaces *> setOpParser)
-              )
-              pure
-          )
-          <|> lhsExprParser
-       )
- where
-  lhsExprParser :: Parser Expression
-  lhsExprParser =
-    spaces
-      *> ( precedentExpressionParser
-            <|> ( try fileTermValueParser
-                    <|> ( tagTermParser
-                            <**> ( tagExpressionLookAhead
-                                    <|> pure TagTermValue
-                                 )
-                        )
-                )
-         )
-   where
-    precedentExpressionParser =
-      between (char '(') (spaces *> char ')') expressionParser
-    tagExpressionLookAhead =
-      (\se tt -> TagExpression (TagTermExtension tt se))
-        <$> between
-          (try (spaces *> char '{'))
-          (spaces *> char '}')
-          subExpressionParser
-
-fileTermValueParser :: Parser Expression
-fileTermValueParser = FileTermValue <$> fileTermParser
-
-subExpressionParser :: Parser SubExpression
-subExpressionParser =
-  spaces
-    *> ( try
-          ( myChainl1
-              lhsSubExpressionParser
-              ( (\so lhs rhs -> BinarySubExpression (BinaryOperation lhs so rhs))
-                  <$> (spaces *> setOpParser)
-              )
-              pure
-          )
-          <|> lhsSubExpressionParser
-       )
- where
-  lhsSubExpressionParser :: Parser SubExpression
-  lhsSubExpressionParser =
-    spaces
-      *> ( precedentSubExpressionParser
-            <|> ( tagTermParser
-                    <**> ( subExpressionLookAheadParser
-                            <|> pure SubTag
-                         )
-                )
-         )
-   where
-    precedentSubExpressionParser =
-      between
-        (char '(')
-        (spaces *> char ')')
-        subExpressionParser
-    subExpressionLookAheadParser =
-      (\se tt -> SubExpression (TagTermExtension tt se))
-        <$> between
-          (try (spaces *> char '{'))
-          (spaces *> char '}')
-          subExpressionParser
 
 {-# INLINEABLE myChainl1 #-}
 
@@ -171,18 +95,6 @@ myChainl1 p op defP = do
         maybe (defP x) (rest . f x) y
     )
       <|> return x
-
-fileTermParser :: Parser FileTerm
-fileTermParser = ichar 'p' *> char '.' *> patternParser <&> FileTerm
-
-tagTermParser :: Parser TagTerm
-tagTermParser =
-  ( ( try (ichar 'r' *> char '.' $> MetaDescriptorTerm)
-        <|> try (ichar 'd' *> char '.' $> DescriptorTerm)
-    )
-      <|> pure MetaDescriptorTerm
-  )
-    <*> patternParser
 
 patternParser :: Parser Text
 patternParser =

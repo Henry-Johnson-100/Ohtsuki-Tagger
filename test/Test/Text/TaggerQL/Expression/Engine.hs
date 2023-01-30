@@ -481,40 +481,40 @@ queryExpressionBasicFunctionality c =
                   , file 16
                   ]
                   r
-            , testCase "SubExpression Tags - 0" $ do
-                h <- c >>= queryTags (DescriptorTerm "descriptor_17")
-                r <-
-                  c
-                    >>= runReaderT
-                      ( evalSubExpression
-                          (SubTag (DescriptorTerm "descriptor_18"))
-                          (HS.fromList h)
-                      )
-                assertEqual
-                  "Matches the tags returned by the LHS of the \
-                  \\"TagExpressions - SubBinary Sub Union\" test."
-                  [ Tag 28 11 17 Nothing
-                  , Tag 32 13 17 Nothing
-                  , Tag 38 15 17 Nothing
-                  , Tag 41 16 17 Nothing
-                  ]
-                  r
-            , testCase "SubExpression Tags - 1" $ do
-                h <- c >>= queryTags (DescriptorTerm "descriptor_17")
-                r <-
-                  c
-                    >>= runReaderT
-                      ( evalSubExpression
-                          (SubTag (DescriptorTerm "descriptor_19"))
-                          (HS.fromList h)
-                      )
-                assertEqual
-                  "Matches the tags returned by the RHS of the \
-                  \\"TagExpressions - SubBinary Sub Union\" test."
-                  [ Tag 30 12 17 Nothing
-                  , Tag 32 13 17 Nothing
-                  ]
-                  r
+            -- , testCase "SubExpression Tags - 0" $ do
+            --     h <- c >>= queryTags (DescriptorTerm "descriptor_17")
+            --     r <-
+            --       c
+            --         >>= runReaderT
+            --           ( evalSubExpression
+            --               (SubTag (DescriptorTerm "descriptor_18"))
+            --               (HS.fromList h)
+            --           )
+            --     assertEqual
+            --       "Matches the tags returned by the LHS of the \
+            --       \\"TagExpressions - SubBinary Sub Union\" test."
+            --       [ Tag 28 11 17 Nothing
+            --       , Tag 32 13 17 Nothing
+            --       , Tag 38 15 17 Nothing
+            --       , Tag 41 16 17 Nothing
+            --       ]
+            --       r
+            -- , testCase "SubExpression Tags - 1" $ do
+            --     h <- c >>= queryTags (DescriptorTerm "descriptor_17")
+            --     r <-
+            --       c
+            --         >>= runReaderT
+            --           ( evalSubExpression
+            --               (SubTag (DescriptorTerm "descriptor_19"))
+            --               (HS.fromList h)
+            --           )
+            --     assertEqual
+            --       "Matches the tags returned by the RHS of the \
+            --       \\"TagExpressions - SubBinary Sub Union\" test."
+            --       [ Tag 30 12 17 Nothing
+            --       , Tag 32 13 17 Nothing
+            --       ]
+            --       r
             , testGroup
                 "TagExpressions - SubBinary"
                 [ testCase "Sub Union" $ do
@@ -914,96 +914,56 @@ enginePropertyTests :: TestTree
 enginePropertyTests =
   testGroup
     "enginePropertyTests"
-    [ testGroup
-        "Indexing tests"
-        [ testProperty
-            "Original Expression can be retrieved from flatten"
-            ( do
-                expr <- arbitrary :: Gen Expression
-                return . (==) expr . snd . head . flatten $ expr
-            )
-        , testProperty
-            "Replace an index with itself as an identity"
-            ( do
-                expr <- arbitrary :: Gen Expression
-                n <-
-                  suchThat
-                    arbitrary
-                    (\n' -> isJust . Text.TaggerQL.Expression.Engine.lookup n' $ expr)
-                let exprAt' = fromJust $ Text.TaggerQL.Expression.Engine.lookup n expr
-                    replaceResult = replace n exprAt' expr
-                let tr = expr == replaceResult
-                return $
-                  whenFail
-                    ( do
-                        print expr
-                        print replaceResult
-                    )
-                    tr
-            )
-        , testProperty
-            "index works"
-            ( do
-                expr <- arbitrary :: Gen Expression
-                n <-
-                  suchThat
-                    arbitrary
-                    ( \n ->
-                        isJust
-                          . Text.TaggerQL.Expression.Engine.lookup n
-                          $ expr
-                    )
-                let indexResult = fromJust $ Text.TaggerQL.Expression.Engine.lookup n expr
-                    ix' = index indexResult expr
-                return $
-                  whenFail
-                    ( print n
-                        >> print indexResult
-                        >> print (fmap fst ix')
-                        >> print (fmap snd ix')
-                    )
-                    $ maybe False (\(ixN, ixE) -> ixE == indexResult && ixN == n) ix'
-            )
-        ]
-    ]
+    []
 
-instance Arbitrary Expression where
-  arbitrary :: Gen Expression
-  arbitrary = exprGen
-
-instance Arbitrary SubExpression where
-  arbitrary :: Gen SubExpression
-  arbitrary = subExprGen
-
-patternGen :: Gen Text
-patternGen = T.pack <$> suchThat arbitrary (not . null)
-
-ttGen :: Gen TagTerm
-ttGen = oneof (fmap <$> [DescriptorTerm, MetaDescriptorTerm] <*> [patternGen])
-
-subExprGen :: Gen SubExpression
-subExprGen = do
-  subtags <- SubTag <$> ttGen
-  subExpressions <- fmap SubExpression (TagTermExtension <$> ttGen <*> subExprGen)
-  binarySubExpressions <-
-    fmap
-      BinarySubExpression
-      ( BinaryOperation <$> subExprGen
-          <*> oneof (map pure [Union, Intersect, Difference])
-          <*> subExprGen
-      )
-  oneof . map pure $ [subtags, subExpressions, binarySubExpressions]
-
-exprGen :: Gen Expression
-exprGen = do
-  tagTermCon <- TagTermValue <$> ttGen
-  fileTerm <- FileTermValue . FileTerm <$> patternGen
-  tagExpr <- fmap TagExpression (TagTermExtension <$> ttGen <*> subExprGen)
-  binaryExpression <-
-    fmap
-      BinaryExpression
-      ( BinaryOperation <$> exprGen
-          <*> oneof (map pure [Union, Intersect, Difference])
-          <*> exprGen
-      )
-  oneof . map pure $ [tagTermCon, fileTerm, tagExpr, binaryExpression]
+-- testGroup
+--   "Indexing tests"
+--   [ testProperty
+--       "Original Expression can be retrieved from flatten"
+--       ( do
+--           expr <- arbitrary :: Gen Expression
+--           return . (==) expr . snd . head . flatten $ expr
+--       )
+--   , testProperty
+--       "Replace an index with itself as an identity"
+--       ( do
+--           expr <- arbitrary :: Gen Expression
+--           n <-
+--             suchThat
+--               arbitrary
+--               (\n' -> isJust . Text.TaggerQL.Expression.Engine.lookup n' $ expr)
+--           let exprAt' = fromJust $ Text.TaggerQL.Expression.Engine.lookup n expr
+--               replaceResult = replace n exprAt' expr
+--           let tr = expr == replaceResult
+--           return $
+--             whenFail
+--               ( do
+--                   print expr
+--                   print replaceResult
+--               )
+--               tr
+--       )
+--   , testProperty
+--       "index works"
+--       ( do
+--           expr <- arbitrary :: Gen Expression
+--           n <-
+--             suchThat
+--               arbitrary
+--               ( \n ->
+--                   isJust
+--                     . Text.TaggerQL.Expression.Engine.lookup n
+--                     $ expr
+--               )
+--           let indexResult = fromJust $ Text.TaggerQL.Expression.Engine.lookup n expr
+--               ix' = index indexResult expr
+--           return $
+--             whenFail
+--               ( print n
+--                   >> print indexResult
+--                   >> print (fmap fst ix')
+--                   >> print (fmap snd ix')
+--               )
+--               $ maybe False (\(ixN, ixE) -> ixE == indexResult && ixN == n) ix'
+--       )
+--   ]

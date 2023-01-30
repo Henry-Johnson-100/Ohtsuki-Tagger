@@ -25,22 +25,8 @@ License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL.Expression.AST (
-  TagTerm (..),
-  tagTermPatternL,
-  FileTerm (..),
-  BinaryOperation (..),
-  lhsL,
-  soL,
-  rhsL,
-  TagTermExtension (..),
-  tagTermL,
-  extensionL,
-  SubExpression (..),
-  Expression (..),
-
   -- * Components
-  Pattern (..),
-  pattern Pattern,
+  Pattern (.., Pattern),
   patternText,
   DTerm (..),
   runDTerm,
@@ -68,147 +54,19 @@ module Text.TaggerQL.Expression.AST (
   Magma (..),
 ) where
 
-import Control.Applicative (liftA2)
 import Control.Monad (ap, join)
-import Data.Bifunctor (Bifunctor, bimap)
+import Data.Bifunctor (bimap)
 import qualified Data.Foldable as F
-import Data.Function ((&))
 import Data.Functor ((<&>))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
 import qualified Data.List as L
-import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
 import Data.String (IsString, fromString)
-import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
 import GHC.Exts (IsList (..))
 import GHC.Generics (Generic)
-import Lens.Micro (Lens', lens)
-
-{-
- ____  _____ ____  ____  _____ ____    _  _____ _____ ____
-|  _ \| ____|  _ \|  _ \| ____/ ___|  / \|_   _| ____|  _ \
-| | | |  _| | |_) | |_) |  _|| |     / _ \ | | |  _| | | | |
-| |_| | |___|  __/|  _ <| |__| |___ / ___ \| | | |___| |_| |
-|____/|_____|_|   |_| \_\_____\____/_/   \_\_| |_____|____/
--}
-
-{- |
- Data structure representing search terms over the set of 'Descriptor`.
--}
-data TagTerm
-  = -- | Corresponds to the set of `Descriptor' that matches the given 'Text`
-    DescriptorTerm Text
-  | -- | Corresponds to the set of 'Descriptor` that are infra to the 'Descriptor`
-    -- matching the given 'Text`, including the matches themselves.
-    MetaDescriptorTerm Text
-  deriving (Show, Eq)
-
-tagTermPatternL :: Lens' TagTerm Text
-tagTermPatternL =
-  lens
-    ( \tt -> case tt of
-        DescriptorTerm txt -> txt
-        MetaDescriptorTerm txt -> txt
-    )
-    ( \tt t -> case tt of
-        DescriptorTerm _ -> DescriptorTerm t
-        MetaDescriptorTerm _ -> MetaDescriptorTerm t
-    )
-
-{- |
- Corresponds to a search term over a filepath.
--}
-newtype FileTerm
-  = FileTerm Text
-  deriving (Show, Eq, Semigroup, Monoid, IsString)
-
-{- |
- A 'SubExpression` is a structure that defines a set of 'Tag` that is some
- subset of the set of all 'Tag` in the database.
-
- A 'SubExpression` is then used:
-
-  * as an operand in another 'SubExpression`
-  * to compute a set of 'File` in an 'Expression`
-  * to tag a single 'File` with the set of 'Tag` that the 'SubExpression` represents.
--}
-data SubExpression
-  = -- | A search term for a set of 'Tag` that are subtags in the current environment.
-    SubTag TagTerm
-  | BinarySubExpression (BinaryOperation SubExpression)
-  | -- | Extends the current 'Tag` environment through the given 'TagTerm`
-    -- to define a more constrained set with the given 'SubExpression`.
-    SubExpression (TagTermExtension SubExpression)
-  deriving (Show, Eq)
-
-{- |
- An 'Expression` is a structure that defines a set of 'File` that is some subset of
- the set of all 'File` in the database.
-
- An 'Expression` is a complete TaggerQL query.
--}
-data Expression
-  = FileTermValue FileTerm
-  | TagTermValue TagTerm
-  | -- | Constructs a 'Tag` set from the given 'TagTerm`
-    -- that serves as the inital environment for the given 'SubExpression`.
-    --
-    -- Essentially, defines the set of 'File` where 'SubExpression` are subtags
-    -- of any 'Tag` appearing in the set defined by the 'TagTerm`.
-    TagExpression (TagTermExtension SubExpression)
-  | BinaryExpression (BinaryOperation Expression)
-  deriving (Show, Eq)
-
-data BinaryOperation a = BinaryOperation a SetOp a deriving (Show, Eq, Functor)
-
-lhsL :: Lens' (BinaryOperation a) a
-lhsL =
-  lens
-    (\(BinaryOperation x _ _) -> x)
-    (\(BinaryOperation _ so rhs) y -> BinaryOperation y so rhs)
-
-soL :: Lens' (BinaryOperation a) SetOp
-soL =
-  lens
-    (\(BinaryOperation _ so _) -> so)
-    (\(BinaryOperation lhs _ rhs) so -> BinaryOperation lhs so rhs)
-
-rhsL :: Lens' (BinaryOperation a) a
-rhsL =
-  lens
-    (\(BinaryOperation _ _ rhs) -> rhs)
-    (\(BinaryOperation lhs so _) rhs -> BinaryOperation lhs so rhs)
-
-data TagTermExtension a = TagTermExtension TagTerm a deriving (Show, Eq, Functor)
-
-tagTermL :: Lens' (TagTermExtension a) TagTerm
-tagTermL =
-  lens
-    (\(TagTermExtension tt _) -> tt)
-    (\(TagTermExtension _ se) tt -> TagTermExtension tt se)
-
-extensionL :: Lens' (TagTermExtension a) a
-extensionL =
-  lens
-    (\(TagTermExtension _ se) -> se)
-    (flip (<$))
-
-{-
- _____ _   _ ____
-| ____| \ | |  _ \
-|  _| |  \| | | | |
-| |___| |\  | |_| |
-|_____|_| \_|____/
-
- ____  _____ ____  ____  _____ ____    _  _____ _____ ____
-|  _ \| ____|  _ \|  _ \| ____/ ___|  / \|_   _| ____|  _ \
-| | | |  _| | |_) | |_) |  _|| |     / _ \ | | |  _| | | | |
-| |_| | |___|  __/|  _ <| |__| |___ / ___ \| | | |___| |_| |
-|____/|_____|_|   |_| \_\_____\____/_/   \_\_| |_____|____/
--}
 
 {- |
  A data type representing an expression of any Ring.
@@ -417,12 +275,6 @@ data DTerm a
   | DMetaTerm a
   deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
 
-extractDTerm = runDTerm
-
-duplicateDTerm :: DTerm a -> DTerm (DTerm a)
-duplicateDTerm (DTerm x) = DTerm (DTerm x)
-duplicateDTerm (DMetaTerm x) = DMetaTerm (DMetaTerm x)
-
 instance Hashable a => Hashable (DTerm a)
 
 instance Applicative DTerm where
@@ -523,129 +375,129 @@ a{b | c{d}} -> a{b} | a{c{d}} -> a{b | c{d}}
   -> a{(c{e} ! c{f}) & (d{e} ! d{f})} -> a{c{e ! f} & d{e ! f}} -> a{(c & d){e ! f}}
 -}
 
-data MagmaFactorization a = MagmaFactorization
-  { -- | Left factors are from right distribution.
-    leftFactors :: Maybe (MagmaExpression a)
-  , -- | Right factors are from left distribution.
-    rightFactors :: Maybe (MagmaExpression a)
-  , -- | The remaining terms that cannot be factored in comparison with the right
-    -- quotient.
-    leftQuotient :: MagmaExpression a
-  , -- | The remaining terms that cannot be factored in comparison with the left
-    -- quotient.
-    rightQuotient :: MagmaExpression a
-  }
-  deriving (Show, Eq, Functor)
+-- data MagmaFactorization a = MagmaFactorization
+--   { -- | Left factors are from right distribution.
+--     leftFactors :: Maybe (MagmaExpression a)
+--   , -- | Right factors are from left distribution.
+--     rightFactors :: Maybe (MagmaExpression a)
+--   , -- | The remaining terms that cannot be factored in comparison with the right
+--     -- quotient.
+--     leftQuotient :: MagmaExpression a
+--   , -- | The remaining terms that cannot be factored in comparison with the left
+--     -- quotient.
+--     rightQuotient :: MagmaExpression a
+--   }
+--   deriving (Show, Eq, Functor)
 
-constructFactorResults ::
-  (MagmaExpression a -> MagmaExpression a -> t) ->
-  MagmaFactorization a ->
-  t
-constructFactorResults c (MagmaFactorization mLeft mRight l r) = withEnds l `c` withEnds r
- where
-  withEnds m =
-    let leftFactorCons = maybe m (<> m) mLeft
-        rightFactorCons = maybe leftFactorCons (leftFactorCons <>) mRight
-     in rightFactorCons
+-- constructFactorResults ::
+--   (MagmaExpression a -> MagmaExpression a -> t) ->
+--   MagmaFactorization a ->
+--   t
+-- constructFactorResults c (MagmaFactorization mLeft mRight l r) = withEnds l `c` withEnds r
+--  where
+--   withEnds m =
+--     let leftFactorCons = maybe m (<> m) mLeft
+--         rightFactorCons = maybe leftFactorCons (leftFactorCons <>) mRight
+--      in rightFactorCons
 
-{- |
- Separate factors that have been produced from left and right distribution
- if there are any.
+-- {- |
+--  Separate factors that have been produced from left and right distribution
+--  if there are any.
 
- Return the left and right remainders of the factored expressions.
+--  Return the left and right remainders of the factored expressions.
 
- This function assumes that the magma is a non-associative, non-commutative operation.
--}
-factorMagma ::
-  Eq a =>
-  MagmaExpression a ->
-  MagmaExpression a ->
-  MagmaFactorization a
-factorMagma l r =
-  let lList = F.foldr (:) [] l
-      rList = F.foldr (:) [] r
-      safeFromList xs = case xs of
-        [] -> Nothing
-        (x : xs') -> Just $ F.foldl' over (Magma x) xs'
+--  This function assumes that the magma is a non-associative, non-commutative operation.
+-- -}
+-- factorMagma ::
+--   Eq a =>
+--   MagmaExpression a ->
+--   MagmaExpression a ->
+--   MagmaFactorization a
+-- factorMagma l r =
+--   let lList = F.foldr (:) [] l
+--       rList = F.foldr (:) [] r
+--       safeFromList xs = case xs of
+--         [] -> Nothing
+--         (x : xs') -> Just $ F.foldl' over (Magma x) xs'
 
-      -- Left factors are a product of right-distribution
-      ( mapMaybe fst ->
-          lFactors
-        , unzip -> lFactorRemainders
-        ) =
-          L.span (fromMaybe False . uncurry (liftA2 (==))) $ zipLongest [] lList rList
+--       -- Left factors are a product of right-distribution
+--       ( mapMaybe fst ->
+--           lFactors
+--         , unzip -> lFactorRemainders
+--         ) =
+--           L.span (fromMaybe False . uncurry (liftA2 (==))) $ zipLongest [] lList rList
 
-      -- Right factors are a product of left-distribution and are taken the same
-      -- way as left factors, only over a reversed list.
-      ( mapMaybe fst . reverse ->
-          rFactors
-        , both reverse . unzip ->
-            (xlRem, ylRem)
-        ) =
-          L.span (fromMaybe False . uncurry (liftA2 (==)))
-            . uncurry (zipLongest [])
-            . both (reverse . catMaybes)
-            $ lFactorRemainders
+--       -- Right factors are a product of left-distribution and are taken the same
+--       -- way as left factors, only over a reversed list.
+--       ( mapMaybe fst . reverse ->
+--           rFactors
+--         , both reverse . unzip ->
+--             (xlRem, ylRem)
+--         ) =
+--           L.span (fromMaybe False . uncurry (liftA2 (==)))
+--             . uncurry (zipLongest [])
+--             . both (reverse . catMaybes)
+--             $ lFactorRemainders
 
-      remainders = both catMaybes (xlRem, ylRem)
-   in if l == r
-        then MagmaFactorization Nothing Nothing l r
-        else case remainders of
-          -- inputs are already fully factored so they are returned.
-          -- Simply a case match for the above if-expr that skips these computations.
-          ([], []) ->
-            MagmaFactorization Nothing Nothing l r
-          (l' : ls, r' : rs) ->
-            MagmaFactorization
-              { leftFactors = safeFromList lFactors
-              , rightFactors = safeFromList rFactors
-              , leftQuotient = F.foldl' over (pure l') ls
-              , rightQuotient = F.foldl' over (pure r') rs
-              }
-          _oneRemIsEmpty ->
-            remainders
-              &
-              -- One remainder is empty, so in order to return a
-              -- Magma expression remainder, it attempts to borrow a factor,
-              -- first from the left side.
-              case safeFromList lFactors of
-                Just me ->
-                  let foldFactorInto fact = both (F.foldl' over fact)
-                   in case me of
-                        Magma _ ->
-                          uncurry (MagmaFactorization Nothing (safeFromList rFactors))
-                            . foldFactorInto me
-                        me' :$ a ->
-                          uncurry (MagmaFactorization (Just me') (safeFromList rFactors))
-                            . foldFactorInto (pure a)
-                -- There are no left factors so it tries the right side.
-                Nothing -> case safeFromList rFactors of
-                  Just me ->
-                    let foldFactorInto fact = both (F.foldr appliedTo fact)
-                     in case me of
-                          Magma _ ->
-                            uncurry (MagmaFactorization Nothing Nothing)
-                              . foldFactorInto me
-                          (partitionLeft -> (lhead, lMag)) ->
-                            uncurry (MagmaFactorization Nothing lMag)
-                              . foldFactorInto (pure lhead)
-                  -- This scenario should absolutely never happen. It means that
-                  -- one remainder is empty and yet there are no factors.
-                  -- Which means that a remainder was removed
-                  -- when it should not have been.
-                  -- To avoid a partial function, this returns the input as unfactorable.
-                  Nothing -> const (uncurry (MagmaFactorization Nothing Nothing) (l, r))
+--       remainders = both catMaybes (xlRem, ylRem)
+--    in if l == r
+--         then MagmaFactorization Nothing Nothing l r
+--         else case remainders of
+--           -- inputs are already fully factored so they are returned.
+--           -- Simply a case match for the above if-expr that skips these computations.
+--           ([], []) ->
+--             MagmaFactorization Nothing Nothing l r
+--           (l' : ls, r' : rs) ->
+--             MagmaFactorization
+--               { leftFactors = safeFromList lFactors
+--               , rightFactors = safeFromList rFactors
+--               , leftQuotient = F.foldl' over (pure l') ls
+--               , rightQuotient = F.foldl' over (pure r') rs
+--               }
+--           _oneRemIsEmpty ->
+--             remainders
+--               &
+--               -- One remainder is empty, so in order to return a
+--               -- Magma expression remainder, it attempts to borrow a factor,
+--               -- first from the left side.
+--               case safeFromList lFactors of
+--                 Just me ->
+--                   let foldFactorInto fact = both (F.foldl' over fact)
+--                    in case me of
+--                         Magma _ ->
+--                           uncurry (MagmaFactorization Nothing (safeFromList rFactors))
+--                             . foldFactorInto me
+--                         me' :$ a ->
+--                           uncurry (MagmaFactorization (Just me') (safeFromList rFactors))
+--                             . foldFactorInto (pure a)
+--                 -- There are no left factors so it tries the right side.
+--                 Nothing -> case safeFromList rFactors of
+--                   Just me ->
+--                     let foldFactorInto fact = both (F.foldr appliedTo fact)
+--                      in case me of
+--                           Magma _ ->
+--                             uncurry (MagmaFactorization Nothing Nothing)
+--                               . foldFactorInto me
+--                           (partitionLeft -> (lhead, lMag)) ->
+--                             uncurry (MagmaFactorization Nothing lMag)
+--                               . foldFactorInto (pure lhead)
+--                   -- This scenario should absolutely never happen. It means that
+--                   -- one remainder is empty and yet there are no factors.
+--                   -- Which means that a remainder was removed
+--                   -- when it should not have been.
+--                   -- To avoid a partial function, this returns the input as unfactorable.
+--                   Nothing -> const (uncurry (MagmaFactorization Nothing Nothing) (l, r))
 
-zipLongest :: [(Maybe a, Maybe a)] -> [a] -> [a] -> [(Maybe a, Maybe a)]
-zipLongest acc [] [] = reverse acc
-zipLongest acc (part' -> (x, xs)) (part' -> (y, ys)) = zipLongest ((x, y) : acc) xs ys
+-- zipLongest :: [(Maybe a, Maybe a)] -> [a] -> [a] -> [(Maybe a, Maybe a)]
+-- zipLongest acc [] [] = reverse acc
+-- zipLongest acc (part' -> (x, xs)) (part' -> (y, ys)) = zipLongest ((x, y) : acc) xs ys
 
-both :: Bifunctor p => (a -> d) -> p a a -> p d d
-both f = bimap f f
+-- both :: Bifunctor p => (a -> d) -> p a a -> p d d
+-- both f = bimap f f
 
-part' :: [a] -> (Maybe a, [a])
-part' [] = (Nothing, [])
-part' (x : xs) = (Just x, xs)
+-- part' :: [a] -> (Maybe a, [a])
+-- part' [] = (Nothing, [])
+-- part' (x : xs) = (Just x, xs)
 
 {-
 END Factoring
@@ -673,18 +525,6 @@ evaluateTagExpressionWithMagma mf te =
     TagValue a -> a
     TagRing re -> evaluateRing . fmap (evaluateTagExpressionWithMagma mf) $ re
     TagMagma me -> mf . fmap (evaluateTagExpressionWithMagma mf) $ me
-
--- mk :: Pattern -> TagExpression Pattern
--- mk = pure
-
--- a = mk "a"
--- b = mk "b"
--- c = mk "c"
--- d = mk "d"
--- e = mk "e"
--- f = mk "f"
--- g = mk "g"
--- h = mk "h"
 
 {- |
  Newtype wrapper for a query expression, which is a ring expression of leaves
@@ -772,22 +612,6 @@ instance Rng Int where
   (-.) :: Int -> Int -> Int
   (-.) = (-)
 
-instance Rng SubExpression where
-  (+.) :: SubExpression -> SubExpression -> SubExpression
-  x +. y = BinarySubExpression $ BinaryOperation x Union y
-  (*.) :: SubExpression -> SubExpression -> SubExpression
-  x *. y = BinarySubExpression $ BinaryOperation x Intersect y
-  (-.) :: SubExpression -> SubExpression -> SubExpression
-  x -. y = BinarySubExpression $ BinaryOperation x Difference y
-
-instance Rng Expression where
-  (+.) :: Expression -> Expression -> Expression
-  x +. y = BinaryExpression $ BinaryOperation x Union y
-  (*.) :: Expression -> Expression -> Expression
-  x *. y = BinaryExpression $ BinaryOperation x Intersect y
-  (-.) :: Expression -> Expression -> Expression
-  x -. y = BinaryExpression $ BinaryOperation x Difference y
-
 instance Rng (RingExpression a) where
   (+.) :: RingExpression a -> RingExpression a -> RingExpression a
   (+.) = (:+)
@@ -833,25 +657,6 @@ instance Ring Int where
   aid = 0
   mid :: Int
   mid = 1
-
-instance Ring SubExpression where
-  mid :: SubExpression
-  mid = SubTag . DescriptorTerm $ "%"
-  aid :: SubExpression
-  aid = BinarySubExpression $ BinaryOperation mid Difference mid
-
-instance Ring Expression where
-  mid :: Expression
-  mid = FileTermValue "%"
-  aid :: Expression
-  aid =
-    let dUniverse = TagTermValue . DescriptorTerm $ "%"
-     in BinaryExpression
-          ( BinaryOperation
-              (BinaryExpression (BinaryOperation mid Difference dUniverse))
-              Intersect
-              dUniverse
-          )
 
 instance Ring QueryExpression where
   -- The set of all files

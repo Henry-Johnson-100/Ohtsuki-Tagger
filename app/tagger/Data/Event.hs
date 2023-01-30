@@ -37,7 +37,7 @@ import Database.Tagger.Type (
   Tag,
  )
 import Monomer (AppEventResponse)
-import Text.TaggerQL.Expression.AST (Expression, Ring, SubExpression)
+import Text.TaggerQL.Expression.AST
 
 data TaggerEvent
   = DoFocusedFileEvent FocusedFileEvent
@@ -117,8 +117,8 @@ data QueryEvent
   | -- | Adds an operand to the end of a Ring expression by an intersection.
     forall r. (Ring r) => RingProduct (Lens' QueryModel r) r
   | RunQuery
-  | UpdateExpression Int Expression
-  | UpdateSubExpression Int Int SubExpression
+  | UpdateExpression Int QueryExpression
+  | UpdateSubExpression Int Int (TagExpression (DTerm Pattern))
 
 data FileSelectionWidgetEvent
   = CycleNextChunk
