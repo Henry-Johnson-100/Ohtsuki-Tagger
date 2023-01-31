@@ -187,6 +187,11 @@ parserTests =
                     , "{apple }"
                     , "{ apple }"
                     ]
+                , testCase "Arbitrarily Deeply Bracketed Tag" $
+                    comTE
+                        "{{{{{a}}}}}"
+                        (tedp . rt $ "a")
+                        "{{{{{a}}}}}"
                 , comBat
                     "Minimal Magma Expression"
                     "apple {red}"
@@ -199,7 +204,15 @@ parserTests =
                     , "apple{red} "
                     , "{apple{red}}"
                     , "{apple {red}}"
+                    , "{apple} {red}"
+                    , "(apple) {red}"
+                    , "({apple}) {red}"
                     ]
+                , testCase "Explicit Set Operator Annihilates Distribution" $
+                    com
+                        "[apple & {red}] /= [apple {red}]"
+                        ((tle . tedp . rt $ "apple") *. (tle . tedp . rt $ "red"))
+                        "apple & {red}"
                 , comBat
                     "Nested Minimal Magma Expression"
                     "apple {peel {red}}"
@@ -213,6 +226,12 @@ parserTests =
                     , "apple{peel{red}}"
                     , "apple { peel { red } }"
                     , "{apple{peel{red}}}"
+                    , "{apple{peel}}{red}"
+                    , "{{apple}{peel}}{red}"
+                    , "({apple}{peel}){red}"
+                    , "(apple{peel}){red}"
+                    , "{apple} {peel} {red}"
+                    , "apple {peel} {red}"
                     ]
                 , comBat
                     "Explicit MetaTerm"
@@ -246,36 +265,156 @@ parserTests =
                         "Terms with similar prefixes can be disambiguated."
                         (tle . tedp . rt $ "dLooksLikeDescriptorTerm")
                         "dLooksLikeDescriptorTerm"
-                , testCase "File Then Tag Leaf" $
-                    com
-                        "p.apple orange"
-                        (fe "apple" *. (tle . tedp . rt $ "orange"))
-                        "p.apple orange"
-                , testCase "Tag Then File Leaf" $
-                    com
-                        "apple p.orange"
-                        ((tle . tedp . rt $ "apple") *. fe "orange")
-                        "apple p.orange"
+                , comBat
+                    "File Then Tag Leaf"
+                    "p.apple orange"
+                    (fe "apple" *. (tle . tedp . rt $ "orange"))
+                    [ "p.apple orange"
+                    , "p.apple {orange}"
+                    , "(p.apple){orange}"
+                    , "(p.apple) & {orange}"
+                    , "(p.apple)({orange})"
+                    , "(p.apple)&({orange})"
+                    ]
+                , comBat
+                    "Tag Then File Leaf"
+                    "apple p.orange"
+                    ((tle . tedp . rt $ "apple") *. fe "orange")
+                    [ "apple p.orange"
+                    , "apple & p.orange"
+                    , "{apple} p.orange"
+                    , "{apple} (p.orange)"
+                    , "apple & (p.orange)"
+                    , "apple (p.orange)"
+                    , "(apple) (p.orange)"
+                    , "({apple})(p.orange)"
+                    , "({apple})&(p.orange)"
+                    ]
                 , comBat
                     "Parenthesized Tag Leaves"
                     "(apple orange banana)"
-                    ( (tle . tedp . rt $ "apple")
-                        *. (tle . tedp . rt $ "orange")
+                    ( ( (tle . tedp . rt $ "apple")
+                            *. (tle . tedp . rt $ "orange")
+                      )
                         *. (tle . tedp . rt $ "banana")
                     )
                     [ "(apple orange banana)"
                     , "((apple orange) banana)"
+                    , -- These are erroneous test cases,
+                      -- since {} distributes and associates
+                      -- strongly to the left.
+                      -- , "{apple} {orange} {banana}"
+                      -- , "({apple} {orange}) {banana}"
+                      "({apple}) ({orange}) ({banana})"
+                    , "(({apple}) ({orange})) ({banana})"
                     ]
-                , testCase "Mixed Parenthesized Tag Leaves" $
-                    com
-                        "[p.apple (orange banana)] - Should be three leaves in a \
-                        \QueryExpression, not two."
-                        ( fe "apple"
-                            *. ( (tle . tedp . rt $ "orange")
-                                    *. (tle . tedp . rt $ "banana")
-                               )
+                , comBat
+                    "Bracketed Tag Leaves are One FileLeaf"
+                    "[{apple orange banana}] - one file with that tag structure."
+                    ( tle
+                        ( ( (tedp . rt $ "apple")
+                                *. (tedp . rt $ "orange")
+                          )
+                            *. (tedp . rt $ "banana")
                         )
-                        "p.apple (orange banana)"
+                    )
+                    [ "{apple orange banana}"
+                    , "{(apple) (orange) (banana)}"
+                    , "{apple & orange & banana}"
+                    , "{{apple} & {orange} & {banana}}"
+                    , "{(apple) & (orange) & (banana)}"
+                    , "{(apple orange) banana}"
+                    , "{({apple}) ({orange}) ({banana})}"
+                    , "{({apple}) & ({orange}) & ({banana})}"
+                    , "{(({apple}) ({orange})) ({banana})}"
+                    ]
+                , comBatTE
+                    "TagExpression is Only Left-Distributive"
+                    ""
+                    ( (tedp . rt $ "apple")
+                        *. (tedp . rt $ "orange")
+                        *. (tedp . rt $ "banana")
+                    )
+                    [ "{{apple} orange banana}"
+                    , "{apple orange banana}"
+                    ]
+                , comBatTE
+                    "Left Distribution Occurs for Bracketed Tags"
+                    ""
+                    ( ( (tedp . rt $ "apple")
+                            # (tedp . rt $ "orange")
+                      )
+                        *. (tedp . rt $ "banana")
+                    )
+                    [ "{{apple} {orange} banana}"
+                    , "{apple{orange} banana}"
+                    , -- This scenario is erroneous because a {} will always
+                      -- associate to the left and is only blocked by ()
+                      -- or a set operator.
+                      --   "{apple{orange} {banana}}"
+                      "{(apple{orange}) banana}"
+                    , "{apple{orange} ({banana})}"
+                    , "{apple{orange} (banana)}"
+                    ]
+                , comBatTE
+                    "Nested Tag Distribution"
+                    ""
+                    ( (tedp . rt $ "apple")
+                        # ( (tedp . rt $ "orange")
+                                # (tedp . rt $ "banana")
+                          )
+                    )
+                    [ "{apple{orange{banana}}}"
+                    , "{{apple} {orange} {banana}}"
+                    , "{{apple{orange}} {banana}}"
+                    , "{{{apple} {orange}} {banana}}"
+                    ]
+                , comBatTE
+                    "Tag Distribution is Associative"
+                    "[{{a} {b} {c}}] Should be associative."
+                    ( (tedp . rt $ "a")
+                        # ( (tedp . rt $ "b")
+                                # (tedp . rt $ "c")
+                          )
+                    )
+                    [ "{{a} {b} {c}}"
+                    , "{{{a} {b}} {c}}"
+                    , "{{a} {{b} {c}}}"
+                    ]
+                , comBat
+                    "Mixed Parenthesized Tag Leaves"
+                    "[p.apple (orange banana)] - Should be three leaves in a \
+                    \QueryExpression, not two."
+                    ( fe "apple"
+                        *. ( (tle . tedp . rt $ "orange")
+                                *. (tle . tedp . rt $ "banana")
+                           )
+                    )
+                    [ "p.apple (orange banana)"
+                    , -- Does not match this scenario because
+                      -- bracketed tag expressions are left distributive to bracketed
+                      -- tag expressions.
+                      -- , "(p.apple) ({orange} {banana})"
+                      --   "(p.apple ({orange} {banana}))"
+                      "p.apple ({orange} banana)"
+                    , -- These are fine because query expressions do not distribute
+                      "p.apple ({orange} (banana))"
+                    , "p.apple ({orange} ({banana}))"
+                    ]
+                , comBat
+                    "Mixed Parenthesized Tag Leaves"
+                    "Bracketed tags are one leaf."
+                    ( fe "apple"
+                        *. tle
+                            ( (tedp . rt $ "orange")
+                                *. (tedp . rt $ "banana")
+                            )
+                    )
+                    [ "p.apple {orange banana}"
+                    , "p.apple ({orange banana})"
+                    , "p.apple & ({orange banana})"
+                    , "p.apple & {orange banana}"
+                    ]
                 , testCase "Mixed Leaves and Simple Magmas" $
                     com
                         "apple{skin{red}} p.orange banana{peel{yellow}}"
@@ -318,26 +457,7 @@ parserTests =
                               )
                     )
                     [ "apple{(peel | skin){red | yellow}}"
-                    , -- These two tests below are currently failing which makes sense
-                      -- given that these are meant to be QueryExpressions and not
-                      -- TagExpressions. So they do not desugar like this.
-                      --
-                      -- Instead, each top-level operand is being parsed as its own TagLeaf
-                      -- which is what is supposed to be happening.
-                      --
-                      -- So I need to either remove these tests or replace them with
-                      -- a testcase using a tag expression parser rather than a
-                      -- query expression parser.
-                      --
-                      -- Or they could be rewritten using distributive expressions,
-                      -- though there are already such tests, it probably wouldn't
-                      -- hurt to have more.
-                      --   "apple {peel {red | yellow}} | apple {skin {red | yellow}}"
-                      -- , "apple {peel {red}} | apple {peel {yellow}} | \
-                      --   \apple {skin {red}} | apple {skin {yellow}}"
-                      --
-                      --
-                      "(apple{peel} | apple{skin}) {red | yellow}"
+                    , "(apple{peel} | apple{skin}) {red | yellow}"
                     , "apple{peel{red | yellow} | skin {red | yellow}}"
                     ]
                 , comBatTE
@@ -353,6 +473,9 @@ parserTests =
                           )
                     )
                     [ "apple{(peel | skin){red | yellow}}"
+                    , "apple{{peel | skin}{red | yellow}}"
+                    , -- mixing parens for fun
+                      "apple{{{peel} | (skin)}{(red) | {yellow}}"
                     , "apple {peel {red | yellow}} | apple {skin {red | yellow}}"
                     , -- desugared
                       -- Because "skin", which was previously one term is desugared into
@@ -367,15 +490,32 @@ parserTests =
                 , comBat
                     "Simple Right Distribution"
                     "(apple | orange) {red}"
-                    ( tle $
+                    ( tle
                         ( (tedp . rt $ "apple")
-                            +. (tedp . rt $ "orange")
-                        )
                             # (tedp . rt $ "red")
+                        )
+                        +. tle
+                            ( (tedp . rt $ "orange")
+                                # (tedp . rt $ "red")
+                            )
                     )
                     [ "(apple | orange) {red}"
                     , "(apple|orange){red}"
                     ]
+                , testCase
+                    "Bracketed Expression is \
+                    \Different than Parenthesized Expression"
+                    $ com
+                        "In a top-evel scope, a bracketed expression \
+                        \produces only one TagLeaf"
+                        ( tle
+                            ( ( (tedp . rt $ "apple")
+                                    +. (tedp . rt $ "orange")
+                              )
+                                # (tedp . rt $ "red")
+                            )
+                        )
+                        "{apple | orange} {red}"
                 , testCase "Incorrect Test Case for \"Simple Right Distribution\"" $
                     com
                         "[apple{red} | orange{red}] should be parsed as two separate \
@@ -399,23 +539,37 @@ parserTests =
                         # (tedp . rt $ "red")
                     )
                     [ "(apple | orange) {red}"
+                    , "{apple | orange} {red}"
                     , "( apple|orange ){ red }"
                     , "apple {red} | orange {red}"
                     ]
                 , comBat
                     "Associative Right Distribution"
                     "(apple | (orange{peel})) {red}"
-                    ( tle $
-                        ( (tedp . rt $ "apple")
-                            +. ( (tedp . rt $ "orange")
-                                    # (tedp . rt $ "peel")
-                               )
-                        )
-                            # (tedp . rt $ "red")
+                    ( tle ((tedp . rt $ "apple") # (tedp . rt $ "red"))
+                        +. tle
+                            ( (tedp . rt $ "orange")
+                                # ( (tedp . rt $ "peel")
+                                        # (tedp . rt $ "red")
+                                  )
+                            )
                     )
                     [ "(apple | (orange{peel})) {red}"
                     , "(apple | orange {peel}) {red}"
                     , "(apple | orange{peel}){red}"
+                    ]
+                , comBatTE
+                    "Associative Right Tag Distribution"
+                    ""
+                    ( ( (tedp . rt $ "apple")
+                            +. ( (tedp . rt $ "orange")
+                                    # (tedp . rt $ "peel")
+                               )
+                      )
+                        # (tedp . rt $ "red")
+                    )
+                    [ "{apple | orange{peel}} {red}"
+                    , "apple {red} | orange {peel {red}}"
                     ]
                 , comBat
                     "Associative Left Distribution"
@@ -428,19 +582,39 @@ parserTests =
                     )
                     [ "(apple{peel}){red}"
                     , "(apple {peel}) {red}"
+                    , "{apple{peel}}{red}"
+                    , "apple {peel}{red}"
                     , -- desugared
                       "apple{peel{red}}"
                     ]
                 , comBat
                     "Mixed Distribution"
                     "(apple{skin} | orange{peel}){orange | red}"
-                    ( tle $
-                        ( ((tedp . rt $ "apple") # (tedp . rt $ "skin"))
-                            +. ((tedp . rt $ "orange") # (tedp . rt $ "peel"))
-                        )
-                            # ((tedp . rt $ "yellow") +. (tedp . rt $ "red"))
+                    ( let rightTE = (tedp . rt $ "orange") +. (tedp . rt $ "red")
+                       in tle
+                            ( ( (tedp . rt $ "apple")
+                                    # (tedp . rt $ "skin")
+                              )
+                                # rightTE
+                            )
+                            +. tle
+                                ( ( (tedp . rt $ "orange")
+                                        # (tedp . rt $ "peel")
+                                  )
+                                    # rightTE
+                                )
                     )
                     ["(apple{skin} | orange{peel}){yellow | red}"]
+                , comBat
+                    "Mixed Tag Distribution"
+                    "Same as above case but should produce only one TagLeaf"
+                    ( let appleskin = (tedp . rt $ "apple") # (tedp . rt $ "skin")
+                          orangepeel = (tedp . rt $ "orange") # (tedp . rt $ "peel")
+                          yellowred = (tedp . rt $ "yellow") +. (tedp . rt $ "red")
+                       in tle ((appleskin +. orangepeel) # yellowred)
+                    )
+                    [ "{apple{skin} | orange{peel}}{yellow | red}"
+                    ]
                 , comBatTE
                     "Mixed Distribution - TagExpression Desugaring"
                     "(apple {skin} | orange {peel}) {yellow | red}"
@@ -456,6 +630,7 @@ parserTests =
                           )
                     )
                     [ "(apple {skin} | orange {peel}) {yellow | red}"
+                    , "{apple {skin} | orange {peel}} {yellow | red}"
                     , "apple {skin {yellow | red}} | orange {peel {yellow | red}}"
                     , "apple {skin {yellow}} | apple {skin {red}} |\
                       \ (orange {peel {yellow}} | orange {peel {red}})"
@@ -485,81 +660,53 @@ parserTests =
                     [ "p.apple orange{peel} ! \
                       \((((coconut & grape) {smells}) {coconut {gun}}) | p.lime)"
                     ]
-                , testCase "Complex Query - 2" $
+                , testCase "Example From Technote" $
                     com
-                        "p.a ! d.b | d.c {d.d} | r.c {r.d} & (d.e{f} p.g) (h | i{j{k}}){(l m){n}} p.o (q){r}"
-                        ( ( ( ( ( ( ( fe "a"
-                                        -. tle (tedp . d $ "b")
-                                    )
-                                        +. tle
-                                            ( (tedp . d $ "c")
-                                                # (tedp . d $ "d")
-                                            )
+                        "Should demonstrate left distribution over a query expression."
+                        ( tle
+                            ( (tedp . rt $ "o%yui")
+                                # (tedp . rt $ "cute")
+                            )
+                            *. tle
+                                ( ( (tedp . rt $ "%riamu")
+                                        +. (tedp . rt $ "%sachiko")
                                   )
-                                    +. tle
-                                        ( (tedp . rt $ "c")
-                                            # (tedp . rt $ "d")
-                                        )
+                                    # (tedp . rt $ "cute")
                                 )
-                                    *. ( tle
-                                            ( (tedp . d $ "e")
-                                                # (tedp . rt $ "f")
-                                            )
-                                            *. fe "g"
+                        )
+                        "(o%yui & {%riamu | %sachiko}) {cute}"
+                , testCase "Counter Example From Technote" $
+                    com
+                        "Should demonstrate left distribution over a tag expression."
+                        ( tle
+                            ( ( (tedp . rt $ "o%yui")
+                                    *. ( (tedp . rt $ "%riamu")
+                                            +. (tedp . rt $ "%sachiko")
                                        )
                               )
-                                *. tle
-                                    ( ( (tedp . rt $ "h")
-                                            +. ( (tedp . rt $ "i")
-                                                    # ( (tedp . rt $ "j")
-                                                            # (tedp . rt $ "k")
-                                                      )
-                                               )
-                                      )
-                                        # ( ( (tedp . rt $ "l")
-                                                *. (tedp . rt $ "m")
-                                            )
-                                                # (tedp . rt $ "n")
-                                          )
-                                    )
+                                # (tedp . rt $ "cute")
                             )
-                                *. fe "o"
-                          )
-                            *. tle ((tedp . rt $ "q") # (tedp . rt $ "r"))
                         )
-                        "p.a ! d.b | d.c {d.d} | r.c {r.d} & (d.e{f} p.g) (h | i{j{k}}){(l m){n}} p.o (q){r}"
-                , testGroup
-                    "Nested Ring Right Distribution"
-                    $ let t = "(a & (b | c)){d}"
-                       in [ testCase "Query Expression" $
-                                com
-                                    (T.unpack t)
-                                    ( tle
-                                        ( ( (tedp . rt $ "a")
-                                                *. ( (tedp . rt $ "b")
-                                                        +. (tedp . rt $ "c")
-                                                   )
-                                          )
-                                            # (tedp . rt $ "d")
-                                        )
-                                    )
-                                    t
-                          , testCase "Tag Expression" $
-                                comTE
-                                    (T.unpack t)
-                                    ( ( (tedp . rt $ "a")
-                                            # (tedp . rt $ "d")
-                                      )
-                                        *. ( ( (tedp . rt $ "b")
-                                                # (tedp . rt $ "d")
-                                             )
-                                                +. ( (tedp . rt $ "c")
-                                                        # (tedp . rt $ "d")
-                                                   )
-                                           )
-                                    )
-                                    t
-                          ]
+                        "{o%yui & {%riamu | %sachiko}} {cute}"
+                , testCase "Example From Technote - 2" $
+                    com
+                        "Demonstrates explicit tag expression."
+                        ( tle (tedp . d $ "o%yui")
+                            *. tle
+                                ( (tedp . rt $ "character")
+                                    -. (tedp . d $ "o%yui")
+                                )
+                        )
+                        "d.o%yui & {r.character ! d.o%yui}"
+                , testCase "Counter Example from Technote - 2" $
+                    com
+                        "Deomonstrates precedence of query expressions."
+                        ( tle (tedp . d $ "o%yui")
+                            *. ( tle (tedp . rt $ "character")
+                                    -. tle (tedp . d $ "o%yui")
+                               )
+                        )
+                        "d.o%yui & (r.character ! d.o%yui)"
                 ]
             , testGroup
                 "Parser Failure Cases"
