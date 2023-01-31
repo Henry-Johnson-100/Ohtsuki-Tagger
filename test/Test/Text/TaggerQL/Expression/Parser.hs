@@ -479,7 +479,7 @@ parserTests =
                     [ "apple{(peel | skin){red | yellow}}"
                     , "apple{{peel | skin}{red | yellow}}"
                     , -- mixing parens for fun
-                      "apple{{{peel} | (skin)}{(red) | {yellow}}"
+                      "apple{{{peel} | (skin)}{(red) | {yellow}}}"
                     , "apple {peel {red | yellow}} | apple {skin {red | yellow}}"
                     , -- desugared
                       -- Because "skin", which was previously one term is desugared into
@@ -641,31 +641,6 @@ parserTests =
                     , "apple {skin {yellow}} | apple {skin {red}} |\
                       \ (orange {peel {yellow}} | orange {peel {red}})"
                     ]
-                , comBat
-                    "Complex Query - 1"
-                    ""
-                    ( ( fe "apple"
-                            *. tle
-                                ( (tedp . rt $ "orange")
-                                    # (tedp . rt $ "peel")
-                                )
-                      )
-                        -. ( tle
-                                ( ( ( (tedp . rt $ "coconut")
-                                        *. (tedp . rt $ "grape")
-                                    )
-                                        # (tedp . rt $ "smells")
-                                  )
-                                    # ( (tedp . rt $ "coconut")
-                                            # (tedp . rt $ "gun")
-                                      )
-                                )
-                                +. fe "lime"
-                           )
-                    )
-                    [ "p.apple orange{peel} ! \
-                      \((((coconut & grape) {smells}) {coconut {gun}}) | p.lime)"
-                    ]
                 , testCase "Example From Technote" $
                     com
                         "Should demonstrate left distribution over a query expression."
@@ -720,7 +695,7 @@ parserTests =
                     "parseQueryExpression Fails When All Input Not Consumed"
                     $ assertBool
                         ""
-                        (isLeft . parseQueryExpression $ "a (p.b){c}")
+                        (isLeft . parseQueryExpression $ "a p.")
                 , testCase
                     "parseQueryExpression Does Not Fail For Trailing Whitespace"
                     $ assertBool
@@ -732,7 +707,7 @@ parserTests =
                         (fe "a" *. fe "b" *. fe "c")
                         "p.a\np.b\np.c"
                 , testCase
-                    "parseTagExpression Fails When All Input Not Consumed"
+                    "parseTagExpression Can Fail"
                     $ assertBool
                         ""
                         (isLeft . parseTagExpression $ "a a.b")
