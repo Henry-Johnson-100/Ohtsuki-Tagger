@@ -250,13 +250,12 @@ bracketedTagParser =
 -}
 zeroOrManyBracketedTagParser :: Parser (Maybe BracketedTag)
 zeroOrManyBracketedTagParser =
-  spaces
-    *> fmap
-      ( \xs -> case xs of
-          [] -> Nothing
-          _notNull -> Just $ L.foldl1' (#) xs
-      )
-      (many bracketedTagParser)
+  fmap
+    ( \xs -> case xs of
+        [] -> Nothing
+        _notNull -> Just $ L.foldl1' (#) xs
+    )
+    (many . try $ (spaces *> bracketedTagParser))
 
 newtype TagTerm = TagTerm
   {runTagTerm :: TagExpression (DTerm Pattern)}

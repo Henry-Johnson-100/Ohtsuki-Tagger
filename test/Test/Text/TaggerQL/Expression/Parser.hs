@@ -457,7 +457,11 @@ parserTests =
                               )
                     )
                     [ "apple{(peel | skin){red | yellow}}"
-                    , "(apple{peel} | apple{skin}) {red | yellow}"
+                    , -- This test fails because the () signify that the terms
+                      -- inside of it are tag leaves and not one tag leaf.
+                      -- The correct way to write this case is just below.
+                      -- , "(apple{peel} | apple{skin}) {red | yellow}"
+                      "{apple{peel} | apple{skin}} {red | yellow}"
                     , "apple{peel{red | yellow} | skin {red | yellow}}"
                     ]
                 , comBatTE
