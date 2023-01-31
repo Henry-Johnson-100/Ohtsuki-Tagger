@@ -52,17 +52,50 @@ import Text.Parsec (
  )
 import Text.TaggerQL.Expression.AST (
   DTerm (..),
-  Magma,
+  Magma ((#)),
   MagmaExpression (Magma, (:$)),
   Pattern (..),
   QueryExpression (..),
   QueryLeaf (..),
   RingExpression (..),
-  Rng,
+  Rng ((*.)),
   TagExpression (..),
  )
 
 type Parser a = Parsec Text () a
+
+{- |
+ A function handling left-distribution of a 'TagExpression` into a 'QueryExpression`.
+
+ Where a 'FileLeaf` becomes an intersection and a 'TagLeaf` is subject to normal
+ distribution.
+
+ Meant to operate over queries of the form:
+
+ > (a){b}
+-}
+distributeTagExpression ::
+  QueryExpression ->
+  TagExpression (DTerm Pattern) ->
+  QueryExpression
+distributeTagExpression (QueryExpression qe) te =
+  QueryExpression $ qe >>= distributeUnderQueryLeaf te
+ where
+  distributeUnderQueryLeaf ::
+    TagExpression (DTerm Pattern) ->
+    QueryLeaf ->
+    RingExpression QueryLeaf
+  distributeUnderQueryLeaf te' ql = case ql of
+    FileLeaf _ -> Ring ql *. (Ring . TagLeaf $ te')
+    TagLeaf te'' -> Ring . TagLeaf $ te'' # te'
+
+infixl 6 <-#
+
+{- |
+ Infix synonym for 'distributeTagExpression`.
+-}
+(<-#) :: QueryExpression -> TagExpression (DTerm Pattern) -> QueryExpression
+(<-#) = distributeTagExpression
 
 {-# INLINEABLE myChainl1 #-}
 
