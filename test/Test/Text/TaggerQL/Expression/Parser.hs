@@ -114,8 +114,8 @@ parserTests =
         [ testGroup
             "Primitive Parser Tests"
             [ testGroup
-                "termPatternParser"
-                ( let parseP = parse termPatternParser ""
+                "patternParser"
+                ( let parseP = parse patternParser ""
                    in [ testCase "Pattern 0" (assertEqual "" (Right "a") (parseP "a"))
                       , testCase "Pattern 1" (assertEqual "" (Right "a") (parseP "\\a"))
                       , testCase "Pattern 2" (assertBool "" (isLeft (parseP "&")))

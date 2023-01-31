@@ -1,10 +1,10 @@
 {-# HLINT ignore "Use lambda-case" #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# HLINT ignore "Use const" #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use const" #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.Parser
@@ -22,14 +22,15 @@ module Text.TaggerQL.Expression.Parser (
   parse,
 
   -- ** Misc
+  patternTextParser,
   patternParser,
-  termPatternParser,
 ) where
 
 import Control.Applicative ((<**>))
 import Control.Monad (join, unless)
 import Data.Char (toLower, toUpper)
 import Data.Functor (($>))
+import qualified Data.List as L
 import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -42,6 +43,7 @@ import Text.Parsec (
   between,
   char,
   getInput,
+  many,
   many1,
   noneOf,
   optionMaybe,
@@ -129,12 +131,12 @@ myChainl1 p op defP = do
     )
       <|> return x
 
-patternParser :: Parser Text
-patternParser =
+patternTextParser :: Parser Text
+patternTextParser =
   T.pack <$> many1 ((char '\\' *> anyChar) <|> notRestricted)
 
-termPatternParser :: Parser Pattern
-termPatternParser = Pattern <$> patternParser
+patternParser :: Parser Pattern
+patternParser = Pattern <$> patternTextParser
 
 notRestricted :: Parser Char
 notRestricted = noneOf restrictedChars
@@ -154,6 +156,10 @@ ichar c = char (toUpper c) <|> char (toLower c)
 
 restrictedChars :: [Char]
 restrictedChars = "(){}!&|. \r\n"
+
+foldBracketedTags :: Magma m => m -> [m] -> m
+foldBracketedTags overTerm [] = overTerm
+foldBracketedTags overTerm xs = overTerm # L.foldl1' (#) xs
 
 parseQueryExpression :: Text -> Either ParseError QueryExpression
 parseQueryExpression =
@@ -188,134 +194,136 @@ failIfNotConsumed = do
 queryExpressionParser :: Parser QueryExpression
 queryExpressionParser =
   spaces
-    *> ( fmap (QueryExpression . join)
+    *> ( fmap (QueryExpression . (>>= runQueryExpression))
           . ringExprParser
-          . fmap runQueryExpression
-          $ queryLeafParser
+          . fmap runQueryTerm
+          $ queryTermParser
        )
-
-fileLeafParser :: Parser QueryLeaf
-fileLeafParser =
-  spaces
-    *> (FileLeaf <$> (ichar 'p' *> char '.' *> termPatternParser))
 
 tagExpressionParser :: Parser (TagExpression (DTerm Pattern))
 tagExpressionParser =
   spaces
-    *> ( fmap TagRing
-          . ringExprParser
-          . fmap runTagExpressionTerm
-          $ (spaces *> tagExpressionTermParser)
-       )
+    *> (TagRing <$> ringExprParser (runTagTerm <$> tagTermParser))
 
-dTermParser :: Parser (DTerm Pattern)
-dTermParser =
+filePathParser :: Parser QueryLeaf
+filePathParser =
   spaces
-    *> (dTermConstructorParser <*> termPatternParser)
+    *> (FileLeaf <$> (ichar 'p' *> char '.' *> patternParser))
 
-newtype MagmaOperand = MagmaOperand {runMagmaOperand :: TagExpression (DTerm Pattern)}
+descriptorPatternParser :: Parser (DTerm Pattern)
+descriptorPatternParser =
+  spaces
+    *> (dTermConstructorParser <*> patternParser)
+
+newtype MinimalTagExpression = MinimalTagExpression
+  {runMinTagExpr :: TagExpression (DTerm Pattern)}
   deriving (Show, Eq, Rng, Magma)
 
-magmaOperandParser :: Parser MagmaOperand
-magmaOperandParser =
+minimalTagExpressionParser :: Parser MinimalTagExpression
+minimalTagExpressionParser =
   spaces
-    *> ( MagmaOperand
-          <$> between
-            (char '{')
-            (char '}')
-            (spaces *> tagExpressionParser <* spaces)
-       )
+    *> fmap
+      MinimalTagExpression
+      ( foldBracketedTags
+          <$> fmap pure descriptorPatternParser
+          <*> fmap (map runBracketTag) (many bracketedTagParser)
+      )
 
-newtype MinimalTagExpressionTerm = MinimalTagExpressionTerm
-  {runMinimalTagExpressionTerm :: TagExpression (DTerm Pattern)}
+newtype ParenthesizedTag = ParenthesizedTag
+  {runParenTag :: TagExpression (DTerm Pattern)}
   deriving (Show, Eq, Rng, Magma)
 
-minimalTagExpressionTermParser :: Parser MinimalTagExpressionTerm
-minimalTagExpressionTermParser =
+parenthesizedTagParser :: Parser ParenthesizedTag
+parenthesizedTagParser = ParenthesizedTag <$> parenthesized tagExpressionParser
+
+newtype BracketedTag = BracketedTag
+  {runBracketTag :: TagExpression (DTerm Pattern)}
+  deriving (Show, Eq, Rng, Magma)
+
+bracketedTagParser :: Parser BracketedTag
+bracketedTagParser =
+  BracketedTag
+    <$> between (char '{') (spaces *> char '}') tagExpressionParser
+
+newtype TagTerm = TagTerm
+  {runTagTerm :: TagExpression (DTerm Pattern)}
+  deriving (Show, Eq, Rng, Magma)
+
+tagTermParser :: Parser TagTerm
+tagTermParser =
   spaces
-    *> ( MinimalTagExpressionTerm
-          <$> ( (TagValue <$> dTermParser)
-                  <**> ( try applyAsMagma
-                          <|> pure id
-                       )
-              )
+    *> ( bracketedTagTerm
+          <|> parenthesizedTagTerm
+          <|> minimalTagTerm
        )
  where
-  applyAsMagma =
-    ( \(MagmaOperand inner) outerDTerm ->
-        TagMagma $ Magma outerDTerm :$ inner
-    )
-      <$> magmaOperandParser
-
-newtype TagExpressionTerm = TagExpressionTerm
-  {runTagExpressionTerm :: TagExpression (DTerm Pattern)}
-  deriving (Show, Eq, Rng, Magma)
-
-tagExpressionTermParser :: Parser TagExpressionTerm
-tagExpressionTermParser =
-  spaces
-    *> ( TagExpressionTerm
-          <$> ( parenthesizedTagExpression
-                  <|> (runMinimalTagExpressionTerm <$> minimalTagExpressionTermParser)
-              )
-       )
- where
-  parenthesizedTagExpression =
-    parenthesized tagExpressionParser
-      <**> ( try
-              ( (\(MagmaOperand o) outerTE -> TagMagma $ Magma outerTE :$ o)
-                  <$> magmaOperandParser
-              )
-              <|> pure id
-           )
-
-newtype DistributiveTagLeaf = DistributeTagLeaf
-  {runDistributiveTagLeaf :: TagExpression (DTerm Pattern)}
-  deriving (Show, Eq, Rng, Magma)
-
-distributiveTagLeafParser :: Parser DistributiveTagLeaf
-distributiveTagLeafParser =
-  spaces
-    *> ( DistributeTagLeaf
-          <$> ( parenthesized tagExpressionParser
-                  <**> ( (\(MagmaOperand o) outerTE -> TagMagma $ Magma outerTE :$ o)
-                          <$> magmaOperandParser
-                       )
-              )
-       )
-
-queryLeafParser :: Parser QueryExpression
-queryLeafParser =
-  spaces
-    *> (
-         -- Parenthesized parsers
-         ( try distributiveTagLeaf
-            <|> parenthesizedQueryExpression
-         )
-          <|>
-          -- Non parenthesized
-          ( try fileLeaf
-              <|> minimalTagLeaf
+  bracketedTagTerm =
+    TagTerm . runBracketTag
+      <$> ( foldBracketedTags
+              <$> bracketedTagParser
+                <*> many bracketedTagParser
           )
+  parenthesizedTagTerm =
+    TagTerm
+      <$> ( foldBracketedTags
+              <$> fmap runParenTag parenthesizedTagParser
+                <*> fmap (map runBracketTag) (many bracketedTagParser)
+          )
+  minimalTagTerm = TagTerm . runMinTagExpr <$> minimalTagExpressionParser
+
+newtype ParenthesizedQuery = ParenthesizedQuery
+  {runParenQuery :: QueryExpression}
+  deriving (Show, Eq, Rng)
+
+parenthesizedQueryParser :: Parser ParenthesizedQuery
+parenthesizedQueryParser =
+  ParenthesizedQuery <$> parenthesized queryExpressionParser
+
+newtype QueryTerm = QueryTerm {runQueryTerm :: QueryExpression}
+  deriving (Show, Eq, Rng)
+
+queryTermParser :: Parser QueryTerm
+queryTermParser =
+  spaces
+    *> ( bracketedQuery
+          <|> parenthesizedQuery
+          <|> try filePathTerm
+          <|> minimalTagQuery
        )
  where
-  fileLeaf = QueryExpression . Ring <$> fileLeafParser
-  minimalTagLeaf =
-    QueryExpression
+  parenthesizedQuery =
+    QueryTerm
+      <$> ( ( \(ParenthesizedQuery q) (map runBracketTag -> brs) ->
+                ( case brs of
+                    [] -> q
+                    _notNull -> q <-# L.foldl1' (#) brs
+                ) ::
+                  QueryExpression
+            )
+              <$> parenthesizedQueryParser <*> many bracketedTagParser
+          )
+  bracketedQuery =
+    QueryTerm
+      . QueryExpression
       . Ring
       . TagLeaf
-      . runMinimalTagExpressionTerm
-      <$> minimalTagExpressionTermParser
-  distributiveTagLeaf =
-    QueryExpression
+      . runBracketTag
+      <$> (foldBracketedTags <$> bracketedTagParser <*> many bracketedTagParser)
+  minimalTagQuery =
+    QueryTerm
+      . QueryExpression
       . Ring
       . TagLeaf
-      . runDistributiveTagLeaf
-      <$> distributiveTagLeafParser
-  parenthesizedQueryExpression = parenthesized queryExpressionParser
+      . runMinTagExpr
+      <$> minimalTagExpressionParser
+  filePathTerm =
+    QueryTerm
+      . QueryExpression
+      . Ring
+      <$> filePathParser
 
 parenthesized :: Parser a -> Parser a
-parenthesized = between (spaces *> char '(') (spaces *> char ')')
+parenthesized = between (char '(') (spaces *> char ')')
 
 dTermConstructorParser :: Parser (a -> DTerm a)
 dTermConstructorParser =
