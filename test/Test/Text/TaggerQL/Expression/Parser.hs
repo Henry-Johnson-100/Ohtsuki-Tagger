@@ -150,6 +150,9 @@ parserTests =
                     , "p.apple |p.orange"
                     , "p.apple|p.orange"
                     , "p.apple   |   p.orange"
+                    , "(p.apple) | p.orange"
+                    , "p.apple | (p.orange)"
+                    , "(p.apple | p.orange)"
                     ]
                 , comBat
                     "Left-Associative Simple Expression"
@@ -159,6 +162,8 @@ parserTests =
                     , "(p.apple&p.orange) p.banana"
                     , "(p.apple & p.orange) p.banana"
                     , "(p.apple p.orange) p.banana"
+                    , "(p.apple p.orange) (p.banana)"
+                    , "((p.apple p.orange) p.banana)"
                     ]
                 , testCase "Explicit Right-Association" $
                     com
@@ -177,6 +182,10 @@ parserTests =
                     , " apple "
                     , "apple "
                     , " apple"
+                    , "{apple}"
+                    , "{ apple}"
+                    , "{apple }"
+                    , "{ apple }"
                     ]
                 , comBat
                     "Minimal Magma Expression"
@@ -188,6 +197,8 @@ parserTests =
                     , "apple { red}"
                     , "apple{ red }"
                     , "apple{red} "
+                    , "{apple{red}}"
+                    , "{apple {red}}"
                     ]
                 , comBat
                     "Nested Minimal Magma Expression"
@@ -201,6 +212,7 @@ parserTests =
                     [ "apple {peel {red}}"
                     , "apple{peel{red}}"
                     , "apple { peel { red } }"
+                    , "{apple{peel{red}}}"
                     ]
                 , comBat
                     "Explicit MetaTerm"
@@ -208,6 +220,8 @@ parserTests =
                     (tle . tedp . rt $ "apple")
                     [ "r.apple"
                     , "R.apple"
+                    , "{r.apple}"
+                    , "{R.apple}"
                     , "apple"
                     ]
                 , comBat
@@ -216,6 +230,8 @@ parserTests =
                     (tle . tedp . d $ "apple")
                     [ "d.apple"
                     , "D.apple"
+                    , "{d.apple}"
+                    , "{D.apple}"
                     ]
                 ]
             , testGroup
