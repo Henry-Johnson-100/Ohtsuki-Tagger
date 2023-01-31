@@ -29,6 +29,7 @@ module Text.TaggerQL.Expression.Parser (
 import Control.Applicative ((<**>))
 import Control.Monad (join, unless)
 import Data.Char (toLower, toUpper)
+import Data.Function ((&))
 import Data.Functor (($>))
 import qualified Data.List as L
 import Data.Tagger (SetOp (..))
@@ -157,9 +158,8 @@ ichar c = char (toUpper c) <|> char (toLower c)
 restrictedChars :: [Char]
 restrictedChars = "(){}!&|. \r\n"
 
-foldBracketedTags :: Magma m => m -> [m] -> m
-foldBracketedTags overTerm [] = overTerm
-foldBracketedTags overTerm xs = overTerm # L.foldl1' (#) xs
+foldBracketedTags :: Magma b => b -> Maybe b -> b
+foldBracketedTags overTerm = maybe overTerm (overTerm #)
 
 parseQueryExpression :: Text -> Either ParseError QueryExpression
 parseQueryExpression =
@@ -226,7 +226,7 @@ minimalTagExpressionParser =
       MinimalTagExpression
       ( foldBracketedTags
           <$> fmap pure descriptorPatternParser
-          <*> fmap (map runBracketTag) (many bracketedTagParser)
+          <*> (fmap runBracketTag <$> zeroOrManyBracketedTagParser)
       )
 
 newtype ParenthesizedTag = ParenthesizedTag
@@ -245,6 +245,19 @@ bracketedTagParser =
   BracketedTag
     <$> between (char '{') (spaces *> char '}') tagExpressionParser
 
+{- |
+ Parses zero or many 'BracketedTag` then folds them together.
+-}
+zeroOrManyBracketedTagParser :: Parser (Maybe BracketedTag)
+zeroOrManyBracketedTagParser =
+  spaces
+    *> fmap
+      ( \xs -> case xs of
+          [] -> Nothing
+          _notNull -> Just $ L.foldl1' (#) xs
+      )
+      (many bracketedTagParser)
+
 newtype TagTerm = TagTerm
   {runTagTerm :: TagExpression (DTerm Pattern)}
   deriving (Show, Eq, Rng, Magma)
@@ -261,13 +274,13 @@ tagTermParser =
     TagTerm . runBracketTag
       <$> ( foldBracketedTags
               <$> bracketedTagParser
-                <*> many bracketedTagParser
+                <*> zeroOrManyBracketedTagParser
           )
   parenthesizedTagTerm =
     TagTerm
       <$> ( foldBracketedTags
               <$> fmap runParenTag parenthesizedTagParser
-                <*> fmap (map runBracketTag) (many bracketedTagParser)
+                <*> (fmap runBracketTag <$> zeroOrManyBracketedTagParser)
           )
   minimalTagTerm = TagTerm . runMinTagExpr <$> minimalTagExpressionParser
 
@@ -293,14 +306,11 @@ queryTermParser =
  where
   parenthesizedQuery =
     QueryTerm
-      <$> ( ( \(ParenthesizedQuery q) (map runBracketTag -> brs) ->
-                ( case brs of
-                    [] -> q
-                    _notNull -> q <-# L.foldl1' (#) brs
-                ) ::
-                  QueryExpression
+      <$> ( ( \(ParenthesizedQuery q) ->
+                maybe q ((q <-#) . runBracketTag) ::
+                  Maybe BracketedTag -> QueryExpression
             )
-              <$> parenthesizedQueryParser <*> many bracketedTagParser
+              <$> parenthesizedQueryParser <*> zeroOrManyBracketedTagParser
           )
   bracketedQuery =
     QueryTerm
@@ -308,7 +318,7 @@ queryTermParser =
       . Ring
       . TagLeaf
       . runBracketTag
-      <$> (foldBracketedTags <$> bracketedTagParser <*> many bracketedTagParser)
+      <$> (foldBracketedTags <$> bracketedTagParser <*> zeroOrManyBracketedTagParser)
   minimalTagQuery =
     QueryTerm
       . QueryExpression
