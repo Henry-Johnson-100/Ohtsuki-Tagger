@@ -26,10 +26,8 @@ module Text.TaggerQL.Expression.Parser (
   patternParser,
 ) where
 
-import Control.Applicative ((<**>))
-import Control.Monad (join, unless)
+import Control.Monad (unless)
 import Data.Char (toLower, toUpper)
-import Data.Function ((&))
 import Data.Functor (($>))
 import qualified Data.List as L
 import Data.Tagger (SetOp (..))
@@ -55,14 +53,13 @@ import Text.Parsec (
  )
 import Text.TaggerQL.Expression.AST (
   DTerm (..),
-  Magma ((#)),
-  MagmaExpression (Magma, (:$)),
-  Pattern (..),
+  Magma (..),
+  Pattern (Pattern),
   QueryExpression (..),
   QueryLeaf (..),
   RingExpression (..),
   Rng ((*.)),
-  TagExpression (..),
+  TagExpression (TagRing),
  )
 
 type Parser a = Parsec Text () a

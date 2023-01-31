@@ -8,9 +8,7 @@ module Test.Text.TaggerQL.Expression.Parser (
 ) where
 
 import Data.Either (isLeft, isRight)
-import Data.Tagger (SetOp (..))
 import Data.Text (Text)
-import qualified Data.Text as T
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.TaggerQL.Expression.AST
