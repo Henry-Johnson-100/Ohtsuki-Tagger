@@ -594,7 +594,7 @@ parserTests =
                 , comBat
                     "Mixed Distribution"
                     "(apple{skin} | orange{peel}){orange | red}"
-                    ( let rightTE = (tedp . rt $ "orange") +. (tedp . rt $ "red")
+                    ( let rightTE = (tedp . rt $ "yellow") +. (tedp . rt $ "red")
                        in tle
                             ( ( (tedp . rt $ "apple")
                                     # (tedp . rt $ "skin")
@@ -608,7 +608,9 @@ parserTests =
                                     # rightTE
                                 )
                     )
-                    ["(apple{skin} | orange{peel}){yellow | red}"]
+                    [ "(apple{skin} | orange{peel}){yellow | red}"
+                    , "apple{skin{yellow | red}} | orange{peel{yellow | red}}"
+                    ]
                 , comBat
                     "Mixed Tag Distribution"
                     "Same as above case but should produce only one TagLeaf"
