@@ -1,9 +1,10 @@
-{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# HLINT ignore "Redundant multi-way if" #-}
+{-# HLINT ignore "Use const" #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Redundant multi-way if" #-}
 
 module Interface.Widget.Internal.Query.QueryBuilder (
   expressionWidget,
@@ -34,15 +35,87 @@ import Text.TaggerQL.Expression.Engine
 
 type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
-tShowSetOp :: SetOp -> Text
-tShowSetOp Union = "|"
-tShowSetOp Intersect = "&"
-tShowSetOp Difference = "!"
+newtype TagExpressionWidget = TagExpressionWidget
+  {runTagExpressionWidget :: (TaggerWidget, TagExpression (DTerm Pattern))}
+
+instance Rng TagExpressionWidget where
+  x +. y = bimapTEW (\xw yw -> hstack [xw, label_ "|" [resizeFactor (-1)], yw]) (+.) x y
+  x *. y = bimapTEW (\xw yw -> hstack [xw, label_ "&" [resizeFactor (-1)], yw]) (*.) x y
+  x -. y = bimapTEW (\xw yw -> hstack [xw, label_ "!" [resizeFactor (-1)], yw]) (-.) x y
+
+instance Magma TagExpressionWidget where
+  x # y =
+    bimapTEW
+      ( \xw yw ->
+          vstack
+            [ xw
+            , label_ "{" [resizeFactor (-1)]
+            , hstack [spacer, yw]
+            , label_ "}" [resizeFactor (-1)]
+            ]
+      )
+      (#)
+      x
+      y
+
+bimapTEW cw cr (TagExpressionWidget (xw, xte)) (TagExpressionWidget (yw, yte)) =
+  TagExpressionWidget (xw `cw` yw, xte `cr` yte)
+
+dTermPatternWidget ::
+  DTerm Pattern ->
+  TagExpressionWidget
+dTermPatternWidget d =
+  let labelText = case d of
+        DTerm (Pattern t) -> "d." <> t
+        DMetaTerm (Pattern t) -> t
+        _synonymNotMatched -> "ERROR dTermPatternWidget"
+      w = label_ labelText [resizeFactor (-1)]
+      te = pure d
+   in TagExpressionWidget (w, te)
+
+tagExpressionWidget :: TagExpression (DTerm Pattern) -> TagExpressionWidget
+tagExpressionWidget = evaluateTagExpressionR (#) . fmap dTermPatternWidget
 
 queryEditorTextFieldKey :: Text
 queryEditorTextFieldKey = "queryEditorTextField"
 
-expressionWidget _ = label "Please Understand"
+newtype QueryExpressionWidget = QueryExpressionWidget
+  {runQueryExpressionWidget :: (TaggerWidget, QueryExpression)}
+
+instance Rng QueryExpressionWidget where
+  x +. y = bimapQEW (\xw yw -> hstack [xw, label_ "|" [resizeFactor (-1)], yw]) (+.) x y
+
+  x *. y = bimapQEW (\xw yw -> hstack [xw, label_ "&" [resizeFactor (-1)], yw]) (*.) x y
+
+  x -. y = bimapQEW (\xw yw -> hstack [xw, label_ "!" [resizeFactor (-1)], yw]) (-.) x y
+
+bimapQEW
+  cw
+  cr
+  (QueryExpressionWidget (xw, xqe))
+  (QueryExpressionWidget (yw, yqe)) =
+    QueryExpressionWidget (xw `cw` yw, xqe `cr` yqe)
+
+expressionWidget :: QueryExpression -> TaggerWidget
+expressionWidget =
+  fst
+    . runQueryExpressionWidget
+    . evaluateRing
+    . fmap queryLeafWidget
+    . runQueryExpression
+
+-- These are just very basic labels for now.
+queryLeafWidget :: QueryLeaf -> QueryExpressionWidget
+queryLeafWidget ql =
+  let qe = QueryExpression . Ring $ ql
+   in case ql of
+        FileLeaf pat ->
+          let w = label_ ("p." <> patternText pat) [resizeFactor (-1)]
+           in QueryExpressionWidget (w, qe)
+        TagLeaf te ->
+          let (TagExpressionWidget (w', _)) = tagExpressionWidget te
+              w = withStyleBasic [border 1 green] w'
+           in QueryExpressionWidget (w, qe)
 
 -- expressionWidget :: Expression -> TaggerWidget
 -- expressionWidget expr =
