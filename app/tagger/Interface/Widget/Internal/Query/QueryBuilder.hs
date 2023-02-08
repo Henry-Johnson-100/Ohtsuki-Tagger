@@ -1,77 +1,178 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# HLINT ignore "Redundant if" #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# HLINT ignore "Redundant multi-way if" #-}
 {-# HLINT ignore "Use const" #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Redundant ^." #-}
 
 module Interface.Widget.Internal.Query.QueryBuilder (
   expressionWidget,
   queryEditorTextFieldKey,
 ) where
 
-import Control.Lens ((^.))
+import Control.Lens hiding (Magma, index, (#))
+import Control.Monad.Trans.Class (MonadTrans, lift)
 import Control.Monad.Trans.State.Strict (
-  State,
-  evalState,
+  StateT,
   get,
   modify,
+  runStateT,
  )
-import Data.Event (FileSelectionEvent (ClearSelection), QueryEvent (CycleExprSetOpAt, PushExpression, RingProduct, RunQuery, UpdateExpression, UpdateSubExpression), TaggerEvent (DoFileSelectionEvent, DoQueryEvent, ToggleQueryEditMode, Unit), anonymousEvent)
-import Data.Model (TaggerModel, fileSelectionModel, queryEditMode, queryModel)
-import Data.Model.Lens (expression, input)
-import Data.Model.Shared.Lens (HasText (text))
-import Data.Monoid (Sum (..))
-import Data.Tagger (SetOp (..))
+import Data.Event (TaggerEvent)
+import Data.Model (TaggerModel)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger (Descriptor (Descriptor), concreteTagDescriptor, descriptor)
-import Interface.Theme
 import Interface.Widget.Internal.Core
 import Monomer
 import Text.TaggerQL.Expression.AST
-import Text.TaggerQL.Expression.Engine
 
 type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
+{- |
+ A stateful accumulator that builds a total widget out of some given expression e.
+-}
+data ExpressionWidgetState e = ExpressionWidgetState
+  { _expressionwidgetstateWidget :: TaggerWidget
+  , _expressionwidgetstateAccumExpression :: e
+  , _expressionwidgetstateNestedOperand :: Bool
+  }
+
+makeLensesWith abbreviatedFields ''ExpressionWidgetState
+
+expressionWidgetState w e = ExpressionWidgetState w e False
+
+{- |
+ A state monad transformer for 1-indexed incremental operations.
+-}
+newtype CounterT m a = CounterT (StateT Int m a)
+  deriving (Functor, Applicative, Monad, MonadTrans)
+
+runCounter :: Monad m => CounterT m a -> m (a, Int)
+runCounter (CounterT s) = runStateT s 1
+
+incr :: Monad m => CounterT m ()
+incr = CounterT (modify (1 +))
+
+getCount :: Monad m => CounterT m Int
+getCount = CounterT get
+
 newtype TagExpressionWidget = TagExpressionWidget
-  {runTagExpressionWidget :: (TaggerWidget, TagExpression (DTerm Pattern))}
+  { runTagExpressionWidget ::
+      CounterT
+        -- This inner count is the index of whatever query leaf the widget interpreter
+        -- is on
+        (CounterT Identity)
+        (ExpressionWidgetState (TagExpression (DTerm Pattern)))
+  }
 
 instance Rng TagExpressionWidget where
-  x +. y = bimapTEW (\xw yw -> hstack [xw, label_ "|" [resizeFactor (-1)], yw]) (+.) x y
-  x *. y = bimapTEW (\xw yw -> hstack [xw, label_ "&" [resizeFactor (-1)], yw]) (*.) x y
-  x -. y = bimapTEW (\xw yw -> hstack [xw, label_ "!" [resizeFactor (-1)], yw]) (-.) x y
+  (+.) :: TagExpressionWidget -> TagExpressionWidget -> TagExpressionWidget
+  x +. y = mkRngTagExprWidget x y "|" (+.)
+  (*.) :: TagExpressionWidget -> TagExpressionWidget -> TagExpressionWidget
+  x *. y = mkRngTagExprWidget x y "&" (*.)
+  (-.) :: TagExpressionWidget -> TagExpressionWidget -> TagExpressionWidget
+  x -. y = mkRngTagExprWidget x y "!" (-.)
 
-instance Magma TagExpressionWidget where
-  x # y =
-    bimapTEW
-      ( \xw yw ->
+{- |
+ Helper function for defining Rng instances.
+-}
+mkRngTagExprWidget ::
+  TagExpressionWidget ->
+  TagExpressionWidget ->
+  Text ->
+  ( TagExpression (DTerm Pattern) ->
+    TagExpression (DTerm Pattern) ->
+    TagExpression (DTerm Pattern)
+  ) ->
+  TagExpressionWidget
+mkRngTagExprWidget (TagExpressionWidget lhs) (TagExpressionWidget rhs) l c =
+  TagExpressionWidget $ do
+    x <- lhs
+    y <- rhs
+    leafCount <- lift getCount
+    teCount <- getCount
+    incr
+    pure $ f leafCount teCount x y
+ where
+  f li i x y =
+    ExpressionWidgetState
+      ( withStyleBasic [paddingT 3, paddingR 3, paddingB 3] $
           vstack
-            [ xw
-            , label_ "{" [resizeFactor (-1)]
-            , hstack [spacer, yw]
-            , label_ "}" [resizeFactor (-1)]
+            [ x ^. widget
+            , hstack
+                [ tooltip_ (T.pack . show $ (li, i)) [tooltipDelay 500] consLabel
+                , spacer
+                , (if y ^. nestedOperand then mkParens else id) $ y ^. widget
+                ]
             ]
       )
-      (#)
-      x
-      y
+      (c (x ^. accumExpression) (y ^. accumExpression))
+      True
+   where
+    mkParens w = withStyleBasic [border 1 black, padding 3] w
 
-bimapTEW cw cr (TagExpressionWidget (xw, xte)) (TagExpressionWidget (yw, yte)) =
-  TagExpressionWidget (xw `cw` yw, xte `cr` yte)
+    consLabel = label_ l [resizeFactor (-1)]
+
+-- testquery:
+-- o%yui {(gym_clothes | swimsuit | kimono){blue} hair{r%bow}! (suggestive | sweetie_cute_new_year {+})}
+
+instance Magma TagExpressionWidget where
+  (#) :: TagExpressionWidget -> TagExpressionWidget -> TagExpressionWidget
+  (TagExpressionWidget x') # (TagExpressionWidget y') = TagExpressionWidget $ do
+    x <- x'
+    y <- y'
+    leafCount <- lift getCount
+    teCount <- getCount
+    incr
+    pure $ f leafCount teCount x y
+   where
+    f li i (x :: ExpressionWidgetState (TagExpression (DTerm Pattern))) y =
+      ExpressionWidgetState
+        ( withStyleBasic [border 1 black, padding 3] $
+            vstack
+              [ box_ [alignTop] $ x ^. widget
+              , tooltip_ (T.pack . show $ (li, i)) [tooltipDelay 500]
+                  . withStyleBasic [paddingB 3]
+                  $ vstack
+                    [ withStyleBasic [paddingB 5] $
+                        separatorLine_ [resizeFactor (-1)]
+                    , separatorLine_ [resizeFactor (-1)]
+                    ]
+              , box_ [alignTop, alignCenter] $ y ^. widget
+              ]
+        )
+        ((x ^. accumExpression) # (y ^. accumExpression))
+        False
 
 dTermPatternWidget ::
   DTerm Pattern ->
   TagExpressionWidget
-dTermPatternWidget d =
-  let labelText = case d of
-        DTerm (Pattern t) -> "d." <> t
-        DMetaTerm (Pattern t) -> t
-        _synonymNotMatched -> "ERROR dTermPatternWidget"
-      w = label_ labelText [resizeFactor (-1)]
-      te = pure d
-   in TagExpressionWidget (w, te)
+dTermPatternWidget d = TagExpressionWidget $ do
+  leafCount <- lift getCount
+  teCount <- getCount
+  incr
+  pure $ f leafCount teCount d
+ where
+  f li i d' = expressionWidgetState w (pure d')
+   where
+    dTermLabelText = case d' of
+      DTerm (Pattern t) -> "d." <> t
+      DMetaTerm (Pattern t) -> t
+      _synonymNotMatched -> T.pack . show $ d'
+
+    w =
+      tooltip_ (T.pack . show $ (li, i)) [tooltipDelay 500] $
+        label_ dTermLabelText [resizeFactor (-1)]
 
 tagExpressionWidget :: TagExpression (DTerm Pattern) -> TagExpressionWidget
 tagExpressionWidget = evaluateTagExpressionR (#) . fmap dTermPatternWidget
@@ -98,7 +199,8 @@ bimapQEW
 
 expressionWidget :: QueryExpression -> TaggerWidget
 expressionWidget =
-  fst
+  box_ [alignCenter]
+    . fst
     . runQueryExpressionWidget
     . evaluateRing
     . fmap queryLeafWidget
@@ -113,9 +215,22 @@ queryLeafWidget ql =
           let w = label_ ("p." <> patternText pat) [resizeFactor (-1)]
            in QueryExpressionWidget (w, qe)
         TagLeaf te ->
-          let (TagExpressionWidget (w', _)) = tagExpressionWidget te
-              w = withStyleBasic [border 1 green] w'
-           in QueryExpressionWidget (w, qe)
+          let r = tagExpressionWidget te
+           in QueryExpressionWidget
+                ( ( fst
+                      -- this has to be changed at some point THOUGH
+                      . runIdentity
+                      . runCounter
+                      -- discard the tag expression index because it doesn't matter
+                      -- after this compotatoation is finished.
+                      . fmap fst
+                      . runCounter
+                      . runTagExpressionWidget
+                      $ r
+                  )
+                    ^. widget
+                , qe
+                )
 
 -- expressionWidget :: Expression -> TaggerWidget
 -- expressionWidget expr =
