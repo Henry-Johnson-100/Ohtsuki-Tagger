@@ -5,15 +5,11 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# HLINT ignore "Redundant ^." #-}
 {-# HLINT ignore "Use let" #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# HLINT ignore "Redundant multi-way if" #-}
 {-# HLINT ignore "Use const" #-}
 {-# LANGUAGE InstanceSigs #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -33,8 +29,9 @@ import Control.Monad.Trans.State.Strict (
   modify,
   runStateT,
  )
+import Data.Data (Typeable)
 import Data.Event (TaggerEvent)
-import Data.Model (TaggerModel)
+import Data.Model (TaggerModel, expression, fileSelectionModel, queryModel)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Interface.Widget.Internal.Core
@@ -96,38 +93,6 @@ class CoerceWithIndex c where
 instance CoerceWithIndex CounterT where
   coerceWithIndex :: Monad m => CounterT m a -> WithIndex m a
   coerceWithIndex = constructWithIndexM
-
-{- |
- Identity type with a phantom HKT.
--}
-newtype Pure :: (* -> *) -> * -> * where
-  Pure :: a -> Pure m a
-  deriving (Functor, Show, Eq, Rng, Magma)
-
-instance CoerceWithIndex Pure where
-  coerceWithIndex :: Monad m => Pure m a -> WithIndex m a
-  coerceWithIndex = runPure . castPure
-
-instance Applicative (Pure m) where
-  pure :: a -> Pure m a
-  pure = return
-  (<*>) :: Pure m (a -> b) -> Pure m a -> Pure m b
-  (<*>) = ap
-
-instance Monad (Pure m) where
-  return :: a -> Pure m a
-  return = Pure
-  (>>=) :: Pure m a -> (a -> Pure m b) -> Pure m b
-  x >>= f = f . extractPure $ x
-
-extractPure :: Pure a b -> b
-extractPure (Pure x) = x
-
-runPure :: Applicative f => Pure f a -> f a
-runPure (Pure x) = pure x
-
-castPure :: Pure m a -> Pure n a
-castPure (Pure x) = Pure x
 
 {- |
  Apply a pure function to some leaf of a structure that is in a monadic context
@@ -323,7 +288,7 @@ tewbRngWidget labelText li i x y =
     vstack
       [ x ^. widget
       , hstack
-          [ tooltip_ (T.pack . show $ (li, i)) [tooltipDelay 500] consLabel
+          [ consLabel
           , spacer
           , (if y ^. nestedOperand then mkParens else id) $ y ^. widget
           ]
@@ -355,9 +320,8 @@ instance
       withStyleBasic [border 1 black, padding 3] $
         vstack
           [ box_ [alignTop] $ x ^. widget
-          , tooltip_ (T.pack . show $ (li, i)) [tooltipDelay 500]
-              . withStyleBasic [paddingB 3]
-              $ vstack
+          , withStyleBasic [paddingB 3] $
+              vstack
                 [ withStyleBasic [paddingB 5] $
                     separatorLine_ [resizeFactor (-1)]
                 , separatorLine_ [resizeFactor (-1)]
@@ -373,6 +337,8 @@ tewbBinHelper ::
   , Monad (t3 m)
   , IncrementableM m
   , IncrementableM (t3 m)
+  , Eq e
+  , Typeable e
   ) =>
   (t1 -> t2 -> e) ->
   (Int -> Int -> s1 -> s2 -> TaggerWidget) ->
@@ -388,10 +354,11 @@ tewbBinHelper binComb wf lhs rhs = do
   pure $ f leafCount teCount lhs' rhs'
  where
   f li i x y =
-    ExpressionWidgetState
-      (wf li i x y)
-      (binComb (x ^. accumExpression) (y ^. accumExpression))
-      False
+    let combinedExpr = binComb (x ^. accumExpression) (y ^. accumExpression)
+     in ExpressionWidgetState
+          (draggable combinedExpr $ wf li i x y)
+          combinedExpr
+          False
 
 tewbLeaf ::
   DTerm Pattern -> TagExpressionWidgetBuilder
@@ -408,7 +375,7 @@ tewbLeaf d = do
       DMetaTerm (Pattern t) -> t
       _synonymNotMatched -> T.pack . show $ d'
     w =
-      tooltip_ (T.pack . show $ (li, i)) [tooltipDelay 500] $
+      draggable (pure d' :: TagExpression (DTerm Pattern)) $
         label_ dTermLabelText [resizeFactor (-1)]
 
 newtype QueryExpressionWidgetBuilderG m a
@@ -438,6 +405,8 @@ qewbRngHelper ::
   , HasAccumExpression s1 t2
   , Monad m
   , IncrementableM m
+  , Eq e
+  , Typeable e
   ) =>
   (t1 -> t2 -> e) ->
   Text ->
@@ -452,48 +421,52 @@ qewbRngHelper c l lhs rhs = do
   pure $ f count x' y'
  where
   f i x y =
-    ExpressionWidgetState
-      ( withStyleBasic [paddingT 3, paddingR 3, paddingB 3] $
-          vstack
-            [ x ^. widget
-            , hstack
-                [ tooltip_ (T.pack . show $ i) [tooltipDelay 500] consLabel
-                , spacer
-                , (if y ^. nestedOperand then mkParens else id) $ y ^. widget
-                ]
-            ]
-      )
-      (c (x ^. accumExpression) (y ^. accumExpression))
-      True
+    let combinedExpr = c (x ^. accumExpression) (y ^. accumExpression)
+     in ExpressionWidgetState
+          ( draggable combinedExpr $
+              withStyleBasic [paddingT 3, paddingR 3, paddingB 3] $
+                vstack
+                  [ x ^. widget
+                  , hstack
+                      [ consLabel
+                      , spacer
+                      , (if y ^. nestedOperand then mkParens else id) $ y ^. widget
+                      ]
+                  ]
+          )
+          combinedExpr
+          True
    where
     mkParens w = withStyleBasic [border 1 black, padding 3] w
 
     consLabel = label_ l [resizeFactor (-1)]
 
 qewbLeaf :: QueryLeaf -> QueryExpressionWidgetBuilder
-qewbLeaf ql = case ql of
-  FileLeaf pat -> do
-    count <- getIncr
-    incr
-    pure $
-      ExpressionWidgetState
-        ( tooltip_ (T.pack . show $ count) [tooltipDelay 500] $
-            label_ ("p." <> patternText pat) [resizeFactor (-1)]
-        )
-        (QueryExpression . pure $ ql)
-        False
-  TagLeaf te -> do
-    teews <-
-      QueryExpressionWidgetBuilderG
-        . constructWithIndexM
-        . buildTagExpressionWidgetState
-        $ te
-    incr
-    pure $
-      ExpressionWidgetState
-        (teews ^. widget)
-        (QueryExpression . pure $ ql)
-        False
+qewbLeaf ql =
+  let qe = QueryExpression . pure $ ql
+   in case ql of
+        FileLeaf pat -> do
+          count <- getIncr
+          incr
+          pure $
+            ExpressionWidgetState
+              ( draggable qe $
+                  label_ ("p." <> patternText pat) [resizeFactor (-1)]
+              )
+              qe
+              False
+        TagLeaf te -> do
+          teews <-
+            QueryExpressionWidgetBuilderG
+              . constructWithIndexM
+              . buildTagExpressionWidgetState
+              $ te
+          incr
+          pure $
+            ExpressionWidgetState
+              (draggable qe $ teews ^. widget)
+              qe
+              False
 
 -- expressionWidget :: Expression -> TaggerWidget
 -- expressionWidget expr =
