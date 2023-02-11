@@ -22,10 +22,11 @@ module Interface.Widget.Internal.Query.QueryBuilder (
 import Control.Lens hiding (Magma, index, (#))
 import Control.Monad.Trans.Class (MonadTrans, lift)
 import Data.Data (Typeable)
-import Data.Event (TaggerEvent)
+import Data.Event (QueryEvent (CycleRingOperator, DeleteRingOperand), TaggerEvent (..))
 import Data.Model (TaggerModel)
 import Data.Text (Text)
 import qualified Data.Text as T
+import Interface.Theme (yuiBlue)
 import Interface.Widget.Internal.Core
 import Monomer
 import Text.TaggerQL.Expression.AST
@@ -92,31 +93,44 @@ instance
   (-.) x y = tewbBinHelper (-.) (tewbRngWidget "!") x y <&> nestedOperand .~ True
 
 tewbRngWidget ::
-  ( Show a
-  , Show b
-  , HasNestedOperand s1 Bool
+  ( HasNestedOperand s1 Bool
   , HasWidget s2 (WidgetNode TaggerModel TaggerEvent)
   , HasWidget s1 (WidgetNode TaggerModel TaggerEvent)
   ) =>
   Text ->
-  a ->
-  b ->
+  Int ->
+  Int ->
   s2 ->
   s1 ->
   WidgetNode TaggerModel TaggerEvent
 tewbRngWidget labelText li i x y =
   withStyleBasic [paddingT 3, paddingR 3, paddingB 3] $
     vstack
-      [ x ^. widget
+      [ hstack
+          [ x ^. widget
+          , styledButton_
+              []
+              "X"
+              (DoQueryEvent $ DeleteRingOperand li (Just i) (Left ()))
+          ]
       , hstack
-          [ consLabel
+          [ styledButton_ [] labelText (DoQueryEvent $ CycleRingOperator li (Just i))
           , spacer
-          , (if y ^. nestedOperand then mkParens else id) $ y ^. widget
+          , hstack
+              [ ( if y ^. nestedOperand
+                    then mkParens
+                    else id
+                )
+                  $ y ^. widget
+              , styledButton_
+                  []
+                  "X"
+                  (DoQueryEvent $ DeleteRingOperand li (Just i) (Right ()))
+              ]
           ]
       ]
  where
   mkParens w = withStyleBasic [border 1 black, padding 3] w
-  consLabel = label_ labelText [resizeFactor (-1)]
 
 instance
   Magma
@@ -137,17 +151,18 @@ instance
       (ExpressionWidgetState (TagExpression (DTerm Pattern)))
   (#) = tewbBinHelper (#) f
    where
-    f li i x y =
+    f _li _i x y =
       withStyleBasic [border 1 black, padding 3] $
         vstack
-          [ box_ [alignTop] $ x ^. widget
+          [ box_ [alignTop, ignoreEmptyArea] $ x ^. widget
           , withStyleBasic [paddingB 3] $
               vstack
-                [ withStyleBasic [paddingB 5] $
-                    separatorLine_ [resizeFactor (-1)]
-                , separatorLine_ [resizeFactor (-1)]
+                [ withStyleBasic
+                    [paddingB 5]
+                    separatorLine
+                , separatorLine
                 ]
-          , box_ [alignTop, alignCenter] $ y ^. widget
+          , box_ [alignTop, alignCenter, ignoreEmptyArea] $ y ^. widget
           ]
 
 tewbBinHelper ::
@@ -179,7 +194,7 @@ tewbBinHelper
     f li i x y =
       let combinedExpr = binComb (x ^. accumExpression) (y ^. accumExpression)
        in ExpressionWidgetState
-            (draggable combinedExpr $ wf li i x y)
+            (wf li i x y)
             combinedExpr
             False
 
@@ -191,15 +206,14 @@ tewbLeaf d = TagExpressionWidgetBuilderG $ do
   incr
   pure $ f leafCount teCount d
  where
-  f li i d' = ExpressionWidgetState w (pure d') False
+  f _li _i d' = ExpressionWidgetState w (pure d') False
    where
     dTermLabelText = case d' of
       DTerm (Pattern t) -> "d." <> t
       DMetaTerm (Pattern t) -> t
       _synonymNotMatched -> T.pack . show $ d'
     w =
-      draggable (pure d' :: TagExpression (DTerm Pattern)) $
-        label_ dTermLabelText [resizeFactor (-1)]
+      label dTermLabelText
 
 newtype QueryExpressionWidgetBuilderG m a
   = QueryExpressionWidgetBuilderG
@@ -249,35 +263,47 @@ qewbRngHelper
     f i x y =
       let combinedExpr = c (x ^. accumExpression) (y ^. accumExpression)
        in ExpressionWidgetState
-            ( draggable combinedExpr $
-                withStyleBasic [paddingT 3, paddingR 3, paddingB 3] $
-                  vstack
-                    [ x ^. widget
-                    , hstack
-                        [ consLabel
-                        , spacer
-                        , (if y ^. nestedOperand then mkParens else id) $ y ^. widget
-                        ]
-                    ]
+            ( withStyleBasic [paddingT 3, paddingR 3, paddingB 3] $
+                vstack
+                  [ hstack
+                      [ x ^. widget
+                      , styledButton_
+                          []
+                          "X"
+                          (DoQueryEvent $ DeleteRingOperand i Nothing (Left ()))
+                      ]
+                  , hstack
+                      [ styledButton_ [] l (DoQueryEvent $ CycleRingOperator i Nothing)
+                      , spacer
+                      , hstack
+                          [ ( if y ^. nestedOperand
+                                then mkParens
+                                else id
+                            )
+                              $ y ^. widget
+                          , styledButton_
+                              []
+                              "X"
+                              (DoQueryEvent $ DeleteRingOperand i Nothing (Right ()))
+                          ]
+                      ]
+                  ]
             )
             combinedExpr
             True
      where
       mkParens w = withStyleBasic [border 1 black, padding 3] w
 
-      consLabel = label_ l [resizeFactor (-1)]
-
 qewbLeaf :: QueryLeaf -> QueryExpressionWidgetBuilder
 qewbLeaf ql =
   let qe = QueryExpression . pure $ ql
    in case ql of
         FileLeaf pat -> QueryExpressionWidgetBuilderG $ do
-          count <- getIncr
+          _count <- getIncr
           incr
           pure $
             ExpressionWidgetState
-              ( draggable qe $
-                  label_ ("p." <> patternText pat) [resizeFactor (-1)]
+              ( label_ ("p." <> patternText pat) [resizeFactor (-1)]
               )
               qe
               False
@@ -293,6 +319,6 @@ qewbLeaf ql =
           incr
           pure $
             ExpressionWidgetState
-              (draggable qe $ teews ^. widget)
+              (withStyleBasic [border 1 yuiBlue] $ teews ^. widget)
               qe
               False
