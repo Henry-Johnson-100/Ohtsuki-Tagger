@@ -11,16 +11,11 @@ module Test.Text.TaggerQL.Expression.Engine (
 ) where
 
 import Control.Monad.Trans.Maybe (runMaybeT)
-import Control.Monad.Trans.Reader (runReaderT)
 import qualified Data.HashSet as HS
-import Data.Maybe (fromJust, isJust)
-import Data.Tagger
-import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger
 import Test.Tasty
 import Test.Tasty.HUnit
-import Test.Tasty.QuickCheck
 import Text.TaggerQL.Expression.AST
 import Text.TaggerQL.Expression.Engine
 
@@ -481,41 +476,41 @@ queryExpressionBasicFunctionality c =
                   , file 16
                   ]
                   r
-            -- , testCase "SubExpression Tags - 0" $ do
-            --     h <- c >>= queryTags (DescriptorTerm "descriptor_17")
-            --     r <-
-            --       c
-            --         >>= runReaderT
-            --           ( evalSubExpression
-            --               (SubTag (DescriptorTerm "descriptor_18"))
-            --               (HS.fromList h)
-            --           )
-            --     assertEqual
-            --       "Matches the tags returned by the LHS of the \
-            --       \\"TagExpressions - SubBinary Sub Union\" test."
-            --       [ Tag 28 11 17 Nothing
-            --       , Tag 32 13 17 Nothing
-            --       , Tag 38 15 17 Nothing
-            --       , Tag 41 16 17 Nothing
-            --       ]
-            --       r
-            -- , testCase "SubExpression Tags - 1" $ do
-            --     h <- c >>= queryTags (DescriptorTerm "descriptor_17")
-            --     r <-
-            --       c
-            --         >>= runReaderT
-            --           ( evalSubExpression
-            --               (SubTag (DescriptorTerm "descriptor_19"))
-            --               (HS.fromList h)
-            --           )
-            --     assertEqual
-            --       "Matches the tags returned by the RHS of the \
-            --       \\"TagExpressions - SubBinary Sub Union\" test."
-            --       [ Tag 30 12 17 Nothing
-            --       , Tag 32 13 17 Nothing
-            --       ]
-            --       r
-            , testGroup
+            , -- , testCase "SubExpression Tags - 0" $ do
+              --     h <- c >>= queryTags (DescriptorTerm "descriptor_17")
+              --     r <-
+              --       c
+              --         >>= runReaderT
+              --           ( evalSubExpression
+              --               (SubTag (DescriptorTerm "descriptor_18"))
+              --               (HS.fromList h)
+              --           )
+              --     assertEqual
+              --       "Matches the tags returned by the LHS of the \
+              --       \\"TagExpressions - SubBinary Sub Union\" test."
+              --       [ Tag 28 11 17 Nothing
+              --       , Tag 32 13 17 Nothing
+              --       , Tag 38 15 17 Nothing
+              --       , Tag 41 16 17 Nothing
+              --       ]
+              --       r
+              -- , testCase "SubExpression Tags - 1" $ do
+              --     h <- c >>= queryTags (DescriptorTerm "descriptor_17")
+              --     r <-
+              --       c
+              --         >>= runReaderT
+              --           ( evalSubExpression
+              --               (SubTag (DescriptorTerm "descriptor_19"))
+              --               (HS.fromList h)
+              --           )
+              --     assertEqual
+              --       "Matches the tags returned by the RHS of the \
+              --       \\"TagExpressions - SubBinary Sub Union\" test."
+              --       [ Tag 30 12 17 Nothing
+              --       , Tag 32 13 17 Nothing
+              --       ]
+              --       r
+              testGroup
                 "TagExpressions - SubBinary"
                 [ testCase "Sub Union" $ do
                     r <-
@@ -915,55 +910,3 @@ enginePropertyTests =
   testGroup
     "enginePropertyTests"
     []
-
--- testGroup
---   "Indexing tests"
---   [ testProperty
---       "Original Expression can be retrieved from flatten"
---       ( do
---           expr <- arbitrary :: Gen Expression
---           return . (==) expr . snd . head . flatten $ expr
---       )
---   , testProperty
---       "Replace an index with itself as an identity"
---       ( do
---           expr <- arbitrary :: Gen Expression
---           n <-
---             suchThat
---               arbitrary
---               (\n' -> isJust . Text.TaggerQL.Expression.Engine.lookup n' $ expr)
---           let exprAt' = fromJust $ Text.TaggerQL.Expression.Engine.lookup n expr
---               replaceResult = replace n exprAt' expr
---           let tr = expr == replaceResult
---           return $
---             whenFail
---               ( do
---                   print expr
---                   print replaceResult
---               )
---               tr
---       )
---   , testProperty
---       "index works"
---       ( do
---           expr <- arbitrary :: Gen Expression
---           n <-
---             suchThat
---               arbitrary
---               ( \n ->
---                   isJust
---                     . Text.TaggerQL.Expression.Engine.lookup n
---                     $ expr
---               )
---           let indexResult = fromJust $ Text.TaggerQL.Expression.Engine.lookup n expr
---               ix' = index indexResult expr
---           return $
---             whenFail
---               ( print n
---                   >> print indexResult
---                   >> print (fmap fst ix')
---                   >> print (fmap snd ix')
---               )
---               $ maybe False (\(ixN, ixE) -> ixE == indexResult && ixN == n) ix'
---       )
---   ]
