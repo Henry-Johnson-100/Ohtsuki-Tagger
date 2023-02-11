@@ -120,6 +120,7 @@ data QueryEvent
     -- The Either spine is matched on its constructor to determine which operand to drop.
     DeleteRingOperand Int (Maybe Int) (Either () ())
   | FlipRingOperands Int (Maybe Int)
+  | LeftDistribute Int (Maybe Int) (TagExpression (DTerm Pattern))
   | PlaceQueryExpression Int (Latitude QueryExpression)
   | PlaceTagExpression Int Int (Latitude (TagExpression (DTerm Pattern)))
   | PushExpression

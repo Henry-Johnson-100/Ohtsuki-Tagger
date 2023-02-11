@@ -19,16 +19,20 @@ module Interface.Widget.Internal.Query.QueryBuilder (
   queryEditorTextFieldKey,
 ) where
 
+import Control.Arrow ((&&&), (***))
 import Control.Lens hiding (Magma, index, (#))
+import Control.Monad ((>=>))
 import Control.Monad.Trans.Class (MonadTrans, lift)
+import Data.Coerce (coerce)
 import Data.Data (Typeable)
-import Data.Event (QueryEvent (CycleRingOperator, DeleteRingOperand), TaggerEvent (..))
-import Data.Model (TaggerModel)
+import Data.Event (QueryEvent (CycleRingOperator, DeleteRingOperand, LeftDistribute, PlaceTagExpression), TaggerEvent (..))
+import Data.Model (HasQueryEditMode (queryEditMode), Latitude (..), TaggerModel)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Interface.Theme (yuiBlue)
+import Interface.Theme (yuiBlue, yuiOrange, yuiPeach)
 import Interface.Widget.Internal.Core
 import Monomer
+import Monomer.Lens (a)
 import Text.TaggerQL.Expression.AST
 import Text.TaggerQL.Expression.AST.Editor
 
@@ -54,12 +58,16 @@ queryEditorTextFieldKey = "queryEditorTextField"
 
 expressionWidget :: QueryExpression -> TaggerWidget
 expressionWidget =
-  box_ [alignCenter]
+  box_
+    [ alignCenter
+    , -- Only trigger a merge if this widget is actually visible
+      mergeRequired (\_wenv _x y -> y ^. queryEditMode)
+    ]
     . (^. widget)
     . fst
     . runIdentity
     . runCounter
-    . (\(QueryExpressionWidgetBuilderG x) -> x)
+    . coerce
     . evaluateRing
     . fmap qewbLeaf
     . runQueryExpression
@@ -72,10 +80,6 @@ newtype TagExpressionWidgetBuilderG m a
       (CounterT m a)
   deriving (Functor, Applicative, Monad, MonadTrans)
 
-{- |
- A builder that mimics a WithIndex counter environment so that the indices are
- exposed to the pure functions in the continuation.
--}
 type TagExpressionWidgetBuilder =
   TagExpressionWidgetBuilderG
     (CounterT Identity)
@@ -108,10 +112,11 @@ tewbRngWidget labelText li i x y =
     vstack
       [ hstack
           [ x ^. widget
-          , styledButton_
-              []
-              "X"
-              (DoQueryEvent $ DeleteRingOperand li (Just i) (Left ()))
+          , withStyleBasic [textColor $ black & a .~ (defaultElementOpacity / 2)] $
+              styledButton_
+                []
+                "X"
+                (DoQueryEvent $ DeleteRingOperand li (Just i) (Left ()))
           ]
       , hstack
           [ styledButton_ [] labelText (DoQueryEvent $ CycleRingOperator li (Just i))
@@ -122,10 +127,11 @@ tewbRngWidget labelText li i x y =
                     else id
                 )
                   $ y ^. widget
-              , styledButton_
-                  []
-                  "X"
-                  (DoQueryEvent $ DeleteRingOperand li (Just i) (Right ()))
+              , withStyleBasic [textColor $ black & a .~ (defaultElementOpacity / 2)] $
+                  styledButton_
+                    []
+                    "X"
+                    (DoQueryEvent $ DeleteRingOperand li (Just i) (Right ()))
               ]
           ]
       ]
@@ -139,16 +145,6 @@ instance
         (ExpressionWidgetState (TagExpression (DTerm Pattern)))
     )
   where
-  (#) ::
-    TagExpressionWidgetBuilderG
-      (CounterT Identity)
-      (ExpressionWidgetState (TagExpression (DTerm Pattern))) ->
-    TagExpressionWidgetBuilderG
-      (CounterT Identity)
-      (ExpressionWidgetState (TagExpression (DTerm Pattern))) ->
-    TagExpressionWidgetBuilderG
-      (CounterT Identity)
-      (ExpressionWidgetState (TagExpression (DTerm Pattern)))
   (#) = tewbBinHelper (#) f
    where
     f _li _i x y =
@@ -206,14 +202,85 @@ tewbLeaf d = TagExpressionWidgetBuilderG $ do
   incr
   pure $ f leafCount teCount d
  where
-  f _li _i d' = ExpressionWidgetState w (pure d') False
+  f li i d' = ExpressionWidgetState w (pure d') False
    where
     dTermLabelText = case d' of
       DTerm (Pattern t) -> "d." <> t
       DMetaTerm (Pattern t) -> t
       _synonymNotMatched -> T.pack . show $ d'
     w =
-      label dTermLabelText
+      withStyleHover [bgColor $ yuiBlue & a .~ defaultElementOpacity]
+        . draggable d
+        $ zstack_
+          [onlyTopActive_ False]
+          [ label dTermLabelText
+          , let dTermDT =
+                  placeTeDropTargetG
+                    li
+                    i
+                    (pure :: DTerm Pattern -> TagExpression (DTerm Pattern))
+                    [border 1 yuiBlue]
+                teDT =
+                  placeTeDropTargetG
+                    li
+                    i
+                    id
+                    [border 1 yuiOrange]
+                teDistDT = leftDistributeDropTarget li (Just i) id [border 1 yuiOrange]
+                dTermDistDT =
+                  leftDistributeDropTarget
+                    li
+                    (Just i)
+                    (pure :: DTerm Pattern -> TagExpression (DTerm Pattern))
+                    [border 1 yuiBlue]
+             in dropTargetHGrid (dTermDT .<< teDT) (teDistDT . dTermDistDT)
+          ]
+
+placeTeDropTargetG ::
+  (Eq a, Typeable a) =>
+  Int ->
+  Int ->
+  (a -> b) ->
+  [StyleState] ->
+  (b -> Latitude (TagExpression (DTerm Pattern))) ->
+  WidgetNode s TaggerEvent ->
+  WidgetNode s TaggerEvent
+placeTeDropTargetG leafIndex teIndex toTe sts c =
+  dropTarget_
+    (DoQueryEvent . PlaceTagExpression leafIndex teIndex . c . toTe)
+    [dropTargetStyle sts]
+
+leftDistributeDropTarget ::
+  (Eq a, Typeable a) =>
+  Int ->
+  Maybe Int ->
+  (a -> TagExpression (DTerm Pattern)) ->
+  [StyleState] ->
+  WidgetNode s TaggerEvent ->
+  WidgetNode s TaggerEvent
+leftDistributeDropTarget leafIndex mTeIndex toTe sts =
+  dropTarget_
+    (DoQueryEvent . LeftDistribute leafIndex mTeIndex . toTe)
+    [dropTargetStyle sts]
+
+{- |
+ Construct an hgrid with 3 zones where each zone corresponds to a 'Latitude`
+-}
+dropTargetHGrid dts distdts =
+  vgrid
+    [ hgrid ((`dts` spacer) <$> [LatLeft, LatMiddle, LatRight])
+    , hgrid [distdts spacer]
+    ]
+
+infixr 9 .<<
+
+{- |
+ Compose functions that can share a common argument
+-}
+(.<<) :: (t -> b -> c) -> (t -> a -> b) -> t -> a -> c
+(.<<) = cmpWith
+ where
+  cmpWith g f x = g x . f x
 
 newtype QueryExpressionWidgetBuilderG m a
   = QueryExpressionWidgetBuilderG
@@ -319,6 +386,10 @@ qewbLeaf ql =
           incr
           pure $
             ExpressionWidgetState
-              (withStyleBasic [border 1 yuiBlue] $ teews ^. widget)
+              ( withStyleBasic [border 1 yuiBlue]
+                  . withStyleHover [bgColor $ yuiPeach & a .~ defaultElementOpacity]
+                  . draggable (teews ^. accumExpression)
+                  $ teews ^. widget
+              )
               qe
               False

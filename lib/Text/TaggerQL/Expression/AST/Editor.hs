@@ -23,6 +23,8 @@ module Text.TaggerQL.Expression.AST.Editor (
   onTagLeaf,
   cutMagmaExpression,
   onTagMagma,
+  distributeTagExpression,
+  (<-#),
 
   -- * Counter
   CounterT,
@@ -36,8 +38,10 @@ import Control.Monad.Trans.Class (MonadTrans (..))
 import Control.Monad.Trans.State.Strict (StateT (..), get, modify)
 import Data.Functor.Identity (runIdentity)
 import Text.TaggerQL.Expression.AST (
+  DTerm,
   Magma (..),
   MagmaExpression (..),
+  Pattern,
   QueryExpression (..),
   QueryLeaf (..),
   RingExpression (..),
@@ -46,6 +50,39 @@ import Text.TaggerQL.Expression.AST (
   evaluateRing,
   evaluateTagExpressionR,
  )
+
+{- |
+ A function handling left-distribution of a 'TagExpression` into a 'QueryExpression`.
+
+ Where a 'FileLeaf` becomes an intersection and a 'TagLeaf` is subject to normal
+ distribution.
+
+ Meant to operate over queries of the form:
+
+ > (a){b}
+-}
+distributeTagExpression ::
+  QueryExpression ->
+  TagExpression (DTerm Pattern) ->
+  QueryExpression
+distributeTagExpression (QueryExpression qe) te =
+  QueryExpression $ qe >>= distributeUnderQueryLeaf te
+ where
+  distributeUnderQueryLeaf ::
+    TagExpression (DTerm Pattern) ->
+    QueryLeaf ->
+    RingExpression QueryLeaf
+  distributeUnderQueryLeaf te' ql = case ql of
+    FileLeaf _ -> Ring ql *. (Ring . TagLeaf $ te')
+    TagLeaf te'' -> Ring . TagLeaf $ te'' # te'
+
+infixl 6 <-#
+
+{- |
+ Infix synonym for 'distributeTagExpression`.
+-}
+(<-#) :: QueryExpression -> TagExpression (DTerm Pattern) -> QueryExpression
+(<-#) = distributeTagExpression
 
 {- |
  Flips the operands of a binary expression.

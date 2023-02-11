@@ -367,6 +367,28 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
       let removeOperand = either (const dropLeftRing) (const dropRightRing) eo
        in [onDisjunctRingExpression li mi removeOperand]
     FlipRingOperands li mi -> [onDisjunctRingExpression li mi flipRingExpression]
+    LeftDistribute li mi te ->
+      [ Model $
+          model & fileSelectionModel . queryModel . expression
+            %~ flip
+              (withQueryExpression li)
+              ( \qe@(QueryExpression qe') ->
+                  case mi of
+                    Nothing -> qe <-# te
+                    Just n -> case qe' of
+                      Ring ql -> case ql of
+                        TagLeaf te' ->
+                          QueryExpression
+                            . Ring
+                            . TagLeaf
+                            $ withTagExpression
+                              n
+                              te'
+                              (\te'' -> TagMagma $ Magma te'' :$ te)
+                        _notTagLeaf -> qe
+                      _notRingValue -> qe
+              )
+      ]
     PlaceQueryExpression n l ->
       [ Model $
           model & fileSelectionModel . queryModel . expression
