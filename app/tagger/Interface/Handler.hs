@@ -362,16 +362,11 @@ queryEventHandler ::
   [AppEventResponse TaggerModel TaggerEvent]
 queryEventHandler _wenv _node model@((^. connection) -> conn) event =
   case event of
-    CycleRingOperator li mi ->
-      [ onDisjunctRingExpression li mi nextRingOperator
-      ]
+    CycleRingOperator li mi -> [onDisjunctRingExpression li mi nextRingOperator]
     DeleteRingOperand li mi eo ->
-      [ let removeOperand = either (const dropLeftRing) (const dropRightRing) eo
-         in onDisjunctRingExpression li mi removeOperand
-      ]
-    FlipRingOperands li mi ->
-      [ onDisjunctRingExpression li mi flipRingExpression
-      ]
+      let removeOperand = either (const dropLeftRing) (const dropRightRing) eo
+       in [onDisjunctRingExpression li mi removeOperand]
+    FlipRingOperands li mi -> [onDisjunctRingExpression li mi flipRingExpression]
     PlaceQueryExpression n l ->
       [ Model $
           model & fileSelectionModel . queryModel . expression
