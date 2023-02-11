@@ -3,15 +3,19 @@ module Test.Text.TaggerQL.Expression.AST (
 ) where
 
 import Control.Monad ((>=>))
+import Data.Coerce (coerce)
+import Data.Maybe (fromJust, isJust)
 import Test.Resources
 import Test.Tasty
 import Test.Tasty.QuickCheck
+import Text.TaggerQL.Expression.AST
+import Text.TaggerQL.Expression.AST.Editor
 
 astTests :: TestTree
 astTests =
     testGroup
         "AST Tests"
-        [astProperties]
+        [astProperties, astEditorProperties]
 
 astProperties :: TestTree
 astProperties =
@@ -205,6 +209,48 @@ astProperties =
                                    )
                                     dt
                     pure testProp
+                )
+            ]
+        ]
+
+astEditorProperties :: TestTree
+astEditorProperties =
+    testGroup
+        "AST Editor Properties"
+        [ testGroup
+            "Replacing Indices With Themselves"
+            [ testProperty
+                "QueryExpression"
+                ( do
+                    expr <-
+                        QueryExpression
+                            . ( coerce ::
+                                    QCRingExpression QCQueryLeaf ->
+                                    RingExpression QueryLeaf
+                              )
+                            <$> resize 3 arbitrary ::
+                            Gen QueryExpression
+                    n <- suchThat arbitrary (\n' -> isJust $ findQueryExpression n' expr)
+                    let exprAt = fromJust $ findQueryExpression n expr
+                        replaceResult = withQueryExpression n expr (const exprAt)
+                    let propTest = expr == replaceResult
+                    pure propTest
+                )
+            , testProperty
+                "TagExpression"
+                ( do
+                    expr <-
+                        ( coerce ::
+                            QCTagExpression (QCDTerm QCPattern) ->
+                            TagExpression (DTerm Pattern)
+                        )
+                            <$> resize 3 arbitrary ::
+                            Gen (TagExpression (DTerm Pattern))
+                    n <- suchThat arbitrary (\n' -> isJust $ findTagExpression n' expr)
+                    let exprAt = fromJust $ findTagExpression n expr
+                        replaceResult = withTagExpression n expr (const exprAt)
+                    let propTest = expr == replaceResult
+                    pure propTest
                 )
             ]
         ]

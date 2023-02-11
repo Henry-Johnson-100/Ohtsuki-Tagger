@@ -6,15 +6,19 @@
 {-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Redundant bracket" #-}
 
 module Test.Resources where
 
 import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
+import Data.Coerce (coerce)
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
 import Data.Maybe (catMaybes)
-import Data.String (IsString)
+import Data.String (IsString, fromString)
 import qualified Data.Text as T
 import Database.Tagger (
   Descriptor (Descriptor, descriptor),
@@ -57,6 +61,7 @@ import Text.TaggerQL.Expression.AST (
   Magma,
   MagmaExpression (Magma),
   Pattern (Pattern),
+  QueryLeaf (..),
   RingExpression (Ring),
   Rng ((+.)),
   TagExpression (..),
@@ -128,7 +133,7 @@ newtype QCPattern = QCPattern Pattern
 -- change this at some point
 instance Arbitrary QCPattern where
   arbitrary :: Gen QCPattern
-  arbitrary = QCPattern . Pattern . T.pack <$> suchThat arbitrary (not . null)
+  arbitrary = fromString <$> suchThat arbitrary (not . null)
 
 newtype QCDTerm a = QCDTerm (DTerm a)
   deriving
@@ -176,7 +181,7 @@ instance Arbitrary a => Arbitrary (QCTagExpression a) where
         let tagRing =
               TagRing <$> do
                 r <-
-                  (\(QCRingExpression re) -> re)
+                  (coerce :: QCRingExpression () -> RingExpression ())
                     <$> arbitrary ::
                     Gen (RingExpression ())
                 let teG = sizedExpr (n `div` 2)
@@ -184,7 +189,7 @@ instance Arbitrary a => Arbitrary (QCTagExpression a) where
             tagMagma =
               TagMagma <$> do
                 r <-
-                  (\(QCMagmaExpression x) -> x)
+                  (coerce :: QCMagmaExpression () -> MagmaExpression ())
                     <$> arbitrary ::
                     Gen (MagmaExpression ())
                 let teG = sizedExpr (n `div` 2)
@@ -194,6 +199,25 @@ instance Arbitrary a => Arbitrary (QCTagExpression a) where
 instance Function a => Function (TagExpression a)
 
 instance Function a => Function (QCTagExpression a)
+
+newtype QCQueryLeaf = QCQueryLeaf QueryLeaf
+  deriving (Show, Eq)
+
+instance Arbitrary QCQueryLeaf where
+  arbitrary :: Gen QCQueryLeaf
+  arbitrary =
+    QCQueryLeaf
+      <$> ( oneof
+              [ TagLeaf
+                  . ( coerce ::
+                        QCTagExpression (QCDTerm QCPattern) ->
+                        TagExpression (DTerm Pattern)
+                    )
+                  <$> arbitrary
+              , FileLeaf . (coerce :: QCPattern -> Pattern)
+                  <$> arbitrary
+              ]
+          )
 
 secureResource :: IO TaggedConnection
 secureResource = openOrCreate "integrated_testing_database.db"
