@@ -16,29 +16,25 @@ import Data.Hashable (Hashable)
 import Data.Maybe (catMaybes)
 import Data.String (IsString)
 import qualified Data.Text as T
-import Database.Tagger.Connection (
-  close,
-  openOrCreate,
-  teardownDatabase,
- )
-import Database.Tagger.Query (
-  allDescriptors,
-  allFiles,
-  allMetaDescriptorRows,
-  allTags,
-  getAllInfra,
-  insertDescriptorRelation,
-  insertDescriptors,
-  insertFiles,
-  insertTags,
-  queryForSingleDescriptorByDescriptorId,
- )
-import Database.Tagger.Type (
+import Database.Tagger (
   Descriptor (Descriptor, descriptor),
   File (File, filePath),
   RecordKey,
   Tag (Tag),
   TaggedConnection,
+  allDescriptors,
+  allFiles,
+  allMetaDescriptorRows,
+  allTags,
+  close,
+  getAllInfra,
+  insertDescriptorRelation,
+  insertDescriptors,
+  insertFiles,
+  insertTags,
+  openOrCreate,
+  queryForSingleDescriptorByDescriptorId,
+  teardownDatabase,
  )
 import GHC.Generics (Generic)
 import Test.Tasty (TestTree, testGroup)
