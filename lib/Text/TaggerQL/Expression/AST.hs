@@ -189,6 +189,42 @@ instance Semigroup (MagmaExpression a) where
       Magma a -> r :$ a
       rd :$ a -> (r <> rd) :$ a
 
+infix 9 :∙
+
+{- |
+ Generalizes a binary operation over type 'a`. Where evaluation is typically
+ accomplished by using this structure's 'Foldable` instance.
+-}
+data FreeMagma a
+  = FreeMagma a
+  | (FreeMagma a) :∙ (FreeMagma a)
+  deriving (Show, Eq, Functor, Generic, Foldable, Traversable)
+
+-- | Not a structural semigroup
+instance Semigroup (FreeMagma a) where
+  (<>) :: FreeMagma a -> FreeMagma a -> FreeMagma a
+  (<>) = (:∙)
+
+instance Magma (FreeMagma a) where
+  (#) :: FreeMagma a -> FreeMagma a -> FreeMagma a
+  (#) = (:∙)
+
+instance Applicative FreeMagma where
+  pure :: a -> FreeMagma a
+  pure = FreeMagma
+  (<*>) :: FreeMagma (a -> b) -> FreeMagma a -> FreeMagma b
+  f <*> x = case f of
+    FreeMagma fab -> fmap fab x
+    fm :∙ fm' -> (fm <*> x) :∙ (fm' <*> x)
+
+instance Monad FreeMagma where
+  return :: a -> FreeMagma a
+  return = FreeMagma
+  (>>=) :: FreeMagma a -> (a -> FreeMagma b) -> FreeMagma b
+  fm >>= f = case fm of
+    FreeMagma a -> f a
+    fm' :∙ fm_a -> (fm' >>= f) :∙ (fm_a >>= f)
+
 {- |
  Prepend a value to an expression, distributing it over
  all subsequent values.
