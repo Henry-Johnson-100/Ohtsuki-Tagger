@@ -1,15 +1,203 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Test.Resources where
 
-import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
+import qualified Data.Foldable as F
 import qualified Data.HashSet as HS
+import Data.Hashable (Hashable)
 import Data.Maybe (catMaybes)
+import Data.String (IsString)
 import qualified Data.Text as T
-import Database.Tagger
-import Test.Tasty
-import Test.Tasty.HUnit
+import Database.Tagger.Connection (
+  close,
+  openOrCreate,
+  teardownDatabase,
+ )
+import Database.Tagger.Query (
+  allDescriptors,
+  allFiles,
+  allMetaDescriptorRows,
+  allTags,
+  getAllInfra,
+  insertDescriptorRelation,
+  insertDescriptors,
+  insertFiles,
+  insertTags,
+  queryForSingleDescriptorByDescriptorId,
+ )
+import Database.Tagger.Type (
+  Descriptor (Descriptor, descriptor),
+  File (File, filePath),
+  RecordKey,
+  Tag (Tag),
+  TaggedConnection,
+ )
+import GHC.Generics (Generic)
+import Test.Tasty (TestTree, testGroup)
+import Test.Tasty.HUnit (
+  assertBool,
+  assertEqual,
+  testCase,
+  testCaseSteps,
+ )
+import Test.Tasty.QuickCheck (
+  Arbitrary (arbitrary),
+  Function,
+  Gen,
+  oneof,
+  sized,
+  suchThat,
+ )
+import Text.TaggerQL.Expression.AST (
+  DTerm (..),
+  Magma,
+  MagmaExpression (Magma),
+  Pattern (Pattern),
+  RingExpression (Ring),
+  Rng ((+.)),
+  TagExpression (..),
+  over,
+ )
+
+newtype QCRingExpression a = QCRingExpression (RingExpression a)
+  deriving
+    ( Show
+    , Eq
+    , Functor
+    , Foldable
+    , Traversable
+    , Generic
+    , Hashable
+    , Applicative
+    , Monad
+    , Rng
+    )
+
+instance Arbitrary a => Arbitrary (QCRingExpression a) where
+  arbitrary :: Arbitrary a => Gen (QCRingExpression a)
+  arbitrary = QCRingExpression <$> sized sizedRing
+   where
+    sizedRing n
+      | n <= 0 = Ring <$> arbitrary
+      | otherwise =
+        oneof
+          [ (+.) <$> sizedRing (n `div` 2) <*> sizedRing (n `div` 2)
+          , (+.) <$> sizedRing (n `div` 2) <*> sizedRing (n `div` 2)
+          , (+.) <$> sizedRing (n `div` 2) <*> sizedRing (n `div` 2)
+          ]
+
+instance Function a => Function (RingExpression a)
+
+instance Function a => Function (QCRingExpression a)
+
+newtype QCMagmaExpression a = QCMagmaExpression (MagmaExpression a)
+  deriving
+    ( Show
+    , Eq
+    , Functor
+    , Generic
+    , Hashable
+    , Foldable
+    , Traversable
+    , Semigroup
+    , Magma
+    , Applicative
+    , Monad
+    )
+
+instance Arbitrary a => Arbitrary (QCMagmaExpression a) where
+  arbitrary :: Arbitrary a => Gen (QCMagmaExpression a)
+  arbitrary =
+    QCMagmaExpression <$> do
+      xs' <- arbitrary
+      case xs' of
+        (x : xs) -> pure $ F.foldl' over (pure x) xs
+        _emptyList -> Magma <$> arbitrary
+
+instance Function a => Function (MagmaExpression a)
+
+instance Function a => Function (QCMagmaExpression a)
+
+newtype QCPattern = QCPattern Pattern
+  deriving (Show, Eq, Generic, IsString, Semigroup, Monoid, Hashable)
+
+-- change this at some point
+instance Arbitrary QCPattern where
+  arbitrary :: Gen QCPattern
+  arbitrary = QCPattern . Pattern . T.pack <$> suchThat arbitrary (not . null)
+
+newtype QCDTerm a = QCDTerm (DTerm a)
+  deriving
+    ( Show
+    , Eq
+    , Functor
+    , Foldable
+    , Traversable
+    , Generic
+    , Applicative
+    , Monad
+    , Hashable
+    )
+
+instance Arbitrary a => Arbitrary (QCDTerm a) where
+  arbitrary :: Arbitrary a => Gen (QCDTerm a)
+  arbitrary = QCDTerm <$> (oneof (pure <$> [DTerm, DMetaTerm]) <*> arbitrary)
+
+instance Function a => Function (DTerm a)
+
+instance Function a => Function (QCDTerm a)
+
+newtype QCTagExpression a = QCTagExpression (TagExpression a)
+  deriving
+    ( Show
+    , Eq
+    , Functor
+    , Foldable
+    , Traversable
+    , Generic
+    , Hashable
+    , Applicative
+    , Monad
+    , Rng
+    , Magma
+    )
+
+instance Arbitrary a => Arbitrary (QCTagExpression a) where
+  arbitrary :: Arbitrary a => Gen (QCTagExpression a)
+  arbitrary = QCTagExpression <$> sized sizedExpr
+   where
+    sizedExpr n
+      | n <= 0 = TagValue <$> arbitrary
+      | otherwise =
+        let tagRing =
+              TagRing <$> do
+                r <-
+                  (\(QCRingExpression re) -> re)
+                    <$> arbitrary ::
+                    Gen (RingExpression ())
+                let teG = sizedExpr (n `div` 2)
+                sequenceA $ teG <$ r
+            tagMagma =
+              TagMagma <$> do
+                r <-
+                  (\(QCMagmaExpression x) -> x)
+                    <$> arbitrary ::
+                    Gen (MagmaExpression ())
+                let teG = sizedExpr (n `div` 2)
+                sequenceA $ teG <$ r
+         in oneof [tagRing, tagMagma]
+
+instance Function a => Function (TagExpression a)
+
+instance Function a => Function (QCTagExpression a)
 
 secureResource :: IO TaggedConnection
 secureResource = openOrCreate "integrated_testing_database.db"
