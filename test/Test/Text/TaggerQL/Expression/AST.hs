@@ -1,75 +1,11 @@
-{-# LANGUAGE InstanceSigs #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
-{-# OPTIONS_GHC -Wno-typed-holes #-}
-
 module Test.Text.TaggerQL.Expression.AST (
     astTests,
 ) where
 
 import Control.Monad ((>=>))
-import qualified Data.Foldable as F
-import qualified Data.Text as T
+import Test.Resources
 import Test.Tasty
 import Test.Tasty.QuickCheck
-import Text.TaggerQL.Expression.AST
-
--- change this at some point
-instance Arbitrary Pattern where
-    arbitrary :: Gen Pattern
-    arbitrary = Pattern . T.pack <$> suchThat arbitrary (not . null)
-
-instance Arbitrary a => Arbitrary (DTerm a) where
-    arbitrary :: Arbitrary a => Gen (DTerm a)
-    arbitrary = oneof (pure <$> [DTerm, DMetaTerm]) <*> arbitrary
-
-instance Function a => Function (DTerm a)
-
-instance Arbitrary a => Arbitrary (RingExpression a) where
-    arbitrary :: Arbitrary a => Gen (RingExpression a)
-    arbitrary = sized sizedRing
-      where
-        sizedRing n
-            | n <= 0 = Ring <$> arbitrary
-            | otherwise =
-                oneof
-                    [ (:+) <$> sizedRing (n `div` 2) <*> sizedRing (n `div` 2)
-                    , (:*) <$> sizedRing (n `div` 2) <*> sizedRing (n `div` 2)
-                    , (:-) <$> sizedRing (n `div` 2) <*> sizedRing (n `div` 2)
-                    ]
-
-instance Function a => Function (RingExpression a)
-
-instance Arbitrary a => Arbitrary (MagmaExpression a) where
-    arbitrary :: Arbitrary a => Gen (MagmaExpression a)
-    arbitrary = do
-        xs' <- arbitrary
-        case xs' of
-            (x : xs) -> pure $ F.foldl' over (pure x) xs
-            _emptyList -> Magma <$> arbitrary
-
-instance Function a => Function (MagmaExpression a)
-
-instance Arbitrary a => Arbitrary (TagExpression a) where
-    arbitrary :: Arbitrary a => Gen (TagExpression a)
-    arbitrary = sized sizedExpr
-      where
-        sizedExpr n
-            | n <= 0 = TagValue <$> arbitrary
-            | otherwise =
-                let tagRing =
-                        TagRing <$> do
-                            r <- arbitrary :: Gen (RingExpression ())
-                            let teG = sizedExpr (n `div` 2)
-                            sequenceA $ teG <$ r
-                    tagMagma =
-                        TagMagma <$> do
-                            r <- arbitrary :: Gen (MagmaExpression ())
-                            let teG = sizedExpr (n `div` 2)
-                            sequenceA $ teG <$ r
-                 in oneof [tagRing, tagMagma]
-
-instance Function a => Function (TagExpression a)
 
 astTests :: TestTree
 astTests =
@@ -86,7 +22,7 @@ astProperties =
             [ testProperty
                 "Left Monad Identity"
                 ( do
-                    f <- arbitrary :: Gen (Int -> RingExpression Int)
+                    f <- arbitrary :: Gen (Int -> QCRingExpression Int)
                     i <- arbitrary
                     let testProp = (pure i >>= f) == f i
                     pure testProp
@@ -94,7 +30,7 @@ astProperties =
             , testProperty
                 "Right Monad Identity"
                 ( do
-                    re <- arbitrary :: Gen (RingExpression Int)
+                    re <- arbitrary :: Gen (QCRingExpression Int)
                     let testProp = (re >>= pure) == re
                     pure testProp
                 )
@@ -108,7 +44,7 @@ astProperties =
                                 (resize 35 arbitrary)
                                 -- Exclude functions that appear to be identities
                                 (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (RingExpression Int))
+                                Gen (Fun Int (QCRingExpression Int))
                     f <- genF
                     g <- genF
                     h <- genF
@@ -134,7 +70,7 @@ astProperties =
             [ testProperty
                 "Left Monad Identity"
                 ( do
-                    f <- arbitrary :: Gen (Int -> MagmaExpression Int)
+                    f <- arbitrary :: Gen (Int -> QCMagmaExpression Int)
                     i <- arbitrary
                     let testProp = (pure i >>= f) == f i
                     pure testProp
@@ -142,7 +78,7 @@ astProperties =
             , testProperty
                 "Right Monad Identity"
                 ( do
-                    re <- arbitrary :: Gen (MagmaExpression Int)
+                    re <- arbitrary :: Gen (QCMagmaExpression Int)
                     let testProp = (re >>= pure) == re
                     pure testProp
                 )
@@ -156,7 +92,7 @@ astProperties =
                                 (resize 35 arbitrary)
                                 -- Exclude functions that appear to be identities
                                 (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (MagmaExpression Int))
+                                Gen (Fun Int (QCMagmaExpression Int))
                     f <- genF
                     g <- genF
                     h <- genF
@@ -182,7 +118,7 @@ astProperties =
             [ testProperty
                 "Left Monad Identity"
                 ( do
-                    f <- resize 3 arbitrary :: Gen (Int -> TagExpression Int)
+                    f <- resize 3 arbitrary :: Gen (Int -> QCTagExpression Int)
                     i <- arbitrary
                     let testProp = (pure i >>= f) == f i
                     pure testProp
@@ -190,7 +126,7 @@ astProperties =
             , testProperty
                 "Right Monad Identity"
                 ( do
-                    re <- resize 3 arbitrary :: Gen (TagExpression Int)
+                    re <- resize 3 arbitrary :: Gen (QCTagExpression Int)
                     let testProp = (re >>= pure) == re
                     pure testProp
                 )
@@ -204,7 +140,7 @@ astProperties =
                                 (resize 3 arbitrary)
                                 -- Exclude functions that appear to be identities
                                 (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (TagExpression Int))
+                                Gen (Fun Int (QCTagExpression Int))
                     f <- genF
                     g <- genF
                     h <- genF
@@ -230,14 +166,14 @@ astProperties =
             [ testProperty
                 "Left Monad Identity"
                 ( do
-                    f <- arbitrary :: Gen (Int -> DTerm Int)
+                    f <- arbitrary :: Gen (Int -> QCDTerm Int)
                     i <- arbitrary :: Gen Int
                     pure $ (pure i >>= f) == f i
                 )
             , testProperty
                 "Right Monad Identity"
                 ( do
-                    dt <- arbitrary :: Gen (DTerm Int)
+                    dt <- arbitrary :: Gen (QCDTerm Int)
                     pure $ (dt >>= pure) == dt
                 )
             , testProperty
@@ -250,7 +186,7 @@ astProperties =
                                 (resize 35 arbitrary)
                                 -- Exclude functions that appear to be identities
                                 (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (DTerm Int))
+                                Gen (Fun Int (QCDTerm Int))
                     f <- genF
                     g <- genF
                     h <- genF
