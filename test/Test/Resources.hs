@@ -60,7 +60,7 @@ import Text.TaggerQL.Expression.AST (
   DTerm (..),
   Magma,
   MagmaExpression (Magma),
-  Pattern (Pattern),
+  Pattern (..),
   QueryLeaf (..),
   RingExpression (Ring),
   Rng ((+.)),
