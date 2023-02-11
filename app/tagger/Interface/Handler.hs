@@ -1,13 +1,14 @@
 {-# LANGUAGE BangPatterns #-}
 {-# HLINT ignore "Use list comprehension" #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# HLINT ignore "Redundant if" #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# HLINT ignore "Use const" #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Redundant if" #-}
 
 module Interface.Handler (
   taggerEventHandler,
@@ -362,44 +363,14 @@ queryEventHandler ::
 queryEventHandler _wenv _node model@((^. connection) -> conn) event =
   case event of
     CycleRingOperator li mi ->
-      [ Model $
-          model & fileSelectionModel . queryModel . expression
-            %~ flip
-              (withQueryExpression li)
-              ( case mi of
-                  Nothing -> QueryExpression . nextRingOperator . runQueryExpression
-                  Just n -> \qe ->
-                    onTagLeaf
-                      qe
-                      (flip (withTagExpression n) (`onTagRing` nextRingOperator))
-              )
+      [ onDisjunctRingExpression li mi nextRingOperator
       ]
     DeleteRingOperand li mi eo ->
       [ let removeOperand = either (const dropLeftRing) (const dropRightRing) eo
-         in Model $
-              model & fileSelectionModel . queryModel . expression
-                %~ flip
-                  (withQueryExpression li)
-                  ( case mi of
-                      Nothing -> QueryExpression . removeOperand . runQueryExpression
-                      Just n -> \qe ->
-                        onTagLeaf
-                          qe
-                          (flip (withTagExpression n) (`onTagRing` removeOperand))
-                  )
+         in onDisjunctRingExpression li mi removeOperand
       ]
     FlipRingOperands li mi ->
-      [ Model $
-          model & fileSelectionModel . queryModel . expression
-            %~ flip
-              (withQueryExpression li)
-              ( case mi of
-                  Nothing -> QueryExpression . flipRingExpression . runQueryExpression
-                  Just n -> \qe ->
-                    onTagLeaf
-                      qe
-                      (flip (withTagExpression n) (`onTagRing` flipRingExpression))
-              )
+      [ onDisjunctRingExpression li mi flipRingExpression
       ]
     PlaceQueryExpression n l ->
       [ Model $
@@ -481,6 +452,30 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
           . queryQueryExpression conn
           $ model ^. fileSelectionModel . queryModel . expression
       ]
+ where
+  -- Run a function that only modifies the structure of a RingExpression
+  -- on the QueryExpression at the given index or the TagExpression at the given
+  -- coordinates if not Nothing.
+  onDisjunctRingExpression
+    qeIndex
+    mTeIndex
+    (f :: forall a. RingExpression a -> RingExpression a) =
+      Model $
+        model & fileSelectionModel . queryModel . expression
+          %~ flip
+            (withQueryExpression qeIndex)
+            ( \qe ->
+                maybe
+                  (QueryExpression . f . runQueryExpression $ qe)
+                  ( \teIndex ->
+                      onTagLeaf
+                        qe
+                        ( \te ->
+                            withTagExpression teIndex te (`onTagRing` f)
+                        )
+                  )
+                  mTeIndex
+            )
 
 fileSelectionWidgetEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
