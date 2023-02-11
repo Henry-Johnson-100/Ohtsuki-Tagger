@@ -20,6 +20,7 @@ module Text.TaggerQL.Expression.AST.Editor (
   dropRightRing,
   duplicateRing,
   onTagRing,
+  onTagLeaf,
   cutMagmaExpression,
   onTagMagma,
 
@@ -38,6 +39,7 @@ import Text.TaggerQL.Expression.AST (
   Magma (..),
   MagmaExpression (..),
   QueryExpression (..),
+  QueryLeaf (..),
   RingExpression (..),
   Rng (..),
   TagExpression (..),
@@ -68,6 +70,20 @@ onTagRing ::
 onTagRing te f = case te of
   TagRing re -> TagRing . f $ re
   _notRing -> te
+
+{- |
+ Modifies the TagExpression in a TagLeaf of a QueryExpression if it is a ring value
+ and not a binary operation.
+-}
+onTagLeaf ::
+  QueryExpression ->
+  (forall a. TagExpression a -> TagExpression a) ->
+  QueryExpression
+onTagLeaf qe@(QueryExpression qe') f = case qe' of
+  Ring ql -> case ql of
+    TagLeaf te -> QueryExpression . Ring . TagLeaf . f $ te
+    _notTagLeaf -> qe
+  _notRingValue -> qe
 
 onTagMagma ::
   TagExpression a ->

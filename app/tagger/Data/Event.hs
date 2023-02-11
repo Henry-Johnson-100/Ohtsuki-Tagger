@@ -20,7 +20,7 @@ module Data.Event (
 import Control.Lens (Lens')
 import Data.HashMap.Strict (HashMap)
 import Data.IntMap.Strict (IntMap)
-import Data.Model.Core (DescriptorInfo, QueryModel, TaggerModel)
+import Data.Model.Core (DescriptorInfo, Latitude, QueryModel, TaggerModel)
 import Data.Model.Lens (TaggerLens)
 import Data.Model.Shared (Visibility)
 import Data.Model.Shared.Core (TextInput)
@@ -111,14 +111,19 @@ data FileSelectionEvent
   deriving (Show, Eq)
 
 data QueryEvent
-  = CycleExprSetOpAt Int
-  | CycleSubExprSetOpAt Int Int
+  = -- | If a second Int is provided, then it attempts to edit a TagExpression
+    -- with the combined argument coordinates
+    CycleRingOperator Int (Maybe Int)
+  | -- | If a second Int is provided, then it attempts to edit a TagExpression
+    -- with the combined argument coordinates.
+    --
+    -- The Either spine is matched on its constructor to determine which operand to drop.
+    DeleteRingOperand Int (Maybe Int) (Either () ())
+  | FlipRingOperands Int (Maybe Int)
+  | PlaceQueryExpression Int (Latitude QueryExpression)
+  | PlaceTagExpression Int Int (Latitude (TagExpression (DTerm Pattern)))
   | PushExpression
-  | -- | Adds an operand to the end of a Ring expression by an intersection.
-    forall r. (Ring r) => RingProduct (Lens' QueryModel r) r
   | RunQuery
-  | UpdateExpression Int QueryExpression
-  | UpdateSubExpression Int Int (TagExpression (DTerm Pattern))
 
 data FileSelectionWidgetEvent
   = CycleNextChunk

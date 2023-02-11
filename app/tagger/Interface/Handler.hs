@@ -47,6 +47,7 @@ import System.IO
 import Tagger.Info (taggerVersion)
 import Text.TaggerQL
 import Text.TaggerQL.Expression.AST
+import Text.TaggerQL.Expression.AST.Editor
 import Text.TaggerQL.Expression.Engine
 import Text.TaggerQL.Expression.Parser
 import Util
@@ -360,31 +361,81 @@ queryEventHandler ::
   [AppEventResponse TaggerModel TaggerEvent]
 queryEventHandler _wenv _node model@((^. connection) -> conn) event =
   case event of
-    CycleExprSetOpAt n ->
-      []
-    -- Model $
-    --   model & fileSelectionModel . queryModel . expression . exprAt n
-    --     %~ ( \mexpr -> do
-    --           expr <- mexpr
-    --           case expr of
-    --             BinaryExpression bn -> Just . BinaryExpression $ bn & soL %~ next
-    --             _notBinary -> Nothing
-    --        )
-
-    CycleSubExprSetOpAt exprIx seIx ->
-      []
-    -- Model $
-    --   model
-    --     & fileSelectionModel
-    --       . queryModel
-    --       . expression
-    --       . subExprAtL exprIx seIx
-    --     %~ fmap
-    --       ( \se -> case se of
-    --           BinarySubExpression bn -> BinarySubExpression $ bn & soL %~ next
-    --           _notBN -> se
-    --       )
-
+    CycleRingOperator li mi ->
+      [ Model $
+          model & fileSelectionModel . queryModel . expression
+            %~ flip
+              (withQueryExpression li)
+              ( case mi of
+                  Nothing -> QueryExpression . nextRingOperator . runQueryExpression
+                  Just n -> \qe ->
+                    onTagLeaf
+                      qe
+                      (flip (withTagExpression n) (`onTagRing` nextRingOperator))
+              )
+      ]
+    DeleteRingOperand li mi eo ->
+      [ let removeOperand = either (const dropLeftRing) (const dropRightRing) eo
+         in Model $
+              model & fileSelectionModel . queryModel . expression
+                %~ flip
+                  (withQueryExpression li)
+                  ( case mi of
+                      Nothing -> QueryExpression . removeOperand . runQueryExpression
+                      Just n -> \qe ->
+                        onTagLeaf
+                          qe
+                          (flip (withTagExpression n) (`onTagRing` removeOperand))
+                  )
+      ]
+    FlipRingOperands li mi ->
+      [ Model $
+          model & fileSelectionModel . queryModel . expression
+            %~ flip
+              (withQueryExpression li)
+              ( case mi of
+                  Nothing -> QueryExpression . flipRingExpression . runQueryExpression
+                  Just n -> \qe ->
+                    onTagLeaf
+                      qe
+                      (flip (withTagExpression n) (`onTagRing` flipRingExpression))
+              )
+      ]
+    PlaceQueryExpression n l ->
+      [ Model $
+          model & fileSelectionModel . queryModel . expression
+            %~ flip
+              (withQueryExpression n)
+              ( case l of
+                  LatLeft qe -> (qe *.)
+                  LatMiddle qe -> const qe
+                  LatRight qe -> (*. qe)
+              )
+      ]
+    PlaceTagExpression li i lte ->
+      [ Model $
+          model & fileSelectionModel . queryModel . expression
+            %~ flip
+              (withQueryExpression li)
+              ( \qe@(QueryExpression qre) ->
+                  case qre of
+                    Ring ql -> case ql of
+                      TagLeaf te ->
+                        QueryExpression
+                          . Ring
+                          . TagLeaf
+                          $ withTagExpression
+                            i
+                            te
+                            ( case lte of
+                                LatLeft te' -> (te' *.)
+                                LatMiddle te' -> const te'
+                                LatRight te' -> (*. te')
+                            )
+                      _notTagLeaf -> qe
+                    _notRingValue -> qe
+              )
+      ]
     PushExpression ->
       let !rawQuery = T.strip $ model ^. fileSelectionModel . queryModel . input . text
        in ( if model ^. queryEditMode
@@ -430,22 +481,6 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
           . queryQueryExpression conn
           $ model ^. fileSelectionModel . queryModel . expression
       ]
-    RingProduct l r ->
-      [Model $ model & fileSelectionModel . queryModel . l %~ (*. r)]
-    UpdateExpression n expr ->
-      []
-    -- Model $ model & fileSelectionModel . queryModel . expression . exprAt n ?~ expr
-
-    UpdateSubExpression exprIx seIx se ->
-      []
-
--- Model $
---   model
---     & fileSelectionModel
---       . queryModel
---       . expression
---       . subExprAtL exprIx seIx
---     ?~ se
 
 fileSelectionWidgetEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
