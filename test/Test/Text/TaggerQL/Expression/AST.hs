@@ -248,9 +248,17 @@ astEditorProperties =
                             Gen (TagExpression (DTerm Pattern))
                     n <- suchThat arbitrary (\n' -> isJust $ findTagExpression n' expr)
                     let exprAt = fromJust $ findTagExpression n expr
-                        replaceResult = withTagExpression n expr (const exprAt)
-                    let propTest = expr == replaceResult
-                    pure propTest
+                        replaceResult = distribute $ withTagExpression n expr (const exprAt)
+                    let propTest = distribute expr == replaceResult
+                    pure $
+                        whenFail
+                            ( do
+                                print n
+                                print exprAt
+                                print expr
+                                print replaceResult
+                            )
+                            propTest
                 )
             ]
         ]
