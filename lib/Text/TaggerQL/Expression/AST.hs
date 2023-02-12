@@ -59,6 +59,7 @@ import Control.Monad (ap, join)
 import Data.Bifunctor (bimap)
 import qualified Data.Foldable as F
 import Data.Functor ((<&>))
+import Data.Functor.Classes
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
@@ -78,6 +79,42 @@ data RingExpression a
   | RingExpression a :* RingExpression a
   | RingExpression a :- RingExpression a
   deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
+
+instance Show1 RingExpression where
+  liftShowsPrec ::
+    (Int -> a -> ShowS) ->
+    ([a] -> ShowS) ->
+    Int ->
+    RingExpression a ->
+    ShowS
+  liftShowsPrec f g n re = case re of
+    Ring a -> showsUnaryWith f "Ring" n a
+    re' :+ re_a -> helpShow1Bin ":+" re' re_a
+    re' :* re_a -> helpShow1Bin ":*" re' re_a
+    re' :- re_a -> helpShow1Bin ":-" re' re_a
+   where
+    helpShow1Bin s x y =
+      showsBinaryWith (liftShowsPrec f g) (liftShowsPrec f g) s n x y
+
+instance Eq1 RingExpression where
+  liftEq :: (a -> b -> Bool) -> RingExpression a -> RingExpression b -> Bool
+  liftEq eq x y = case x of
+    Ring a ->
+      case y of
+        Ring b -> eq a b
+        _ -> False
+    re :+ re' ->
+      case y of
+        rey :+ rey' -> liftEq eq re rey && liftEq eq re' rey'
+        _ -> False
+    re :* re' ->
+      case y of
+        rey :* rey' -> liftEq eq re rey && liftEq eq re' rey'
+        _ -> False
+    re :- re' ->
+      case y of
+        rey :- rey' -> liftEq eq re rey && liftEq eq re' rey'
+        _ -> False
 
 instance Hashable a => Hashable (RingExpression a)
 
