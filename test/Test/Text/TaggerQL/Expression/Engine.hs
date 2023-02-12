@@ -63,8 +63,8 @@ queryExpressionEdgeCases c =
                     >>= qqe
                       ( tle
                           ( (tedp . d . des $ 8)
-                              # ( (tedp . d . des $ 9)
-                                    # (tedp . d . des $ 10)
+                              ∙ ( (tedp . d . des $ 9)
+                                    ∙ (tedp . d . des $ 10)
                                 )
                           )
                       )
@@ -86,7 +86,7 @@ queryExpressionEdgeCases c =
                 r <-
                   c
                     >>= qqe
-                      (tle ((tedp . d . des $ 8) # (tedp . d . des $ 9)))
+                      (tle ((tedp . d . des $ 8) ∙ (tedp . d . des $ 9)))
                 -- runExpr
                 -- ( TagExpression $
                 --     TagTermExtension
@@ -101,7 +101,7 @@ queryExpressionEdgeCases c =
                 r <-
                   c
                     >>= qqe
-                      (tle ((tedp . d . des $ 9) # (tedp . d . des $ 10)))
+                      (tle ((tedp . d . des $ 9) ∙ (tedp . d . des $ 10)))
                 -- runExpr
                 -- ( TagExpression $
                 --     TagTermExtension
@@ -116,7 +116,7 @@ queryExpressionEdgeCases c =
                 r <-
                   c
                     >>= qqe
-                      (tle ((tedp . d . des $ 11) # (tedp . d . des $ 9)))
+                      (tle ((tedp . d . des $ 11) ∙ (tedp . d . des $ 9)))
                 -- runExpr
                 -- ( TagExpression $
                 --     TagTermExtension
@@ -136,7 +136,7 @@ queryExpressionEdgeCases c =
                     >>= qqe
                       ( tle
                           ( (tedp . rt . des $ 12)
-                              # ( (tedp . d . des $ 15)
+                              ∙ ( (tedp . d . des $ 15)
                                     *. (tedp . d . des $ 16)
                                 )
                           )
@@ -160,8 +160,8 @@ queryExpressionEdgeCases c =
                 r <-
                   c
                     >>= qqe
-                      ( tle ((tedp . rt . des $ 12) # (tedp . d . des $ 15))
-                          *. tle ((tedp . rt . des $ 12) # (tedp . d . des $ 16))
+                      ( tle ((tedp . rt . des $ 12) ∙ (tedp . d . des $ 15))
+                          *. tle ((tedp . rt . des $ 12) ∙ (tedp . d . des $ 16))
                       )
                 -- runExpr
                 -- ( BinaryExpression $
@@ -188,7 +188,7 @@ queryExpressionEdgeCases c =
                     >>= qqe
                       ( tle
                           ( (tedp . d . des $ 13)
-                              # ( (tedp . d . des $ 15)
+                              ∙ ( (tedp . d . des $ 15)
                                     *. (tedp . d . des $ 16)
                                 )
                           )
@@ -396,7 +396,7 @@ queryExpressionBasicFunctionality c =
                     >>= qqe
                       ( tle
                           ( (tedp . d . des $ 5)
-                              # (tedp . d . des $ 6)
+                              ∙ (tedp . d . des $ 6)
                           )
                       )
                 -- runExpr
@@ -415,7 +415,7 @@ queryExpressionBasicFunctionality c =
                     >>= qqe
                       ( tle
                           ( (tedp . d . des $ 6)
-                              # (tedp . d . des $ 7)
+                              ∙ (tedp . d . des $ 7)
                           )
                       )
                 -- runExpr
@@ -434,8 +434,8 @@ queryExpressionBasicFunctionality c =
                     >>= qqe
                       ( tle
                           ( (tedp . d . des $ 17)
-                              # ( (tedp . d . des $ 18)
-                                    # (tedp . d . des $ 20)
+                              ∙ ( (tedp . d . des $ 18)
+                                    ∙ (tedp . d . des $ 20)
                                 )
                           )
                       )
@@ -459,7 +459,7 @@ queryExpressionBasicFunctionality c =
                     >>= qqe
                       ( tle
                           ( (tedp . d . des $ 17)
-                              # (tedp . d . des $ 18)
+                              ∙ (tedp . d . des $ 18)
                           )
                       )
                 --  runExpr
@@ -518,7 +518,7 @@ queryExpressionBasicFunctionality c =
                         >>= qqe
                           ( tle
                               ( (tedp . d . des $ 17)
-                                  # ( (tedp . d . des $ 18)
+                                  ∙ ( (tedp . d . des $ 18)
                                         +. (tedp . d . des $ 19)
                                     )
                               )
@@ -550,7 +550,7 @@ queryExpressionBasicFunctionality c =
                         >>= qqe
                           ( tle
                               ( (tedp . d . des $ 17)
-                                  # ( (tedp . d . des $ 18)
+                                  ∙ ( (tedp . d . des $ 18)
                                         *. (tedp . d . des $ 19)
                                     )
                               )
@@ -578,7 +578,7 @@ queryExpressionBasicFunctionality c =
                         >>= qqe
                           ( tle
                               ( (tedp . d . des $ 17)
-                                  # ( (tedp . d . des $ 18)
+                                  ∙ ( (tedp . d . des $ 18)
                                         -. (tedp . d . des $ 19)
                                     )
                               )
@@ -612,7 +612,7 @@ queryExpressionBasicFunctionality c =
                     >>= qqe
                       ( tle
                           ( (tedp . d $ WildCard)
-                              # ( (tedp . d . des $ 20)
+                              ∙ ( (tedp . d . des $ 20)
                                     -. (tedp . d . des $ 18)
                                 )
                           )
@@ -639,8 +639,8 @@ queryExpressionBasicFunctionality c =
                 r <-
                   c
                     >>= qqe
-                      ( tle ((tedp . d $ WildCard) # (tedp . d . des $ 20))
-                          -. tle ((tedp . d $ WildCard) # (tedp . d . des $ 18))
+                      ( tle ((tedp . d $ WildCard) ∙ (tedp . d . des $ 20))
+                          -. tle ((tedp . d $ WildCard) ∙ (tedp . d . des $ 18))
                       )
                 assertEqual
                   ""
@@ -657,7 +657,7 @@ taggingEngineTests c =
         [ testCase "Tagging Engine - 0" $ do
             let se =
                   (pure . des $ 21)
-                    # ( (pure . des $ 22)
+                    ∙ ( (pure . des $ 22)
                           *. (pure . des $ 23)
                       )
                 -- SubExpression $
@@ -692,8 +692,8 @@ taggingEngineTests c =
             testCase "Tagging Engine - 1" $ do
               let se =
                     (pure . des $ 21)
-                      # ( ( (pure . des $ 22)
-                              # ( (pure . des $ 24)
+                      ∙ ( ( (pure . des $ 22)
+                              ∙ ( (pure . des $ 24)
                                     *. (pure . des $ 25)
                                 )
                           )
@@ -742,9 +742,9 @@ taggingEngineTests c =
             testCase "Tagging Engine - 2" $ do
               let se =
                     (pure . des $ 26)
-                      # ( ( (pure . des $ 27)
-                              # ( ( (pure . des $ 28)
-                                      # (pure . des $ 29)
+                      ∙ ( ( (pure . des $ 27)
+                              ∙ ( ( (pure . des $ 28)
+                                      ∙ (pure . des $ 29)
                                   )
                                     *. (pure . des $ 30)
                                 )
@@ -833,7 +833,7 @@ taggingEngineTests c =
         , after AllSucceed "Tagging Engine - 3" . testCase "Tagging Engine - 4" $ do
             let se =
                   (pure . des $ 33)
-                    # (pure . des $ 32)
+                    ∙ (pure . des $ 32)
                 -- SubExpression $ TagTermExtension (td 33) (SubTag (td 32))
                 fk = 19
                 expectedResults =
@@ -860,7 +860,7 @@ taggingEngineTests c =
                   ( (pure . des $ 35)
                       *. (pure . des $ 36)
                   )
-                    # (pure . des $ 37)
+                    ∙ (pure . des $ 37)
                 fk = 20
                 expectedResults =
                   [ Tag 59 20 35 Nothing
@@ -880,10 +880,10 @@ taggingEngineTests c =
             let se =
                   ( (pure . des $ 38)
                       *. ( (pure . des $ 39)
-                            # (pure . des $ 40)
+                            ∙ (pure . des $ 40)
                          )
                   )
-                    # (pure . des $ 41)
+                    ∙ (pure . des $ 41)
                 fk = 21
                 expectedResults =
                   [ Tag 63 21 38 Nothing

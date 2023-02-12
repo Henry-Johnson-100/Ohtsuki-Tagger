@@ -54,6 +54,7 @@ module Text.TaggerQL.Expression.AST (
   Magma (..),
 ) where
 
+import Control.Arrow ((***))
 import Control.Monad (ap, join)
 import Data.Bifunctor (bimap)
 import qualified Data.Foldable as F
@@ -206,8 +207,8 @@ instance Semigroup (FreeMagma a) where
   (<>) = (:∙)
 
 instance Magma (FreeMagma a) where
-  (#) :: FreeMagma a -> FreeMagma a -> FreeMagma a
-  (#) = (:∙)
+  (∙) :: FreeMagma a -> FreeMagma a -> FreeMagma a
+  (∙) = (:∙)
 
 instance Applicative FreeMagma where
   pure :: a -> FreeMagma a
@@ -703,26 +704,26 @@ instance Ring QueryExpression where
   aid :: QueryExpression
   aid = mid -. mid
 
-infix 9 #
+infix 9 ∙
 
 {- |
  Class for any magma.
 -}
 class Magma m where
-  -- | A binary operation.
-  (#) :: m -> m -> m
+  -- | A closed binary operation.
+  (∙) :: m -> m -> m
 
 instance (Magma a, Magma b) => Magma (a, b) where
-  (#) :: (Magma a, Magma b) => (a, b) -> (a, b) -> (a, b)
-  x # (a, b) = bimap (# a) (# b) x
+  (∙) :: (Magma a, Magma b) => (a, b) -> (a, b) -> (a, b)
+  x ∙ (a, b) = bimap (∙ a) (∙ b) x
 
 instance Magma (MagmaExpression a) where
-  (#) :: MagmaExpression a -> MagmaExpression a -> MagmaExpression a
-  (#) = (<>)
+  (∙) :: MagmaExpression a -> MagmaExpression a -> MagmaExpression a
+  (∙) = (<>)
 
 {- |
  A non-associative, distributive function.
 -}
 instance Magma (TagExpression a) where
-  (#) :: TagExpression a -> TagExpression a -> TagExpression a
-  x # y = TagMagma $ pure x :$ y
+  (∙) :: TagExpression a -> TagExpression a -> TagExpression a
+  x ∙ y = TagMagma $ pure x :$ y

@@ -145,7 +145,7 @@ instance
         (ExpressionWidgetState (TagExpression (DTerm Pattern)))
     )
   where
-  (#) = tewbBinHelper (#) f
+  (∙) = tewbBinHelper (∙) f
    where
     f _li _i x y =
       withStyleBasic [border 1 black, padding 3] $
@@ -379,7 +379,7 @@ qewbLeaf ql =
             fmap fst
               . runCounter
               . (\(TagExpressionWidgetBuilderG x) -> x)
-              . evaluateTagExpressionR (#)
+              . evaluateTagExpressionR (∙)
               . fmap tewbLeaf
               $ te ::
               CounterT Identity (ExpressionWidgetState (TagExpression (DTerm Pattern)))

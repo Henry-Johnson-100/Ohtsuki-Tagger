@@ -124,7 +124,7 @@ restrictedChars :: [Char]
 restrictedChars = "(){}!&|. \r\n"
 
 foldBracketedTags :: Magma b => b -> Maybe b -> b
-foldBracketedTags overTerm = maybe overTerm (overTerm #)
+foldBracketedTags overTerm = maybe overTerm (overTerm ∙)
 
 parseQueryExpression :: Text -> Either ParseError QueryExpression
 parseQueryExpression =
@@ -218,7 +218,7 @@ zeroOrManyBracketedTagParser =
   fmap
     ( \xs -> case xs of
         [] -> Nothing
-        _notNull -> Just $ L.foldl1' (#) xs
+        _notNull -> Just $ L.foldl1' (∙) xs
     )
     (many . try $ (spaces *> bracketedTagParser))
 

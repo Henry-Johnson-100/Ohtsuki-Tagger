@@ -74,7 +74,7 @@ distributeTagExpression (QueryExpression qe) te =
     RingExpression QueryLeaf
   distributeUnderQueryLeaf te' ql = case ql of
     FileLeaf _ -> Ring ql *. (Ring . TagLeaf $ te')
-    TagLeaf te'' -> Ring . TagLeaf $ te'' # te'
+    TagLeaf te'' -> Ring . TagLeaf $ te'' ∙ te'
 
 infixl 6 <-#
 
@@ -211,8 +211,8 @@ instance (Rng a, Monad m) => Rng (FinderT m a) where
   (-.) = finderBinHelper (-.)
 
 instance (Magma a, Monad m) => Magma (FinderT m a) where
-  (#) :: (Magma a, Monad m) => FinderT m a -> FinderT m a -> FinderT m a
-  (#) = finderBinHelper (#)
+  (∙) :: (Magma a, Monad m) => FinderT m a -> FinderT m a -> FinderT m a
+  (∙) = finderBinHelper (∙)
 
 finderBinHelper ::
   Monad m =>
@@ -250,8 +250,8 @@ instance (Rng a, Monad m) => Rng (EditorT m a) where
   (-.) = editorTBinHelper (-.)
 
 instance (Magma a, Monad m) => Magma (EditorT m a) where
-  (#) :: (Magma a, Monad m) => EditorT m a -> EditorT m a -> EditorT m a
-  (#) = editorTBinHelper (#)
+  (∙) :: (Magma a, Monad m) => EditorT m a -> EditorT m a -> EditorT m a
+  (∙) = editorTBinHelper (∙)
 
 editorTBinHelper ::
   Monad m =>
@@ -306,7 +306,7 @@ findTagExpression :: Int -> TagExpression a -> Maybe (TagExpression a)
 findTagExpression n =
   runIdentity
     . evalFinder
-    . evaluateTagExpressionR (#)
+    . evaluateTagExpressionR (∙)
     . fmap (mkFinder n . pure)
 
 {- |
@@ -320,6 +320,6 @@ withTagExpression ::
 withTagExpression n te f =
   runIdentity
     . evalEditor
-    . evaluateTagExpressionR (#)
+    . evaluateTagExpressionR (∙)
     . fmap (mkEditor n f . pure)
     $ te

@@ -193,7 +193,7 @@ parserTests =
                 , comBat
                     "Minimal Magma Expression"
                     "apple {red}"
-                    (tle $ (tedp . rt $ "apple") # (tedp . rt $ "red"))
+                    (tle $ (tedp . rt $ "apple") ∙ (tedp . rt $ "red"))
                     [ "apple {red}"
                     , "apple{red}"
                     , "apple{ red}"
@@ -216,8 +216,8 @@ parserTests =
                     "apple {peel {red}}"
                     ( tle $
                         (tedp . rt $ "apple")
-                            # ( (tedp . rt $ "peel")
-                                    # (tedp . rt $ "red")
+                            ∙ ( (tedp . rt $ "peel")
+                                    ∙ (tedp . rt $ "red")
                               )
                     )
                     [ "apple {peel {red}}"
@@ -340,7 +340,7 @@ parserTests =
                     "Left Distribution Occurs for Bracketed Tags"
                     ""
                     ( ( (tedp . rt $ "apple")
-                            # (tedp . rt $ "orange")
+                            ∙ (tedp . rt $ "orange")
                       )
                         *. (tedp . rt $ "banana")
                     )
@@ -358,8 +358,8 @@ parserTests =
                     "Nested Tag Distribution"
                     ""
                     ( (tedp . rt $ "apple")
-                        # ( (tedp . rt $ "orange")
-                                # (tedp . rt $ "banana")
+                        ∙ ( (tedp . rt $ "orange")
+                                ∙ (tedp . rt $ "banana")
                           )
                     )
                     [ "{apple{orange{banana}}}"
@@ -371,8 +371,8 @@ parserTests =
                     "Tag Distribution is Associative"
                     "[{{a} {b} {c}}] Should be associative."
                     ( (tedp . rt $ "a")
-                        # ( (tedp . rt $ "b")
-                                # (tedp . rt $ "c")
+                        ∙ ( (tedp . rt $ "b")
+                                ∙ (tedp . rt $ "c")
                           )
                     )
                     [ "{{a} {b} {c}}"
@@ -418,15 +418,15 @@ parserTests =
                         "apple{skin{red}} p.orange banana{peel{yellow}}"
                         ( tle
                             ( (tedp . rt $ "apple")
-                                # ( (tedp . rt $ "skin")
-                                        # (tedp . rt $ "red")
+                                ∙ ( (tedp . rt $ "skin")
+                                        ∙ (tedp . rt $ "red")
                                   )
                             )
                             *. fe "orange"
                             *. tle
                                 ( (tedp . rt $ "banana")
-                                    # ( (tedp . rt $ "peel")
-                                            # (tedp . rt $ "yellow")
+                                    ∙ ( (tedp . rt $ "peel")
+                                            ∙ (tedp . rt $ "yellow")
                                       )
                                 )
                         )
@@ -436,7 +436,7 @@ parserTests =
                         "apple {red | yellow}"
                         ( tle $
                             (tedp . rt $ "apple")
-                                # ( (tedp . rt $ "red")
+                                ∙ ( (tedp . rt $ "red")
                                         +. (tedp . rt $ "yellow")
                                   )
                         )
@@ -446,10 +446,10 @@ parserTests =
                     ""
                     ( tle $
                         (tedp . rt $ "apple")
-                            # ( ( (tedp . rt $ "peel")
+                            ∙ ( ( (tedp . rt $ "peel")
                                     +. (tedp . rt $ "skin")
                                 )
-                                    # ( (tedp . rt $ "red")
+                                    ∙ ( (tedp . rt $ "red")
                                             +. (tedp . rt $ "yellow")
                                       )
                               )
@@ -466,10 +466,10 @@ parserTests =
                     "Nested Left TagExpression Distribution"
                     ""
                     ( (tedp . rt $ "apple")
-                        # ( ( (tedp . rt $ "peel")
+                        ∙ ( ( (tedp . rt $ "peel")
                                 +. (tedp . rt $ "skin")
                             )
-                                # ( (tedp . rt $ "red")
+                                ∙ ( (tedp . rt $ "red")
                                         +. (tedp . rt $ "yellow")
                                   )
                           )
@@ -494,11 +494,11 @@ parserTests =
                     "(apple | orange) {red}"
                     ( tle
                         ( (tedp . rt $ "apple")
-                            # (tedp . rt $ "red")
+                            ∙ (tedp . rt $ "red")
                         )
                         +. tle
                             ( (tedp . rt $ "orange")
-                                # (tedp . rt $ "red")
+                                ∙ (tedp . rt $ "red")
                             )
                     )
                     [ "(apple | orange) {red}"
@@ -514,7 +514,7 @@ parserTests =
                             ( ( (tedp . rt $ "apple")
                                     +. (tedp . rt $ "orange")
                               )
-                                # (tedp . rt $ "red")
+                                ∙ (tedp . rt $ "red")
                             )
                         )
                         "{apple | orange} {red}"
@@ -524,11 +524,11 @@ parserTests =
                         \Query Leaves and not one TagExpression."
                         ( tle
                             ( (tedp . rt $ "apple")
-                                # (tedp . rt $ "red")
+                                ∙ (tedp . rt $ "red")
                             )
                             +. tle
                                 ( (tedp . rt $ "orange")
-                                    # (tedp . rt $ "red")
+                                    ∙ (tedp . rt $ "red")
                                 )
                         )
                         "apple{red} | orange{red}"
@@ -538,7 +538,7 @@ parserTests =
                     ( ( (tedp . rt $ "apple")
                             +. (tedp . rt $ "orange")
                       )
-                        # (tedp . rt $ "red")
+                        ∙ (tedp . rt $ "red")
                     )
                     [ "(apple | orange) {red}"
                     , "{apple | orange} {red}"
@@ -548,11 +548,11 @@ parserTests =
                 , comBat
                     "Associative Right Distribution"
                     "(apple | (orange{peel})) {red}"
-                    ( tle ((tedp . rt $ "apple") # (tedp . rt $ "red"))
+                    ( tle ((tedp . rt $ "apple") ∙ (tedp . rt $ "red"))
                         +. tle
                             ( (tedp . rt $ "orange")
-                                # ( (tedp . rt $ "peel")
-                                        # (tedp . rt $ "red")
+                                ∙ ( (tedp . rt $ "peel")
+                                        ∙ (tedp . rt $ "red")
                                   )
                             )
                     )
@@ -565,10 +565,10 @@ parserTests =
                     ""
                     ( ( (tedp . rt $ "apple")
                             +. ( (tedp . rt $ "orange")
-                                    # (tedp . rt $ "peel")
+                                    ∙ (tedp . rt $ "peel")
                                )
                       )
-                        # (tedp . rt $ "red")
+                        ∙ (tedp . rt $ "red")
                     )
                     [ "{apple | orange{peel}} {red}"
                     , "apple {red} | orange {peel {red}}"
@@ -578,9 +578,9 @@ parserTests =
                     "(apple{peel}){red}"
                     ( tle $
                         ( (tedp . rt $ "apple")
-                            # (tedp . rt $ "peel")
+                            ∙ (tedp . rt $ "peel")
                         )
-                            # (tedp . rt $ "red")
+                            ∙ (tedp . rt $ "red")
                     )
                     [ "(apple{peel}){red}"
                     , "(apple {peel}) {red}"
@@ -595,15 +595,15 @@ parserTests =
                     ( let rightTE = (tedp . rt $ "yellow") +. (tedp . rt $ "red")
                        in tle
                             ( ( (tedp . rt $ "apple")
-                                    # (tedp . rt $ "skin")
+                                    ∙ (tedp . rt $ "skin")
                               )
-                                # rightTE
+                                ∙ rightTE
                             )
                             +. tle
                                 ( ( (tedp . rt $ "orange")
-                                        # (tedp . rt $ "peel")
+                                        ∙ (tedp . rt $ "peel")
                                   )
-                                    # rightTE
+                                    ∙ rightTE
                                 )
                     )
                     [ "(apple{skin} | orange{peel}){yellow | red}"
@@ -612,10 +612,10 @@ parserTests =
                 , comBat
                     "Mixed Tag Distribution"
                     "Same as above case but should produce only one TagLeaf"
-                    ( let appleskin = (tedp . rt $ "apple") # (tedp . rt $ "skin")
-                          orangepeel = (tedp . rt $ "orange") # (tedp . rt $ "peel")
+                    ( let appleskin = (tedp . rt $ "apple") ∙ (tedp . rt $ "skin")
+                          orangepeel = (tedp . rt $ "orange") ∙ (tedp . rt $ "peel")
                           yellowred = (tedp . rt $ "yellow") +. (tedp . rt $ "red")
-                       in tle ((appleskin +. orangepeel) # yellowred)
+                       in tle ((appleskin +. orangepeel) ∙ yellowred)
                     )
                     [ "{apple{skin} | orange{peel}}{yellow | red}"
                     ]
@@ -623,13 +623,13 @@ parserTests =
                     "Mixed Distribution - TagExpression Desugaring"
                     "(apple {skin} | orange {peel}) {yellow | red}"
                     ( ( ( (tedp . rt $ "apple")
-                            # (tedp . rt $ "skin")
+                            ∙ (tedp . rt $ "skin")
                         )
                             +. ( (tedp . rt $ "orange")
-                                    # (tedp . rt $ "peel")
+                                    ∙ (tedp . rt $ "peel")
                                )
                       )
-                        # ( (tedp . rt $ "yellow")
+                        ∙ ( (tedp . rt $ "yellow")
                                 +. (tedp . rt $ "red")
                           )
                     )
@@ -644,13 +644,13 @@ parserTests =
                         "Should demonstrate left distribution over a query expression."
                         ( tle
                             ( (tedp . rt $ "o%yui")
-                                # (tedp . rt $ "cute")
+                                ∙ (tedp . rt $ "cute")
                             )
                             *. tle
                                 ( ( (tedp . rt $ "%riamu")
                                         +. (tedp . rt $ "%sachiko")
                                   )
-                                    # (tedp . rt $ "cute")
+                                    ∙ (tedp . rt $ "cute")
                                 )
                         )
                         "(o%yui & {%riamu | %sachiko}) {cute}"
@@ -663,7 +663,7 @@ parserTests =
                                             +. (tedp . rt $ "%sachiko")
                                        )
                               )
-                                # (tedp . rt $ "cute")
+                                ∙ (tedp . rt $ "cute")
                             )
                         )
                         "{o%yui & {%riamu | %sachiko}} {cute}"
@@ -718,7 +718,7 @@ parserTests =
                     comTE
                         ""
                         ( ( (tedp . rt $ "a")
-                                # ( (tedp . rt $ "b")
+                                ∙ ( (tedp . rt $ "b")
                                         *. (tedp . rt $ "c")
                                   )
                           )
