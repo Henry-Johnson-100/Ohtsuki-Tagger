@@ -8,6 +8,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StrictData #-}
@@ -38,7 +39,6 @@ module Text.TaggerQL.Expression.AST (
   foldTagExpressionL,
   foldTagExpression,
   distribute,
-  distributeToNonRec,
   unwrapIdentities,
   normalize,
   RingExpression (..),
@@ -74,6 +74,7 @@ import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
 import qualified Data.List as L
+import Data.Maybe (fromMaybe)
 import Data.String (IsString, fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -368,32 +369,20 @@ runDTerm :: DTerm p -> p
 runDTerm (DTerm x) = x
 runDTerm (DMetaTerm x) = x
 
-{- |
- A recursive expression that is ultimately resolvable to a ring expression
- of magma expressions.
--}
-data TagExpression a
-  = TagValue a
-  | TagRing (RingExpression (TagExpression a))
-  | TagMagma (FreeMagma (TagExpression a))
-  deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
-
-instance Hashable a => Hashable (TagExpression a)
-
-instance Applicative TagExpression where
-  pure :: a -> TagExpression a
-  pure = return
-  (<*>) :: TagExpression (a -> b) -> TagExpression a -> TagExpression b
-  (<*>) = ap
-
-instance Monad TagExpression where
-  return :: a -> TagExpression a
-  return = TagValue
-  (>>=) :: TagExpression a -> (a -> TagExpression b) -> TagExpression b
-  ye >>= f = case ye of
-    TagValue a -> f a
-    TagRing re -> TagRing . fmap (>>= f) $ re
-    TagMagma me -> TagMagma . fmap (>>= f) $ me
+newtype TagExpression a = TagExpression
+  {runTagExpression :: FreeCompoundExpression RingExpression FreeMagma a}
+  deriving
+    ( Show
+    , Eq
+    , Functor
+    , Applicative
+    , Monad
+    , Foldable
+    , Generic
+    , Traversable
+    , Rng
+    , Magma
+    )
 
 {- |
  Distribute all magma expressions over ring expressions.
@@ -402,31 +391,24 @@ instance Monad TagExpression where
  outcome of that as well.
 -}
 distribute :: TagExpression a -> TagExpression a
-distribute = TagRing . fmap (TagMagma . fmap pure) . distributeToNonRec
-
-{- |
-  Distribute all magma expressions through a non-recursive intermediate structure.
--}
-distributeToNonRec :: TagExpression a -> RingExpression (FreeMagma a)
-distributeToNonRec te = case te of
-  TagValue a -> Ring . Magma $ a
-  TagRing re -> re >>= distributeToNonRec
-  TagMagma me -> fmap join . traverse distributeToNonRec $ me
+distribute = TagExpression . distributeK . runTagExpression
 
 {- |
  Attempts to remove some redundant monadic identities.
 -}
 unwrapIdentities :: TagExpression a -> TagExpression a
-unwrapIdentities te = case te of
-  TagValue _ -> te
-  TagRing re -> case re of
-    Ring te' -> unwrapIdentities te'
-    re' :+ re2 -> TagRing $ fmap unwrapIdentities re' :+ fmap unwrapIdentities re2
-    re' :* re2 -> TagRing $ fmap unwrapIdentities re' :* fmap unwrapIdentities re2
-    re' :- re2 -> TagRing $ fmap unwrapIdentities re' :- fmap unwrapIdentities re2
-  TagMagma fm -> case fm of
-    Magma te' -> unwrapIdentities te'
-    fm' :∙ fm2 -> TagMagma $ fmap unwrapIdentities fm' :∙ fmap unwrapIdentities fm2
+unwrapIdentities (TagExpression te) =
+  TagExpression $
+    case te of
+      FreeCompoundExpression a -> pure a
+      T re -> case re of
+        Ring fce -> fce
+        _notIdentity ->
+          T . fmap (runTagExpression . unwrapIdentities . TagExpression) $ re
+      K fm -> case fm of
+        Magma fce -> fce
+        _notIdentity ->
+          K . fmap (runTagExpression . unwrapIdentities . TagExpression) $ fm
 
 {- |
  Resolve structural ambiguities and redundancies by distributing the magma expressions
@@ -462,17 +444,18 @@ evaluateTagExpressionWithMagma ::
   (FreeMagma b -> b) ->
   TagExpression b ->
   b
-evaluateTagExpressionWithMagma mf te =
-  case te of
-    TagValue a -> a
-    TagRing re -> evaluateRing . fmap (evaluateTagExpressionWithMagma mf) $ re
-    TagMagma me -> mf . fmap (evaluateTagExpressionWithMagma mf) $ me
+evaluateTagExpressionWithMagma mf =
+  evaluateFreeCompoundExpression
+    evaluateRing
+    mf
+    . runTagExpression
 
 {- |
  Newtype wrapper for a query expression, which is a ring expression of leaves
  where each leaf is resolvable to a set of files.
 -}
-newtype QueryExpression = QueryExpression {runQueryExpression :: RingExpression QueryLeaf}
+newtype QueryExpression = QueryExpression
+  {runQueryExpression :: RingExpression QueryLeaf}
   deriving (Show, Eq, Rng)
 
 {- |
@@ -495,6 +478,7 @@ data FreeCompoundExpression t k a
   = FreeCompoundExpression a
   | T (t (FreeCompoundExpression t k a))
   | K (k (FreeCompoundExpression t k a))
+  deriving (Generic)
 
 instance (Show1 t, Show1 k) => Show1 (FreeCompoundExpression t k) where
   liftShowsPrec ::
@@ -699,6 +683,27 @@ flipTK fce = case fce of
   T t -> K . fmap flipTK $ t
   K k -> T . fmap flipTK $ k
 
+{- |
+ Apply unwrapping functions to the inner constructors of a 'FreeCompoundExpression`
+
+ This can be used to remove redundant layers of monadic identities for example.
+-}
+unwrapTK ::
+  (Functor t, Functor k) =>
+  (forall a1. t a1 -> Maybe a1) ->
+  (forall a1. k a1 -> Maybe a1) ->
+  FreeCompoundExpression t k a ->
+  FreeCompoundExpression t k a
+unwrapTK tf kf fce =
+  case fce of
+    FreeCompoundExpression _ -> fce
+    T t ->
+      let mappedUnwrap = unwrapTK tf kf <$> t
+       in fromMaybe (T mappedUnwrap) . tf $ mappedUnwrap
+    K k ->
+      let mappedUnwrap = unwrapTK tf kf <$> k
+       in fromMaybe (K mappedUnwrap) . kf $ mappedUnwrap
+
 evaluateFreeCompoundExpression ::
   (Functor f1, Functor f2) =>
   (f1 b -> b) ->
@@ -789,17 +794,6 @@ instance Rng (RingExpression a) where
   (-.) :: RingExpression a -> RingExpression a -> RingExpression a
   (-.) = (:-)
 
-{- |
- Not technically a rng as the constructors are not associative.
--}
-instance Rng (TagExpression a) where
-  (+.) :: TagExpression a -> TagExpression a -> TagExpression a
-  x +. y = TagRing $ pure x +. pure y
-  (*.) :: TagExpression a -> TagExpression a -> TagExpression a
-  x *. y = TagRing $ pure x *. pure y
-  (-.) :: TagExpression a -> TagExpression a -> TagExpression a
-  x -. y = TagRing $ pure x -. pure y
-
 instance (Rng a, Rng b) => Rng (a, b) where
   (+.) :: (Rng a, Rng b) => (a, b) -> (a, b) -> (a, b)
   x +. (a, b) = bimap (+. a) (+. b) x
@@ -848,10 +842,3 @@ class Magma m where
 instance (Magma a, Magma b) => Magma (a, b) where
   (∙) :: (Magma a, Magma b) => (a, b) -> (a, b) -> (a, b)
   x ∙ (a, b) = bimap (∙ a) (∙ b) x
-
-{- |
- A non-associative, distributive function.
--}
-instance Magma (TagExpression a) where
-  (∙) :: TagExpression a -> TagExpression a -> TagExpression a
-  x ∙ y = TagMagma $ pure x ∙ pure y

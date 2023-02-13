@@ -38,6 +38,7 @@ import Control.Monad.Trans.State.Strict (StateT (..), get, modify)
 import Data.Functor.Identity (runIdentity)
 import Text.TaggerQL.Expression.AST (
   DTerm,
+  FreeCompoundExpression (..),
   FreeMagma,
   Magma (..),
   Pattern,
@@ -103,9 +104,10 @@ onTagRing ::
     RingExpression a1
   ) ->
   TagExpression a
-onTagRing te f = case te of
-  TagRing re -> TagRing . f $ re
-  _notRing -> te
+onTagRing (TagExpression te) f = TagExpression $
+  case te of
+    T re -> T . f $ re
+    _notRing -> te
 
 {- |
  Modifies the TagExpression in a TagLeaf of a QueryExpression if it is a ring value
@@ -128,9 +130,9 @@ onTagMagma ::
     FreeMagma a1
   ) ->
   TagExpression a
-onTagMagma te f =
+onTagMagma (TagExpression te) f = TagExpression $
   case te of
-    TagMagma m -> TagMagma . f $ m
+    K m -> K . f $ m
     _notMagma -> te
 
 {- |

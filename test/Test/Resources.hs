@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# HLINT ignore "Redundant bracket" #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -7,8 +9,7 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Redundant bracket" #-}
+{-# HLINT ignore "Use const" #-}
 
 module Test.Resources where
 
@@ -57,6 +58,7 @@ import Test.Tasty.QuickCheck (
  )
 import Text.TaggerQL.Expression.AST (
   DTerm (..),
+  FreeCompoundExpression (..),
   FreeMagma,
   Magma,
   Pattern (..),
@@ -158,23 +160,22 @@ newtype QCTagExpression a = QCTagExpression (TagExpression a)
     , Functor
     , Foldable
     , Traversable
-    , Generic
-    , Hashable
     , Applicative
     , Monad
     , Rng
     , Magma
+    , Generic
     )
 
 instance Arbitrary a => Arbitrary (QCTagExpression a) where
   arbitrary :: Arbitrary a => Gen (QCTagExpression a)
-  arbitrary = QCTagExpression <$> sized sizedExpr
+  arbitrary = QCTagExpression . TagExpression <$> sized sizedExpr
    where
     sizedExpr n
-      | n <= 0 = TagValue <$> arbitrary
+      | n <= 0 = pure <$> arbitrary
       | otherwise =
         let tagRing =
-              TagRing <$> do
+              T <$> do
                 r <-
                   (coerce :: QCRingExpression () -> RingExpression ())
                     <$> arbitrary ::
@@ -182,7 +183,7 @@ instance Arbitrary a => Arbitrary (QCTagExpression a) where
                 let teG = sizedExpr (n `div` 2)
                 sequenceA $ teG <$ r
             tagMagma =
-              TagMagma <$> do
+              K <$> do
                 r <-
                   (coerce :: QCFreeMagma () -> FreeMagma ())
                     <$> arbitrary ::
@@ -190,6 +191,8 @@ instance Arbitrary a => Arbitrary (QCTagExpression a) where
                 let teG = sizedExpr (n `div` 2)
                 sequenceA $ teG <$ r
          in oneof [tagRing, tagMagma]
+
+instance Function a => Function (FreeCompoundExpression RingExpression FreeMagma a)
 
 instance Function a => Function (TagExpression a)
 
@@ -204,7 +207,7 @@ instance Arbitrary QCQueryLeaf where
     QCQueryLeaf
       <$> ( oneof
               [ TagLeaf
-                  . ( coerce ::
+                  . ( (\(QCTagExpression te) -> fmap coerce te) ::
                         QCTagExpression (QCDTerm QCPattern) ->
                         TagExpression (DTerm Pattern)
                     )

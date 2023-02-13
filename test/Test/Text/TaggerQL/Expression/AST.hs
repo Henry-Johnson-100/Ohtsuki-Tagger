@@ -260,7 +260,7 @@ astEditorProperties =
                 "TagExpression"
                 ( do
                     expr <-
-                        ( coerce ::
+                        ( (\(QCTagExpression te) -> fmap coerce te) ::
                             QCTagExpression (QCDTerm QCPattern) ->
                             TagExpression (DTerm Pattern)
                         )

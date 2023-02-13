@@ -53,13 +53,14 @@ import Text.Parsec (
  )
 import Text.TaggerQL.Expression.AST (
   DTerm (..),
+  FreeCompoundExpression (T),
   Magma (..),
   Pattern (Pattern),
   QueryExpression (..),
   QueryLeaf (..),
   RingExpression (..),
   Rng,
-  TagExpression (TagRing),
+  TagExpression (TagExpression, runTagExpression),
  )
 import Text.TaggerQL.Expression.AST.Editor ((<-#))
 
@@ -168,7 +169,13 @@ queryExpressionParser =
 tagExpressionParser :: Parser (TagExpression (DTerm Pattern))
 tagExpressionParser =
   spaces
-    *> (TagRing <$> ringExprParser (runTagTerm <$> tagTermParser))
+    *> ( TagExpression . T
+          <$> ringExprParser
+            ( runTagExpression
+                . runTagTerm
+                <$> tagTermParser
+            )
+       )
 
 filePathParser :: Parser QueryLeaf
 filePathParser =
