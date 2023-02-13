@@ -9,14 +9,12 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use infix" #-}
-{-# HLINT ignore "Use const" #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.AST
@@ -45,8 +43,16 @@ module Text.TaggerQL.Expression.AST (
   normalize,
   RingExpression (..),
   evaluateRing,
+  toFreeMagma,
   FreeMagma (..),
+  foldFreeMagma1,
   evaluateFreeMagma,
+  FreeCompoundExpression (..),
+  mapT,
+  mapK,
+  distributeK,
+  flipTK,
+  evaluateFreeCompoundExpression,
   DefaultRng (..),
 
   -- * Classes
@@ -60,7 +66,7 @@ import Data.Bifunctor (bimap)
 import qualified Data.Foldable as F
 import Data.Functor.Classes (
   Eq1 (..),
-  Show1 (liftShowsPrec),
+  Show1 (liftShowList, liftShowsPrec),
   showsPrec1,
   showsUnaryWith,
  )
@@ -182,6 +188,24 @@ evaluateRing r = case r of
   re :+ re' -> evaluateRing re +. evaluateRing re'
   re :* re' -> evaluateRing re *. evaluateRing re'
   re :- re' -> evaluateRing re -. evaluateRing re'
+
+{- |
+ Transform a 'RingExpression` to a more general free expression, 'FreeMagma`.
+
+ It should be noted that the 'Foldable` instance for a 'RingExpression` and 'FreeMagma`
+ behave the same. So if the ultimate goal is to perform some kind of associative
+  fold of a 'FreeMagma`, then simply folding the 'RingExpression` will suffice.
+
+ For example:
+
+ >(toList :: RingExpression a -> [a]) == toList . toFreeMagma
+-}
+toFreeMagma :: RingExpression a -> FreeMagma a
+toFreeMagma re = case re of
+  Ring a -> pure a
+  re' :+ re_a -> toFreeMagma re' :∙ toFreeMagma re_a
+  re' :* re_a -> toFreeMagma re' :∙ toFreeMagma re_a
+  re' :- re_a -> toFreeMagma re' :∙ toFreeMagma re_a
 
 infix 9 :∙
 
@@ -459,6 +483,233 @@ data QueryLeaf
   = FileLeaf Pattern
   | TagLeaf (TagExpression (DTerm Pattern))
   deriving (Show, Eq)
+
+{- |
+ A free data structure representing expressions of different structures of the same
+ type.
+
+ This is a free type in that the only constraint it fulfills is that its constructors
+ are closed over the specified operations.
+-}
+data FreeCompoundExpression t k a
+  = FreeCompoundExpression a
+  | T (t (FreeCompoundExpression t k a))
+  | K (k (FreeCompoundExpression t k a))
+
+instance (Show1 t, Show1 k) => Show1 (FreeCompoundExpression t k) where
+  liftShowsPrec ::
+    (Show1 t, Show1 k) =>
+    (Int -> a -> ShowS) ->
+    ([a] -> ShowS) ->
+    Int ->
+    FreeCompoundExpression t k a ->
+    ShowS
+  liftShowsPrec f g n x = case x of
+    FreeCompoundExpression a -> showsUnaryWith f "FreeCompoundExpression" n a
+    T t -> showsUnaryWith (liftShowsPrec (liftShowsPrec f g) (liftShowList f g)) "T" n t
+    K k -> showsUnaryWith (liftShowsPrec (liftShowsPrec f g) (liftShowList f g)) "K" n k
+
+instance (Show1 t, Show1 k, Show a) => Show (FreeCompoundExpression t k a) where
+  showsPrec ::
+    (Show1 t, Show1 k, Show a) =>
+    Int ->
+    FreeCompoundExpression t k a ->
+    ShowS
+  showsPrec = showsPrec1
+
+instance (Eq1 t, Eq1 k) => Eq1 (FreeCompoundExpression t k) where
+  liftEq ::
+    (Eq1 t, Eq1 k) =>
+    (a -> b -> Bool) ->
+    FreeCompoundExpression t k a ->
+    FreeCompoundExpression t k b ->
+    Bool
+  liftEq eq x y = case x of
+    FreeCompoundExpression a -> case y of
+      FreeCompoundExpression b -> eq a b
+      _ -> False
+    T t ->
+      case y of
+        T tb -> liftEq (liftEq eq) t tb
+        _ -> False
+    K k ->
+      case y of
+        K kb -> liftEq (liftEq eq) k kb
+        _ -> False
+
+instance (Eq1 t, Eq1 k, Eq a) => Eq (FreeCompoundExpression t k a) where
+  (==) ::
+    (Eq1 t, Eq1 k, Eq a) =>
+    FreeCompoundExpression t k a ->
+    FreeCompoundExpression t k a ->
+    Bool
+  (==) = liftEq (==)
+
+instance (Functor t, Functor k) => Functor (FreeCompoundExpression t k) where
+  fmap ::
+    (Functor t, Functor k) =>
+    (a -> b) ->
+    FreeCompoundExpression t k a ->
+    FreeCompoundExpression t k b
+  fmap f fce = case fce of
+    FreeCompoundExpression a -> FreeCompoundExpression (f a)
+    T t -> T (fmap (fmap f) t)
+    K k -> K (fmap (fmap f) k)
+
+instance (Applicative t, Applicative k) => Applicative (FreeCompoundExpression t k) where
+  pure :: (Applicative t, Applicative k) => a -> FreeCompoundExpression t k a
+  pure = FreeCompoundExpression
+  (<*>) ::
+    (Applicative t, Applicative k) =>
+    FreeCompoundExpression t k (a -> b) ->
+    FreeCompoundExpression t k a ->
+    FreeCompoundExpression t k b
+  fcef <*> x = case fcef of
+    FreeCompoundExpression fab -> fmap fab x
+    T t -> T (fmap (<*> x) t)
+    K k -> K (fmap (<*> x) k)
+
+instance (Monad t, Monad k) => Monad (FreeCompoundExpression t k) where
+  return :: (Monad t, Monad k) => a -> FreeCompoundExpression t k a
+  return = pure
+  (>>=) ::
+    (Monad t, Monad k) =>
+    FreeCompoundExpression t k a ->
+    (a -> FreeCompoundExpression t k b) ->
+    FreeCompoundExpression t k b
+  fce >>= f = case fce of
+    FreeCompoundExpression a -> f a
+    T t -> T (fmap (>>= f) t)
+    K k -> K (fmap (>>= f) k)
+
+instance (Foldable t, Foldable k) => Foldable (FreeCompoundExpression t k) where
+  foldr ::
+    (Foldable t, Foldable k) =>
+    (a -> b -> b) ->
+    b ->
+    FreeCompoundExpression t k a ->
+    b
+  foldr f acc fce = case fce of
+    FreeCompoundExpression a -> f a acc
+    T t -> foldr (flip (foldr f)) acc t
+    K k -> foldr (flip (foldr f)) acc k
+
+instance (Traversable t, Traversable k) => Traversable (FreeCompoundExpression t k) where
+  traverse ::
+    (Traversable t, Traversable k, Applicative f) =>
+    (a -> f b) ->
+    FreeCompoundExpression t k a ->
+    f (FreeCompoundExpression t k b)
+  traverse f fce = case fce of
+    FreeCompoundExpression a -> FreeCompoundExpression <$> f a
+    T t -> T <$> traverse (traverse f) t
+    K k -> K <$> traverse (traverse f) k
+
+instance Rng (FreeCompoundExpression RingExpression k a) where
+  (+.) = fcebh T (+.) pure pure
+  (*.) = fcebh T (*.) pure pure
+  (-.) = fcebh T (-.) pure pure
+
+-- This should be literally the same thing as
+-- > flipTK . (+.) . flipTK
+-- only it does not require an additional Functor constraint.
+instance Rng (FreeCompoundExpression t RingExpression a) where
+  (+.) = fcebh K (+.) pure pure
+  (*.) = fcebh K (*.) pure pure
+  (-.) = fcebh K (-.) pure pure
+
+instance Magma (FreeCompoundExpression FreeMagma k a) where
+  (∙) = fcebh T (∙) pure pure
+
+instance Magma (FreeCompoundExpression t FreeMagma a) where
+  (∙) = fcebh K (∙) pure pure
+
+{- |
+ A helper for defining a binary operation over a preconstruction.
+
+  where
+
+  > fcebh constructor combinator preconstrX preconstrY x y
+
+  Applies the function @combinator@ to @preconstrX x@ and @preconstrY y@
+    before application of the final function, @constructor@
+
+ Stands for FreeCompoundExpression-Binary-Helper since it used to defined
+ (*) kinded typeclasses for this type.
+-}
+fcebh ::
+  (t1 -> t2) ->
+  (t3 -> t4 -> t1) ->
+  (t5 -> t3) ->
+  (t6 -> t4) ->
+  t5 ->
+  t6 ->
+  t2
+fcebh dc cm cx cy x y = dc $ cm (cx x) (cy y)
+
+mapT ::
+  (Functor t, Functor k) =>
+  FreeCompoundExpression t k a ->
+  (forall a1. t a1 -> h a1) ->
+  FreeCompoundExpression h k a
+mapT fce f = case fce of
+  FreeCompoundExpression a -> FreeCompoundExpression a
+  T t -> T . f . fmap (`mapT` f) $ t
+  K k -> K . fmap (`mapT` f) $ k
+
+mapK ::
+  (Functor t, Functor k) =>
+  FreeCompoundExpression t k a ->
+  (forall a1. k a1 -> h a1) ->
+  FreeCompoundExpression t h a
+mapK fce f = case fce of
+  FreeCompoundExpression a -> FreeCompoundExpression a
+  T t -> T . fmap (`mapK` f) $ t
+  K k -> K . f . fmap (`mapK` f) $ k
+
+{- |
+ Distributes the operation denoted by K over the operation denoted by T.
+ This creates an intermediate representation of @t(k a)@ which is then rewrapped
+ in the 'FreeCompoundExpression` type
+-}
+distributeK ::
+  (Monad t, Monad k, Traversable k) =>
+  FreeCompoundExpression t k a ->
+  FreeCompoundExpression t k a
+distributeK = T . fmap (K . fmap pure) . distributeK'
+
+distributeK' ::
+  (Monad t, Monad k, Traversable k) =>
+  FreeCompoundExpression t k a ->
+  t (k a)
+distributeK' fce = case fce of
+  FreeCompoundExpression a -> pure . pure $ a
+  T t -> t >>= distributeK'
+  K k -> fmap join . traverse distributeK' $ k
+
+{- |
+ Simply flips the constructors.
+-}
+flipTK ::
+  (Functor t, Functor k) =>
+  FreeCompoundExpression t k a ->
+  FreeCompoundExpression k t a
+flipTK fce = case fce of
+  FreeCompoundExpression a -> FreeCompoundExpression a
+  T t -> K . fmap flipTK $ t
+  K k -> T . fmap flipTK $ k
+
+evaluateFreeCompoundExpression ::
+  (Functor f1, Functor f2) =>
+  (f1 b -> b) ->
+  (f2 b -> b) ->
+  FreeCompoundExpression f1 f2 b ->
+  b
+evaluateFreeCompoundExpression f g fce =
+  case fce of
+    FreeCompoundExpression a -> a
+    T t -> f . fmap (evaluateFreeCompoundExpression f g) $ t
+    K k -> g . fmap (evaluateFreeCompoundExpression f g) $ k
 
 newtype DefaultRng a = DefaultRng {runDefaultRng :: a}
   deriving
