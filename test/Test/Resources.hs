@@ -14,7 +14,6 @@ module Test.Resources where
 
 import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
 import Data.Coerce (coerce)
-import qualified Data.Foldable as F
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
 import Data.Maybe (catMaybes)
@@ -60,13 +59,11 @@ import Text.TaggerQL.Expression.AST (
   DTerm (..),
   FreeMagma,
   Magma,
-  MagmaExpression (Magma),
   Pattern (..),
   QueryLeaf (..),
   RingExpression (Ring),
   Rng ((+.)),
   TagExpression (..),
-  over,
   (∙),
  )
 
@@ -100,34 +97,6 @@ instance Arbitrary a => Arbitrary (QCRingExpression a) where
 instance Function a => Function (RingExpression a)
 
 instance Function a => Function (QCRingExpression a)
-
-newtype QCMagmaExpression a = QCMagmaExpression (MagmaExpression a)
-  deriving
-    ( Show
-    , Eq
-    , Functor
-    , Generic
-    , Hashable
-    , Foldable
-    , Traversable
-    , Semigroup
-    , Magma
-    , Applicative
-    , Monad
-    )
-
-instance Arbitrary a => Arbitrary (QCMagmaExpression a) where
-  arbitrary :: Arbitrary a => Gen (QCMagmaExpression a)
-  arbitrary =
-    QCMagmaExpression <$> do
-      xs' <- arbitrary
-      case xs' of
-        (x : xs) -> pure $ F.foldl' over (pure x) xs
-        _emptyList -> Magma <$> arbitrary
-
-instance Function a => Function (MagmaExpression a)
-
-instance Function a => Function (QCMagmaExpression a)
 
 newtype QCFreeMagma a = QCFreeMagma (FreeMagma a)
   deriving

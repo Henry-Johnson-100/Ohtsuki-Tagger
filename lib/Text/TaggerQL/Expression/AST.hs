@@ -45,12 +45,6 @@ module Text.TaggerQL.Expression.AST (
   normalize,
   RingExpression (..),
   evaluateRing,
-  MagmaExpression (..),
-  foldMagmaExpression,
-  foldMagmaExpressionL,
-  partitionLeft,
-  appliedTo,
-  over,
   FreeMagma (..),
   evaluateFreeMagma,
   DefaultRng (..),
@@ -64,7 +58,6 @@ module Text.TaggerQL.Expression.AST (
 import Control.Monad (ap, join)
 import Data.Bifunctor (bimap)
 import qualified Data.Foldable as F
-import Data.Functor ((<&>))
 import Data.Functor.Classes (
   Eq1 (..),
   Show1 (liftShowsPrec),
@@ -190,89 +183,6 @@ evaluateRing r = case r of
   re :* re' -> evaluateRing re *. evaluateRing re'
   re :- re' -> evaluateRing re -. evaluateRing re'
 
-{- |
- A data type representing an expression over a magma. A sequence of operations can
- be concatenated and composed before or after another sequence.
-
- All expressions can be evaluated with the '1' variant of a foldable function,
- since they are non-empty.
-
- This type is more efficiently folded with a right-to-left fold. Therefore, foldr'
- is the most optimal.
-
- It is essentially a reversed, non-empty list.
--}
-data MagmaExpression a
-  = Magma a
-  | (MagmaExpression a) :$ a
-  deriving (Show, Eq, Functor, Generic)
-
-instance Hashable a => Hashable (MagmaExpression a)
-
-instance IsList (MagmaExpression a) where
-  type Item (MagmaExpression a) = a
-  fromList :: [Item (MagmaExpression a)] -> MagmaExpression a
-  fromList [] = error "Empty list in fromList :: [a] -> MagmaExpression a"
-  fromList (x : xs) = F.foldl' over (return x) xs
-  toList :: MagmaExpression a -> [Item (MagmaExpression a)]
-  toList = foldr (:) []
-
-instance Foldable MagmaExpression where
-  foldr :: (a -> b -> b) -> b -> MagmaExpression a -> b
-  foldr f acc me = case me of
-    Magma a -> f a acc
-    dme :$ a -> foldr f (f a acc) dme
-
-{- |
- An alias for a fold @foldr1'@ over a 'MagmaExpression`
--}
-foldMagmaExpression :: (a -> a -> a) -> MagmaExpression a -> a
-foldMagmaExpression _ (Magma x) = x
-foldMagmaExpression f (dme :$ x) = F.foldr' f x dme
-
-{- |
- Lazy, left-associative fold over a 'MagmaExpression`
--}
-foldMagmaExpressionL :: (a -> a -> a) -> MagmaExpression a -> a
-foldMagmaExpressionL = F.foldl1
-
-{- |
- Separates the left-most term in a 'MagmaExpression` from the
- rest of the expression.
--}
-partitionLeft :: MagmaExpression a -> (a, Maybe (MagmaExpression a))
-partitionLeft me = case me of
-  Magma a -> (a, Nothing)
-  me' :$ a -> case me' of
-    Magma a' -> (a', Just . pure $ a)
-    (partitionLeft -> (l, mea)) :$ a' ->
-      let rm = a' `appliedTo` pure a
-       in (l, Just $ maybe rm (<> rm) mea)
-
-instance Traversable MagmaExpression where
-  traverse ::
-    Applicative f =>
-    (a -> f b) ->
-    MagmaExpression a ->
-    f (MagmaExpression b)
-  traverse f me = case me of
-    Magma a -> Magma <$> f a
-    dme :$ a -> (traverse f dme <&> (:$)) <*> f a
-
-{- |
- Left-to-right composition of a 'MagmaExpression`
--}
-instance Semigroup (MagmaExpression a) where
-  (<>) ::
-    MagmaExpression a ->
-    MagmaExpression a ->
-    MagmaExpression a
-  r <> d = case r of
-    Magma a -> a `appliedTo` d
-    _leftDistTerm -> case d of
-      Magma a -> r :$ a
-      rd :$ a -> (r <> rd) :$ a
-
 infix 9 :∙
 
 {- |
@@ -280,9 +190,50 @@ infix 9 :∙
  accomplished by using this structure's 'Foldable` instance.
 -}
 data FreeMagma a
-  = FreeMagma a
+  = Magma a
   | (FreeMagma a) :∙ (FreeMagma a)
-  deriving (Show, Eq, Functor, Generic, Foldable, Traversable)
+  deriving (Functor, Generic, Foldable, Traversable)
+
+instance Show1 FreeMagma where
+  liftShowsPrec ::
+    (Int -> a -> ShowS) ->
+    ([a] -> ShowS) ->
+    Int ->
+    FreeMagma a ->
+    ShowS
+  liftShowsPrec f g n x = case x of
+    Magma a -> showsUnaryWith f "Magma" n a
+    fm :∙ fm' ->
+      let mWithParens fm'' =
+            showParen
+              ( case fm'' of
+                  Magma _ -> False
+                  _ -> True
+              )
+          lhs = mWithParens fm $ liftShowsPrec f g n fm
+          rhs = mWithParens fm' $ liftShowsPrec f g n fm'
+          c = showString " :∙ "
+       in lhs . c . rhs
+
+instance Show a => Show (FreeMagma a) where
+  showsPrec :: Show a => Int -> FreeMagma a -> ShowS
+  showsPrec = showsPrec1
+
+instance Eq1 FreeMagma where
+  liftEq :: (a -> b -> Bool) -> FreeMagma a -> FreeMagma b -> Bool
+  liftEq eq x y = case x of
+    Magma a ->
+      case y of
+        Magma b -> eq a b
+        _ -> False
+    fm :∙ fm' ->
+      case y of
+        a :∙ b -> liftEq eq fm a && liftEq eq fm' b
+        _ -> False
+
+instance Eq a => Eq (FreeMagma a) where
+  (==) :: Eq a => FreeMagma a -> FreeMagma a -> Bool
+  (==) = liftEq (==)
 
 instance IsList (FreeMagma a) where
   type Item (FreeMagma a) = a
@@ -305,18 +256,18 @@ instance Magma (FreeMagma a) where
 
 instance Applicative FreeMagma where
   pure :: a -> FreeMagma a
-  pure = FreeMagma
+  pure = Magma
   (<*>) :: FreeMagma (a -> b) -> FreeMagma a -> FreeMagma b
   f <*> x = case f of
-    FreeMagma fab -> fmap fab x
+    Magma fab -> fmap fab x
     fm :∙ fm' -> (fm <*> x) :∙ (fm' <*> x)
 
 instance Monad FreeMagma where
   return :: a -> FreeMagma a
-  return = FreeMagma
+  return = Magma
   (>>=) :: FreeMagma a -> (a -> FreeMagma b) -> FreeMagma b
   fm >>= f = case fm of
-    FreeMagma a -> f a
+    Magma a -> f a
     fm' :∙ fm_a -> (fm' >>= f) :∙ (fm_a >>= f)
 
 {- |
@@ -324,58 +275,11 @@ instance Monad FreeMagma where
 -}
 foldFreeMagma1 :: (a -> a -> a) -> FreeMagma a -> a
 foldFreeMagma1 f fm = case fm of
-  FreeMagma a -> a
+  Magma a -> a
   fm' :∙ fm_a -> f (foldFreeMagma1 f fm') (foldFreeMagma1 f fm_a)
 
 evaluateFreeMagma :: Magma a => FreeMagma a -> a
 evaluateFreeMagma = foldFreeMagma1 (∙)
-
-{- |
- Prepend a value to an expression, distributing it over
- all subsequent values.
-
- @
-  let x = Magma 0
-    in 1 \`appliedTo\` x == Magma 1 :$ 0
- @
--}
-appliedTo :: a -> MagmaExpression a -> MagmaExpression a
-x `appliedTo` rdx = case rdx of
-  Magma a -> Magma x :$ a
-  rd :$ a -> x `appliedTo` rd :$ a
-
-{- |
- Append a value to the distribution. Where the previous bottom value is
- now distributed over the given pure value, after all previous distributions have taken
- place.
-
- @
-  let x = Magma 0
-    in x \`over\` 1 == Magma 0 :$ 1
- @
--}
-over :: MagmaExpression a -> a -> MagmaExpression a
-over = (:$)
-
-instance Applicative MagmaExpression where
-  pure :: a -> MagmaExpression a
-  pure = return
-  (<*>) ::
-    MagmaExpression (a -> b) ->
-    MagmaExpression a ->
-    MagmaExpression b
-  (<*>) = ap
-
-instance Monad MagmaExpression where
-  return :: a -> MagmaExpression a
-  return = Magma
-  (>>=) ::
-    MagmaExpression a ->
-    (a -> MagmaExpression b) ->
-    MagmaExpression b
-  rd >>= f = case rd of
-    Magma a -> f a
-    rd' :$ a -> (rd' >>= f) <> f a
 
 {- |
  A string used for searching with SQL LIKE expressions. Where a wildcard is a
@@ -481,7 +385,7 @@ distribute = TagRing . fmap (TagMagma . fmap pure) . distributeToNonRec
 -}
 distributeToNonRec :: TagExpression a -> RingExpression (FreeMagma a)
 distributeToNonRec te = case te of
-  TagValue a -> Ring . FreeMagma $ a
+  TagValue a -> Ring . Magma $ a
   TagRing re -> re >>= distributeToNonRec
   TagMagma me -> fmap join . traverse distributeToNonRec $ me
 
@@ -497,7 +401,7 @@ unwrapIdentities te = case te of
     re' :* re2 -> TagRing $ fmap unwrapIdentities re' :* fmap unwrapIdentities re2
     re' :- re2 -> TagRing $ fmap unwrapIdentities re' :- fmap unwrapIdentities re2
   TagMagma fm -> case fm of
-    FreeMagma te' -> unwrapIdentities te'
+    Magma te' -> unwrapIdentities te'
     fm' :∙ fm2 -> TagMagma $ fmap unwrapIdentities fm' :∙ fmap unwrapIdentities fm2
 
 {- |
@@ -518,13 +422,13 @@ foldTagExpression :: Rng a => (a -> a -> a) -> TagExpression a -> a
 foldTagExpression f = evaluateTagExpressionWithMagma (foldFreeMagma1 f)
 
 {- |
- Evaluate a 'TagExpression` with a right-associative function over its 'MagmaExpression`.
+ Evaluate a 'TagExpression` with a right-associative function over its 'FreeMagma`.
 -}
 foldTagExpressionR :: Rng a => (a -> a -> a) -> TagExpression a -> a
 foldTagExpressionR f = evaluateTagExpressionWithMagma (F.foldr1 f)
 
 {- |
- Evaluate a 'TagExpression` with a left-associative function over its 'MagmaExpression`.
+ Evaluate a 'TagExpression` with a left-associative function over its 'FreeMagma`.
 -}
 foldTagExpressionL :: Rng a => (a -> a -> a) -> TagExpression a -> a
 foldTagExpressionL f = evaluateTagExpressionWithMagma (F.foldl1 f)
@@ -693,10 +597,6 @@ class Magma m where
 instance (Magma a, Magma b) => Magma (a, b) where
   (∙) :: (Magma a, Magma b) => (a, b) -> (a, b) -> (a, b)
   x ∙ (a, b) = bimap (∙ a) (∙ b) x
-
-instance Magma (MagmaExpression a) where
-  (∙) :: MagmaExpression a -> MagmaExpression a -> MagmaExpression a
-  (∙) = (<>)
 
 {- |
  A non-associative, distributive function.
