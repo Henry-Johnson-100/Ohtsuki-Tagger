@@ -190,7 +190,7 @@ infix 9 :∙
  accomplished by using this structure's 'Foldable` instance.
 -}
 data FreeMagma a
-  = FreeMagma a
+  = Magma a
   | (FreeMagma a) :∙ (FreeMagma a)
   deriving (Show, Eq, Functor, Generic, Foldable, Traversable)
 
@@ -215,18 +215,18 @@ instance Magma (FreeMagma a) where
 
 instance Applicative FreeMagma where
   pure :: a -> FreeMagma a
-  pure = FreeMagma
+  pure = Magma
   (<*>) :: FreeMagma (a -> b) -> FreeMagma a -> FreeMagma b
   f <*> x = case f of
-    FreeMagma fab -> fmap fab x
+    Magma fab -> fmap fab x
     fm :∙ fm' -> (fm <*> x) :∙ (fm' <*> x)
 
 instance Monad FreeMagma where
   return :: a -> FreeMagma a
-  return = FreeMagma
+  return = Magma
   (>>=) :: FreeMagma a -> (a -> FreeMagma b) -> FreeMagma b
   fm >>= f = case fm of
-    FreeMagma a -> f a
+    Magma a -> f a
     fm' :∙ fm_a -> (fm' >>= f) :∙ (fm_a >>= f)
 
 {- |
@@ -234,7 +234,7 @@ instance Monad FreeMagma where
 -}
 foldFreeMagma1 :: (a -> a -> a) -> FreeMagma a -> a
 foldFreeMagma1 f fm = case fm of
-  FreeMagma a -> a
+  Magma a -> a
   fm' :∙ fm_a -> f (foldFreeMagma1 f fm') (foldFreeMagma1 f fm_a)
 
 evaluateFreeMagma :: Magma a => FreeMagma a -> a
@@ -344,7 +344,7 @@ distribute = TagRing . fmap (TagMagma . fmap pure) . distributeToNonRec
 -}
 distributeToNonRec :: TagExpression a -> RingExpression (FreeMagma a)
 distributeToNonRec te = case te of
-  TagValue a -> Ring . FreeMagma $ a
+  TagValue a -> Ring . Magma $ a
   TagRing re -> re >>= distributeToNonRec
   TagMagma me -> fmap join . traverse distributeToNonRec $ me
 
@@ -360,7 +360,7 @@ unwrapIdentities te = case te of
     re' :* re2 -> TagRing $ fmap unwrapIdentities re' :* fmap unwrapIdentities re2
     re' :- re2 -> TagRing $ fmap unwrapIdentities re' :- fmap unwrapIdentities re2
   TagMagma fm -> case fm of
-    FreeMagma te' -> unwrapIdentities te'
+    Magma te' -> unwrapIdentities te'
     fm' :∙ fm2 -> TagMagma $ fmap unwrapIdentities fm' :∙ fmap unwrapIdentities fm2
 
 {- |
@@ -381,13 +381,13 @@ foldTagExpression :: Rng a => (a -> a -> a) -> TagExpression a -> a
 foldTagExpression f = evaluateTagExpressionWithMagma (foldFreeMagma1 f)
 
 {- |
- Evaluate a 'TagExpression` with a right-associative function over its 'MagmaExpression`.
+ Evaluate a 'TagExpression` with a right-associative function over its 'FreeMagma`.
 -}
 foldTagExpressionR :: Rng a => (a -> a -> a) -> TagExpression a -> a
 foldTagExpressionR f = evaluateTagExpressionWithMagma (F.foldr1 f)
 
 {- |
- Evaluate a 'TagExpression` with a left-associative function over its 'MagmaExpression`.
+ Evaluate a 'TagExpression` with a left-associative function over its 'FreeMagma`.
 -}
 foldTagExpressionL :: Rng a => (a -> a -> a) -> TagExpression a -> a
 foldTagExpressionL f = evaluateTagExpressionWithMagma (F.foldl1 f)
