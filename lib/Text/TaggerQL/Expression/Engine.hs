@@ -237,7 +237,7 @@ evaluateTagExpression ::
   IO (HashSet Tag)
 evaluateTagExpression c =
   fmap
-    ( evaluateTagExpressionR
+    ( foldTagExpressionR
         rightAssocJoinTags
         . distribute
     )
@@ -279,7 +279,7 @@ insertTagExpression c fk =
   void
     . flip runTagInserter Nothing
     . runDefaultRng
-    . evaluateTagExpressionL (liftA2 leftAssocInsertTags)
+    . foldTagExpressionL (liftA2 leftAssocInsertTags)
     . distribute
     . fmap
       ( DefaultRng

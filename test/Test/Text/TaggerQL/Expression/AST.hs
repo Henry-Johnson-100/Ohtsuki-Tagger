@@ -5,11 +5,31 @@ module Test.Text.TaggerQL.Expression.AST (
 import Control.Monad ((>=>))
 import Data.Coerce (coerce)
 import Data.Maybe (fromJust, isJust)
-import Test.Resources
+import Test.Resources (
+    QCDTerm (..),
+    QCFreeMagma,
+    QCPattern (..),
+    QCQueryLeaf (..),
+    QCRingExpression (..),
+    QCTagExpression (..),
+ )
 import Test.Tasty
 import Test.Tasty.QuickCheck
-import Text.TaggerQL.Expression.AST
-import Text.TaggerQL.Expression.AST.Editor
+import Text.TaggerQL.Expression.AST (
+    DTerm,
+    Pattern,
+    QueryExpression (QueryExpression),
+    QueryLeaf,
+    RingExpression,
+    TagExpression,
+    normalize,
+ )
+import Text.TaggerQL.Expression.AST.Editor (
+    findQueryExpression,
+    findTagExpression,
+    withQueryExpression,
+    withTagExpression,
+ )
 
 astTests :: TestTree
 astTests =
@@ -74,7 +94,7 @@ astProperties =
             [ testProperty
                 "Left Monad Identity"
                 ( do
-                    f <- arbitrary :: Gen (Int -> QCMagmaExpression Int)
+                    f <- arbitrary :: Gen (Int -> QCFreeMagma Int)
                     i <- arbitrary
                     let testProp = (pure i >>= f) == f i
                     pure testProp
@@ -82,7 +102,7 @@ astProperties =
             , testProperty
                 "Right Monad Identity"
                 ( do
-                    re <- arbitrary :: Gen (QCMagmaExpression Int)
+                    re <- arbitrary :: Gen (QCFreeMagma Int)
                     let testProp = (re >>= pure) == re
                     pure testProp
                 )
@@ -96,7 +116,7 @@ astProperties =
                                 (resize 35 arbitrary)
                                 -- Exclude functions that appear to be identities
                                 (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (QCMagmaExpression Int))
+                                Gen (Fun Int (QCFreeMagma Int))
                     f <- genF
                     g <- genF
                     h <- genF
@@ -248,8 +268,8 @@ astEditorProperties =
                             Gen (TagExpression (DTerm Pattern))
                     n <- suchThat arbitrary (\n' -> isJust $ findTagExpression n' expr)
                     let exprAt = fromJust $ findTagExpression n expr
-                        replaceResult = distribute $ withTagExpression n expr (const exprAt)
-                    let propTest = distribute expr == replaceResult
+                        replaceResult = normalize $ withTagExpression n expr (const exprAt)
+                    let propTest = normalize expr == replaceResult
                     pure $
                         whenFail
                             ( do

@@ -49,7 +49,7 @@ import Text.TaggerQL.Expression.AST (
   Rng (..),
   TagExpression (..),
   evaluateRing,
-  evaluateTagExpressionR,
+  foldTagExpression,
  )
 
 {- |
@@ -307,7 +307,7 @@ findTagExpression :: Int -> TagExpression a -> Maybe (TagExpression a)
 findTagExpression n =
   runIdentity
     . evalFinder
-    . evaluateTagExpressionR (∙)
+    . foldTagExpression (∙)
     . fmap (mkFinder n . pure)
 
 {- |
@@ -321,6 +321,6 @@ withTagExpression ::
 withTagExpression n te f =
   runIdentity
     . evalEditor
-    . evaluateTagExpressionR (∙)
+    . foldTagExpression (∙)
     . fmap (mkEditor n f . pure)
     $ te
