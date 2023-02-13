@@ -16,6 +16,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use infix" #-}
+{-# HLINT ignore "Use const" #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.AST
@@ -54,12 +55,16 @@ module Text.TaggerQL.Expression.AST (
   Magma (..),
 ) where
 
-import Control.Arrow ((***))
 import Control.Monad (ap, join)
 import Data.Bifunctor (bimap)
 import qualified Data.Foldable as F
 import Data.Functor ((<&>))
-import Data.Functor.Classes
+import Data.Functor.Classes (
+  Eq1 (..),
+  Show1 (liftShowsPrec),
+  showsPrec1,
+  showsUnaryWith,
+ )
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
@@ -78,7 +83,7 @@ data RingExpression a
   | RingExpression a :+ RingExpression a
   | RingExpression a :* RingExpression a
   | RingExpression a :- RingExpression a
-  deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
+  deriving (Functor, Foldable, Traversable, Generic)
 
 instance Show1 RingExpression where
   liftShowsPrec ::
@@ -89,12 +94,43 @@ instance Show1 RingExpression where
     ShowS
   liftShowsPrec f g n re = case re of
     Ring a -> showsUnaryWith f "Ring" n a
-    re' :+ re_a -> helpShow1Bin ":+" re' re_a
-    re' :* re_a -> helpShow1Bin ":*" re' re_a
-    re' :- re_a -> helpShow1Bin ":-" re' re_a
+    re' :+ re_a -> helpShow1Bin " :+ " re' re_a
+    re' :* re_a -> helpShow1Bin " :* " re' re_a
+    re' :- re_a -> helpShow1Bin " :- " re' re_a
    where
     helpShow1Bin s x y =
-      showsBinaryWith (liftShowsPrec f g) (liftShowsPrec f g) s n x y
+      let mShowParen r = showParen (case r of Ring _ -> False; _ -> True)
+          lhs = mShowParen x $ liftShowsPrec f g n x
+          c = showString s
+          rhs = mShowParen y $ liftShowsPrec f g n y
+       in lhs . c . rhs
+
+-- This is a good baseline for something like a pretty printer but it makes a poor
+-- Show1 instance.
+-- instance Show1 RingExpression where
+--   liftShowsPrec ::
+--     (Int -> a -> ShowS) ->
+--     ([a] -> ShowS) ->
+--     Int ->
+--     RingExpression a ->
+--     ShowS
+--   liftShowsPrec f g n re = case re of
+--     Ring a -> f n a
+--     re' :+ re_a -> helpShow1Bin " :+ " re' re_a
+--     re' :* re_a -> helpShow1Bin " :* " re' re_a
+--     re' :- re_a -> helpShow1Bin " :- " re' re_a
+--    where
+--     helpShow1Bin s x y =
+--       let lhs = liftShowsPrec f g n x
+--           c = showString s
+--           rhs =
+--             showParen (case y of Ring _ -> False; _ -> True) $
+--               liftShowsPrec f g n y
+--        in lhs . c . rhs
+
+instance Show a => Show (RingExpression a) where
+  showsPrec :: Show a => Int -> RingExpression a -> ShowS
+  showsPrec = showsPrec1
 
 instance Eq1 RingExpression where
   liftEq :: (a -> b -> Bool) -> RingExpression a -> RingExpression b -> Bool
@@ -115,6 +151,10 @@ instance Eq1 RingExpression where
       case y of
         rey :- rey' -> liftEq eq re rey && liftEq eq re' rey'
         _ -> False
+
+instance Eq a => Eq (RingExpression a) where
+  (==) :: Eq a => RingExpression a -> RingExpression a -> Bool
+  (==) = liftEq (==)
 
 instance Hashable a => Hashable (RingExpression a)
 
