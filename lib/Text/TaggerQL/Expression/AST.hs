@@ -192,7 +192,48 @@ infix 9 :∙
 data FreeMagma a
   = Magma a
   | (FreeMagma a) :∙ (FreeMagma a)
-  deriving (Show, Eq, Functor, Generic, Foldable, Traversable)
+  deriving (Functor, Generic, Foldable, Traversable)
+
+instance Show1 FreeMagma where
+  liftShowsPrec ::
+    (Int -> a -> ShowS) ->
+    ([a] -> ShowS) ->
+    Int ->
+    FreeMagma a ->
+    ShowS
+  liftShowsPrec f g n x = case x of
+    Magma a -> showsUnaryWith f "Magma" n a
+    fm :∙ fm' ->
+      let mWithParens fm'' =
+            showParen
+              ( case fm'' of
+                  Magma _ -> False
+                  _ -> True
+              )
+          lhs = mWithParens fm $ liftShowsPrec f g n fm
+          rhs = mWithParens fm' $ liftShowsPrec f g n fm'
+          c = showString " :∙ "
+       in lhs . c . rhs
+
+instance Show a => Show (FreeMagma a) where
+  showsPrec :: Show a => Int -> FreeMagma a -> ShowS
+  showsPrec = showsPrec1
+
+instance Eq1 FreeMagma where
+  liftEq :: (a -> b -> Bool) -> FreeMagma a -> FreeMagma b -> Bool
+  liftEq eq x y = case x of
+    Magma a ->
+      case y of
+        Magma b -> eq a b
+        _ -> False
+    fm :∙ fm' ->
+      case y of
+        a :∙ b -> liftEq eq fm a && liftEq eq fm' b
+        _ -> False
+
+instance Eq a => Eq (FreeMagma a) where
+  (==) :: Eq a => FreeMagma a -> FreeMagma a -> Bool
+  (==) = liftEq (==)
 
 instance IsList (FreeMagma a) where
   type Item (FreeMagma a) = a
