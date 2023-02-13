@@ -39,6 +39,7 @@ import Control.Monad.Trans.State.Strict (StateT (..), get, modify)
 import Data.Functor.Identity (runIdentity)
 import Text.TaggerQL.Expression.AST (
   DTerm,
+  FreeMagma,
   Magma (..),
   MagmaExpression (..),
   Pattern,
@@ -125,8 +126,8 @@ onTagLeaf qe@(QueryExpression qe') f = case qe' of
 onTagMagma ::
   TagExpression a ->
   ( forall a1.
-    MagmaExpression a1 ->
-    MagmaExpression a1
+    FreeMagma a1 ->
+    FreeMagma a1
   ) ->
   TagExpression a
 onTagMagma te f =

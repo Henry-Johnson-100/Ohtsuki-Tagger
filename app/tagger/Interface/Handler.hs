@@ -384,7 +384,7 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
                             $ withTagExpression
                               n
                               te'
-                              (\te'' -> TagMagma $ Magma te'' :$ te)
+                              (∙ te)
                         _notTagLeaf -> qe
                       _notRingValue -> qe
               )

@@ -58,6 +58,7 @@ import Test.Tasty.QuickCheck (
  )
 import Text.TaggerQL.Expression.AST (
   DTerm (..),
+  FreeMagma,
   Magma,
   MagmaExpression (Magma),
   Pattern (..),
@@ -66,6 +67,7 @@ import Text.TaggerQL.Expression.AST (
   Rng ((+.)),
   TagExpression (..),
   over,
+  (∙),
  )
 
 newtype QCRingExpression a = QCRingExpression (RingExpression a)
@@ -126,6 +128,30 @@ instance Arbitrary a => Arbitrary (QCMagmaExpression a) where
 instance Function a => Function (MagmaExpression a)
 
 instance Function a => Function (QCMagmaExpression a)
+
+newtype QCFreeMagma a = QCFreeMagma (FreeMagma a)
+  deriving
+    ( Show
+    , Eq
+    , Functor
+    , Applicative
+    , Monad
+    , Foldable
+    , Traversable
+    , Hashable
+    , Generic
+    )
+
+instance Arbitrary a => Arbitrary (QCFreeMagma a) where
+  arbitrary = QCFreeMagma <$> sized sizedFreeMagma
+   where
+    sizedFreeMagma n
+      | n <= 0 = pure <$> arbitrary
+      | otherwise = (∙) <$> sizedFreeMagma (n `div` 2) <*> sizedFreeMagma (n `div` 2)
+
+instance Function a => Function (FreeMagma a)
+
+instance Function a => Function (QCFreeMagma a)
 
 newtype QCPattern = QCPattern Pattern
   deriving (Show, Eq, Generic, IsString, Semigroup, Monoid, Hashable)
@@ -189,9 +215,9 @@ instance Arbitrary a => Arbitrary (QCTagExpression a) where
             tagMagma =
               TagMagma <$> do
                 r <-
-                  (coerce :: QCMagmaExpression () -> MagmaExpression ())
+                  (coerce :: QCFreeMagma () -> FreeMagma ())
                     <$> arbitrary ::
-                    Gen (MagmaExpression ())
+                    Gen (FreeMagma ())
                 let teG = sizedExpr (n `div` 2)
                 sequenceA $ teG <$ r
          in oneof [tagRing, tagMagma]
