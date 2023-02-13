@@ -36,9 +36,13 @@ module Text.TaggerQL.Expression.AST (
   QueryExpression (..),
   QueryLeaf (..),
   TagExpression (..),
-  evaluateTagExpressionR,
-  evaluateTagExpressionL,
+  foldTagExpressionR,
+  foldTagExpressionL,
+  foldTagExpression,
   distribute,
+  distributeToNonRec,
+  unwrapIdentities,
+  normalize,
   RingExpression (..),
   evaluateRing,
   MagmaExpression (..),
@@ -47,6 +51,8 @@ module Text.TaggerQL.Expression.AST (
   partitionLeft,
   appliedTo,
   over,
+  FreeMagma (..),
+  evaluateFreeMagma,
   DefaultRng (..),
 
   -- * Classes
@@ -278,6 +284,16 @@ data FreeMagma a
   | (FreeMagma a) :∙ (FreeMagma a)
   deriving (Show, Eq, Functor, Generic, Foldable, Traversable)
 
+instance IsList (FreeMagma a) where
+  type Item (FreeMagma a) = a
+  fromList :: [Item (FreeMagma a)] -> FreeMagma a
+  fromList [] = error "Empty list in fromList :: [a] -> FreeMagma a"
+  fromList (x : xs) = F.foldl' (\m a -> m :∙ pure a) (pure x) xs
+  toList :: FreeMagma a -> [Item (FreeMagma a)]
+  toList = foldr (:) []
+
+instance Hashable a => Hashable (FreeMagma a)
+
 -- | Not a structural semigroup
 instance Semigroup (FreeMagma a) where
   (<>) :: FreeMagma a -> FreeMagma a -> FreeMagma a
@@ -302,6 +318,17 @@ instance Monad FreeMagma where
   fm >>= f = case fm of
     FreeMagma a -> f a
     fm' :∙ fm_a -> (fm' >>= f) :∙ (fm_a >>= f)
+
+{- |
+ Non associative fold of a 'FreeMagma`
+-}
+foldFreeMagma1 :: (a -> a -> a) -> FreeMagma a -> a
+foldFreeMagma1 f fm = case fm of
+  FreeMagma a -> a
+  fm' :∙ fm_a -> f (foldFreeMagma1 f fm') (foldFreeMagma1 f fm_a)
+
+evaluateFreeMagma :: Magma a => FreeMagma a -> a
+evaluateFreeMagma = foldFreeMagma1 (∙)
 
 {- |
  Prepend a value to an expression, distributing it over
@@ -420,7 +447,7 @@ runDTerm (DMetaTerm x) = x
 data TagExpression a
   = TagValue a
   | TagRing (RingExpression (TagExpression a))
-  | TagMagma (MagmaExpression (TagExpression a))
+  | TagMagma (FreeMagma (TagExpression a))
   deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
 
 instance Hashable a => Hashable (TagExpression a)
@@ -447,191 +474,64 @@ instance Monad TagExpression where
  outcome of that as well.
 -}
 distribute :: TagExpression a -> TagExpression a
-distribute = TagRing . fmap (TagMagma . fmap pure) . toNonRecursive
- where
-  -- Distribute all magma expressions through a non-recursive intermediate structure
-  -- then convert back to a TagExpression.
-  toNonRecursive :: TagExpression a -> RingExpression (MagmaExpression a)
-  toNonRecursive te = case te of
-    TagValue a -> Ring . Magma $ a
-    TagRing re -> re >>= toNonRecursive
-    TagMagma me -> fmap join . traverse toNonRecursive $ me
+distribute = TagRing . fmap (TagMagma . fmap pure) . distributeToNonRec
 
-{-
-BEGIN Factoring - An experimental set of functions meant to be the inverse of
-  distribute.
-
-How would this factor?
-
-right factor
-a{c} | b{c} -> (a | b){c}
-
-left factor
-a{b} | a{c} -> a{b | c}
-
-left-right factor
-a{b{c}} | a{d{c}} -> a{(b | d){c}}
-
-right factor
-a{b{c}} | d{b{c}} -> (a | d){b{c}}
-
-Simplify then factor?
-
-right factoring involves comparing the bottom magma of two operands in a ring.
-There is no point in factoring a single term.
-(a | b{c}){d} -> a{d} | b{c{d}} -> (a | b{c}){d}
-
-left factoring is looking at the top magma value of two operands.
-a{b | c{d}} -> a{b} | a{c{d}} -> a{b | c{d}}
-
-(a | b){(c & d){e ! f}} -> (a{c{e}} ! a{c{f}} & (a{d{e}} ! a{d{f}})) | (b{c{e}} ! b{c{f}} & (b{d{e}} ! b{d{f}}))
-    'or' left operator:
-  -> a{(c{e} ! c{f}) & (d{e} ! d{f})} -> a{c{e ! f} & d{e ! f}} -> a{(c & d){e ! f}}
+{- |
+  Distribute all magma expressions through a non-recursive intermediate structure.
 -}
+distributeToNonRec :: TagExpression a -> RingExpression (FreeMagma a)
+distributeToNonRec te = case te of
+  TagValue a -> Ring . FreeMagma $ a
+  TagRing re -> re >>= distributeToNonRec
+  TagMagma me -> fmap join . traverse distributeToNonRec $ me
 
--- data MagmaFactorization a = MagmaFactorization
---   { -- | Left factors are from right distribution.
---     leftFactors :: Maybe (MagmaExpression a)
---   , -- | Right factors are from left distribution.
---     rightFactors :: Maybe (MagmaExpression a)
---   , -- | The remaining terms that cannot be factored in comparison with the right
---     -- quotient.
---     leftQuotient :: MagmaExpression a
---   , -- | The remaining terms that cannot be factored in comparison with the left
---     -- quotient.
---     rightQuotient :: MagmaExpression a
---   }
---   deriving (Show, Eq, Functor)
-
--- constructFactorResults ::
---   (MagmaExpression a -> MagmaExpression a -> t) ->
---   MagmaFactorization a ->
---   t
--- constructFactorResults c (MagmaFactorization mLeft mRight l r) = withEnds l `c` withEnds r
---  where
---   withEnds m =
---     let leftFactorCons = maybe m (<> m) mLeft
---         rightFactorCons = maybe leftFactorCons (leftFactorCons <>) mRight
---      in rightFactorCons
-
--- {- |
---  Separate factors that have been produced from left and right distribution
---  if there are any.
-
---  Return the left and right remainders of the factored expressions.
-
---  This function assumes that the magma is a non-associative, non-commutative operation.
--- -}
--- factorMagma ::
---   Eq a =>
---   MagmaExpression a ->
---   MagmaExpression a ->
---   MagmaFactorization a
--- factorMagma l r =
---   let lList = F.foldr (:) [] l
---       rList = F.foldr (:) [] r
---       safeFromList xs = case xs of
---         [] -> Nothing
---         (x : xs') -> Just $ F.foldl' over (Magma x) xs'
-
---       -- Left factors are a product of right-distribution
---       ( mapMaybe fst ->
---           lFactors
---         , unzip -> lFactorRemainders
---         ) =
---           L.span (fromMaybe False . uncurry (liftA2 (==))) $ zipLongest [] lList rList
-
---       -- Right factors are a product of left-distribution and are taken the same
---       -- way as left factors, only over a reversed list.
---       ( mapMaybe fst . reverse ->
---           rFactors
---         , both reverse . unzip ->
---             (xlRem, ylRem)
---         ) =
---           L.span (fromMaybe False . uncurry (liftA2 (==)))
---             . uncurry (zipLongest [])
---             . both (reverse . catMaybes)
---             $ lFactorRemainders
-
---       remainders = both catMaybes (xlRem, ylRem)
---    in if l == r
---         then MagmaFactorization Nothing Nothing l r
---         else case remainders of
---           -- inputs are already fully factored so they are returned.
---           -- Simply a case match for the above if-expr that skips these computations.
---           ([], []) ->
---             MagmaFactorization Nothing Nothing l r
---           (l' : ls, r' : rs) ->
---             MagmaFactorization
---               { leftFactors = safeFromList lFactors
---               , rightFactors = safeFromList rFactors
---               , leftQuotient = F.foldl' over (pure l') ls
---               , rightQuotient = F.foldl' over (pure r') rs
---               }
---           _oneRemIsEmpty ->
---             remainders
---               &
---               -- One remainder is empty, so in order to return a
---               -- Magma expression remainder, it attempts to borrow a factor,
---               -- first from the left side.
---               case safeFromList lFactors of
---                 Just me ->
---                   let foldFactorInto fact = both (F.foldl' over fact)
---                    in case me of
---                         Magma _ ->
---                           uncurry (MagmaFactorization Nothing (safeFromList rFactors))
---                             . foldFactorInto me
---                         me' :$ a ->
---                           uncurry (MagmaFactorization (Just me') (safeFromList rFactors))
---                             . foldFactorInto (pure a)
---                 -- There are no left factors so it tries the right side.
---                 Nothing -> case safeFromList rFactors of
---                   Just me ->
---                     let foldFactorInto fact = both (F.foldr appliedTo fact)
---                      in case me of
---                           Magma _ ->
---                             uncurry (MagmaFactorization Nothing Nothing)
---                               . foldFactorInto me
---                           (partitionLeft -> (lhead, lMag)) ->
---                             uncurry (MagmaFactorization Nothing lMag)
---                               . foldFactorInto (pure lhead)
---                   -- This scenario should absolutely never happen. It means that
---                   -- one remainder is empty and yet there are no factors.
---                   -- Which means that a remainder was removed
---                   -- when it should not have been.
---                   -- To avoid a partial function, this returns the input as unfactorable.
---                   Nothing -> const (uncurry (MagmaFactorization Nothing Nothing) (l, r))
-
--- zipLongest :: [(Maybe a, Maybe a)] -> [a] -> [a] -> [(Maybe a, Maybe a)]
--- zipLongest acc [] [] = reverse acc
--- zipLongest acc (part' -> (x, xs)) (part' -> (y, ys)) = zipLongest ((x, y) : acc) xs ys
-
--- both :: Bifunctor p => (a -> d) -> p a a -> p d d
--- both f = bimap f f
-
--- part' :: [a] -> (Maybe a, [a])
--- part' [] = (Nothing, [])
--- part' (x : xs) = (Just x, xs)
-
-{-
-END Factoring
+{- |
+ Attempts to remove some redundant monadic identities.
 -}
+unwrapIdentities :: TagExpression a -> TagExpression a
+unwrapIdentities te = case te of
+  TagValue _ -> te
+  TagRing re -> case re of
+    Ring te' -> unwrapIdentities te'
+    re' :+ re2 -> TagRing $ fmap unwrapIdentities re' :+ fmap unwrapIdentities re2
+    re' :* re2 -> TagRing $ fmap unwrapIdentities re' :* fmap unwrapIdentities re2
+    re' :- re2 -> TagRing $ fmap unwrapIdentities re' :- fmap unwrapIdentities re2
+  TagMagma fm -> case fm of
+    FreeMagma te' -> unwrapIdentities te'
+    fm' :∙ fm2 -> TagMagma $ fmap unwrapIdentities fm' :∙ fmap unwrapIdentities fm2
+
+{- |
+ Resolve structural ambiguities and redundancies by distributing the magma expressions
+ throughout and unwrapping any redundant monadic identities.
+
+ > normalize = unwrapIdentities . distribute
+-}
+normalize :: TagExpression a -> TagExpression a
+normalize = unwrapIdentities . distribute
+
+{- |
+ Evaluate a 'TagExpression` by traversing its structure,
+ applying function @f :: a -> a -> a@
+ to its magma operations.
+-}
+foldTagExpression :: Rng a => (a -> a -> a) -> TagExpression a -> a
+foldTagExpression f = evaluateTagExpressionWithMagma (foldFreeMagma1 f)
 
 {- |
  Evaluate a 'TagExpression` with a right-associative function over its 'MagmaExpression`.
 -}
-evaluateTagExpressionR :: Rng a => (a -> a -> a) -> TagExpression a -> a
-evaluateTagExpressionR f = evaluateTagExpressionWithMagma (foldMagmaExpression f)
+foldTagExpressionR :: Rng a => (a -> a -> a) -> TagExpression a -> a
+foldTagExpressionR f = evaluateTagExpressionWithMagma (F.foldr1 f)
 
 {- |
  Evaluate a 'TagExpression` with a left-associative function over its 'MagmaExpression`.
 -}
-evaluateTagExpressionL :: Rng a => (a -> a -> a) -> TagExpression a -> a
-evaluateTagExpressionL f = evaluateTagExpressionWithMagma (foldMagmaExpressionL f)
+foldTagExpressionL :: Rng a => (a -> a -> a) -> TagExpression a -> a
+foldTagExpressionL f = evaluateTagExpressionWithMagma (F.foldl1 f)
 
 evaluateTagExpressionWithMagma ::
   Rng b =>
-  (MagmaExpression b -> b) ->
+  (FreeMagma b -> b) ->
   TagExpression b ->
   b
 evaluateTagExpressionWithMagma mf te =
@@ -803,4 +703,4 @@ instance Magma (MagmaExpression a) where
 -}
 instance Magma (TagExpression a) where
   (∙) :: TagExpression a -> TagExpression a -> TagExpression a
-  x ∙ y = TagMagma $ pure x :$ y
+  x ∙ y = TagMagma $ pure x ∙ pure y

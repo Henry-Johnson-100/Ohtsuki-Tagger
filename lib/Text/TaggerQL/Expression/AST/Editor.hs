@@ -39,6 +39,7 @@ import Control.Monad.Trans.State.Strict (StateT (..), get, modify)
 import Data.Functor.Identity (runIdentity)
 import Text.TaggerQL.Expression.AST (
   DTerm,
+  FreeMagma,
   Magma (..),
   MagmaExpression (..),
   Pattern,
@@ -48,7 +49,7 @@ import Text.TaggerQL.Expression.AST (
   Rng (..),
   TagExpression (..),
   evaluateRing,
-  evaluateTagExpressionR,
+  foldTagExpression,
  )
 
 {- |
@@ -125,8 +126,8 @@ onTagLeaf qe@(QueryExpression qe') f = case qe' of
 onTagMagma ::
   TagExpression a ->
   ( forall a1.
-    MagmaExpression a1 ->
-    MagmaExpression a1
+    FreeMagma a1 ->
+    FreeMagma a1
   ) ->
   TagExpression a
 onTagMagma te f =
@@ -306,7 +307,7 @@ findTagExpression :: Int -> TagExpression a -> Maybe (TagExpression a)
 findTagExpression n =
   runIdentity
     . evalFinder
-    . evaluateTagExpressionR (∙)
+    . foldTagExpression (∙)
     . fmap (mkFinder n . pure)
 
 {- |
@@ -320,6 +321,6 @@ withTagExpression ::
 withTagExpression n te f =
   runIdentity
     . evalEditor
-    . evaluateTagExpressionR (∙)
+    . foldTagExpression (∙)
     . fmap (mkEditor n f . pure)
     $ te

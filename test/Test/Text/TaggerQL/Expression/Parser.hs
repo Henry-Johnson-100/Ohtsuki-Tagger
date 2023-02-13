@@ -211,25 +211,48 @@ parserTests =
                         "[apple & {red}] /= [apple {red}]"
                         ((tle . tedp . rt $ "apple") *. (tle . tedp . rt $ "red"))
                         "apple & {red}"
-                , comBat
+                , testGroup
                     "Nested Minimal Magma Expression"
-                    "apple {peel {red}}"
-                    ( tle $
-                        (tedp . rt $ "apple")
-                            ∙ ( (tedp . rt $ "peel")
-                                    ∙ (tedp . rt $ "red")
-                              )
-                    )
-                    [ "apple {peel {red}}"
-                    , "apple{peel{red}}"
-                    , "apple { peel { red } }"
-                    , "{apple{peel{red}}}"
-                    , "{apple{peel}}{red}"
-                    , "{{apple}{peel}}{red}"
-                    , "({apple}{peel}){red}"
-                    , "(apple{peel}){red}"
-                    , "{apple} {peel} {red}"
-                    , "apple {peel} {red}"
+                    [ comBat
+                        "Implicit Right Association"
+                        "apple {peel {red}}"
+                        ( tle $
+                            (tedp . rt $ "apple")
+                                ∙ ( (tedp . rt $ "peel")
+                                        ∙ (tedp . rt $ "red")
+                                  )
+                        )
+                        [ "{apple} {peel} {red}"
+                        , "apple {peel} {red}"
+                        ]
+                    , comBat
+                        "Right Association"
+                        "apple {peel {red}}"
+                        ( tle $
+                            (tedp . rt $ "apple")
+                                ∙ ( (tedp . rt $ "peel")
+                                        ∙ (tedp . rt $ "red")
+                                  )
+                        )
+                        [ "apple {peel {red}}"
+                        , "apple{peel{red}}"
+                        , "apple { peel { red } }"
+                        , "{apple{peel{red}}}"
+                        ]
+                    , comBat
+                        "Left Association"
+                        "apple {peel {red}}"
+                        ( tle $
+                            ( (tedp . rt $ "apple")
+                                ∙ (tedp . rt $ "peel")
+                            )
+                                ∙ (tedp . rt $ "red")
+                        )
+                        [ "{apple{peel}}{red}"
+                        , "{{apple}{peel}}{red}"
+                        , "({apple}{peel}){red}"
+                        , "(apple{peel}){red}"
+                        ]
                     ]
                 , comBat
                     "Explicit MetaTerm"
@@ -354,30 +377,43 @@ parserTests =
                     , "{apple{orange} ({banana})}"
                     , "{apple{orange} (banana)}"
                     ]
-                , comBatTE
+                , testGroup
                     "Nested Tag Distribution"
-                    ""
-                    ( (tedp . rt $ "apple")
-                        ∙ ( (tedp . rt $ "orange")
-                                ∙ (tedp . rt $ "banana")
+                    [ comBatTE
+                        "Implicit Right Association"
+                        ""
+                        ( (tedp . rt $ "apple")
+                            ∙ ( (tedp . rt $ "orange")
+                                    ∙ (tedp . rt $ "banana")
+                              )
+                        )
+                        [ "{{apple} {orange} {banana}}"
+                        , "{apple} {orange} {banana}"
+                        , "apple {orange} {banana}"
+                        ]
+                    , comBatTE
+                        "Right Association"
+                        ""
+                        ( (tedp . rt $ "apple")
+                            ∙ ( (tedp . rt $ "orange")
+                                    ∙ (tedp . rt $ "banana")
+                              )
+                        )
+                        [ "{apple{orange{banana}}}"
+                        , "apple{orange{banana}}"
+                        ]
+                    , comBatTE
+                        "Left Assocation"
+                        ""
+                        ( ( (tedp . rt $ "apple")
+                                ∙ (tedp . rt $ "orange")
                           )
-                    )
-                    [ "{apple{orange{banana}}}"
-                    , "{{apple} {orange} {banana}}"
-                    , "{{apple{orange}} {banana}}"
-                    , "{{{apple} {orange}} {banana}}"
-                    ]
-                , comBatTE
-                    "Tag Distribution is Associative"
-                    "[{{a} {b} {c}}] Should be associative."
-                    ( (tedp . rt $ "a")
-                        ∙ ( (tedp . rt $ "b")
-                                ∙ (tedp . rt $ "c")
-                          )
-                    )
-                    [ "{{a} {b} {c}}"
-                    , "{{{a} {b}} {c}}"
-                    , "{{a} {{b} {c}}}"
+                            ∙ (tedp . rt $ "banana")
+                        )
+                        [ "{{apple{orange}} {banana}}"
+                        , "{{{apple} {orange}} {banana}}"
+                        , "{apple {orange}} {banana}"
+                        ]
                     ]
                 , comBat
                     "Mixed Parenthesized Tag Leaves"
@@ -441,26 +477,39 @@ parserTests =
                                   )
                         )
                         "apple {red | yellow}"
-                , comBat
+                , testGroup
                     "Nested Left Distribution"
-                    ""
-                    ( tle $
-                        (tedp . rt $ "apple")
-                            ∙ ( ( (tedp . rt $ "peel")
-                                    +. (tedp . rt $ "skin")
-                                )
-                                    ∙ ( (tedp . rt $ "red")
-                                            +. (tedp . rt $ "yellow")
-                                      )
-                              )
-                    )
-                    [ "apple{(peel | skin){red | yellow}}"
-                    , -- This test fails because the () signify that the terms
-                      -- inside of it are tag leaves and not one tag leaf.
-                      -- The correct way to write this case is just below.
-                      -- , "(apple{peel} | apple{skin}) {red | yellow}"
-                      "{apple{peel} | apple{skin}} {red | yellow}"
-                    , "apple{peel{red | yellow} | skin {red | yellow}}"
+                    [ comBat
+                        "Right Association"
+                        ""
+                        ( tle $
+                            (tedp . rt $ "apple")
+                                ∙ ( ( (tedp . rt $ "peel")
+                                        +. (tedp . rt $ "skin")
+                                    )
+                                        ∙ ( (tedp . rt $ "red")
+                                                +. (tedp . rt $ "yellow")
+                                          )
+                                  )
+                        )
+                        [ "apple{(peel | skin){red | yellow}}"
+                        , "apple{peel{red | yellow} | skin {red | yellow}}"
+                        ]
+                    , comBat
+                        "Left Association"
+                        ""
+                        ( tle $
+                            ( (tedp . rt $ "apple")
+                                ∙ ( (tedp . rt $ "peel")
+                                        +. (tedp . rt $ "skin")
+                                  )
+                            )
+                                ∙ ( (tedp . rt $ "red")
+                                        +. (tedp . rt $ "yellow")
+                                  )
+                        )
+                        [ "{apple{peel} | apple{skin}} {red | yellow}"
+                        ]
                     ]
                 , comBatTE
                     "Nested Left TagExpression Distribution"
@@ -550,10 +599,10 @@ parserTests =
                     "(apple | (orange{peel})) {red}"
                     ( tle ((tedp . rt $ "apple") ∙ (tedp . rt $ "red"))
                         +. tle
-                            ( (tedp . rt $ "orange")
-                                ∙ ( (tedp . rt $ "peel")
-                                        ∙ (tedp . rt $ "red")
-                                  )
+                            ( ( (tedp . rt $ "orange")
+                                    ∙ (tedp . rt $ "peel")
+                              )
+                                ∙ (tedp . rt $ "red")
                             )
                     )
                     [ "(apple | (orange{peel})) {red}"
@@ -571,10 +620,10 @@ parserTests =
                         ∙ (tedp . rt $ "red")
                     )
                     [ "{apple | orange{peel}} {red}"
-                    , "apple {red} | orange {peel {red}}"
+                    , "{apple} {red} | {orange {peel}} {red}"
                     ]
                 , comBat
-                    "Associative Left Distribution"
+                    "Left Associated Distributed Operation"
                     "(apple{peel}){red}"
                     ( tle $
                         ( (tedp . rt $ "apple")
@@ -585,29 +634,47 @@ parserTests =
                     [ "(apple{peel}){red}"
                     , "(apple {peel}) {red}"
                     , "{apple{peel}}{red}"
-                    , "apple {peel}{red}"
-                    , -- desugared
-                      "apple{peel{red}}"
                     ]
-                , comBat
+                , testGroup
                     "Mixed Distribution"
-                    "(apple{skin} | orange{peel}){orange | red}"
-                    ( let rightTE = (tedp . rt $ "yellow") +. (tedp . rt $ "red")
-                       in tle
-                            ( ( (tedp . rt $ "apple")
-                                    ∙ (tedp . rt $ "skin")
-                              )
-                                ∙ rightTE
-                            )
-                            +. tle
-                                ( ( (tedp . rt $ "orange")
-                                        ∙ (tedp . rt $ "peel")
+                    [ comBat
+                        "Left Association"
+                        "(apple{skin} | orange{peel}){orange | red}"
+                        ( let rightTE = (tedp . rt $ "yellow") +. (tedp . rt $ "red")
+                           in tle
+                                ( ( (tedp . rt $ "apple")
+                                        ∙ (tedp . rt $ "skin")
                                   )
                                     ∙ rightTE
                                 )
-                    )
-                    [ "(apple{skin} | orange{peel}){yellow | red}"
-                    , "apple{skin{yellow | red}} | orange{peel{yellow | red}}"
+                                +. tle
+                                    ( ( (tedp . rt $ "orange")
+                                            ∙ (tedp . rt $ "peel")
+                                      )
+                                        ∙ rightTE
+                                    )
+                        )
+                        [ "(apple{skin} | orange{peel}){yellow | red}"
+                        , "{apple {skin}} {yellow | red} | {orange {peel}} {yellow | red}"
+                        , "{{apple {skin}} {yellow} | {apple {skin}} {red}} | \
+                          \{{orange {peel}} {yellow} | {orange {peel}} {red}}"
+                        ]
+                    , comBat
+                        "Implicit Right Association"
+                        ""
+                        ( let syr =
+                                (tedp . rt $ "skin")
+                                    ∙ ( (tedp . rt $ "yellow")
+                                            +. (tedp . rt $ "red")
+                                      )
+                           in tle ((tedp . rt $ "apple") ∙ syr)
+                                +. tle ((tedp . rt $ "orange") ∙ syr)
+                        )
+                        [ "(apple | orange) {skin} {yellow | red}"
+                        , "apple {skin {yellow | red}} | orange {skin {yellow | red}}"
+                        , "{apple{skin{yellow}} | apple{skin{red}}} | \
+                          \{orange{skin{yellow}} | orange{skin{red}}}"
+                        ]
                     ]
                 , comBat
                     "Mixed Tag Distribution"
@@ -635,9 +702,9 @@ parserTests =
                     )
                     [ "(apple {skin} | orange {peel}) {yellow | red}"
                     , "{apple {skin} | orange {peel}} {yellow | red}"
-                    , "apple {skin {yellow | red}} | orange {peel {yellow | red}}"
-                    , "apple {skin {yellow}} | apple {skin {red}} |\
-                      \ (orange {peel {yellow}} | orange {peel {red}})"
+                    , "{apple {skin}} {yellow | red} | {orange {peel}} {yellow | red}"
+                    , "{{apple {skin}} {yellow} | {apple {skin}} {red}} |\
+                      \{{orange {peel}} {yellow} | {orange {peel}} {red}}"
                     ]
                 , testCase "Example From Technote" $
                     com

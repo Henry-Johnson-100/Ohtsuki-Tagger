@@ -379,7 +379,7 @@ qewbLeaf ql =
             fmap fst
               . runCounter
               . (\(TagExpressionWidgetBuilderG x) -> x)
-              . evaluateTagExpressionR (∙)
+              . foldTagExpressionR (∙)
               . fmap tewbLeaf
               $ te ::
               CounterT Identity (ExpressionWidgetState (TagExpression (DTerm Pattern)))
