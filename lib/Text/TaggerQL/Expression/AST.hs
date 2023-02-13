@@ -45,12 +45,6 @@ module Text.TaggerQL.Expression.AST (
   normalize,
   RingExpression (..),
   evaluateRing,
-  MagmaExpression (..),
-  foldMagmaExpression,
-  foldMagmaExpressionL,
-  partitionLeft,
-  appliedTo,
-  over,
   FreeMagma (..),
   evaluateFreeMagma,
   DefaultRng (..),
@@ -64,7 +58,6 @@ module Text.TaggerQL.Expression.AST (
 import Control.Monad (ap, join)
 import Data.Bifunctor (bimap)
 import qualified Data.Foldable as F
-import Data.Functor ((<&>))
 import Data.Functor.Classes (
   Eq1 (..),
   Show1 (liftShowsPrec),
@@ -190,89 +183,6 @@ evaluateRing r = case r of
   re :* re' -> evaluateRing re *. evaluateRing re'
   re :- re' -> evaluateRing re -. evaluateRing re'
 
-{- |
- A data type representing an expression over a magma. A sequence of operations can
- be concatenated and composed before or after another sequence.
-
- All expressions can be evaluated with the '1' variant of a foldable function,
- since they are non-empty.
-
- This type is more efficiently folded with a right-to-left fold. Therefore, foldr'
- is the most optimal.
-
- It is essentially a reversed, non-empty list.
--}
-data MagmaExpression a
-  = Magma a
-  | (MagmaExpression a) :$ a
-  deriving (Show, Eq, Functor, Generic)
-
-instance Hashable a => Hashable (MagmaExpression a)
-
-instance IsList (MagmaExpression a) where
-  type Item (MagmaExpression a) = a
-  fromList :: [Item (MagmaExpression a)] -> MagmaExpression a
-  fromList [] = error "Empty list in fromList :: [a] -> MagmaExpression a"
-  fromList (x : xs) = F.foldl' over (return x) xs
-  toList :: MagmaExpression a -> [Item (MagmaExpression a)]
-  toList = foldr (:) []
-
-instance Foldable MagmaExpression where
-  foldr :: (a -> b -> b) -> b -> MagmaExpression a -> b
-  foldr f acc me = case me of
-    Magma a -> f a acc
-    dme :$ a -> foldr f (f a acc) dme
-
-{- |
- An alias for a fold @foldr1'@ over a 'MagmaExpression`
--}
-foldMagmaExpression :: (a -> a -> a) -> MagmaExpression a -> a
-foldMagmaExpression _ (Magma x) = x
-foldMagmaExpression f (dme :$ x) = F.foldr' f x dme
-
-{- |
- Lazy, left-associative fold over a 'MagmaExpression`
--}
-foldMagmaExpressionL :: (a -> a -> a) -> MagmaExpression a -> a
-foldMagmaExpressionL = F.foldl1
-
-{- |
- Separates the left-most term in a 'MagmaExpression` from the
- rest of the expression.
--}
-partitionLeft :: MagmaExpression a -> (a, Maybe (MagmaExpression a))
-partitionLeft me = case me of
-  Magma a -> (a, Nothing)
-  me' :$ a -> case me' of
-    Magma a' -> (a', Just . pure $ a)
-    (partitionLeft -> (l, mea)) :$ a' ->
-      let rm = a' `appliedTo` pure a
-       in (l, Just $ maybe rm (<> rm) mea)
-
-instance Traversable MagmaExpression where
-  traverse ::
-    Applicative f =>
-    (a -> f b) ->
-    MagmaExpression a ->
-    f (MagmaExpression b)
-  traverse f me = case me of
-    Magma a -> Magma <$> f a
-    dme :$ a -> (traverse f dme <&> (:$)) <*> f a
-
-{- |
- Left-to-right composition of a 'MagmaExpression`
--}
-instance Semigroup (MagmaExpression a) where
-  (<>) ::
-    MagmaExpression a ->
-    MagmaExpression a ->
-    MagmaExpression a
-  r <> d = case r of
-    Magma a -> a `appliedTo` d
-    _leftDistTerm -> case d of
-      Magma a -> r :$ a
-      rd :$ a -> (r <> rd) :$ a
-
 infix 9 :∙
 
 {- |
@@ -329,53 +239,6 @@ foldFreeMagma1 f fm = case fm of
 
 evaluateFreeMagma :: Magma a => FreeMagma a -> a
 evaluateFreeMagma = foldFreeMagma1 (∙)
-
-{- |
- Prepend a value to an expression, distributing it over
- all subsequent values.
-
- @
-  let x = Magma 0
-    in 1 \`appliedTo\` x == Magma 1 :$ 0
- @
--}
-appliedTo :: a -> MagmaExpression a -> MagmaExpression a
-x `appliedTo` rdx = case rdx of
-  Magma a -> Magma x :$ a
-  rd :$ a -> x `appliedTo` rd :$ a
-
-{- |
- Append a value to the distribution. Where the previous bottom value is
- now distributed over the given pure value, after all previous distributions have taken
- place.
-
- @
-  let x = Magma 0
-    in x \`over\` 1 == Magma 0 :$ 1
- @
--}
-over :: MagmaExpression a -> a -> MagmaExpression a
-over = (:$)
-
-instance Applicative MagmaExpression where
-  pure :: a -> MagmaExpression a
-  pure = return
-  (<*>) ::
-    MagmaExpression (a -> b) ->
-    MagmaExpression a ->
-    MagmaExpression b
-  (<*>) = ap
-
-instance Monad MagmaExpression where
-  return :: a -> MagmaExpression a
-  return = Magma
-  (>>=) ::
-    MagmaExpression a ->
-    (a -> MagmaExpression b) ->
-    MagmaExpression b
-  rd >>= f = case rd of
-    Magma a -> f a
-    rd' :$ a -> (rd' >>= f) <> f a
 
 {- |
  A string used for searching with SQL LIKE expressions. Where a wildcard is a
@@ -693,10 +556,6 @@ class Magma m where
 instance (Magma a, Magma b) => Magma (a, b) where
   (∙) :: (Magma a, Magma b) => (a, b) -> (a, b) -> (a, b)
   x ∙ (a, b) = bimap (∙ a) (∙ b) x
-
-instance Magma (MagmaExpression a) where
-  (∙) :: MagmaExpression a -> MagmaExpression a -> MagmaExpression a
-  (∙) = (<>)
 
 {- |
  A non-associative, distributive function.

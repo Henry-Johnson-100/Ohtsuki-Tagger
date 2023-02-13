@@ -21,7 +21,6 @@ module Text.TaggerQL.Expression.AST.Editor (
   duplicateRing,
   onTagRing,
   onTagLeaf,
-  cutMagmaExpression,
   onTagMagma,
   distributeTagExpression,
   (<-#),
@@ -41,7 +40,6 @@ import Text.TaggerQL.Expression.AST (
   DTerm,
   FreeMagma,
   Magma (..),
-  MagmaExpression (..),
   Pattern,
   QueryExpression (..),
   QueryLeaf (..),
@@ -171,14 +169,6 @@ dropLeftRing r =
 -}
 duplicateRing :: RingExpression a -> RingExpression a
 duplicateRing r = r :* r
-
-{- |
- Remove the last term from a 'MagmaExpression`
--}
-cutMagmaExpression :: MagmaExpression a -> MagmaExpression a
-cutMagmaExpression m = case m of
-  Magma _ -> m
-  me :$ _ -> me
 
 {- |
  A state monad transformer for 1-indexed incremental operations.
