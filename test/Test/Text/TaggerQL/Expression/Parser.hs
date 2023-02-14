@@ -186,8 +186,8 @@ parserTests =
                     , "{apple{red}}"
                     , "{apple {red}}"
                     , "{apple} {red}"
-                    , "(apple) {red}"
-                    , "({apple}) {red}"
+                    , "(apple) {red}" -- #FIXME
+                    , "({apple}) {red}" -- #FIXME
                     ]
                 , testCase "Explicit Set Operator Annihilates Distribution" $
                     com
@@ -233,8 +233,8 @@ parserTests =
                         )
                         [ "{apple{peel}}{red}"
                         , "{{apple}{peel}}{red}"
-                        , "({apple}{peel}){red}"
-                        , "(apple{peel}){red}"
+                        , "({apple}{peel}){red}" -- #FIXME
+                        , "(apple{peel}){red}" -- #FIXME
                         ]
                     ]
                 , comBat
@@ -275,7 +275,7 @@ parserTests =
                     (fe "apple" *. (tle . tedp . rt $ "orange"))
                     [ "p.apple orange"
                     , "p.apple {orange}"
-                    , "(p.apple){orange}"
+                    , "(p.apple){orange}" -- #FIXME
                     , "(p.apple) & {orange}"
                     , "(p.apple)({orange})"
                     , "(p.apple)&({orange})"
@@ -533,8 +533,8 @@ parserTests =
                                 ∙ (tedp . rt $ "red")
                             )
                     )
-                    [ "(apple | orange) {red}"
-                    , "(apple|orange){red}"
+                    [ "(apple | orange) {red}" -- #FIXME
+                    , "(apple|orange){red}" -- #FIXME
                     ]
                 , testCase
                     "Bracketed Expression is \
@@ -588,9 +588,9 @@ parserTests =
                                 ∙ (tedp . rt $ "red")
                             )
                     )
-                    [ "(apple | (orange{peel})) {red}"
-                    , "(apple | orange {peel}) {red}"
-                    , "(apple | orange{peel}){red}"
+                    [ "(apple | (orange{peel})) {red}" -- #FIXME
+                    , "(apple | orange {peel}) {red}" -- #FIXME
+                    , "(apple | orange{peel}){red}" -- #FIXME
                     ]
                 , comBatTE
                     "Associative Right Tag Distribution"
@@ -614,8 +614,8 @@ parserTests =
                         )
                             ∙ (tedp . rt $ "red")
                     )
-                    [ "(apple{peel}){red}"
-                    , "(apple {peel}) {red}"
+                    [ "(apple{peel}){red}" -- #FIXME
+                    , "(apple {peel}) {red}" -- #FIXME
                     , "{apple{peel}}{red}"
                     ]
                 , testGroup
@@ -637,7 +637,7 @@ parserTests =
                                         ∙ rightTE
                                     )
                         )
-                        [ "(apple{skin} | orange{peel}){yellow | red}"
+                        [ "(apple{skin} | orange{peel}){yellow | red}" -- #FIXME
                         , "{apple {skin}} {yellow | red} | {orange {peel}} {yellow | red}"
                         , "{{apple {skin}} {yellow} | {apple {skin}} {red}} | \
                           \{{orange {peel}} {yellow} | {orange {peel}} {red}}"
@@ -653,7 +653,7 @@ parserTests =
                            in tle ((tedp . rt $ "apple") ∙ syr)
                                 +. tle ((tedp . rt $ "orange") ∙ syr)
                         )
-                        [ "(apple | orange) {skin} {yellow | red}"
+                        [ "(apple | orange) {skin} {yellow | red}" -- #FIXME
                         , "apple {skin {yellow | red}} | orange {skin {yellow | red}}"
                         , "{apple{skin{yellow}} | apple{skin{red}}} | \
                           \{orange{skin{yellow}} | orange{skin{red}}}"
@@ -703,7 +703,7 @@ parserTests =
                                     ∙ (tedp . rt $ "cute")
                                 )
                         )
-                        "(o%yui & {%riamu | %sachiko}) {cute}"
+                        "(o%yui & {%riamu | %sachiko}) {cute}" -- #FIXME
                 , testCase "Counter Example From Technote" $
                     com
                         "Should demonstrate left distribution over a tag expression."
