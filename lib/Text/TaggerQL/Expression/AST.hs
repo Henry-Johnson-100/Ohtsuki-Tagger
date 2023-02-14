@@ -52,6 +52,7 @@ module Text.TaggerQL.Expression.AST (
   evaluateFreeCompoundExpression,
   FreeQueryExpression (..),
   liftSimpleQueryRing,
+  unliftFreeQueryExpression,
 
   -- * Classes
   Rng (..),
@@ -59,7 +60,7 @@ module Text.TaggerQL.Expression.AST (
   Magma (..),
 ) where
 
-import Control.Monad (ap, join)
+import Control.Monad (ap, join, (<=<))
 import Data.Bifunctor (Bifunctor (..), bimap)
 import qualified Data.Foldable as F
 import Data.Functor.Classes (
@@ -808,3 +809,22 @@ liftSimpleQueryRing ::
   RingExpression (Either Pattern TagQueryExpression) ->
   FreeQueryExpression
 liftSimpleQueryRing = FreeQueryExpression . fmap Right
+
+{- |
+ Resolves the left product by binding the 'FreeQueryExpression` ring
+ to a left distribution. Expanding terms in place and yielding a non-recursive
+ type.
+-}
+unliftFreeQueryExpression ::
+  FreeQueryExpression ->
+  RingExpression (Either Pattern TagQueryExpression)
+unliftFreeQueryExpression = either unify pure <=< runFreeQueryExpression
+ where
+  unify (FreeQueryExpression fqe, tqe) =
+    fqe
+      >>= either
+        (unify . second (∙ tqe))
+        ( either
+            ((*. (Ring . Right $ tqe)) . Ring . Left)
+            (Ring . Right . (∙ tqe))
+        )

@@ -125,26 +125,12 @@ queryQueryExpression c =
   fmap evaluateRing
     . resolveTagFileDisjunction
     <=< queryTerms
-      . unrecurse
+      . unliftFreeQueryExpression
  where
   resolveTagFileDisjunction = traverse (either pure (toFileSet c))
 
   queryTerms =
     traverse (bitraverse (queryFilePattern c) (evaluateTagExpression c))
-
-  -- Resolves the first disjunction by left distribution of the left
-  -- product type so that the query language can be
-  -- represented as a non-recursive type.
-  unrecurse = either unify pure <=< runFreeQueryExpression
-   where
-    unify (FreeQueryExpression fqe', tqe) =
-      fqe'
-        >>= either
-          unify
-          ( either
-              ((*. (Ring . Right $ tqe)) . Ring . Left)
-              (Ring . Right . (∙ tqe))
-          )
 
 queryFilePattern :: TaggedConnection -> Pattern -> IO (HashSet File)
 queryFilePattern c pat =
