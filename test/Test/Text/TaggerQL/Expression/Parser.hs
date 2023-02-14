@@ -53,7 +53,7 @@ distrTEs (QueryExpression qe) =
         . fmap
             ( \ql -> case ql of
                 FileLeaf pat -> FileLeaf pat
-                TagLeaf te -> TagLeaf . distributeK $ te
+                TagLeaf te -> TagLeaf . T . fmap (K . fmap pure) . distributeK $ te
             )
         $ qe
 

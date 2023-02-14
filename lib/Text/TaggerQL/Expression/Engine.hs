@@ -91,7 +91,6 @@ import Text.TaggerQL.Expression.AST (
   RingExpression,
   TagQueryExpression,
   distributeK,
-  evaluateFreeCompoundExpression,
   evaluateRing,
   runDTerm,
  )
@@ -221,7 +220,8 @@ evaluateTagExpression ::
   IO (HashSet Tag)
 evaluateTagExpression c =
   fmap
-    ( evaluateFreeCompoundExpression evaluateRing (F.foldr1 rightAssocJoinTags)
+    ( evaluateRing
+        . fmap (F.foldr1 rightAssocJoinTags)
         . distributeK
     )
     . traverse (queryDTerm c)
@@ -261,9 +261,8 @@ insertTagExpression ::
 insertTagExpression c fk =
   void
     . flip runTagInserter Nothing
-    . evaluateFreeCompoundExpression
-      (F.foldl1 (<>))
-      (F.foldl1 leftAssocInsertTags)
+    . F.foldl1 (<>)
+    . fmap (F.foldl1 leftAssocInsertTags)
     . distributeK
     . fmap
       ( TagInserter

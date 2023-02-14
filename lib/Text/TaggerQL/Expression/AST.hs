@@ -387,7 +387,7 @@ unwrapIdentities =
  > normalize = unwrapIdentities . distribute
 -}
 normalize :: TagQueryExpression -> TagQueryExpression
-normalize = unwrapIdentities . distributeK
+normalize = unwrapIdentities . T . fmap (K . fmap pure) . distributeK
 
 {- |
  Newtype wrapper for a query expression, which is a ring expression of leaves
@@ -592,23 +592,15 @@ mapK f fce = case fce of
 
 {- |
  Distributes the operation denoted by K over the operation denoted by T.
- This creates an intermediate representation of @t(k a)@ which is then rewrapped
- in the 'FreeCompoundExpression` type
 -}
 distributeK ::
   (Monad t, Monad k, Traversable k) =>
   FreeCompoundExpression t k a ->
-  FreeCompoundExpression t k a
-distributeK = T . fmap (K . fmap pure) . distributeK'
-
-distributeK' ::
-  (Monad t, Monad k, Traversable k) =>
-  FreeCompoundExpression t k a ->
   t (k a)
-distributeK' fce = case fce of
+distributeK fce = case fce of
   FreeCompoundExpression a -> pure . pure $ a
-  T t -> t >>= distributeK'
-  K k -> fmap join . traverse distributeK' $ k
+  T t -> t >>= distributeK
+  K k -> fmap join . traverse distributeK $ k
 
 {- |
  Simply flips the constructors.
