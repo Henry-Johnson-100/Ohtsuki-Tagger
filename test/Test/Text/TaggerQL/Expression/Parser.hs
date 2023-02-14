@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 {-# HLINT ignore "Use lambda-case" #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -79,13 +80,21 @@ comBatTE name failMsg expect tsts =
         (Right . distributeK $ expect)
         (fmap distributeK . parseTagExpression <$> tsts)
 
-com :: HasCallStack => String -> FreeQueryExpression -> Text -> Assertion
+{- |
+ Compare a query to the given normalized structure.
+-}
+com ::
+    HasCallStack =>
+    String ->
+    RingExpression
+        (Either Pattern (RingExpression (FreeMagma (DTerm Pattern)))) ->
+    Text ->
+    Assertion
 com msg x y =
     assertEqual
         msg
         ( Right
-            . distrTEs
-            $ x
+            x
         )
         (distrTEs <$> parseQueryExpression y)
 
@@ -112,29 +121,52 @@ equivalentQueries testName failMsg prototype eqQs =
 
 {- |
  Compare a query prototype to a structure and test equivalent queries.
+
+ Only runs equivalency tests if the prototype matches the expected structure.
 -}
 verifyQueryStructure ::
     TestName ->
     String ->
-    FreeQueryExpression ->
+    RingExpression
+        (Either Pattern (RingExpression (FreeMagma (DTerm Pattern)))) ->
     Text ->
     [Text] ->
     TestTree
 verifyQueryStructure testName failMsg structure prototype equivalences =
-    testGroup
-        testName
-        [ testCase
-            (testName <> " - Structure")
-            $ com
-                ("Structure Failure - " <> failMsg)
-                structure
-                prototype
-        , equivalentQueries
-            (testName <> " - Equivalent Queries")
-            ("Equivalency Failure - " <> failMsg)
-            prototype
-            equivalences
-        ]
+    let structurePattern = testName <> " - Structure"
+     in testGroup
+            testName
+            [ testCase
+                structurePattern
+                $ com
+                    ("Structure Failure - " <> failMsg)
+                    structure
+                    prototype
+            , after AllSucceed structurePattern $
+                equivalentQueries
+                    (testName <> " - Equivalent Queries")
+                    ("Equivalency Failure - " <> failMsg)
+                    prototype
+                    equivalences
+            ]
+
+{- |
+ Alias for Left
+-}
+l :: a -> Either a b
+l = Left
+
+{- |
+ Alias for DTerm
+-}
+d' :: a -> DTerm a
+d' = DTerm
+
+{- |
+ Alias for pure
+-}
+p :: Applicative f => a -> f a
+p = pure
 
 parserTests :: TestTree
 parserTests =
@@ -168,7 +200,7 @@ parserTests =
                 [ testCase "Single FileLeaf" $
                     com
                         "p.apple"
-                        (fe "apple")
+                        (p . l $ "apple")
                         "p.apple"
                 , comBat
                     "Ring Expression of FileLeaf"
@@ -197,7 +229,7 @@ parserTests =
                 , testCase "Explicit Right-Association" $
                     com
                         "p.apple (p.orange p.banana)"
-                        (fe "apple" *. (fe "orange" *. fe "banana"))
+                        ((p . l) "apple" *. ((p . l) "orange" *. (p . l) "banana"))
                         "p.apple (p.orange p.banana)"
                 ]
             , testGroup
@@ -240,7 +272,7 @@ parserTests =
                 , testCase "Explicit Set Operator Annihilates Distribution" $
                     com
                         "[apple & {red}] /= [apple {red}]"
-                        ((tle . tedp . rt $ "apple") *. (tle . tedp . rt $ "red"))
+                        ((p . p . p . p . p $ "apple") *. (p . p . p . p . p $ "red"))
                         "apple & {red}"
                 , testGroup
                     "Nested Minimal Magma Expression"
@@ -310,12 +342,12 @@ parserTests =
                 [ testCase "Ambiguous Prefix - 1" $
                     com
                         "Terms with similar prefixes can be disambiguated."
-                        (tle . tedp . rt $ "pLooksLikeFileLeaf")
+                        (p . p . p . p . p $ "pLooksLikeFileLeaf")
                         "pLooksLikeFileLeaf"
                 , testCase "Ambiguous Prefix - 2" $
                     com
                         "Terms with similar prefixes can be disambiguated."
-                        (tle . tedp . rt $ "dLooksLikeDescriptorTerm")
+                        (p . p . p . p . p $ "dLooksLikeDescriptorTerm")
                         "dLooksLikeDescriptorTerm"
                 , comBat
                     "File Then Tag Leaf"
@@ -483,17 +515,18 @@ parserTests =
                 , testCase "Mixed Leaves and Simple Magmas" $
                     com
                         "apple{skin{red}} p.orange banana{peel{yellow}}"
-                        ( tle
-                            ( (tedp . rt $ "apple")
-                                ∙ ( (tedp . rt $ "skin")
-                                        ∙ (tedp . rt $ "red")
-                                  )
-                            )
-                            *. fe "orange"
-                            *. tle
-                                ( (tedp . rt $ "banana")
-                                    ∙ ( (tedp . rt $ "peel")
-                                            ∙ (tedp . rt $ "yellow")
+                        ( ( (p . p . p)
+                                ( (p . p) "apple"
+                                    ∙ ( (p . p) "skin"
+                                            ∙ (p . p) "red"
+                                      )
+                                )
+                                *. (p . l) "orange"
+                          )
+                            *. (p . p . p)
+                                ( (p . p) "banana"
+                                    ∙ ( (p . p) "peel"
+                                            ∙ (p . p) "yellow"
                                       )
                                 )
                         )
@@ -501,11 +534,16 @@ parserTests =
                 , testCase "Simple Left Distribution" $
                     com
                         "apple {red | yellow}"
-                        ( tle $
-                            (tedp . rt $ "apple")
-                                ∙ ( (tedp . rt $ "red")
-                                        +. (tedp . rt $ "yellow")
-                                  )
+                        ( (p . p)
+                            ( p
+                                ( (p . p) "apple"
+                                    ∙ (p . p) "red"
+                                )
+                                +. p
+                                    ( (p . p) "apple"
+                                        ∙ (p . p) "yellow"
+                                    )
+                            )
                         )
                         "apple {red | yellow}"
                 , testGroup
@@ -590,11 +628,15 @@ parserTests =
                     $ com
                         "In a top-evel scope, a bracketed expression \
                         \produces only one TagLeaf"
-                        ( tle
-                            ( ( (tedp . rt $ "apple")
-                                    +. (tedp . rt $ "orange")
-                              )
-                                ∙ (tedp . rt $ "red")
+                        ( (p . p)
+                            ( p
+                                ( (p . p) "apple"
+                                    ∙ (p . p) "red"
+                                )
+                                +. p
+                                    ( (p . p) "orange"
+                                        ∙ (p . p) "red"
+                                    )
                             )
                         )
                         "{apple | orange} {red}"
@@ -602,13 +644,13 @@ parserTests =
                     com
                         "[apple{red} | orange{red}] should be parsed as two separate \
                         \Query Leaves and not one TagExpression."
-                        ( tle
-                            ( (tedp . rt $ "apple")
-                                ∙ (tedp . rt $ "red")
+                        ( (p . p . p)
+                            ( (p . p) "apple"
+                                ∙ (p . p) "red"
                             )
-                            +. tle
-                                ( (tedp . rt $ "orange")
-                                    ∙ (tedp . rt $ "red")
+                            +. (p . p . p)
+                                ( (p . p) "orange"
+                                    ∙ (p . p) "red"
                                 )
                         )
                         "apple{red} | orange{red}"
@@ -740,48 +782,36 @@ parserTests =
                 , testCase "Example From Technote" $
                     com
                         "Should demonstrate left distribution over a query expression."
-                        ( tle
-                            ( (tedp . rt $ "o%yui")
-                                ∙ (tedp . rt $ "cute")
-                            )
-                            *. tle
-                                ( ( (tedp . rt $ "%riamu")
-                                        +. (tedp . rt $ "%sachiko")
-                                  )
-                                    ∙ (tedp . rt $ "cute")
-                                )
+                        ( let oyui = (p . p . p) ((p . p) "o%yui" ∙ (p . p) "cute")
+                              riamu = p $ (p . p) "%riamu" ∙ (p . p) "cute"
+                              sachiko = p $ (p . p) "%sachiko" ∙ (p . p) "cute"
+                           in oyui *. (p . p) (riamu +. sachiko)
                         )
                         "(o%yui & {%riamu | %sachiko}) {cute}"
                 , testCase "Counter Example From Technote" $
                     com
                         "Should demonstrate left distribution over a tag expression."
-                        ( tle
-                            ( ( (tedp . rt $ "o%yui")
-                                    *. ( (tedp . rt $ "%riamu")
-                                            +. (tedp . rt $ "%sachiko")
-                                       )
-                              )
-                                ∙ (tedp . rt $ "cute")
-                            )
+                        ( let mk x = p $ (p . p) x ∙ (p . p) "cute"
+                              oyui = mk "o%yui"
+                              riamu = mk "%riamu"
+                              sachiko = mk "%sachiko"
+                           in (p . p) (oyui *. (riamu +. sachiko))
                         )
                         "{o%yui & {%riamu | %sachiko}} {cute}"
                 , testCase "Example From Technote - 2" $
                     com
                         "Demonstrates explicit tag expression."
-                        ( tle (tedp . d $ "o%yui")
-                            *. tle
-                                ( (tedp . rt $ "character")
-                                    -. (tedp . d $ "o%yui")
-                                )
+                        ( let oyui = p . p . d' $ "o%yui"
+                              char = p . p . p $ "character"
+                           in (p . p) oyui *. (p . p) (char -. oyui)
                         )
                         "d.o%yui & {r.character ! d.o%yui}"
                 , testCase "Counter Example from Technote - 2" $
                     com
-                        "Deomonstrates precedence of query expressions."
-                        ( tle (tedp . d $ "o%yui")
-                            *. ( tle (tedp . rt $ "character")
-                                    -. tle (tedp . d $ "o%yui")
-                               )
+                        "Demonstrates precedence of query expressions."
+                        ( let oyui = p . p . p . p . d' $ "o%yui"
+                              char = p . p . p . p . p $ "character"
+                           in oyui *. (char -. oyui)
                         )
                         "d.o%yui & (r.character ! d.o%yui)"
                 , -- Tests stating that (a p.b){c}{d} = a{c{d}} (p.b c{d})
@@ -829,21 +859,10 @@ parserTests =
                 , verifyQueryStructure
                     "Unification"
                     "Unification is a Right-Associative, Left-Distributive operation."
-                    ( liftSimpleQueryRing $
-                        ( Ring . Right $
-                            ( (tedp . rt $ "a")
-                                ∙ ( (tedp . rt $ "c")
-                                        ∙ (tedp . rt $ "d")
-                                  )
-                            )
-                        )
-                            *. ( (Ring . Left $ "b")
-                                    *. ( Ring . Right $
-                                            ( (tedp . rt $ "c")
-                                                ∙ (tedp . rt $ "d")
-                                            )
-                                       )
-                               )
+                    ( let withcd f cb x = x `cb` f ((p . p) "c" ∙ (p . p) "d")
+                          acd = p . p . p $ withcd id (∙) ((p . p) "a")
+                          bAndcd = withcd (p . p . p) (*.) (p . l $ "b")
+                       in acd *. bAndcd
                     )
                     "(a & p.b){c}{d}"
                     ["(a & p.b){c{d}}"]
@@ -863,7 +882,7 @@ parserTests =
                 , testCase "parseQueryExpression ignores line breaks" $
                     com
                         ""
-                        (fe "a" *. fe "b" *. fe "c")
+                        ((p . l) "a" *. (p . l) "b" *. (p . l) "c")
                         "p.a\np.b\np.c"
                 , testCase
                     "parseTagExpression Can Fail"
