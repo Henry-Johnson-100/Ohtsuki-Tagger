@@ -11,7 +11,7 @@ module Test.Text.TaggerQL.Expression.Parser (
 
 import Data.Either (isLeft, isRight)
 import Data.Text (Text)
-import Test.Resources (d, fe, rt, tedp, tle)
+import Test.Resources (rt, tedp)
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.TaggerQL.Expression.AST
@@ -120,36 +120,36 @@ verifyQueryStructure testName failMsg structure prototype equivalences =
                     structure
                     equivalences
             ]
+  where
+    com ::
+        HasCallStack =>
+        String ->
+        RingExpression
+            (Either Pattern (RingExpression (FreeMagma (DTerm Pattern)))) ->
+        Text ->
+        Assertion
+    com msg x y =
+        assertEqual
+            msg
+            ( Right
+                x
+            )
+            (distrTEs <$> parseQueryExpression y)
 
-com ::
-    HasCallStack =>
-    String ->
-    RingExpression
-        (Either Pattern (RingExpression (FreeMagma (DTerm Pattern)))) ->
-    Text ->
-    Assertion
-com msg x y =
-    assertEqual
-        msg
-        ( Right
-            x
-        )
-        (distrTEs <$> parseQueryExpression y)
-
-comBat ::
-    HasCallStack =>
-    TestName ->
-    String ->
-    RingExpression
-        (Either Pattern (RingExpression (FreeMagma (DTerm Pattern)))) ->
-    [Text] ->
-    TestTree
-comBat name failMsg expect tsts =
-    battery
-        name
-        failMsg
-        (Right expect)
-        (fmap distrTEs . parseQueryExpression <$> tsts)
+    comBat ::
+        HasCallStack =>
+        TestName ->
+        String ->
+        RingExpression
+            (Either Pattern (RingExpression (FreeMagma (DTerm Pattern)))) ->
+        [Text] ->
+        TestTree
+    comBat name failMsg expect tsts =
+        battery
+            name
+            failMsg
+            (Right expect)
+            (fmap distrTEs . parseQueryExpression <$> tsts)
 
 {- |
  Alias for Left
@@ -198,11 +198,7 @@ parserTests =
             "QueryExpressionParser tests"
             [ testGroup
                 "FileLeaf Expressions"
-                [ testCase "Single FileLeaf" $
-                    com
-                        "p.apple"
-                        (p . l $ "apple")
-                        "p.apple"
+                [ verifyQueryStructure "Single FileLeaf" "p.apple" (p . l $ "apple") "p.apple" []
                 , verifyQueryStructure
                     "Ring Expression of FileLeaf"
                     ""
@@ -227,11 +223,7 @@ parserTests =
                     , "(p.apple p.orange) (p.banana)"
                     , "((p.apple p.orange) p.banana)"
                     ]
-                , testCase "Explicit Right-Association" $
-                    com
-                        "p.apple (p.orange p.banana)"
-                        ((p . l) "apple" *. ((p . l) "orange" *. (p . l) "banana"))
-                        "p.apple (p.orange p.banana)"
+                , verifyQueryStructure "Explicit Right-Association" "p.apple (p.orange p.banana)" ((p . l) "apple" *. ((p . l) "orange" *. (p . l) "banana")) "p.apple (p.orange p.banana)" []
                 ]
             , testGroup
                 "TagLeaf Expressions"
@@ -269,11 +261,7 @@ parserTests =
                     , "(apple) {red}"
                     , "({apple}) {red}"
                     ]
-                , testCase "Explicit Set Operator Annihilates Distribution" $
-                    com
-                        "[apple & {red}] /= [apple {red}]"
-                        ((p . p . p . p . p $ "apple") *. (p . p . p . p . p $ "red"))
-                        "apple & {red}"
+                , verifyQueryStructure "Explicit Set Operator Annihilates Distribution" "[apple & {red}] /= [apple {red}]" ((p . p . p . p . p $ "apple") *. (p . p . p . p . p $ "red")) "apple & {red}" []
                 , testGroup
                     "Nested Minimal Magma Expression"
                     [ verifyQueryStructure
@@ -330,16 +318,8 @@ parserTests =
                 ]
             , testGroup
                 "Mixed Leaf Expressions"
-                [ testCase "Ambiguous Prefix - 1" $
-                    com
-                        "Terms with similar prefixes can be disambiguated."
-                        (p . p . p . p . p $ "pLooksLikeFileLeaf")
-                        "pLooksLikeFileLeaf"
-                , testCase "Ambiguous Prefix - 2" $
-                    com
-                        "Terms with similar prefixes can be disambiguated."
-                        (p . p . p . p . p $ "dLooksLikeDescriptorTerm")
-                        "dLooksLikeDescriptorTerm"
+                [ verifyQueryStructure "Ambiguous Prefix - 1" "Terms with similar prefixes can be disambiguated." (p . p . p . p . p $ "pLooksLikeFileLeaf") "pLooksLikeFileLeaf" []
+                , verifyQueryStructure "Ambiguous Prefix - 2" "Terms with similar prefixes can be disambiguated." (p . p . p . p . p $ "dLooksLikeDescriptorTerm") "dLooksLikeDescriptorTerm" []
                 , verifyQueryStructure
                     "File Then Tag Leaf"
                     "p.apple orange"
@@ -495,40 +475,42 @@ parserTests =
                     , "p.apple & ({orange banana})"
                     , "p.apple & {orange banana}"
                     ]
-                , testCase "Mixed Leaves and Simple Magmas" $
-                    com
-                        "apple{skin{red}} p.orange banana{peel{yellow}}"
-                        ( ( (p . p . p)
-                                ( (p . p) "apple"
-                                    ∙ ( (p . p) "skin"
-                                            ∙ (p . p) "red"
-                                      )
-                                )
-                                *. (p . l) "orange"
-                          )
-                            *. (p . p . p)
-                                ( (p . p) "banana"
-                                    ∙ ( (p . p) "peel"
-                                            ∙ (p . p) "yellow"
-                                      )
-                                )
-                        )
-                        "apple{skin{red}} p.orange banana{peel{yellow}}"
-                , testCase "Simple Left Distribution" $
-                    com
-                        "apple {red | yellow}"
-                        ( (p . p)
-                            ( p
-                                ( (p . p) "apple"
-                                    ∙ (p . p) "red"
-                                )
-                                +. p
-                                    ( (p . p) "apple"
-                                        ∙ (p . p) "yellow"
-                                    )
+                , verifyQueryStructure
+                    "Mixed Leaves and Simple Magmas"
+                    "apple{skin{red}} p.orange banana{peel{yellow}}"
+                    ( ( (p . p . p)
+                            ( (p . p) "apple"
+                                ∙ ( (p . p) "skin"
+                                        ∙ (p . p) "red"
+                                  )
                             )
+                            *. (p . l) "orange"
+                      )
+                        *. (p . p . p)
+                            ( (p . p) "banana"
+                                ∙ ( (p . p) "peel"
+                                        ∙ (p . p) "yellow"
+                                  )
+                            )
+                    )
+                    "apple{skin{red}} p.orange banana{peel{yellow}}"
+                    []
+                , verifyQueryStructure
+                    "Simple Left Distribution"
+                    "apple {red | yellow}"
+                    ( (p . p)
+                        ( p
+                            ( (p . p) "apple"
+                                ∙ (p . p) "red"
+                            )
+                            +. p
+                                ( (p . p) "apple"
+                                    ∙ (p . p) "yellow"
+                                )
                         )
-                        "apple {red | yellow}"
+                    )
+                    "apple {red | yellow}"
+                    []
                 , testGroup
                     "Nested Left Distribution"
                     [ verifyQueryStructure
@@ -595,38 +577,39 @@ parserTests =
                     "(apple | orange) {red}"
                     [ "(apple|orange){red}"
                     ]
-                , testCase
+                , verifyQueryStructure
                     "Bracketed Expression is \
                     \Different than Parenthesized Expression"
-                    $ com
-                        "In a top-evel scope, a bracketed expression \
-                        \produces only one TagLeaf"
-                        ( (p . p)
-                            ( p
-                                ( (p . p) "apple"
-                                    ∙ (p . p) "red"
-                                )
-                                +. p
-                                    ( (p . p) "orange"
-                                        ∙ (p . p) "red"
-                                    )
-                            )
-                        )
-                        "{apple | orange} {red}"
-                , testCase "Incorrect Test Case for \"Simple Right Distribution\"" $
-                    com
-                        "[apple{red} | orange{red}] should be parsed as two separate \
-                        \Query Leaves and not one TagExpression."
-                        ( (p . p . p)
+                    "In a top-evel scope, a bracketed expression \
+                    \produces only one TagLeaf"
+                    ( (p . p)
+                        ( p
                             ( (p . p) "apple"
                                 ∙ (p . p) "red"
                             )
-                            +. (p . p . p)
+                            +. p
                                 ( (p . p) "orange"
                                     ∙ (p . p) "red"
                                 )
                         )
-                        "apple{red} | orange{red}"
+                    )
+                    "{apple | orange} {red}"
+                    []
+                , verifyQueryStructure
+                    "Incorrect Test Case for Simple Right Distribution"
+                    "[apple{red} | orange{red}] should be parsed as two separate \
+                    \Query Leaves and not one TagExpression."
+                    ( (p . p . p)
+                        ( (p . p) "apple"
+                            ∙ (p . p) "red"
+                        )
+                        +. (p . p . p)
+                            ( (p . p) "orange"
+                                ∙ (p . p) "red"
+                            )
+                    )
+                    "apple{red} | orange{red}"
+                    []
                 , comBatTE
                     "Simple Right TagExpression Distribution"
                     "(apple | orange) {red}"
@@ -760,41 +743,45 @@ parserTests =
                     , "{{apple {skin}} {yellow} | {apple {skin}} {red}} |\
                       \{{orange {peel}} {yellow} | {orange {peel}} {red}}"
                     ]
-                , testCase "Example From Technote" $
-                    com
-                        "Should demonstrate left distribution over a query expression."
-                        ( let oyui = (p . p . p) ((p . p) "o%yui" ∙ (p . p) "cute")
-                              riamu = p $ (p . p) "%riamu" ∙ (p . p) "cute"
-                              sachiko = p $ (p . p) "%sachiko" ∙ (p . p) "cute"
-                           in oyui *. (p . p) (riamu +. sachiko)
-                        )
-                        "(o%yui & {%riamu | %sachiko}) {cute}"
-                , testCase "Counter Example From Technote" $
-                    com
-                        "Should demonstrate left distribution over a tag expression."
-                        ( let mk x = p $ (p . p) x ∙ (p . p) "cute"
-                              oyui = mk "o%yui"
-                              riamu = mk "%riamu"
-                              sachiko = mk "%sachiko"
-                           in (p . p) (oyui *. (riamu +. sachiko))
-                        )
-                        "{o%yui & {%riamu | %sachiko}} {cute}"
-                , testCase "Example From Technote - 2" $
-                    com
-                        "Demonstrates explicit tag expression."
-                        ( let oyui = p . p . d' $ "o%yui"
-                              char = p . p . p $ "character"
-                           in (p . p) oyui *. (p . p) (char -. oyui)
-                        )
-                        "d.o%yui & {r.character ! d.o%yui}"
-                , testCase "Counter Example from Technote - 2" $
-                    com
-                        "Demonstrates precedence of query expressions."
-                        ( let oyui = p . p . p . p . d' $ "o%yui"
-                              char = p . p . p . p . p $ "character"
-                           in oyui *. (char -. oyui)
-                        )
-                        "d.o%yui & (r.character ! d.o%yui)"
+                , verifyQueryStructure
+                    "Example From Technote"
+                    "Should demonstrate left distribution over a query expression."
+                    ( let oyui = (p . p . p) ((p . p) "o%yui" ∙ (p . p) "cute")
+                          riamu = p $ (p . p) "%riamu" ∙ (p . p) "cute"
+                          sachiko = p $ (p . p) "%sachiko" ∙ (p . p) "cute"
+                       in oyui *. (p . p) (riamu +. sachiko)
+                    )
+                    "(o%yui & {%riamu | %sachiko}) {cute}"
+                    []
+                , verifyQueryStructure
+                    "Counter Example From Technote"
+                    "Should demonstrate left distribution over a tag expression."
+                    ( let mk x = p $ (p . p) x ∙ (p . p) "cute"
+                          oyui = mk "o%yui"
+                          riamu = mk "%riamu"
+                          sachiko = mk "%sachiko"
+                       in (p . p) (oyui *. (riamu +. sachiko))
+                    )
+                    "{o%yui & {%riamu | %sachiko}} {cute}"
+                    []
+                , verifyQueryStructure
+                    "Example From Technote - 2"
+                    "Demonstrates explicit tag expression."
+                    ( let oyui = p . p . d' $ "o%yui"
+                          char = p . p . p $ "character"
+                       in (p . p) oyui *. (p . p) (char -. oyui)
+                    )
+                    "d.o%yui & {r.character ! d.o%yui}"
+                    []
+                , verifyQueryStructure
+                    "Counter Example from Technote - 2"
+                    "Demonstrates precedence of query expressions."
+                    ( let oyui = p . p . p . p . d' $ "o%yui"
+                          char = p . p . p . p . p $ "character"
+                       in oyui *. (char -. oyui)
+                    )
+                    "d.o%yui & (r.character ! d.o%yui)"
+                    []
                 , -- Tests stating that (a p.b){c}{d} = a{c{d}} (p.b c{d})
                   -- Which is that the operation that is left-distributive (Query -> Tag -> Query)
                   -- first right-associatively folds all right-operands.
@@ -860,11 +847,7 @@ parserTests =
                     $ assertBool
                         ""
                         (isRight . parseQueryExpression $ "a ")
-                , testCase "parseQueryExpression ignores line breaks" $
-                    com
-                        ""
-                        ((p . l) "a" *. (p . l) "b" *. (p . l) "c")
-                        "p.a\np.b\np.c"
+                , verifyQueryStructure "parseQueryExpression ignores line breaks" "" ((p . l) "a" *. (p . l) "b" *. (p . l) "c") "p.a\np.b\np.c" []
                 , testCase
                     "parseTagExpression Can Fail"
                     $ assertBool
