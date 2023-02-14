@@ -34,8 +34,6 @@ module Text.TaggerQL.Expression.AST (
   runDTerm,
 
   -- * Language Expressions
-  QueryExpression (..),
-  QueryLeaf (..),
   TagQueryExpression,
   unwrapIdentities,
   normalize,
@@ -54,7 +52,6 @@ module Text.TaggerQL.Expression.AST (
   evaluateFreeCompoundExpression,
   FreeQueryExpression (..),
   liftSimpleQueryRing,
-  DefaultRng (..),
 
   -- * Classes
   Rng (..),

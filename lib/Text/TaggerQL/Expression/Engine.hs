@@ -117,17 +117,11 @@ toFileSet conn =
 
 -- Tagging Engine
 
-queryQueryExpression :: TaggedConnection -> QueryExpression -> IO (HashSet File)
-queryQueryExpression c =
-  fmap evaluateRing
-    . traverse (queryQueryLeaf c)
-    . runQueryExpression
-
-queryFreeQueryExpression ::
+queryQueryExpression ::
   TaggedConnection ->
   FreeQueryExpression ->
   IO (HashSet File)
-queryFreeQueryExpression c =
+queryQueryExpression c =
   fmap evaluateRing
     . resolveTagFileDisjunction
     <=< queryTerms
@@ -151,11 +145,6 @@ queryFreeQueryExpression c =
               ((*. (Ring . Right $ tqe)) . Ring . Left)
               (Ring . Right . (∙ tqe))
           )
-
-queryQueryLeaf :: TaggedConnection -> QueryLeaf -> IO (HashSet File)
-queryQueryLeaf c ql = case ql of
-  FileLeaf pat -> queryFilePattern c pat
-  TagLeaf te -> evaluateTagExpression c te >>= toFileSet c
 
 queryFilePattern :: TaggedConnection -> Pattern -> IO (HashSet File)
 queryFilePattern c pat =

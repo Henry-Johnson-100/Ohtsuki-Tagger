@@ -50,17 +50,7 @@ import Text.Parsec (
   try,
   (<|>),
  )
-import Text.TaggerQL.Expression.AST (
-  DTerm (..),
-  FreeCompoundExpression (T),
-  Magma (..),
-  Pattern (Pattern),
-  QueryExpression (..),
-  QueryLeaf (..),
-  RingExpression (..),
-  Rng,
-  TagQueryExpression,
- )
+import Text.TaggerQL.Expression.AST
 import Text.TaggerQL.Expression.AST.Editor ((<-#))
 
 type Parser a = Parsec Text () a
@@ -126,7 +116,7 @@ restrictedChars = "(){}!&|. \r\n"
 foldBracketedTags :: Magma b => b -> Maybe b -> b
 foldBracketedTags overTerm = maybe overTerm (overTerm ∙)
 
-parseQueryExpression :: Text -> Either ParseError QueryExpression
+parseQueryExpression :: Text -> Either ParseError FreeQueryExpression
 parseQueryExpression =
   parse
     allInput
@@ -156,10 +146,10 @@ failIfNotConsumed = do
       <> T.unpack remains
       <> "\""
 
-queryExpressionParser :: Parser QueryExpression
+queryExpressionParser :: Parser FreeQueryExpression
 queryExpressionParser =
   spaces
-    *> ( fmap (QueryExpression . (>>= runQueryExpression))
+    *> ( fmap (FreeQueryExpression . (>>= runFreeQueryExpression))
           . ringExprParser
           . fmap runQueryTerm
           $ queryTermParser
@@ -175,10 +165,10 @@ tagExpressionParser =
             )
        )
 
-filePathParser :: Parser QueryLeaf
+filePathParser :: Parser (Either Pattern TagQueryExpression)
 filePathParser =
   spaces
-    *> (FileLeaf <$> (ichar 'p' *> char '.' *> patternParser))
+    *> (Left <$> (ichar 'p' *> char '.' *> patternParser))
 
 descriptorPatternParser :: Parser (DTerm Pattern)
 descriptorPatternParser =
@@ -254,14 +244,14 @@ tagTermParser =
   minimalTagTerm = TagTerm . runMinTagExpr <$> minimalTagExpressionParser
 
 newtype ParenthesizedQuery = ParenthesizedQuery
-  {runParenQuery :: QueryExpression}
+  {runParenQuery :: FreeQueryExpression}
   deriving (Show, Eq, Rng)
 
 parenthesizedQueryParser :: Parser ParenthesizedQuery
 parenthesizedQueryParser =
   ParenthesizedQuery <$> parenthesized queryExpressionParser
 
-newtype QueryTerm = QueryTerm {runQueryTerm :: QueryExpression}
+newtype QueryTerm = QueryTerm {runQueryTerm :: FreeQueryExpression}
   deriving (Show, Eq, Rng)
 
 queryTermParser :: Parser QueryTerm
@@ -277,27 +267,27 @@ queryTermParser =
     QueryTerm
       <$> ( ( \(ParenthesizedQuery q) ->
                 maybe q ((q <-#) . runBracketTag) ::
-                  Maybe BracketedTag -> QueryExpression
+                  Maybe BracketedTag -> FreeQueryExpression
             )
               <$> parenthesizedQueryParser <*> zeroOrManyBracketedTagParser
           )
   bracketedQuery =
     QueryTerm
-      . QueryExpression
+      . liftSimpleQueryRing
       . Ring
-      . TagLeaf
+      . Right
       . runBracketTag
       <$> (foldBracketedTags <$> bracketedTagParser <*> zeroOrManyBracketedTagParser)
   minimalTagQuery =
     QueryTerm
-      . QueryExpression
+      . liftSimpleQueryRing
       . Ring
-      . TagLeaf
+      . Right
       . runMinTagExpr
       <$> minimalTagExpressionParser
   filePathTerm =
     QueryTerm
-      . QueryExpression
+      . liftSimpleQueryRing
       . Ring
       <$> filePathParser
 
