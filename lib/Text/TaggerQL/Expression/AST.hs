@@ -52,15 +52,14 @@ module Text.TaggerQL.Expression.AST (
   flipTK,
   unwrapTK,
   evaluateFreeCompoundExpression,
+  FreeQueryExpression (..),
+  liftSimpleQueryRing,
   DefaultRng (..),
 
   -- * Classes
   Rng (..),
   Ring (..),
   Magma (..),
-
-  -- * Future
-  FreeQueryExpression (..),
 ) where
 
 import Control.Monad (ap, join)
@@ -777,30 +776,38 @@ instance (Magma a, Magma b) => Magma (a, b) where
 type TagQueryExpression =
   FreeCompoundExpression RingExpression FreeMagma (DTerm Pattern)
 
-newtype FreeQueryExpression
-  = FreeQueryExpression
-      ( -- a ring expression over a set of files
-        RingExpression
-          ( -- The disjunction between either a termination of the expression
-            -- or a left distribution of a query of type tag over a query of type file.
+newtype FreeQueryExpression = FreeQueryExpression
+  { runFreeQueryExpression ::
+      -- a ring expression over a set of files
+      RingExpression
+        ( -- The disjunction between either a termination of the expression
+          -- or a left distribution of a query of type tag over a query of type file.
+          --
+          -- Where either of these options are resolvable to a set of files.
+          Either
+            -- This product type represents the left-distribution of a tag typed
+            -- expression over a FreeQueryExpression.
             --
-            -- Where either of these options are resolvable to a set of files.
-            Either
-              -- This product type represents the left-distribution of a tag typed
-              -- expression over a FreeQueryExpression.
-              --
-              -- Notice how the TagQueryExpression is a proper subset of a
-              -- FreeQueryExpression in both disjunct cases.
-              ( FreeQueryExpression
-              , TagQueryExpression
-              )
-              ( -- The terminal disjunction between the types of files and tags
-                -- where either option is resolvable to a set of files
-                -- but evaluation is not forced until later.
-                Either
-                  Pattern
-                  TagQueryExpression
-              )
-          )
-      )
+            -- Notice how the TagQueryExpression is a proper subset of a
+            -- FreeQueryExpression in both disjunct cases.
+            ( FreeQueryExpression
+            , TagQueryExpression
+            )
+            ( -- The terminal disjunction between the types of files and tags
+              -- where either option is resolvable to a set of files
+              -- but evaluation is not forced until later.
+              Either
+                Pattern
+                TagQueryExpression
+            )
+        )
+  }
   deriving (Show, Eq, Rng, Generic)
+
+{- |
+ To make non-recursive query expressions easier to build.
+-}
+liftSimpleQueryRing ::
+  RingExpression (Either Pattern TagQueryExpression) ->
+  FreeQueryExpression
+liftSimpleQueryRing = FreeQueryExpression . fmap Right
