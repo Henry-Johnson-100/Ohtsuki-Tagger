@@ -98,14 +98,16 @@ com msg x y =
         )
         (distrTEs <$> parseQueryExpression y)
 
-comTE :: HasCallStack => String -> TagQueryExpression -> Text -> Assertion
+comTE ::
+    HasCallStack =>
+    String ->
+    RingExpression (FreeMagma (DTerm Pattern)) ->
+    Text ->
+    Assertion
 comTE msg x y =
     assertEqual
         msg
-        ( Right
-            . distributeK
-            $ x
-        )
+        (Right x)
         (distributeK <$> parseTagExpression y)
 
 {- |
@@ -251,7 +253,7 @@ parserTests =
                 , testCase "Arbitrarily Deeply Bracketed Tag" $
                     comTE
                         "{{{{{a}}}}}"
-                        (tedp . rt $ "a")
+                        (p . p . p $ "a")
                         "{{{{{a}}}}}"
                 , comBat
                     "Minimal Magma Expression"
@@ -897,12 +899,10 @@ parserTests =
                 , testCase "tagExpressionParser ignores line breaks" $
                     comTE
                         ""
-                        ( ( (tedp . rt $ "a")
-                                ∙ ( (tedp . rt $ "b")
-                                        *. (tedp . rt $ "c")
-                                  )
-                          )
-                            *. (tedp . rt $ "d")
+                        ( let underA x = (p . p) "a" ∙ (p . p) x
+                              ab = underA "b"
+                              ac = underA "c"
+                           in (p ab *. p ac) *. (p . p . p) "d"
                         )
                         "a\n{\nb\nc\n}\nd"
                 , testCase "Structural Equality of the Normalized query can be Judged" $
