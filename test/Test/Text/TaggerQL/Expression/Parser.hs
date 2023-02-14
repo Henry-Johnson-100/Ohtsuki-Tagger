@@ -7,27 +7,14 @@ module Test.Text.TaggerQL.Expression.Parser (
     parserTests,
 ) where
 
+import Data.Bifunctor
 import Data.Either (isLeft, isRight)
 import Data.Text (Text)
+import Test.Resources (d, fe, rt, tedp, tle)
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.TaggerQL.Expression.AST
 import Text.TaggerQL.Expression.Parser
-
-fe :: Pattern -> QueryExpression
-fe = QueryExpression . pure . FileLeaf
-
-tle :: TagQueryExpression -> QueryExpression
-tle = QueryExpression . pure . TagLeaf
-
-tedp :: DTerm Pattern -> TagQueryExpression
-tedp = pure
-
-d :: a -> DTerm a
-d = DTerm
-
-rt :: a -> DTerm a
-rt = DMetaTerm
 
 {- |
  Run a series of equality assertions on varying inputs that all produce the same
@@ -47,21 +34,17 @@ battery name failMsg expectedResult samples =
                 tests
             )
 
-distrTEs :: QueryExpression -> QueryExpression
-distrTEs (QueryExpression qe) =
-    QueryExpression
-        . fmap
-            ( \ql -> case ql of
-                FileLeaf pat -> FileLeaf pat
-                TagLeaf te -> TagLeaf . normalize $ te
-            )
+distrTEs :: FreeQueryExpression -> FreeQueryExpression
+distrTEs (FreeQueryExpression qe) =
+    FreeQueryExpression
+        . fmap (bimap (bimap distrTEs normalize) (second normalize))
         $ qe
 
 comBat ::
     HasCallStack =>
     TestName ->
     String ->
-    QueryExpression ->
+    FreeQueryExpression ->
     [Text] ->
     TestTree
 comBat name failMsg expect tsts =
@@ -85,7 +68,7 @@ comBatTE name failMsg expect tsts =
         (Right . distributeK $ expect)
         (fmap distributeK . parseTagExpression <$> tsts)
 
-com :: HasCallStack => String -> QueryExpression -> Text -> Assertion
+com :: HasCallStack => String -> FreeQueryExpression -> Text -> Assertion
 com msg x y =
     assertEqual
         msg
@@ -418,7 +401,7 @@ parserTests =
                 , comBat
                     "Mixed Parenthesized Tag Leaves"
                     "[p.apple (orange banana)] - Should be three leaves in a \
-                    \QueryExpression, not two."
+                    \FreeQueryExpression, not two."
                     ( fe "apple"
                         *. ( (tle . tedp . rt $ "orange")
                                 *. (tle . tedp . rt $ "banana")

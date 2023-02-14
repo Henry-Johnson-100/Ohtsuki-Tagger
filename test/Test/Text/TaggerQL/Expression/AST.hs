@@ -6,30 +6,18 @@ module Test.Text.TaggerQL.Expression.AST (
 ) where
 
 import Control.Monad ((>=>))
-import Data.Coerce (coerce)
 import Data.Maybe (fromJust, isJust)
 import Test.Resources (
     QCDTerm (..),
-    QCFreeCompoundExpression (runQCFreeCompoundExpression),
-    QCFreeMagma (QCFreeMagma),
-    QCPattern (..),
-    QCQueryLeaf (..),
+    QCFreeCompoundExpression,
+    QCFreeMagma,
+    QCFreeQueryExpression (..),
     QCRingExpression (..),
+    castQCTagQueryExpression,
  )
 import Test.Tasty
 import Test.Tasty.QuickCheck
-import Text.TaggerQL.Expression.AST (
-    DTerm,
-    FreeMagma,
-    Pattern,
-    QueryExpression (QueryExpression),
-    QueryLeaf,
-    RingExpression,
-    TagQueryExpression,
-    mapK,
-    mapT,
-    normalize,
- )
+import Text.TaggerQL.Expression.AST
 import Text.TaggerQL.Expression.AST.Editor (
     findQueryExpression,
     findTagExpression,
@@ -249,13 +237,9 @@ astEditorProperties =
                 "QueryExpression"
                 ( do
                     expr <-
-                        QueryExpression
-                            . ( coerce ::
-                                    QCRingExpression QCQueryLeaf ->
-                                    RingExpression QueryLeaf
-                              )
+                        runQCFreeQueryExpression
                             <$> resize 3 arbitrary ::
-                            Gen QueryExpression
+                            Gen FreeQueryExpression
                     n <- suchThat arbitrary (\n' -> isJust $ findQueryExpression n' expr)
                     let exprAt = fromJust $ findQueryExpression n expr
                         replaceResult = withQueryExpression n expr (const exprAt)
@@ -266,23 +250,7 @@ astEditorProperties =
                 "TagExpression"
                 ( do
                     expr <-
-                        ( ( mapK
-                                ( (\(QCFreeMagma x) -> x) ::
-                                    forall b. QCFreeMagma b -> FreeMagma b
-                                )
-                                . mapT
-                                    ( coerce ::
-                                        forall b. QCRingExpression b -> RingExpression b
-                                    )
-                                . runQCFreeCompoundExpression
-                                . fmap (coerce :: QCDTerm QCPattern -> DTerm Pattern)
-                          ) ::
-                            QCFreeCompoundExpression
-                                QCRingExpression
-                                QCFreeMagma
-                                (QCDTerm QCPattern) ->
-                            TagQueryExpression
-                        )
+                        castQCTagQueryExpression
                             <$> resize 3 arbitrary ::
                             Gen TagQueryExpression
                     n <- suchThat arbitrary (\n' -> isJust $ findTagExpression n' expr)
