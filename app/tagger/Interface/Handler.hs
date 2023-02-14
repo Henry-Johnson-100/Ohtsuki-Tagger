@@ -14,7 +14,7 @@ module Interface.Handler (
   taggerEventHandler,
 ) where
 
-import Control.Lens ((%~), (&), (.~), (<|), (?~), (^.), (|>))
+import Control.Lens ((%~), (&), (.~), (<|), (^.), (|>))
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
@@ -488,7 +488,7 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
                       onTagLeaf
                         qe
                         ( \te ->
-                            withTagExpression teIndex te (`onTagRing` f)
+                            withTagExpression teIndex te (mapT f)
                         )
                   )
                   mTeIndex

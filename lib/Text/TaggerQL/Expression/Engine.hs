@@ -45,19 +45,17 @@ module Text.TaggerQL.Expression.Engine (
   insertTagExpression,
 ) where
 
-import Control.Applicative (liftA2, (<|>))
-import Control.Monad (foldM, guard, void, when, (>=>))
+import Control.Applicative ((<|>))
+import Control.Monad (foldM, guard, void, (>=>))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (ExceptT, throwE)
-import Control.Monad.Trans.Reader (ReaderT (runReaderT), ask, asks)
-import Control.Monad.Trans.State.Strict (State, StateT, evalState, execState, get, gets, modify, runState)
-import Data.Bifunctor (Bifunctor (first, second))
+import Data.Bifunctor (Bifunctor (second))
+import qualified Data.Foldable as F
 import Data.Functor (($>))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import qualified Data.List as L
 import Data.Maybe (fromJust)
-import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger (
@@ -72,8 +70,6 @@ import Database.Tagger (
   queryForTagByMetaDescriptorPattern,
  )
 import Database.Tagger.Query (
-  flatQueryForFileByTagDescriptorPattern,
-  flatQueryForFileOnMetaRelationPattern,
   queryForFileByPattern,
   queryForTagBySubTagTriple,
  )
@@ -83,9 +79,22 @@ import Database.Tagger.Type (
   TaggedConnection,
   descriptorId,
  )
-import Lens.Micro (Lens', lens, (%~), (&), (.~), (^.))
+import Lens.Micro (Lens', lens)
 import Text.Parsec.Error (errorMessages, messageString)
-import Text.TaggerQL.Expression.AST
+import Text.TaggerQL.Expression.AST (
+  DTerm (..),
+  FreeCompoundExpression,
+  FreeMagma,
+  Pattern (PatternText, WildCard),
+  QueryExpression (runQueryExpression),
+  QueryLeaf (..),
+  RingExpression,
+  TagQueryExpression,
+  distributeK,
+  evaluateFreeCompoundExpression,
+  evaluateRing,
+  runDTerm,
+ )
 import Text.TaggerQL.Expression.Parser (parseQueryExpression, parseTagExpression)
 import Prelude hiding (lookup, (!!))
 
@@ -150,31 +159,6 @@ exprAt n =
     (\expr mReplace -> maybe expr (\re -> replace n re expr) mReplace)
 
 {- |
- Helper function for defining instances of 'ExpressionIndex.lookup`
--}
-stlookupWith ::
-  (Monad m, Num a, Eq a) =>
-  a ->
-  b ->
-  StateT (a, Maybe b) m b
-stlookupWith n x = do
-  st <- gets fst
-  modify . first $ (1 +)
-  when (st == n) . modify . second . const . Just $ x
-  return x
-
-{- |
- Helper function for defining instance of 'ExpressionIndex.replace`
--}
-stReplaceWith :: (Monad m, Num a, Eq a) => a -> b -> b -> StateT a m b
-stReplaceWith n t e = do
-  st <- get
-  modify (1 +)
-  if st == n
-    then return t
-    else return e
-
-{- |
  Flatten an 'ExpressionIndex` into its respective components along with their indices
  in reverse evaluation order.
 
@@ -233,13 +217,12 @@ queryQueryLeaf c ql = case ql of
 -- A naive query interpreter, with no caching.
 evaluateTagExpression ::
   TaggedConnection ->
-  TagExpression (DTerm Pattern) ->
+  TagQueryExpression ->
   IO (HashSet Tag)
 evaluateTagExpression c =
   fmap
-    ( foldTagExpressionR
-        rightAssocJoinTags
-        . distribute
+    ( evaluateFreeCompoundExpression evaluateRing (F.foldr1 rightAssocJoinTags)
+        . distributeK
     )
     . traverse (queryDTerm c)
  where
@@ -273,17 +256,17 @@ instance Semigroup TagInserter where
 insertTagExpression ::
   TaggedConnection ->
   RecordKey File ->
-  TagExpression Pattern ->
+  FreeCompoundExpression RingExpression FreeMagma Pattern ->
   IO ()
 insertTagExpression c fk =
   void
     . flip runTagInserter Nothing
-    . runDefaultRng
-    . foldTagExpressionL (liftA2 leftAssocInsertTags)
-    . distribute
+    . evaluateFreeCompoundExpression
+      (F.foldl1 (<>))
+      (F.foldl1 leftAssocInsertTags)
+    . distributeK
     . fmap
-      ( DefaultRng
-          . TagInserter
+      ( TagInserter
           . insertTagPattern c fk
       )
  where

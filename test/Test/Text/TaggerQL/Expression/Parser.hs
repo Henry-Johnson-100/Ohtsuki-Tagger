@@ -17,10 +17,10 @@ import Text.TaggerQL.Expression.Parser
 fe :: Pattern -> QueryExpression
 fe = QueryExpression . pure . FileLeaf
 
-tle :: TagExpression (DTerm Pattern) -> QueryExpression
+tle :: TagQueryExpression -> QueryExpression
 tle = QueryExpression . pure . TagLeaf
 
-tedp :: DTerm Pattern -> TagExpression (DTerm Pattern)
+tedp :: DTerm Pattern -> TagQueryExpression
 tedp = pure
 
 d :: a -> DTerm a
@@ -53,7 +53,7 @@ distrTEs (QueryExpression qe) =
         . fmap
             ( \ql -> case ql of
                 FileLeaf pat -> FileLeaf pat
-                TagLeaf te -> TagLeaf . distribute $ te
+                TagLeaf te -> TagLeaf . distributeK $ te
             )
         $ qe
 
@@ -75,15 +75,15 @@ comBatTE ::
     HasCallStack =>
     TestName ->
     String ->
-    TagExpression (DTerm Pattern) ->
+    TagQueryExpression ->
     [Text] ->
     TestTree
 comBatTE name failMsg expect tsts =
     battery
         name
         failMsg
-        (Right . distribute $ expect)
-        (fmap distribute . parseTagExpression <$> tsts)
+        (Right . distributeK $ expect)
+        (fmap distributeK . parseTagExpression <$> tsts)
 
 com :: HasCallStack => String -> QueryExpression -> Text -> Assertion
 com msg x y =
@@ -95,15 +95,15 @@ com msg x y =
         )
         (distrTEs <$> parseQueryExpression y)
 
-comTE :: HasCallStack => String -> TagExpression (DTerm Pattern) -> Text -> Assertion
+comTE :: HasCallStack => String -> TagQueryExpression -> Text -> Assertion
 comTE msg x y =
     assertEqual
         msg
         ( Right
-            . distribute
+            . distributeK
             $ x
         )
-        (distribute <$> parseTagExpression y)
+        (distributeK <$> parseTagExpression y)
 
 parserTests :: TestTree
 parserTests =

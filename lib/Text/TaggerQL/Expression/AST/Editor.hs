@@ -19,9 +19,7 @@ module Text.TaggerQL.Expression.AST.Editor (
   dropLeftRing,
   dropRightRing,
   duplicateRing,
-  onTagRing,
   onTagLeaf,
-  onTagMagma,
   distributeTagExpression,
   (<-#),
 
@@ -37,18 +35,17 @@ import Control.Monad.Trans.Class (MonadTrans (..))
 import Control.Monad.Trans.State.Strict (StateT (..), get, modify)
 import Data.Functor.Identity (runIdentity)
 import Text.TaggerQL.Expression.AST (
-  DTerm,
   FreeCompoundExpression (..),
   FreeMagma,
   Magma (..),
-  Pattern,
   QueryExpression (..),
   QueryLeaf (..),
   RingExpression (..),
   Rng (..),
-  TagExpression (..),
+  TagQueryExpression,
+  evaluateFreeCompoundExpression,
+  evaluateFreeMagma,
   evaluateRing,
-  foldTagExpression,
  )
 
 {- |
@@ -63,13 +60,13 @@ import Text.TaggerQL.Expression.AST (
 -}
 distributeTagExpression ::
   QueryExpression ->
-  TagExpression (DTerm Pattern) ->
+  TagQueryExpression ->
   QueryExpression
 distributeTagExpression (QueryExpression qe) te =
   QueryExpression $ qe >>= distributeUnderQueryLeaf te
  where
   distributeUnderQueryLeaf ::
-    TagExpression (DTerm Pattern) ->
+    TagQueryExpression ->
     QueryLeaf ->
     RingExpression QueryLeaf
   distributeUnderQueryLeaf te' ql = case ql of
@@ -81,7 +78,7 @@ infixl 6 <-#
 {- |
  Infix synonym for 'distributeTagExpression`.
 -}
-(<-#) :: QueryExpression -> TagExpression (DTerm Pattern) -> QueryExpression
+(<-#) :: QueryExpression -> TagQueryExpression -> QueryExpression
 (<-#) = distributeTagExpression
 
 {- |
@@ -95,45 +92,18 @@ flipRingExpression r = case r of
   re :- re' -> re' :- re
 
 {- |
- Manipulate the ring operation of the given 'TagExpression` if it is a ring operation.
--}
-onTagRing ::
-  TagExpression a ->
-  ( forall a1.
-    RingExpression a1 ->
-    RingExpression a1
-  ) ->
-  TagExpression a
-onTagRing (TagExpression te) f = TagExpression $
-  case te of
-    T re -> T . f $ re
-    _notRing -> te
-
-{- |
  Modifies the TagExpression in a TagLeaf of a QueryExpression if it is a ring value
  and not a binary operation.
 -}
 onTagLeaf ::
   QueryExpression ->
-  (forall a. TagExpression a -> TagExpression a) ->
+  (TagQueryExpression -> TagQueryExpression) ->
   QueryExpression
 onTagLeaf qe@(QueryExpression qe') f = case qe' of
   Ring ql -> case ql of
     TagLeaf te -> QueryExpression . Ring . TagLeaf . f $ te
     _notTagLeaf -> qe
   _notRingValue -> qe
-
-onTagMagma ::
-  TagExpression a ->
-  ( forall a1.
-    FreeMagma a1 ->
-    FreeMagma a1
-  ) ->
-  TagExpression a
-onTagMagma (TagExpression te) f = TagExpression $
-  case te of
-    K m -> K . f $ m
-    _notMagma -> te
 
 {- |
  Cycles 'RingExpression` constructors for a single binary expression.
@@ -295,11 +265,14 @@ withQueryExpression n qe f =
     . runQueryExpression
     $ qe
 
-findTagExpression :: Int -> TagExpression a -> Maybe (TagExpression a)
+findTagExpression ::
+  Int ->
+  FreeCompoundExpression RingExpression FreeMagma a ->
+  Maybe (FreeCompoundExpression RingExpression FreeMagma a)
 findTagExpression n =
   runIdentity
     . evalFinder
-    . foldTagExpression (∙)
+    . evaluateFreeCompoundExpression evaluateRing evaluateFreeMagma
     . fmap (mkFinder n . pure)
 
 {- |
@@ -307,12 +280,14 @@ findTagExpression n =
 -}
 withTagExpression ::
   Int ->
-  TagExpression a ->
-  (TagExpression a -> TagExpression a) ->
-  TagExpression a
+  FreeCompoundExpression RingExpression FreeMagma a ->
+  ( FreeCompoundExpression RingExpression FreeMagma a ->
+    FreeCompoundExpression RingExpression FreeMagma a
+  ) ->
+  FreeCompoundExpression RingExpression FreeMagma a
 withTagExpression n te f =
   runIdentity
     . evalEditor
-    . foldTagExpression (∙)
+    . evaluateFreeCompoundExpression evaluateRing evaluateFreeMagma
     . fmap (mkEditor n f . pure)
     $ te

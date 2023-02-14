@@ -2,7 +2,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# HLINT ignore "Use const" #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
@@ -60,7 +59,7 @@ import Text.TaggerQL.Expression.AST (
   QueryLeaf (..),
   RingExpression (..),
   Rng,
-  TagExpression (TagExpression, runTagExpression),
+  TagQueryExpression,
  )
 import Text.TaggerQL.Expression.AST.Editor ((<-#))
 
@@ -100,7 +99,7 @@ myChainl1 p op defP = do
 
 patternTextParser :: Parser Text
 patternTextParser =
-  T.pack <$> many1 ((char '\\' *> anyChar) <|> notRestricted)
+  T.pack <$> many1 (char '\\' *> anyChar <|> notRestricted)
 
 patternParser :: Parser Pattern
 patternParser = Pattern <$> patternTextParser
@@ -121,7 +120,7 @@ explicitSetOpParser = unionParser <|> intersectParser <|> differenceParser
 ichar :: Char -> Parser Char
 ichar c = char (toUpper c) <|> char (toLower c)
 
-restrictedChars :: [Char]
+restrictedChars :: String
 restrictedChars = "(){}!&|. \r\n"
 
 foldBracketedTags :: Magma b => b -> Maybe b -> b
@@ -138,7 +137,7 @@ parseQueryExpression =
       <* spaces
       <* failIfNotConsumed
 
-parseTagExpression :: Text -> Either ParseError (TagExpression (DTerm Pattern))
+parseTagExpression :: Text -> Either ParseError TagQueryExpression
 parseTagExpression =
   parse
     allInput
@@ -166,13 +165,12 @@ queryExpressionParser =
           $ queryTermParser
        )
 
-tagExpressionParser :: Parser (TagExpression (DTerm Pattern))
+tagExpressionParser :: Parser TagQueryExpression
 tagExpressionParser =
   spaces
-    *> ( TagExpression . T
+    *> ( T
           <$> ringExprParser
-            ( runTagExpression
-                . runTagTerm
+            ( runTagTerm
                 <$> tagTermParser
             )
        )
@@ -188,7 +186,7 @@ descriptorPatternParser =
     *> (dTermConstructorParser <*> patternParser)
 
 newtype MinimalTagExpression = MinimalTagExpression
-  {runMinTagExpr :: TagExpression (DTerm Pattern)}
+  {runMinTagExpr :: TagQueryExpression}
   deriving (Show, Eq, Rng, Magma)
 
 minimalTagExpressionParser :: Parser MinimalTagExpression
@@ -202,14 +200,14 @@ minimalTagExpressionParser =
       )
 
 newtype ParenthesizedTag = ParenthesizedTag
-  {runParenTag :: TagExpression (DTerm Pattern)}
+  {runParenTag :: TagQueryExpression}
   deriving (Show, Eq, Rng, Magma)
 
 parenthesizedTagParser :: Parser ParenthesizedTag
 parenthesizedTagParser = ParenthesizedTag <$> parenthesized tagExpressionParser
 
 newtype BracketedTag = BracketedTag
-  {runBracketTag :: TagExpression (DTerm Pattern)}
+  {runBracketTag :: TagQueryExpression}
   deriving (Show, Eq, Rng, Magma)
 
 bracketedTagParser :: Parser BracketedTag
@@ -227,10 +225,10 @@ zeroOrManyBracketedTagParser =
         [] -> Nothing
         _notNull -> Just $ L.foldl1' (∙) xs
     )
-    (many . try $ (spaces *> bracketedTagParser))
+    (many . try $ spaces *> bracketedTagParser)
 
 newtype TagTerm = TagTerm
-  {runTagTerm :: TagExpression (DTerm Pattern)}
+  {runTagTerm :: TagQueryExpression}
   deriving (Show, Eq, Rng, Magma)
 
 tagTermParser :: Parser TagTerm
@@ -308,9 +306,8 @@ parenthesized = between (char '(') (spaces *> char ')')
 
 dTermConstructorParser :: Parser (a -> DTerm a)
 dTermConstructorParser =
-  ( try (ichar 'r' *> char '.' $> DMetaTerm)
-      <|> try (ichar 'd' *> char '.' $> DTerm)
-  )
+  try (ichar 'r' *> char '.' $> DMetaTerm)
+    <|> try (ichar 'd' *> char '.' $> DTerm)
     <|> pure DMetaTerm
 
 ringExprParser :: Parser a -> Parser (RingExpression a)

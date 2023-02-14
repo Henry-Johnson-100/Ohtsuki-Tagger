@@ -1,3 +1,6 @@
+{-# LANGUAGE RankNTypes #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
+
 module Test.Text.TaggerQL.Expression.AST (
     astTests,
 ) where
@@ -7,21 +10,24 @@ import Data.Coerce (coerce)
 import Data.Maybe (fromJust, isJust)
 import Test.Resources (
     QCDTerm (..),
-    QCFreeMagma,
+    QCFreeCompoundExpression (runQCFreeCompoundExpression),
+    QCFreeMagma (QCFreeMagma),
     QCPattern (..),
     QCQueryLeaf (..),
     QCRingExpression (..),
-    QCTagExpression (..),
  )
 import Test.Tasty
 import Test.Tasty.QuickCheck
 import Text.TaggerQL.Expression.AST (
     DTerm,
+    FreeMagma,
     Pattern,
     QueryExpression (QueryExpression),
     QueryLeaf,
     RingExpression,
-    TagExpression,
+    TagQueryExpression,
+    mapK,
+    mapT,
     normalize,
  )
 import Text.TaggerQL.Expression.AST.Editor (
@@ -142,7 +148,7 @@ astProperties =
             [ testProperty
                 "Left Monad Identity"
                 ( do
-                    f <- resize 3 arbitrary :: Gen (Int -> QCTagExpression Int)
+                    f <- (resize 3 arbitrary :: Gen (Int -> QCFreeCompoundExpression QCRingExpression QCFreeMagma Int))
                     i <- arbitrary
                     let testProp = (pure i >>= f) == f i
                     pure testProp
@@ -150,7 +156,7 @@ astProperties =
             , testProperty
                 "Right Monad Identity"
                 ( do
-                    re <- resize 3 arbitrary :: Gen (QCTagExpression Int)
+                    re <- resize 3 arbitrary :: Gen (QCFreeCompoundExpression QCRingExpression QCFreeMagma Int)
                     let testProp = (re >>= pure) == re
                     pure testProp
                 )
@@ -164,7 +170,7 @@ astProperties =
                                 (resize 3 arbitrary)
                                 -- Exclude functions that appear to be identities
                                 (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (QCTagExpression Int))
+                                Gen (Fun Int (QCFreeCompoundExpression QCRingExpression QCFreeMagma Int))
                     f <- genF
                     g <- genF
                     h <- genF
@@ -260,12 +266,25 @@ astEditorProperties =
                 "TagExpression"
                 ( do
                     expr <-
-                        ( (\(QCTagExpression te) -> fmap coerce te) ::
-                            QCTagExpression (QCDTerm QCPattern) ->
-                            TagExpression (DTerm Pattern)
+                        ( ( mapK
+                                ( (\(QCFreeMagma x) -> x) ::
+                                    forall b. QCFreeMagma b -> FreeMagma b
+                                )
+                                . mapT
+                                    ( coerce ::
+                                        forall b. QCRingExpression b -> RingExpression b
+                                    )
+                                . runQCFreeCompoundExpression
+                                . fmap (coerce :: QCDTerm QCPattern -> DTerm Pattern)
+                          ) ::
+                            QCFreeCompoundExpression
+                                QCRingExpression
+                                QCFreeMagma
+                                (QCDTerm QCPattern) ->
+                            TagQueryExpression
                         )
                             <$> resize 3 arbitrary ::
-                            Gen (TagExpression (DTerm Pattern))
+                            Gen TagQueryExpression
                     n <- suchThat arbitrary (\n' -> isJust $ findTagExpression n' expr)
                     let exprAt = fromJust $ findTagExpression n expr
                         replaceResult = normalize $ withTagExpression n expr (const exprAt)

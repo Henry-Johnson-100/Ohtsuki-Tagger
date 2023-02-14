@@ -38,6 +38,7 @@ common tagger-common
                       ,StrictData
                       ,ViewPatterns
                       ,InstanceSigs
+                      ,RankNTypes
 
   other-modules:       Paths_tagger
 

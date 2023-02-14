@@ -32,10 +32,10 @@ queryEngineASTTests c =
 fe :: Pattern -> QueryExpression
 fe = QueryExpression . pure . FileLeaf
 
-tle :: TagExpression (DTerm Pattern) -> QueryExpression
+tle :: TagQueryExpression -> QueryExpression
 tle = QueryExpression . pure . TagLeaf
 
-tedp :: DTerm Pattern -> TagExpression (DTerm Pattern)
+tedp :: DTerm Pattern -> TagQueryExpression
 tedp = pure
 
 d :: a -> DTerm a

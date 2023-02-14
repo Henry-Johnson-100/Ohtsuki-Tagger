@@ -17,10 +17,9 @@ module Data.Event (
   TaggerInfoEvent (..),
 ) where
 
-import Control.Lens (Lens')
 import Data.HashMap.Strict (HashMap)
 import Data.IntMap.Strict (IntMap)
-import Data.Model.Core (DescriptorInfo, Latitude, QueryModel, TaggerModel)
+import Data.Model.Core (DescriptorInfo, Latitude, TaggerModel)
 import Data.Model.Lens (TaggerLens)
 import Data.Model.Shared (Visibility)
 import Data.Model.Shared.Core (TextInput)
@@ -120,9 +119,9 @@ data QueryEvent
     -- The Either spine is matched on its constructor to determine which operand to drop.
     DeleteRingOperand Int (Maybe Int) (Either () ())
   | FlipRingOperands Int (Maybe Int)
-  | LeftDistribute Int (Maybe Int) (TagExpression (DTerm Pattern))
+  | LeftDistribute Int (Maybe Int) TagQueryExpression
   | PlaceQueryExpression Int (Latitude QueryExpression)
-  | PlaceTagExpression Int Int (Latitude (TagExpression (DTerm Pattern)))
+  | PlaceTagExpression Int Int (Latitude TagQueryExpression)
   | PushExpression
   | RunQuery
 

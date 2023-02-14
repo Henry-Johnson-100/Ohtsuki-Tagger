@@ -7,6 +7,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# HLINT ignore "Use newtype instead of data" #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE PatternSynonyms #-}
@@ -34,11 +36,7 @@ module Text.TaggerQL.Expression.AST (
   -- * Language Expressions
   QueryExpression (..),
   QueryLeaf (..),
-  TagExpression (..),
-  foldTagExpressionR,
-  foldTagExpressionL,
-  foldTagExpression,
-  distribute,
+  TagQueryExpression,
   unwrapIdentities,
   normalize,
   RingExpression (..),
@@ -52,6 +50,7 @@ module Text.TaggerQL.Expression.AST (
   mapK,
   distributeK,
   flipTK,
+  unwrapTK,
   evaluateFreeCompoundExpression,
   DefaultRng (..),
 
@@ -59,10 +58,13 @@ module Text.TaggerQL.Expression.AST (
   Rng (..),
   Ring (..),
   Magma (..),
+
+  -- * Future
+  FreeQueryExpression (..),
 ) where
 
 import Control.Monad (ap, join)
-import Data.Bifunctor (bimap)
+import Data.Bifunctor (Bifunctor (..), bimap)
 import qualified Data.Foldable as F
 import Data.Functor.Classes (
   Eq1 (..),
@@ -369,46 +371,14 @@ runDTerm :: DTerm p -> p
 runDTerm (DTerm x) = x
 runDTerm (DMetaTerm x) = x
 
-newtype TagExpression a = TagExpression
-  {runTagExpression :: FreeCompoundExpression RingExpression FreeMagma a}
-  deriving
-    ( Show
-    , Eq
-    , Functor
-    , Applicative
-    , Monad
-    , Foldable
-    , Generic
-    , Traversable
-    , Rng
-    , Magma
-    )
-
-{- |
- Distribute all magma expressions over ring expressions.
- This alters the structure of the 'TagExpression` and if the function used to
- evaluate the expression is not distributive, then this function will effect the
- outcome of that as well.
--}
-distribute :: TagExpression a -> TagExpression a
-distribute = TagExpression . distributeK . runTagExpression
-
 {- |
  Attempts to remove some redundant monadic identities.
 -}
-unwrapIdentities :: TagExpression a -> TagExpression a
-unwrapIdentities (TagExpression te) =
-  TagExpression $
-    case te of
-      FreeCompoundExpression a -> pure a
-      T re -> case re of
-        Ring fce -> fce
-        _notIdentity ->
-          T . fmap (runTagExpression . unwrapIdentities . TagExpression) $ re
-      K fm -> case fm of
-        Magma fce -> fce
-        _notIdentity ->
-          K . fmap (runTagExpression . unwrapIdentities . TagExpression) $ fm
+unwrapIdentities :: TagQueryExpression -> TagQueryExpression
+unwrapIdentities =
+  unwrapTK
+    (\re -> case re of Ring x -> Just x; _ -> Nothing)
+    (\fm -> case fm of Magma x -> Just x; _ -> Nothing)
 
 {- |
  Resolve structural ambiguities and redundancies by distributing the magma expressions
@@ -416,39 +386,8 @@ unwrapIdentities (TagExpression te) =
 
  > normalize = unwrapIdentities . distribute
 -}
-normalize :: TagExpression a -> TagExpression a
-normalize = unwrapIdentities . distribute
-
-{- |
- Evaluate a 'TagExpression` by traversing its structure,
- applying function @f :: a -> a -> a@
- to its magma operations.
--}
-foldTagExpression :: Rng a => (a -> a -> a) -> TagExpression a -> a
-foldTagExpression f = evaluateTagExpressionWithMagma (foldFreeMagma1 f)
-
-{- |
- Evaluate a 'TagExpression` with a right-associative function over its 'FreeMagma`.
--}
-foldTagExpressionR :: Rng a => (a -> a -> a) -> TagExpression a -> a
-foldTagExpressionR f = evaluateTagExpressionWithMagma (F.foldr1 f)
-
-{- |
- Evaluate a 'TagExpression` with a left-associative function over its 'FreeMagma`.
--}
-foldTagExpressionL :: Rng a => (a -> a -> a) -> TagExpression a -> a
-foldTagExpressionL f = evaluateTagExpressionWithMagma (F.foldl1 f)
-
-evaluateTagExpressionWithMagma ::
-  Rng b =>
-  (FreeMagma b -> b) ->
-  TagExpression b ->
-  b
-evaluateTagExpressionWithMagma mf =
-  evaluateFreeCompoundExpression
-    evaluateRing
-    mf
-    . runTagExpression
+normalize :: TagQueryExpression -> TagQueryExpression
+normalize = unwrapIdentities . distributeK
 
 {- |
  Newtype wrapper for a query expression, which is a ring expression of leaves
@@ -464,7 +403,7 @@ newtype QueryExpression = QueryExpression
 -}
 data QueryLeaf
   = FileLeaf Pattern
-  | TagLeaf (TagExpression (DTerm Pattern))
+  | TagLeaf TagQueryExpression
   deriving (Show, Eq)
 
 {- |
@@ -633,23 +572,23 @@ fcebh dc cm cx cy x y = dc $ cm (cx x) (cy y)
 
 mapT ::
   (Functor t, Functor k) =>
-  FreeCompoundExpression t k a ->
   (forall a1. t a1 -> h a1) ->
+  FreeCompoundExpression t k a ->
   FreeCompoundExpression h k a
-mapT fce f = case fce of
+mapT f fce = case fce of
   FreeCompoundExpression a -> FreeCompoundExpression a
-  T t -> T . f . fmap (`mapT` f) $ t
-  K k -> K . fmap (`mapT` f) $ k
+  T t -> T . f . fmap (mapT f) $ t
+  K k -> K . fmap (mapT f) $ k
 
 mapK ::
   (Functor t, Functor k) =>
-  FreeCompoundExpression t k a ->
   (forall a1. k a1 -> h a1) ->
+  FreeCompoundExpression t k a ->
   FreeCompoundExpression t h a
-mapK fce f = case fce of
+mapK f fce = case fce of
   FreeCompoundExpression a -> FreeCompoundExpression a
-  T t -> T . fmap (`mapK` f) $ t
-  K k -> K . f . fmap (`mapK` f) $ k
+  T t -> T . fmap (mapK f) $ t
+  K k -> K . f . fmap (mapK f) $ k
 
 {- |
  Distributes the operation denoted by K over the operation denoted by T.
@@ -842,3 +781,34 @@ class Magma m where
 instance (Magma a, Magma b) => Magma (a, b) where
   (∙) :: (Magma a, Magma b) => (a, b) -> (a, b) -> (a, b)
   x ∙ (a, b) = bimap (∙ a) (∙ b) x
+
+type TagQueryExpression =
+  FreeCompoundExpression RingExpression FreeMagma (DTerm Pattern)
+
+newtype FreeQueryExpression
+  = FreeQueryExpression
+      ( -- a ring expression over a set of files
+        RingExpression
+          ( -- The disjunction between either a termination of the expression
+            -- or a left distribution of a query of type tag over a query of type file.
+            --
+            -- Where either of these options are resolvable to a set of files.
+            Either
+              -- This product type represents the left-distribution of a tag typed
+              -- expression over a FreeQueryExpression.
+              --
+              -- Notice how the TagQueryExpression is a proper subset of a
+              -- FreeQueryExpression in both disjunct cases.
+              ( FreeQueryExpression
+              , TagQueryExpression
+              )
+              ( -- The terminal disjunction between the types of files and tags
+                -- where either option is resolvable to a set of files
+                -- but evaluation is not forced until later.
+                Either
+                  Pattern
+                  TagQueryExpression
+              )
+          )
+      )
+  deriving (Show, Eq, Rng, Generic)
