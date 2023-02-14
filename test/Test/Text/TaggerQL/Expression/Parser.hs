@@ -7,7 +7,6 @@ module Test.Text.TaggerQL.Expression.Parser (
     parserTests,
 ) where
 
-import Data.Bifunctor
 import Data.Either (isLeft, isRight)
 import Data.Text (Text)
 import Test.Resources (d, fe, rt, tedp, tle)
@@ -43,7 +42,7 @@ battery name failMsg expectedResult samples =
 
  But it is important to remember that generally, the expressions described in this
     program are compared with computational equality and not structural equality.
-    Though they can be judged this way, it is difficult and not truly necessary
+    Though they can be judged this way, it is often not truly necessary
     to judge structural equality with these structures.
 -}
 distrTEs ::
@@ -235,8 +234,8 @@ parserTests =
                     , "{apple{red}}"
                     , "{apple {red}}"
                     , "{apple} {red}"
-                    , "(apple) {red}" -- #FIXME
-                    , "({apple}) {red}" -- #FIXME
+                    , "(apple) {red}"
+                    , "({apple}) {red}"
                     ]
                 , testCase "Explicit Set Operator Annihilates Distribution" $
                     com
@@ -282,8 +281,8 @@ parserTests =
                         )
                         [ "{apple{peel}}{red}"
                         , "{{apple}{peel}}{red}"
-                        , "({apple}{peel}){red}" -- #FIXME
-                        , "(apple{peel}){red}" -- #FIXME
+                        , "({apple}{peel}){red}"
+                        , "(apple{peel}){red}"
                         ]
                     ]
                 , comBat
@@ -324,7 +323,7 @@ parserTests =
                     (fe "apple" *. (tle . tedp . rt $ "orange"))
                     [ "p.apple orange"
                     , "p.apple {orange}"
-                    , "(p.apple){orange}" -- #FIXME
+                    , "(p.apple){orange}"
                     , "(p.apple) & {orange}"
                     , "(p.apple)({orange})"
                     , "(p.apple)&({orange})"
@@ -582,8 +581,8 @@ parserTests =
                                 ∙ (tedp . rt $ "red")
                             )
                     )
-                    [ "(apple | orange) {red}" -- #FIXME
-                    , "(apple|orange){red}" -- #FIXME
+                    [ "(apple | orange) {red}"
+                    , "(apple|orange){red}"
                     ]
                 , testCase
                     "Bracketed Expression is \
@@ -637,9 +636,9 @@ parserTests =
                                 ∙ (tedp . rt $ "red")
                             )
                     )
-                    [ "(apple | (orange{peel})) {red}" -- #FIXME
-                    , "(apple | orange {peel}) {red}" -- #FIXME
-                    , "(apple | orange{peel}){red}" -- #FIXME
+                    [ "(apple | (orange{peel})) {red}"
+                    , "(apple | orange {peel}) {red}"
+                    , "(apple | orange{peel}){red}"
                     ]
                 , comBatTE
                     "Associative Right Tag Distribution"
@@ -663,8 +662,8 @@ parserTests =
                         )
                             ∙ (tedp . rt $ "red")
                     )
-                    [ "(apple{peel}){red}" -- #FIXME
-                    , "(apple {peel}) {red}" -- #FIXME
+                    [ "(apple{peel}){red}"
+                    , "(apple {peel}) {red}"
                     , "{apple{peel}}{red}"
                     ]
                 , testGroup
@@ -686,7 +685,7 @@ parserTests =
                                         ∙ rightTE
                                     )
                         )
-                        [ "(apple{skin} | orange{peel}){yellow | red}" -- #FIXME
+                        [ "(apple{skin} | orange{peel}){yellow | red}"
                         , "{apple {skin}} {yellow | red} | {orange {peel}} {yellow | red}"
                         , "{{apple {skin}} {yellow} | {apple {skin}} {red}} | \
                           \{{orange {peel}} {yellow} | {orange {peel}} {red}}"
@@ -702,7 +701,7 @@ parserTests =
                            in tle ((tedp . rt $ "apple") ∙ syr)
                                 +. tle ((tedp . rt $ "orange") ∙ syr)
                         )
-                        [ "(apple | orange) {skin} {yellow | red}" -- #FIXME
+                        [ "(apple | orange) {skin} {yellow | red}"
                         , "apple {skin {yellow | red}} | orange {skin {yellow | red}}"
                         , "{apple{skin{yellow}} | apple{skin{red}}} | \
                           \{orange{skin{yellow}} | orange{skin{red}}}"
@@ -752,7 +751,7 @@ parserTests =
                                     ∙ (tedp . rt $ "cute")
                                 )
                         )
-                        "(o%yui & {%riamu | %sachiko}) {cute}" -- #FIXME
+                        "(o%yui & {%riamu | %sachiko}) {cute}"
                 , testCase "Counter Example From Technote" $
                     com
                         "Should demonstrate left distribution over a tag expression."
