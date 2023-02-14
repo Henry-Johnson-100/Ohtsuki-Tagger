@@ -34,11 +34,23 @@ battery name failMsg expectedResult samples =
                 tests
             )
 
-distrTEs :: FreeQueryExpression -> FreeQueryExpression
-distrTEs (FreeQueryExpression qe) =
-    FreeQueryExpression
-        . fmap (bimap (bimap distrTEs normalize) (second normalize))
-        $ qe
+{- |
+ Normalizes a FreeQueryExpression to its non-recursive representation, making
+ equivalence easier to judge.
+
+ This assumes that there are many equivalent ways to express a FreeQueryExpression.
+ This is of course true for the purposes of this program.
+
+ But it is important to remember that generally, the expressions described in this
+    program are compared with computational equality and not structural equality.
+    Though they can be judged this way, it is difficult and not truly necessary
+    to judge structural equality with these structures.
+-}
+distrTEs ::
+    FreeQueryExpression ->
+    RingExpression
+        (Either Pattern (RingExpression (FreeMagma (DTerm Pattern))))
+distrTEs = fmap (fmap distributeK) . unliftFreeQueryExpression
 
 comBat ::
     HasCallStack =>
@@ -87,6 +99,43 @@ comTE msg x y =
             $ x
         )
         (distributeK <$> parseTagExpression y)
+
+{- |
+ Compare the normalized structure of a given list of queries against a prototype.
+-}
+equivalentQueries :: TestName -> String -> Text -> [Text] -> TestTree
+equivalentQueries testName failMsg prototype eqQs =
+    battery
+        testName
+        failMsg
+        (distrTEs <$> parseQueryExpression prototype)
+        (map (fmap distrTEs . parseQueryExpression) eqQs)
+
+{- |
+ Compare a query prototype to a structure and test equivalent queries.
+-}
+verifyQueryStructure ::
+    TestName ->
+    String ->
+    FreeQueryExpression ->
+    Text ->
+    [Text] ->
+    TestTree
+verifyQueryStructure testName failMsg structure prototype equivalences =
+    testGroup
+        testName
+        [ testCase
+            (testName <> " - Structure")
+            $ com
+                ("Structure Failure - " <> failMsg)
+                structure
+                prototype
+        , equivalentQueries
+            (testName <> " - Equivalent Queries")
+            ("Equivalency Failure - " <> failMsg)
+            prototype
+            equivalences
+        ]
 
 parserTests :: TestTree
 parserTests =
@@ -736,6 +785,69 @@ parserTests =
                                )
                         )
                         "d.o%yui & (r.character ! d.o%yui)"
+                , -- Tests stating that (a p.b){c}{d} = a{c{d}} (p.b c{d})
+                  -- Which is that the operation that is left-distributive (Query -> Tag -> Query)
+                  -- first right-associatively folds all right-operands.
+                  --
+                  -- if this was not the case then the former query would evaluate to
+                  -- a{c}{d} ((p.b d) c{d})
+                  -- which is nonsensical.
+                  --
+                  -- Additionally, the query (a p.b){c{d}} is identical to this case.
+                  -- and that any 1 right operand should maintain its internal association.
+                  testGroup
+                    "Unification"
+                    [ testCase "Unification Distribution is Right-Associative" $
+                        assertEqual
+                            "Textual version of AST test by the same name."
+                            ( fmap (fmap (fmap distributeK)) . Right $
+                                ( Ring . Right $
+                                    ( (tedp . rt $ "a")
+                                        ∙ ( (tedp . rt $ "c")
+                                                ∙ (tedp . rt $ "d")
+                                          )
+                                    )
+                                )
+                                    *. ( (Ring . Left $ "b")
+                                            *. ( Ring . Right $
+                                                    ( (tedp . rt $ "c")
+                                                        ∙ (tedp . rt $ "d")
+                                                    )
+                                               )
+                                       )
+                            )
+                            ( fmap (fmap distributeK)
+                                . unliftFreeQueryExpression
+                                <$> parseQueryExpression
+                                    "(a & p.b){c}{d}"
+                            )
+                    , equivalentQueries
+                        "Unification Distribution Equivalence"
+                        ""
+                        "(a p.b){c}{d}"
+                        ["(a p.b){c{d}}"]
+                    ]
+                , verifyQueryStructure
+                    "Unification"
+                    "Unification is a Right-Associative, Left-Distributive operation."
+                    ( liftSimpleQueryRing $
+                        ( Ring . Right $
+                            ( (tedp . rt $ "a")
+                                ∙ ( (tedp . rt $ "c")
+                                        ∙ (tedp . rt $ "d")
+                                  )
+                            )
+                        )
+                            *. ( (Ring . Left $ "b")
+                                    *. ( Ring . Right $
+                                            ( (tedp . rt $ "c")
+                                                ∙ (tedp . rt $ "d")
+                                            )
+                                       )
+                               )
+                    )
+                    "(a & p.b){c}{d}"
+                    ["(a & p.b){c{d}}"]
                 ]
             , testGroup
                 "Parser Failure Cases"
@@ -775,6 +887,13 @@ parserTests =
                             *. (tedp . rt $ "d")
                         )
                         "a\n{\nb\nc\n}\nd"
+                , testCase "Structural Equality of the Normalized query can be Judged" $
+                    assertBool
+                        "Structural inequality in the normalized structure can\
+                        \ indicate computational non-equivalence."
+                        ( (distrTEs <$> parseQueryExpression "(a b) c")
+                            /= (distrTEs <$> parseQueryExpression "a (b c)")
+                        )
                 ]
             ]
         ]

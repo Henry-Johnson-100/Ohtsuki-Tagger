@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
@@ -14,8 +15,11 @@ import Test.Resources (
     QCFreeQueryExpression (..),
     QCRingExpression (..),
     castQCTagQueryExpression,
+    rt,
+    tedp,
  )
 import Test.Tasty
+import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 import Text.TaggerQL.Expression.AST
 import Text.TaggerQL.Expression.AST.Editor (
@@ -23,6 +27,7 @@ import Text.TaggerQL.Expression.AST.Editor (
     findTagExpression,
     withQueryExpression,
     withTagExpression,
+    (<-#),
  )
 
 astTests :: TestTree
@@ -224,6 +229,63 @@ astProperties =
                                     dt
                     pure testProp
                 )
+            ]
+        , testGroup
+            "FreeQueryExpression Properties"
+            [ testCase "Unification Distribution is Right-Associative" $
+                assertEqual
+                    "(a & p.b){c}{d} = a{c{d}} & (p.b & c{d})"
+                    ( ( Ring . Right $
+                            ( (tedp . rt $ "a")
+                                ∙ ( (tedp . rt $ "c")
+                                        ∙ (tedp . rt $ "d")
+                                  )
+                            )
+                      )
+                        *. ( (Ring . Left $ "b")
+                                *. ( Ring . Right $
+                                        ( (tedp . rt $ "c")
+                                            ∙ (tedp . rt $ "d")
+                                        )
+                                   )
+                           )
+                    )
+                    ( unliftFreeQueryExpression $
+                        ( liftSimpleQueryRing
+                            ( (pure . Right . tedp . rt $ "a")
+                                *. (pure . Left $ "b")
+                            )
+                            <-# (tedp . rt $ "c")
+                        )
+                            <-# (tedp . rt $ "d")
+                    )
+            , testCase "Unification Distribution is Associatively Right-Associative" $
+                assertEqual
+                    "(a & p.b){c{d}} = a{c{d}} & (p.b & {c{d}})"
+                    ( ( Ring . Right $
+                            ( (tedp . rt $ "a")
+                                ∙ ( (tedp . rt $ "c")
+                                        ∙ (tedp . rt $ "d")
+                                  )
+                            )
+                      )
+                        *. ( (Ring . Left $ "b")
+                                *. ( Ring . Right $
+                                        ( (tedp . rt $ "c")
+                                            ∙ (tedp . rt $ "d")
+                                        )
+                                   )
+                           )
+                    )
+                    ( unliftFreeQueryExpression $
+                        liftSimpleQueryRing
+                            ( (pure . Right . tedp . rt $ "a")
+                                *. (pure . Left $ "b")
+                            )
+                            <-# ( (tedp . rt $ "c")
+                                    ∙ (tedp . rt $ "d")
+                                )
+                    )
             ]
         ]
 
