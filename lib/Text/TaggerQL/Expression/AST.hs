@@ -1,22 +1,15 @@
 {-# HLINT ignore "Use lambda-case" #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# HLINT ignore "Redundant if" #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
-{-# HLINT ignore "Use newtype instead of data" #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {- |
@@ -82,6 +75,13 @@ import GHC.Generics (Generic)
 
 {- |
  A data type representing an expression of any Ring.
+
+ This type is just an edge-labeled, unrooted binary tree.
+
+ Each node is an operand and each edge is an operation.
+
+ The edges are differentiable as addition, multiplication, and subtraction operations
+ respectively.
 -}
 data RingExpression a
   = Ring a
@@ -212,6 +212,9 @@ infix 9 :∙
 {- |
  Generalizes a binary operation over type 'a`. Where evaluation is typically
  accomplished by using this structure's 'Foldable` instance.
+
+ This type is just an unrooted binary tree where each node is an operand and each edge
+ is an operation.
 -}
 data FreeMagma a
   = Magma a
@@ -385,23 +388,6 @@ unwrapIdentities =
 -}
 normalize :: TagQueryExpression -> TagQueryExpression
 normalize = unwrapIdentities . T . fmap (K . fmap pure) . distributeK
-
-{- |
- Newtype wrapper for a query expression, which is a ring expression of leaves
- where each leaf is resolvable to a set of files.
--}
-newtype QueryExpression = QueryExpression
-  {runQueryExpression :: RingExpression QueryLeaf}
-  deriving (Show, Eq, Rng)
-
-{- |
- A disjunction between filepath patterns and tag expressions that are resolvable
- to an expression of file sets.
--}
-data QueryLeaf
-  = FileLeaf Pattern
-  | TagLeaf TagQueryExpression
-  deriving (Show, Eq)
 
 {- |
  A free data structure representing expressions of different structures of the same
@@ -749,15 +735,6 @@ instance Ring Int where
   mid :: Int
   mid = 1
 
-instance Ring QueryExpression where
-  -- The set of all files
-  mid :: QueryExpression
-  mid = QueryExpression . Ring . FileLeaf $ WildCard
-
-  -- The set of all files minus itself, an empty set.
-  aid :: QueryExpression
-  aid = mid -. mid
-
 infix 9 ∙
 
 {- |
@@ -771,6 +748,9 @@ instance (Magma a, Magma b) => Magma (a, b) where
   (∙) :: (Magma a, Magma b) => (a, b) -> (a, b) -> (a, b)
   x ∙ (a, b) = bimap (∙ a) (∙ b) x
 
+{- |
+ > FreeCompoundExpression RingExpression FreeMagma (DTerm Pattern)
+-}
 type TagQueryExpression =
   FreeCompoundExpression RingExpression FreeMagma (DTerm Pattern)
 
