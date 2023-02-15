@@ -210,7 +210,7 @@ instance
   arbitrary = liftArbitrary arbitrary
 
 newtype QCFreeQueryExpression = QCFreeQueryExpression
-  {runQCFreeQueryExpression :: FreeQueryExpression}
+  {runQCFreeQueryExpression :: QueryExpression}
   deriving (Show, Eq, Rng, Generic)
 
 instance Arbitrary QCFreeQueryExpression where
@@ -229,7 +229,7 @@ instance Arbitrary QCFreeQueryExpression where
             )
           <$> arbitrary
       | otherwise =
-        FreeQueryExpression . runQCLabeledFreeTree
+        QueryExpression . runQCLabeledFreeTree
           <$> liftArbitrary
             ( liftArbitrary2
                 ((,) <$> s (n `div` 2) <*> fmap castQCTagQueryExpression arbitrary)
@@ -240,13 +240,13 @@ instance Arbitrary QCFreeQueryExpression where
                 )
             )
 
-fe :: Pattern -> FreeQueryExpression
+fe :: Pattern -> QueryExpression
 fe = liftSimpleQueryRing . pure . Left
 
-tle :: TagQuery -> FreeQueryExpression
+tle :: TagQueryExpression -> QueryExpression
 tle = liftSimpleQueryRing . pure . Right
 
-tedp :: DTerm Pattern -> TagQuery
+tedp :: DTerm Pattern -> TagQueryExpression
 tedp = pure
 
 d :: a -> DTerm a

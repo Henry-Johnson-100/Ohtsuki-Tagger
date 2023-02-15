@@ -128,7 +128,7 @@ createFileSelectionModel =
 
 data QueryModel = QueryModel
   { _queryInput :: TextInput
-  , _queryExpression :: FreeQueryExpression
+  , _queryExpression :: QueryExpression
   }
   deriving (Show, Eq)
 

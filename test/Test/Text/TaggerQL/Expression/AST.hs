@@ -222,7 +222,7 @@ astProperties =
                 )
             ]
         , testGroup
-            "FreeQueryExpression Properties"
+            "QueryExpression Properties"
             [ testCase "Unification Distribution is Right-Associative" $
                 assertEqual
                     "(a & p.b){c}{d} = a{c{d}} & (p.b & c{d})"
@@ -241,7 +241,7 @@ astProperties =
                                    )
                            )
                     )
-                    ( unliftFreeQueryExpression $
+                    ( unliftQueryExpression $
                         ( liftSimpleQueryRing
                             ( (pure . Right . tedp . rt $ "a")
                                 *. (pure . Left $ "b")
@@ -268,7 +268,7 @@ astProperties =
                                    )
                            )
                     )
-                    ( unliftFreeQueryExpression $
+                    ( unliftQueryExpression $
                         liftSimpleQueryRing
                             ( (pure . Right . tedp . rt $ "a")
                                 *. (pure . Left $ "b")
@@ -292,7 +292,7 @@ astEditorProperties =
                     expr <-
                         runQCFreeQueryExpression
                             <$> resize 3 arbitrary ::
-                            Gen FreeQueryExpression
+                            Gen QueryExpression
                     n <- suchThat arbitrary (\n' -> isJust $ findQueryExpression n' expr)
                     let exprAt = fromJust $ findQueryExpression n expr
                         replaceResult = withQueryExpression n expr (const exprAt)
@@ -305,7 +305,7 @@ astEditorProperties =
                     expr <-
                         castQCTagQueryExpression
                             <$> resize 3 arbitrary ::
-                            Gen TagQuery
+                            Gen TagQueryExpression
                     n <- suchThat arbitrary (\n' -> isJust $ findTagExpression n' expr)
                     let exprAt = fromJust $ findTagExpression n expr
                         replaceResult = normalize $ withTagExpression n expr (const exprAt)

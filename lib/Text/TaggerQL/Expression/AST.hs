@@ -29,9 +29,14 @@ module Text.TaggerQL.Expression.AST (
   runDTerm,
 
   -- * Language Expressions
-  TagQuery,
+  TagQueryExpression,
   unwrapIdentities,
   normalize,
+  QueryExpression (..),
+  liftSimpleQueryRing,
+  unliftQueryExpression,
+  RingExpression,
+  MagmaExpression,
   FreeDisjunctMonad (..),
   mapT,
   mapK,
@@ -40,11 +45,6 @@ module Text.TaggerQL.Expression.AST (
   flipTK,
   unwrapTK,
   evaluateFreeCompoundExpression,
-  FreeQueryExpression (..),
-  liftSimpleQueryRing,
-  unliftFreeQueryExpression,
-  RingExpression,
-  MagmaExpression,
   LabeledFreeTree (..),
   fold1WithEdge,
   fold1WithEdgeMl,
@@ -96,7 +96,7 @@ type MagmaExpression = LabeledFreeTree ()
 {- |
  > FreeDisjunctMonad RingExpression MagmaExpression (DTerm Pattern)
 -}
-type TagQuery =
+type TagQueryExpression =
   FreeDisjunctMonad RingExpression MagmaExpression (DTerm Pattern)
 
 {- |
@@ -403,7 +403,7 @@ runDTerm (DMetaTerm x) = x
 {- |
  Attempts to remove some redundant monadic identities.
 -}
-unwrapIdentities :: TagQuery -> TagQuery
+unwrapIdentities :: TagQueryExpression -> TagQueryExpression
 unwrapIdentities =
   unwrapTK
     (\re -> case re of Node x -> Just x; _ -> Nothing)
@@ -415,7 +415,7 @@ unwrapIdentities =
 
  > normalize = unwrapIdentities . distributeK
 -}
-normalize :: TagQuery -> TagQuery
+normalize :: TagQueryExpression -> TagQueryExpression
 normalize = unwrapIdentities . T . fmap (K . fmap pure) . distributeK
 
 {- |
@@ -797,8 +797,8 @@ instance (Magma a, Magma b) => Magma (a, b) where
   (∙) :: (Magma a, Magma b) => (a, b) -> (a, b) -> (a, b)
   x ∙ (a, b) = bimap (∙ a) (∙ b) x
 
-newtype FreeQueryExpression = FreeQueryExpression
-  { runFreeQueryExpression ::
+newtype QueryExpression = QueryExpression
+  { runQueryExpression ::
       -- a ring expression over a set of files
       LabeledFreeTree
         RingOperation
@@ -808,11 +808,11 @@ newtype FreeQueryExpression = FreeQueryExpression
           -- Where either of these options are resolvable to a set of files.
           Either
             -- This product type represents the left-distribution of a tag typed
-            -- expression over a FreeQueryExpression.
+            -- expression over a QueryExpression.
             --
-            -- Notice how the TagQuery is a proper subset of a
-            -- FreeQueryExpression in both disjunct cases.
-            ( FreeQueryExpression
+            -- Notice how the TagQueryExpression is a proper subset of a
+            -- QueryExpression in both disjunct cases.
+            ( QueryExpression
             , FreeDisjunctMonad
                 (LabeledFreeTree RingOperation)
                 (LabeledFreeTree ())
@@ -833,31 +833,31 @@ newtype FreeQueryExpression = FreeQueryExpression
   }
   deriving (Show, Eq, Rng, Generic)
 
-instance Ring FreeQueryExpression where
-  aid :: FreeQueryExpression
-  aid = FreeQueryExpression . Node . Right . Left $ WildCard
-  mid :: FreeQueryExpression
+instance Ring QueryExpression where
+  aid :: QueryExpression
+  aid = QueryExpression . Node . Right . Left $ WildCard
+  mid :: QueryExpression
   mid = aid -. aid
 
 {- |
  To make non-recursive query expressions easier to build.
 -}
 liftSimpleQueryRing ::
-  RingExpression (Either Pattern TagQuery) ->
-  FreeQueryExpression
-liftSimpleQueryRing = FreeQueryExpression . fmap Right
+  RingExpression (Either Pattern TagQueryExpression) ->
+  QueryExpression
+liftSimpleQueryRing = QueryExpression . fmap Right
 
 {- |
- Resolves the left product by binding the 'FreeQueryExpression` ring
+ Resolves the left product by binding the 'QueryExpression` ring
  to a left distribution. Expanding terms in place and yielding a non-recursive
  type.
 -}
-unliftFreeQueryExpression ::
-  FreeQueryExpression ->
-  RingExpression (Either Pattern TagQuery)
-unliftFreeQueryExpression = either unify pure <=< runFreeQueryExpression
+unliftQueryExpression ::
+  QueryExpression ->
+  RingExpression (Either Pattern TagQueryExpression)
+unliftQueryExpression = either unify pure <=< runQueryExpression
  where
-  unify (FreeQueryExpression fqe, tqe) =
+  unify (QueryExpression fqe, tqe) =
     fqe
       >>= either
         (unify . second (∙ tqe))

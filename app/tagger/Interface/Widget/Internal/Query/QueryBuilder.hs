@@ -62,7 +62,7 @@ makeLensesWith abbreviatedFields ''ExpressionWidgetState
 queryEditorTextFieldKey :: Text
 queryEditorTextFieldKey = "queryEditorTextField"
 
-expressionWidget :: FreeQueryExpression -> TaggerWidget
+expressionWidget :: QueryExpression -> TaggerWidget
 expressionWidget =
   box_
     [ alignCenter
@@ -78,9 +78,9 @@ expressionWidget =
     . buildExpressionWidget
 
 buildExpressionWidget ::
-  FreeQueryExpression ->
+  QueryExpression ->
   RingExpression QueryExpressionWidgetBuilder
-buildExpressionWidget (FreeQueryExpression fqe) = do
+buildExpressionWidget (QueryExpression fqe) = do
   fqe' <- fqe
   either
     ( \(x, y) ->
@@ -116,13 +116,13 @@ newtype TagExpressionWidgetBuilderG m a
 type TagExpressionWidgetBuilder =
   TagExpressionWidgetBuilderG
     (CounterT Identity)
-    (ExpressionWidgetState TagQuery)
+    (ExpressionWidgetState TagQueryExpression)
 
 instance
   Rng
     ( TagExpressionWidgetBuilderG
         (CounterT Identity)
-        (ExpressionWidgetState TagQuery)
+        (ExpressionWidgetState TagQueryExpression)
     )
   where
   (+.) x y = tewbBinHelper (+.) (tewbRngWidget "|") x y <&> nestedOperand .~ True
@@ -175,7 +175,7 @@ instance
   Magma
     ( TagExpressionWidgetBuilderG
         (CounterT Identity)
-        (ExpressionWidgetState TagQuery)
+        (ExpressionWidgetState TagQueryExpression)
     )
   where
   (∙) = tewbBinHelper (∙) f
@@ -251,7 +251,7 @@ tewbLeaf d = TagExpressionWidgetBuilderG $ do
                   placeTeDropTargetG
                     li
                     i
-                    (pure :: DTerm Pattern -> TagQuery)
+                    (pure :: DTerm Pattern -> TagQueryExpression)
                     [border 1 yuiBlue]
                 teDT =
                   placeTeDropTargetG
@@ -264,7 +264,7 @@ tewbLeaf d = TagExpressionWidgetBuilderG $ do
                   leftDistributeDropTarget
                     li
                     (Just i)
-                    (pure :: DTerm Pattern -> TagQuery)
+                    (pure :: DTerm Pattern -> TagQueryExpression)
                     [border 1 yuiBlue]
              in dropTargetHGrid (dTermDT .<< teDT) (teDistDT . dTermDistDT)
           ]
@@ -275,7 +275,7 @@ placeTeDropTargetG ::
   Int ->
   (a -> b) ->
   [StyleState] ->
-  (b -> Latitude TagQuery) ->
+  (b -> Latitude TagQueryExpression) ->
   WidgetNode s TaggerEvent ->
   WidgetNode s TaggerEvent
 placeTeDropTargetG leafIndex teIndex toTe sts c =
@@ -287,7 +287,7 @@ leftDistributeDropTarget ::
   (Eq a, Typeable a) =>
   Int ->
   Maybe Int ->
-  (a -> TagQuery) ->
+  (a -> TagQueryExpression) ->
   [StyleState] ->
   WidgetNode s TaggerEvent ->
   WidgetNode s TaggerEvent
@@ -325,13 +325,13 @@ newtype QueryExpressionWidgetBuilderG m a
   deriving (Functor, Applicative, Monad, MonadTrans)
 
 type QueryExpressionWidgetBuilder =
-  QueryExpressionWidgetBuilderG Identity (ExpressionWidgetState FreeQueryExpression)
+  QueryExpressionWidgetBuilderG Identity (ExpressionWidgetState QueryExpression)
 
 instance
   Rng
     ( QueryExpressionWidgetBuilderG
         Identity
-        (ExpressionWidgetState FreeQueryExpression)
+        (ExpressionWidgetState QueryExpression)
     )
   where
   (+.) = qewbRngHelper (+.) "|"
@@ -398,9 +398,9 @@ qewbRngHelper
      where
       mkParens w = withStyleBasic [border 1 black, padding 3] w
 
-qewbLeaf :: Either Pattern TagQuery -> QueryExpressionWidgetBuilder
+qewbLeaf :: Either Pattern TagQueryExpression -> QueryExpressionWidgetBuilder
 qewbLeaf ql =
-  let qe = FreeQueryExpression . pure . pure $ ql
+  let qe = QueryExpression . pure . pure $ ql
    in case ql of
         Left pat -> QueryExpressionWidgetBuilderG $ do
           _count <- getIncr
@@ -418,7 +418,7 @@ qewbLeaf ql =
               . (\(TagExpressionWidgetBuilderG x) -> x)
               . buildTagExpressionWidget
               $ te ::
-              CounterT Identity (ExpressionWidgetState TagQuery)
+              CounterT Identity (ExpressionWidgetState TagQueryExpression)
           incr
           pure $
             ExpressionWidgetState

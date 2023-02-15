@@ -36,10 +36,10 @@ battery name failMsg expectedResult samples =
             )
 
 {- |
- Normalizes a FreeQueryExpression to its non-recursive representation, making
+ Normalizes a QueryExpression to its non-recursive representation, making
  equivalence easier to judge.
 
- This assumes that there are many equivalent ways to express a FreeQueryExpression.
+ This assumes that there are many equivalent ways to express a QueryExpression.
  This is of course true for the purposes of this program.
 
  But it is important to remember that generally, the expressions described in this
@@ -48,16 +48,16 @@ battery name failMsg expectedResult samples =
     to judge structural equality with these structures.
 -}
 distrTEs ::
-    FreeQueryExpression ->
+    QueryExpression ->
     RingExpression
         (Either Pattern (RingExpression (MagmaExpression (DTerm Pattern))))
-distrTEs = fmap (fmap distributeK) . unliftFreeQueryExpression
+distrTEs = fmap (fmap distributeK) . unliftQueryExpression
 
 comBatTE ::
     HasCallStack =>
     TestName ->
     String ->
-    TagQuery ->
+    TagQueryExpression ->
     [Text] ->
     TestTree
 comBatTE name failMsg expect tsts =
@@ -448,7 +448,7 @@ parserTests =
                 , verifyQueryStructure
                     "Mixed Parenthesized Tag Leaves"
                     "[p.apple (orange banana)] - Should be three leaves in a \
-                    \FreeQueryExpression, not two."
+                    \QueryExpression, not two."
                     ( let mk = p . p . p . p . p
                        in (p . l) "apple" *. (mk "orange" *. mk "banana")
                     )
@@ -814,7 +814,7 @@ parserTests =
                                        )
                             )
                             ( fmap (fmap distributeK)
-                                . unliftFreeQueryExpression
+                                . unliftQueryExpression
                                 <$> parseQueryExpression
                                     "(a & p.b){c}{d}"
                             )

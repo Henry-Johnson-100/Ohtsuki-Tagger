@@ -115,7 +115,7 @@ restrictedChars = "(){}!&|. \r\n"
 foldBracketedTags :: Magma b => b -> Maybe b -> b
 foldBracketedTags overTerm = maybe overTerm (overTerm ∙)
 
-parseQueryExpression :: Text -> Either ParseError FreeQueryExpression
+parseQueryExpression :: Text -> Either ParseError QueryExpression
 parseQueryExpression =
   parse
     allInput
@@ -126,7 +126,7 @@ parseQueryExpression =
       <* spaces
       <* failIfNotConsumed
 
-parseTagExpression :: Text -> Either ParseError TagQuery
+parseTagExpression :: Text -> Either ParseError TagQueryExpression
 parseTagExpression =
   parse
     allInput
@@ -145,16 +145,16 @@ failIfNotConsumed = do
       <> T.unpack remains
       <> "\""
 
-queryExpressionParser :: Parser FreeQueryExpression
+queryExpressionParser :: Parser QueryExpression
 queryExpressionParser =
   spaces
-    *> ( fmap (FreeQueryExpression . (>>= runFreeQueryExpression))
+    *> ( fmap (QueryExpression . (>>= runQueryExpression))
           . ringExprParser
           . fmap runQueryTerm
           $ queryTermParser
        )
 
-tagExpressionParser :: Parser TagQuery
+tagExpressionParser :: Parser TagQueryExpression
 tagExpressionParser =
   spaces
     *> ( T
@@ -164,7 +164,7 @@ tagExpressionParser =
             )
        )
 
-filePathParser :: Parser (Either Pattern TagQuery)
+filePathParser :: Parser (Either Pattern TagQueryExpression)
 filePathParser =
   spaces
     *> (Left <$> (ichar 'p' *> char '.' *> patternParser))
@@ -175,7 +175,7 @@ descriptorPatternParser =
     *> (dTermConstructorParser <*> patternParser)
 
 newtype MinimalTagExpression = MinimalTagExpression
-  {runMinTagExpr :: TagQuery}
+  {runMinTagExpr :: TagQueryExpression}
   deriving (Show, Eq, Rng, Magma)
 
 minimalTagExpressionParser :: Parser MinimalTagExpression
@@ -189,14 +189,14 @@ minimalTagExpressionParser =
       )
 
 newtype ParenthesizedTag = ParenthesizedTag
-  {runParenTag :: TagQuery}
+  {runParenTag :: TagQueryExpression}
   deriving (Show, Eq, Rng, Magma)
 
 parenthesizedTagParser :: Parser ParenthesizedTag
 parenthesizedTagParser = ParenthesizedTag <$> parenthesized tagExpressionParser
 
 newtype BracketedTag = BracketedTag
-  {runBracketTag :: TagQuery}
+  {runBracketTag :: TagQueryExpression}
   deriving (Show, Eq, Rng, Magma)
 
 bracketedTagParser :: Parser BracketedTag
@@ -217,7 +217,7 @@ zeroOrManyBracketedTagParser =
     (many . try $ spaces *> bracketedTagParser)
 
 newtype TagTerm = TagTerm
-  {runTagTerm :: TagQuery}
+  {runTagTerm :: TagQueryExpression}
   deriving (Show, Eq, Rng, Magma)
 
 tagTermParser :: Parser TagTerm
@@ -243,14 +243,14 @@ tagTermParser =
   minimalTagTerm = TagTerm . runMinTagExpr <$> minimalTagExpressionParser
 
 newtype ParenthesizedQuery = ParenthesizedQuery
-  {runParenQuery :: FreeQueryExpression}
+  {runParenQuery :: QueryExpression}
   deriving (Show, Eq, Rng)
 
 parenthesizedQueryParser :: Parser ParenthesizedQuery
 parenthesizedQueryParser =
   ParenthesizedQuery <$> parenthesized queryExpressionParser
 
-newtype QueryTerm = QueryTerm {runQueryTerm :: FreeQueryExpression}
+newtype QueryTerm = QueryTerm {runQueryTerm :: QueryExpression}
   deriving (Show, Eq, Rng)
 
 queryTermParser :: Parser QueryTerm
@@ -266,7 +266,7 @@ queryTermParser =
     QueryTerm
       <$> ( ( \(ParenthesizedQuery q) ->
                 maybe q ((q <-#) . runBracketTag) ::
-                  Maybe BracketedTag -> FreeQueryExpression
+                  Maybe BracketedTag -> QueryExpression
             )
               <$> parenthesizedQueryParser <*> zeroOrManyBracketedTagParser
           )

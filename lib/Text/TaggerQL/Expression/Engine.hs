@@ -114,13 +114,13 @@ toFileSet conn =
 
 queryQueryExpression ::
   TaggedConnection ->
-  FreeQueryExpression ->
+  QueryExpression ->
   IO (HashSet File)
 queryQueryExpression c =
   fmap evaluateRingExpression
     . resolveTagFileDisjunction
     <=< queryTerms
-      . unliftFreeQueryExpression
+      . unliftQueryExpression
  where
   resolveTagFileDisjunction = traverse (either pure (toFileSet c))
 
@@ -136,7 +136,7 @@ queryFilePattern c pat =
 -- A naive query interpreter, with no caching.
 evaluateTagExpression ::
   TaggedConnection ->
-  TagQuery ->
+  TagQueryExpression ->
   IO (HashSet Tag)
 evaluateTagExpression c =
   fmap

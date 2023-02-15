@@ -47,17 +47,17 @@ import Text.TaggerQL.Expression.AST
  > (a){b}
 -}
 distributeTagExpression ::
-  FreeQueryExpression ->
-  TagQuery ->
-  FreeQueryExpression
-distributeTagExpression fqe tqe = FreeQueryExpression . Node . Left $ (fqe, tqe)
+  QueryExpression ->
+  TagQueryExpression ->
+  QueryExpression
+distributeTagExpression fqe tqe = QueryExpression . Node . Left $ (fqe, tqe)
 
 infixl 6 <-#
 
 {- |
  Infix synonym for 'distributeTagExpression`.
 -}
-(<-#) :: FreeQueryExpression -> TagQuery -> FreeQueryExpression
+(<-#) :: QueryExpression -> TagQueryExpression -> QueryExpression
 (<-#) = distributeTagExpression
 
 {- |
@@ -65,11 +65,11 @@ infixl 6 <-#
  and not a binary operation.
 -}
 onTagLeaf ::
-  FreeQueryExpression ->
-  (TagQuery -> TagQuery) ->
-  FreeQueryExpression
-onTagLeaf fqe'@(FreeQueryExpression fqe) f = case fqe of
-  Node e -> FreeQueryExpression . Node $ bimap (second f) (second f) e
+  QueryExpression ->
+  (TagQueryExpression -> TagQueryExpression) ->
+  QueryExpression
+onTagLeaf fqe'@(QueryExpression fqe) f = case fqe of
+  Node e -> QueryExpression . Node $ bimap (second f) (second f) e
   _notNode -> fqe'
 
 {- |
@@ -229,7 +229,7 @@ bindEditor (EditorT x) f = EditorT $ do
   (r, n, g) <- (\(EditorT z) -> z) . f $ x'
   pure (r, n, g)
 
-findQueryExpression :: Int -> FreeQueryExpression -> Maybe FreeQueryExpression
+findQueryExpression :: Int -> QueryExpression -> Maybe QueryExpression
 findQueryExpression n =
   runIdentity
     . evalFinder
@@ -244,20 +244,20 @@ findQueryExpression n =
                 mkFinder n . (<-# y)
           )
           ( either
-              (mkFinder n . FreeQueryExpression . Node . Right . Left)
-              (mkFinder n . FreeQueryExpression . Node . Right . Right)
+              (mkFinder n . QueryExpression . Node . Right . Left)
+              (mkFinder n . QueryExpression . Node . Right . Right)
           )
       )
-      . runFreeQueryExpression
+      . runQueryExpression
 
 {- |
  Modify the 'QueryExpression` at the given index.
 -}
 withQueryExpression ::
   Int ->
-  FreeQueryExpression ->
-  (FreeQueryExpression -> FreeQueryExpression) ->
-  FreeQueryExpression
+  QueryExpression ->
+  (QueryExpression -> QueryExpression) ->
+  QueryExpression
 withQueryExpression n qe f =
   runIdentity
     . evalEditor
@@ -273,11 +273,11 @@ withQueryExpression n qe f =
                 mkEditor n f . (<-# y)
           )
           ( either
-              (mkEditor n f . FreeQueryExpression . Node . Right . Left)
-              (mkEditor n f . FreeQueryExpression . Node . Right . Right)
+              (mkEditor n f . QueryExpression . Node . Right . Left)
+              (mkEditor n f . QueryExpression . Node . Right . Right)
           )
       )
-      . runFreeQueryExpression
+      . runQueryExpression
 
 findTagExpression ::
   Int ->

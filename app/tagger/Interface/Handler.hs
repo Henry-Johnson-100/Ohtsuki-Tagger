@@ -376,9 +376,9 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
               ( case mi of
                   Nothing -> (<-# te)
                   Just n ->
-                    FreeQueryExpression
+                    QueryExpression
                       . fmap (second (second (flip (withTagExpression n) (∙ te))))
-                      . runFreeQueryExpression
+                      . runQueryExpression
               )
       ]
     PlaceQueryExpression n l ->
@@ -397,7 +397,7 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
           model & fileSelectionModel . queryModel . expression
             %~ flip
               (withQueryExpression li)
-              ( FreeQueryExpression
+              ( QueryExpression
                   . fmap
                     ( second
                         ( second
@@ -411,7 +411,7 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
                             )
                         )
                     )
-                  . runFreeQueryExpression
+                  . runQueryExpression
               )
       ]
     PushExpression ->
@@ -473,7 +473,7 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
             (withQueryExpression qeIndex)
             ( \qe ->
                 maybe
-                  (FreeQueryExpression . f . runFreeQueryExpression $ qe)
+                  (QueryExpression . f . runQueryExpression $ qe)
                   ( \teIndex ->
                       onTagLeaf
                         qe
