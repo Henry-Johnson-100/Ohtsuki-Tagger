@@ -32,9 +32,10 @@ module Text.TaggerQL.Expression.AST (
   TagQuery,
   unwrapIdentities,
   normalize,
-  FreeCompoundExpression (..),
+  FreeDisjunctMonad (..),
   mapT,
   mapK,
+  distributeT,
   distributeK,
   flipTK,
   unwrapTK,
@@ -93,10 +94,10 @@ type RingExpression = LabeledFreeTree RingOperation
 type MagmaExpression = LabeledFreeTree ()
 
 {- |
- > FreeCompoundExpression RingExpression MagmaExpression (DTerm Pattern)
+ > FreeDisjunctMonad RingExpression MagmaExpression (DTerm Pattern)
 -}
 type TagQuery =
-  FreeCompoundExpression RingExpression MagmaExpression (DTerm Pattern)
+  FreeDisjunctMonad RingExpression MagmaExpression (DTerm Pattern)
 
 {- |
  A type detailing how set-like collections are to be combined.
@@ -412,55 +413,71 @@ unwrapIdentities =
  Resolve structural ambiguities and redundancies by distributing the magma expressions
  throughout and unwrapping any redundant monadic identities.
 
- > normalize = unwrapIdentities . distribute
+ > normalize = unwrapIdentities . distributeK
 -}
 normalize :: TagQuery -> TagQuery
 normalize = unwrapIdentities . T . fmap (K . fmap pure) . distributeK
 
 {- |
- A free data structure representing expressions of different structures of the same
- type.
+ A free monad with disjunct constructors for Functors t and k. Meaning that the
+ structure can be interspersed with either type throughout.
 
- This is a free type in that the only constraint it fulfills is that its constructors
- are closed over the specified operations.
+ Conceptually it is like a type @t(k(t(k(t(k(t(...(a))))))))@
+ where types t or k can occur in any order any number of times, but eventually terminate
+ in some type a.
+
+ This type is used primarily to create arbitrary expressions of operations 't` and 'k`
+  over type 'a`.
+
+ For example,
+ let @T a :: *@ be a functor representing an expression of addition over type 'a`.
+  and @K a :: *@ be a functor representing an expression of multiplication over type 'a`.
+  and 'a`, 'b`, 'c`, 'd`, 'w`, 'x`, 'y`, and 'z` are values belonging to a type 'a`
+
+consider that T can also be represented as \"w + x\"
+and K can be represented as \"y * z\"
+
+Therefore, the type @FreeDisjunctMonad T K a@ can be represented as: \"(a + b) * (c * d)"
+  or any arbitrary combination of values in types T, K, and a.
 -}
-data FreeCompoundExpression t k a
-  = FreeCompoundExpression a
-  | T (t (FreeCompoundExpression t k a))
-  | K (k (FreeCompoundExpression t k a))
+data FreeDisjunctMonad t k a
+  = -- | The \"Disjunct\" refers to the higher-kinded disjunction.
+    PureDisjunct a
+  | T (t (FreeDisjunctMonad t k a))
+  | K (k (FreeDisjunctMonad t k a))
   deriving (Generic)
 
-instance (Show1 t, Show1 k) => Show1 (FreeCompoundExpression t k) where
+instance (Show1 t, Show1 k) => Show1 (FreeDisjunctMonad t k) where
   liftShowsPrec ::
     (Show1 t, Show1 k) =>
     (Int -> a -> ShowS) ->
     ([a] -> ShowS) ->
     Int ->
-    FreeCompoundExpression t k a ->
+    FreeDisjunctMonad t k a ->
     ShowS
   liftShowsPrec f g n x = case x of
-    FreeCompoundExpression a -> showsUnaryWith f "FreeCompoundExpression" n a
+    PureDisjunct a -> showsUnaryWith f "PureDisjunct" n a
     T t -> showsUnaryWith (liftShowsPrec (liftShowsPrec f g) (liftShowList f g)) "T" n t
     K k -> showsUnaryWith (liftShowsPrec (liftShowsPrec f g) (liftShowList f g)) "K" n k
 
-instance (Show1 t, Show1 k, Show a) => Show (FreeCompoundExpression t k a) where
+instance (Show1 t, Show1 k, Show a) => Show (FreeDisjunctMonad t k a) where
   showsPrec ::
     (Show1 t, Show1 k, Show a) =>
     Int ->
-    FreeCompoundExpression t k a ->
+    FreeDisjunctMonad t k a ->
     ShowS
   showsPrec = showsPrec1
 
-instance (Eq1 t, Eq1 k) => Eq1 (FreeCompoundExpression t k) where
+instance (Eq1 t, Eq1 k) => Eq1 (FreeDisjunctMonad t k) where
   liftEq ::
     (Eq1 t, Eq1 k) =>
     (a -> b -> Bool) ->
-    FreeCompoundExpression t k a ->
-    FreeCompoundExpression t k b ->
+    FreeDisjunctMonad t k a ->
+    FreeDisjunctMonad t k b ->
     Bool
   liftEq eq x y = case x of
-    FreeCompoundExpression a -> case y of
-      FreeCompoundExpression b -> eq a b
+    PureDisjunct a -> case y of
+      PureDisjunct b -> eq a b
       _ -> False
     T t ->
       case y of
@@ -471,92 +488,92 @@ instance (Eq1 t, Eq1 k) => Eq1 (FreeCompoundExpression t k) where
         K kb -> liftEq (liftEq eq) k kb
         _ -> False
 
-instance (Eq1 t, Eq1 k, Eq a) => Eq (FreeCompoundExpression t k a) where
+instance (Eq1 t, Eq1 k, Eq a) => Eq (FreeDisjunctMonad t k a) where
   (==) ::
     (Eq1 t, Eq1 k, Eq a) =>
-    FreeCompoundExpression t k a ->
-    FreeCompoundExpression t k a ->
+    FreeDisjunctMonad t k a ->
+    FreeDisjunctMonad t k a ->
     Bool
   (==) = liftEq (==)
 
-instance (Functor t, Functor k) => Functor (FreeCompoundExpression t k) where
+instance (Functor t, Functor k) => Functor (FreeDisjunctMonad t k) where
   fmap ::
     (Functor t, Functor k) =>
     (a -> b) ->
-    FreeCompoundExpression t k a ->
-    FreeCompoundExpression t k b
+    FreeDisjunctMonad t k a ->
+    FreeDisjunctMonad t k b
   fmap f fce = case fce of
-    FreeCompoundExpression a -> FreeCompoundExpression (f a)
+    PureDisjunct a -> PureDisjunct (f a)
     T t -> T (fmap (fmap f) t)
     K k -> K (fmap (fmap f) k)
 
-instance (Functor t, Functor k) => Applicative (FreeCompoundExpression t k) where
-  pure :: (Functor t, Functor k) => a -> FreeCompoundExpression t k a
-  pure = FreeCompoundExpression
+instance (Functor t, Functor k) => Applicative (FreeDisjunctMonad t k) where
+  pure :: (Functor t, Functor k) => a -> FreeDisjunctMonad t k a
+  pure = PureDisjunct
   (<*>) ::
     (Functor t, Functor k) =>
-    FreeCompoundExpression t k (a -> b) ->
-    FreeCompoundExpression t k a ->
-    FreeCompoundExpression t k b
+    FreeDisjunctMonad t k (a -> b) ->
+    FreeDisjunctMonad t k a ->
+    FreeDisjunctMonad t k b
   fcef <*> x = case fcef of
-    FreeCompoundExpression fab -> fmap fab x
+    PureDisjunct fab -> fmap fab x
     T t -> T (fmap (<*> x) t)
     K k -> K (fmap (<*> x) k)
 
-instance (Functor t, Functor k) => Monad (FreeCompoundExpression t k) where
-  return :: (Functor t, Functor k) => a -> FreeCompoundExpression t k a
+instance (Functor t, Functor k) => Monad (FreeDisjunctMonad t k) where
+  return :: (Functor t, Functor k) => a -> FreeDisjunctMonad t k a
   return = pure
   (>>=) ::
     (Functor t, Functor k) =>
-    FreeCompoundExpression t k a ->
-    (a -> FreeCompoundExpression t k b) ->
-    FreeCompoundExpression t k b
+    FreeDisjunctMonad t k a ->
+    (a -> FreeDisjunctMonad t k b) ->
+    FreeDisjunctMonad t k b
   fce >>= f = case fce of
-    FreeCompoundExpression a -> f a
+    PureDisjunct a -> f a
     T t -> T (fmap (>>= f) t)
     K k -> K (fmap (>>= f) k)
 
-instance (Foldable t, Foldable k) => Foldable (FreeCompoundExpression t k) where
+instance (Foldable t, Foldable k) => Foldable (FreeDisjunctMonad t k) where
   foldr ::
     (Foldable t, Foldable k) =>
     (a -> b -> b) ->
     b ->
-    FreeCompoundExpression t k a ->
+    FreeDisjunctMonad t k a ->
     b
   foldr f acc fce = case fce of
-    FreeCompoundExpression a -> f a acc
+    PureDisjunct a -> f a acc
     T t -> foldr (flip (foldr f)) acc t
     K k -> foldr (flip (foldr f)) acc k
 
-instance (Traversable t, Traversable k) => Traversable (FreeCompoundExpression t k) where
+instance (Traversable t, Traversable k) => Traversable (FreeDisjunctMonad t k) where
   traverse ::
     (Traversable t, Traversable k, Applicative f) =>
     (a -> f b) ->
-    FreeCompoundExpression t k a ->
-    f (FreeCompoundExpression t k b)
+    FreeDisjunctMonad t k a ->
+    f (FreeDisjunctMonad t k b)
   traverse f fce = case fce of
-    FreeCompoundExpression a -> FreeCompoundExpression <$> f a
+    PureDisjunct a -> PureDisjunct <$> f a
     T t -> T <$> traverse (traverse f) t
     K k -> K <$> traverse (traverse f) k
 
-instance Rng (FreeCompoundExpression RingExpression k a) where
-  (+.) = fcebh T (+.) pure pure
-  (*.) = fcebh T (*.) pure pure
-  (-.) = fcebh T (-.) pure pure
+instance Rng (FreeDisjunctMonad RingExpression k a) where
+  (+.) = fdmbh T (+.) pure pure
+  (*.) = fdmbh T (*.) pure pure
+  (-.) = fdmbh T (-.) pure pure
 
 -- This should be literally the same thing as
 -- > flipTK . (+.) . flipTK
 -- only it does not require an additional Functor constraint.
-instance Rng (FreeCompoundExpression t RingExpression a) where
-  (+.) = fcebh K (+.) pure pure
-  (*.) = fcebh K (*.) pure pure
-  (-.) = fcebh K (-.) pure pure
+instance Rng (FreeDisjunctMonad t RingExpression a) where
+  (+.) = fdmbh K (+.) pure pure
+  (*.) = fdmbh K (*.) pure pure
+  (-.) = fdmbh K (-.) pure pure
 
-instance Magma (FreeCompoundExpression MagmaExpression k a) where
-  (∙) = fcebh T (∙) pure pure
+instance Magma (FreeDisjunctMonad MagmaExpression k a) where
+  (∙) = fdmbh T (∙) pure pure
 
-instance Magma (FreeCompoundExpression t MagmaExpression a) where
-  (∙) = fcebh K (∙) pure pure
+instance Magma (FreeDisjunctMonad t MagmaExpression a) where
+  (∙) = fdmbh K (∙) pure pure
 
 {- |
  A helper for defining a binary operation over a preconstruction.
@@ -568,10 +585,10 @@ instance Magma (FreeCompoundExpression t MagmaExpression a) where
   Applies the function @combinator@ to @preconstrX x@ and @preconstrY y@
     before application of the final function, @constructor@
 
- Stands for FreeCompoundExpression-Binary-Helper since it used to defined
+ Stands for FreeDisjunctMonad-Binary-Helper since it used to defined
  (*) kinded typeclasses for this type.
 -}
-fcebh ::
+fdmbh ::
   (t1 -> t2) ->
   (t3 -> t4 -> t1) ->
   (t5 -> t3) ->
@@ -579,37 +596,49 @@ fcebh ::
   t5 ->
   t6 ->
   t2
-fcebh dc cm cx cy x y = dc $ cm (cx x) (cy y)
+fdmbh dc cm cx cy x y = dc $ cm (cx x) (cy y)
 
 mapT ::
   (Functor t, Functor k) =>
   (forall a1. t a1 -> h a1) ->
-  FreeCompoundExpression t k a ->
-  FreeCompoundExpression h k a
+  FreeDisjunctMonad t k a ->
+  FreeDisjunctMonad h k a
 mapT f fce = case fce of
-  FreeCompoundExpression a -> FreeCompoundExpression a
+  PureDisjunct a -> PureDisjunct a
   T t -> T . f . fmap (mapT f) $ t
   K k -> K . fmap (mapT f) $ k
 
 mapK ::
   (Functor t, Functor k) =>
   (forall a1. k a1 -> h a1) ->
-  FreeCompoundExpression t k a ->
-  FreeCompoundExpression t h a
+  FreeDisjunctMonad t k a ->
+  FreeDisjunctMonad t h a
 mapK f fce = case fce of
-  FreeCompoundExpression a -> FreeCompoundExpression a
+  PureDisjunct a -> PureDisjunct a
   T t -> T . fmap (mapK f) $ t
   K k -> K . f . fmap (mapK f) $ k
 
 {- |
  Distributes the operation denoted by K over the operation denoted by T.
 -}
+distributeT ::
+  (Monad t, Monad k, Traversable t) =>
+  FreeDisjunctMonad t k a ->
+  k (t a)
+distributeT fce = case fce of
+  PureDisjunct a -> pure . pure $ a
+  T t -> fmap join . traverse distributeT $ t
+  K k -> k >>= distributeT
+
+{- |
+ Distributes the operation denoted by K over the operation denoted by T.
+-}
 distributeK ::
   (Monad t, Monad k, Traversable k) =>
-  FreeCompoundExpression t k a ->
+  FreeDisjunctMonad t k a ->
   t (k a)
 distributeK fce = case fce of
-  FreeCompoundExpression a -> pure . pure $ a
+  PureDisjunct a -> pure . pure $ a
   T t -> t >>= distributeK
   K k -> fmap join . traverse distributeK $ k
 
@@ -618,15 +647,15 @@ distributeK fce = case fce of
 -}
 flipTK ::
   (Functor t, Functor k) =>
-  FreeCompoundExpression t k a ->
-  FreeCompoundExpression k t a
+  FreeDisjunctMonad t k a ->
+  FreeDisjunctMonad k t a
 flipTK fce = case fce of
-  FreeCompoundExpression a -> FreeCompoundExpression a
+  PureDisjunct a -> PureDisjunct a
   T t -> K . fmap flipTK $ t
   K k -> T . fmap flipTK $ k
 
 {- |
- Apply unwrapping functions to the inner constructors of a 'FreeCompoundExpression`
+ Apply unwrapping functions to the inner constructors of a 'FreeDisjunctMonad`
 
  This can be used to remove redundant layers of monadic identities for example.
 -}
@@ -634,11 +663,11 @@ unwrapTK ::
   (Functor t, Functor k) =>
   (forall a1. t a1 -> Maybe a1) ->
   (forall a1. k a1 -> Maybe a1) ->
-  FreeCompoundExpression t k a ->
-  FreeCompoundExpression t k a
+  FreeDisjunctMonad t k a ->
+  FreeDisjunctMonad t k a
 unwrapTK tf kf fce =
   case fce of
-    FreeCompoundExpression _ -> fce
+    PureDisjunct _ -> fce
     T t ->
       let mappedUnwrap = unwrapTK tf kf <$> t
        in fromMaybe (T mappedUnwrap) . tf $ mappedUnwrap
@@ -650,11 +679,11 @@ evaluateFreeCompoundExpression ::
   (Functor f1, Functor f2) =>
   (f1 b -> b) ->
   (f2 b -> b) ->
-  FreeCompoundExpression f1 f2 b ->
+  FreeDisjunctMonad f1 f2 b ->
   b
 evaluateFreeCompoundExpression f g fce =
   case fce of
-    FreeCompoundExpression a -> a
+    PureDisjunct a -> a
     T t -> f . fmap (evaluateFreeCompoundExpression f g) $ t
     K k -> g . fmap (evaluateFreeCompoundExpression f g) $ k
 
@@ -784,7 +813,7 @@ newtype FreeQueryExpression = FreeQueryExpression
             -- Notice how the TagQuery is a proper subset of a
             -- FreeQueryExpression in both disjunct cases.
             ( FreeQueryExpression
-            , FreeCompoundExpression
+            , FreeDisjunctMonad
                 (LabeledFreeTree RingOperation)
                 (LabeledFreeTree ())
                 (DTerm Pattern)
@@ -794,7 +823,7 @@ newtype FreeQueryExpression = FreeQueryExpression
               -- but evaluation is not forced until later.
               Either
                 Pattern
-                ( FreeCompoundExpression
+                ( FreeDisjunctMonad
                     (LabeledFreeTree RingOperation)
                     (LabeledFreeTree ())
                     (DTerm Pattern)

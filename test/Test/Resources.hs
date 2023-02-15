@@ -144,7 +144,7 @@ instance Function a => Function (DTerm a)
 instance Function a => Function (QCDTerm a)
 
 newtype QCFreeCompoundExpression t k a = QCFreeCompoundExpression
-  {runQCFreeCompoundExpression :: FreeCompoundExpression t k a}
+  {runQCFreeCompoundExpression :: FreeDisjunctMonad t k a}
   deriving
     ( Show
     , Eq
@@ -172,7 +172,7 @@ castFreeCompoundExpression ::
   , forall b. Coercible (qck b) (k b)
   ) =>
   QCFreeCompoundExpression qct qck qca ->
-  FreeCompoundExpression h k a
+  FreeDisjunctMonad h k a
 castFreeCompoundExpression (qcef :: QCFreeCompoundExpression qct qck qca) =
   mapT coerce . mapK coerce . fmap coerce . runQCFreeCompoundExpression $ qcef
 
@@ -181,7 +181,7 @@ castQCTagQueryExpression ::
     (QCLabeledFreeTree RingOperation)
     (QCLabeledFreeTree ())
     (QCDTerm QCPattern) ->
-  FreeCompoundExpression RingExpression MagmaExpression (DTerm Pattern)
+  FreeDisjunctMonad RingExpression MagmaExpression (DTerm Pattern)
 castQCTagQueryExpression =
   castFreeCompoundExpression
 
@@ -193,7 +193,7 @@ instance (Arbitrary1 t, Arbitrary1 k) => Arbitrary1 (QCFreeCompoundExpression t 
   liftArbitrary g = QCFreeCompoundExpression <$> sized liftSized
    where
     liftSized n
-      | n <= 0 = FreeCompoundExpression <$> g
+      | n <= 0 = PureDisjunct <$> g
       | otherwise =
         oneof
           [ T <$> liftArbitrary (liftSized (n `div` 2))
