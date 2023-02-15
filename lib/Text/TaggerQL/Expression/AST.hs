@@ -32,9 +32,6 @@ module Text.TaggerQL.Expression.AST (
   TagQueryExpression,
   unwrapIdentities,
   normalize,
-  RingExpression (..),
-  evaluateRing,
-  toFreeTree,
   FreeTree (..),
   foldFreeMagma1,
   evaluateFreeMagma,
@@ -48,6 +45,12 @@ module Text.TaggerQL.Expression.AST (
   FreeQueryExpression (..),
   liftSimpleQueryRing,
   unliftFreeQueryExpression,
+  RingExpression,
+  LabeledFreeTree (..),
+  fold1WithEdge,
+  fold1WithEdgeMl,
+  fold1WithEdgeMr,
+  evaluateRingExpression,
 
   -- * Classes
   Rng (..),
@@ -87,141 +90,11 @@ data SetOp
   = Union
   | Intersect
   | Difference
-  deriving (Show, Eq, Bounded, Enum, Ord)
+  deriving (Show, Eq, Bounded, Enum, Ord, Generic)
 
-{- |
- A data type representing an expression of any Ring.
+instance Hashable SetOp
 
- This type is just an edge-labeled, unrooted binary tree.
-
- Each node is an operand and each edge is an operation.
-
- The edges are differentiable as addition, multiplication, and subtraction operations
- respectively.
--}
-data RingExpression a
-  = Ring a
-  | RingExpression a :+ RingExpression a
-  | RingExpression a :* RingExpression a
-  | RingExpression a :- RingExpression a
-  deriving (Functor, Foldable, Traversable, Generic)
-
-instance Show1 RingExpression where
-  liftShowsPrec ::
-    (Int -> a -> ShowS) ->
-    ([a] -> ShowS) ->
-    Int ->
-    RingExpression a ->
-    ShowS
-  liftShowsPrec f g n re = case re of
-    Ring a -> showsUnaryWith f "Ring" n a
-    re' :+ re_a -> helpShow1Bin " :+ " re' re_a
-    re' :* re_a -> helpShow1Bin " :* " re' re_a
-    re' :- re_a -> helpShow1Bin " :- " re' re_a
-   where
-    helpShow1Bin s x y =
-      let mShowParen r = showParen (case r of Ring _ -> False; _ -> True)
-          lhs = mShowParen x $ liftShowsPrec f g n x
-          c = showString s
-          rhs = mShowParen y $ liftShowsPrec f g n y
-       in lhs . c . rhs
-
--- This is a good baseline for something like a pretty printer but it makes a poor
--- Show1 instance.
--- instance Show1 RingExpression where
---   liftShowsPrec ::
---     (Int -> a -> ShowS) ->
---     ([a] -> ShowS) ->
---     Int ->
---     RingExpression a ->
---     ShowS
---   liftShowsPrec f g n re = case re of
---     Ring a -> f n a
---     re' :+ re_a -> helpShow1Bin " :+ " re' re_a
---     re' :* re_a -> helpShow1Bin " :* " re' re_a
---     re' :- re_a -> helpShow1Bin " :- " re' re_a
---    where
---     helpShow1Bin s x y =
---       let lhs = liftShowsPrec f g n x
---           c = showString s
---           rhs =
---             showParen (case y of Ring _ -> False; _ -> True) $
---               liftShowsPrec f g n y
---        in lhs . c . rhs
-
-instance Show a => Show (RingExpression a) where
-  showsPrec :: Show a => Int -> RingExpression a -> ShowS
-  showsPrec = showsPrec1
-
-instance Eq1 RingExpression where
-  liftEq :: (a -> b -> Bool) -> RingExpression a -> RingExpression b -> Bool
-  liftEq eq x y = case x of
-    Ring a ->
-      case y of
-        Ring b -> eq a b
-        _ -> False
-    re :+ re' ->
-      case y of
-        rey :+ rey' -> liftEq eq re rey && liftEq eq re' rey'
-        _ -> False
-    re :* re' ->
-      case y of
-        rey :* rey' -> liftEq eq re rey && liftEq eq re' rey'
-        _ -> False
-    re :- re' ->
-      case y of
-        rey :- rey' -> liftEq eq re rey && liftEq eq re' rey'
-        _ -> False
-
-instance Eq a => Eq (RingExpression a) where
-  (==) :: Eq a => RingExpression a -> RingExpression a -> Bool
-  (==) = liftEq (==)
-
-instance Hashable a => Hashable (RingExpression a)
-
-instance Applicative RingExpression where
-  pure :: a -> RingExpression a
-  pure = return
-  (<*>) :: RingExpression (a -> b) -> RingExpression a -> RingExpression b
-  (<*>) = ap
-
-instance Monad RingExpression where
-  return :: a -> RingExpression a
-  return = Ring
-  (>>=) :: RingExpression a -> (a -> RingExpression b) -> RingExpression b
-  r >>= f = case r of
-    Ring a -> f a
-    re :+ re' -> (re >>= f) :+ (re' >>= f)
-    re :* re' -> (re >>= f) :* (re' >>= f)
-    re :- re' -> (re >>= f) :- (re' >>= f)
-
-{- |
- Run the computation defined by a 'RingExpression`
--}
-evaluateRing :: Rng a => RingExpression a -> a
-evaluateRing r = case r of
-  Ring a -> a
-  re :+ re' -> evaluateRing re +. evaluateRing re'
-  re :* re' -> evaluateRing re *. evaluateRing re'
-  re :- re' -> evaluateRing re -. evaluateRing re'
-
-{- |
- Transform a 'RingExpression` to a more general free expression, 'FreeTree`.
-
- It should be noted that the 'Foldable` instance for a 'RingExpression` and 'FreeTree`
- behave the same. So if the ultimate goal is to perform some kind of associative
-  fold of a 'FreeTree`, then simply folding the 'RingExpression` will suffice.
-
- For example:
-
- >(toList :: RingExpression a -> [a]) == toList . toFreeTree
--}
-toFreeTree :: RingExpression a -> FreeTree a
-toFreeTree re = case re of
-  Ring a -> pure a
-  re' :+ re_a -> toFreeTree re' :∙ toFreeTree re_a
-  re' :* re_a -> toFreeTree re' :∙ toFreeTree re_a
-  re' :- re_a -> toFreeTree re' :∙ toFreeTree re_a
+type RingExpression = LabeledFreeTree SetOp
 
 {- |
  Unrooted binary tree of node type 'a`
@@ -245,7 +118,9 @@ toFreeTree re = case re of
 data LabeledFreeTree l a
   = Node a
   | Edge (LabeledFreeTree l a) l (LabeledFreeTree l a)
-  deriving (Functor, Foldable, Traversable)
+  deriving (Functor, Foldable, Traversable, Generic)
+
+instance (Hashable l, Hashable a) => Hashable (LabeledFreeTree l a)
 
 instance Show2 LabeledFreeTree where
   liftShowsPrec2 ::
@@ -260,12 +135,12 @@ instance Show2 LabeledFreeTree where
     Node b -> showsUnaryWith af "LabeledFreeTree" n b
     Edge elft a elft' ->
       let liftS = liftShowsPrec2 lf lfxs af afxs n
-          mShowParens r = showParen (case r of Node _ -> False; _ -> True)
+          mShowParens = showParen True
           edge = showString "Edge "
-          lhs = mShowParens elft $ liftS elft
+          lhs = mShowParens $ liftS elft
           cen = lf n a
-          rhs = mShowParens elft' $ liftS elft'
-       in edge . lhs . cen . rhs
+          rhs = mShowParens $ liftS elft'
+       in edge . lhs . showString " " . cen . showString " " . rhs
 
 instance Show l => Show1 (LabeledFreeTree l) where
   liftShowsPrec ::
@@ -438,14 +313,17 @@ fold1WithEdgeMr f elft =
       lhs <- fold1WithEdgeMr f elft'
       f l lhs rhs
 
-evaluateFreeRingTree :: Rng a => LabeledFreeTree SetOp a -> a
-evaluateFreeRingTree =
+evaluateRingExpression :: Rng a => LabeledFreeTree SetOp a -> a
+evaluateRingExpression =
   fold1WithEdge
     ( \so -> case so of
         Union -> (+.)
         Intersect -> (*.)
         Difference -> (-.)
     )
+
+evaluateMagmaExpression :: Magma a => LabeledFreeTree () a -> a
+evaluateMagmaExpression = fold1WithEdge (const (∙))
 
 infix 9 :∙
 
@@ -617,7 +495,7 @@ runDTerm (DMetaTerm x) = x
 unwrapIdentities :: TagQueryExpression -> TagQueryExpression
 unwrapIdentities =
   unwrapTK
-    (\re -> case re of Ring x -> Just x; _ -> Nothing)
+    (\re -> case re of Node x -> Just x; _ -> Nothing)
     (\fm -> case fm of FreeTree x -> Just x; _ -> Nothing)
 
 {- |
@@ -940,14 +818,6 @@ instance Rng Int where
   (-.) :: Int -> Int -> Int
   (-.) = (-)
 
-instance Rng (RingExpression a) where
-  (+.) :: RingExpression a -> RingExpression a -> RingExpression a
-  (+.) = (:+)
-  (*.) :: RingExpression a -> RingExpression a -> RingExpression a
-  (*.) = (:*)
-  (-.) :: RingExpression a -> RingExpression a -> RingExpression a
-  (-.) = (:-)
-
 instance (Rng a, Rng b) => Rng (a, b) where
   (+.) :: (Rng a, Rng b) => (a, b) -> (a, b) -> (a, b)
   x +. (a, b) = bimap (+. a) (+. b) x
@@ -1024,7 +894,7 @@ newtype FreeQueryExpression = FreeQueryExpression
 
 instance Ring FreeQueryExpression where
   aid :: FreeQueryExpression
-  aid = FreeQueryExpression . Ring . Right . Left $ WildCard
+  aid = FreeQueryExpression . Node . Right . Left $ WildCard
   mid :: FreeQueryExpression
   mid = aid -. aid
 
@@ -1051,6 +921,6 @@ unliftFreeQueryExpression = either unify pure <=< runFreeQueryExpression
       >>= either
         (unify . second (∙ tqe))
         ( either
-            ((*. (Ring . Right $ tqe)) . Ring . Left)
-            (Ring . Right . (∙ tqe))
+            ((*. (Node . Right $ tqe)) . Node . Left)
+            (Node . Right . (∙ tqe))
         )

@@ -273,21 +273,21 @@ queryTermParser =
   bracketedQuery =
     QueryTerm
       . liftSimpleQueryRing
-      . Ring
+      . Node
       . Right
       . runBracketTag
       <$> (foldBracketedTags <$> bracketedTagParser <*> zeroOrManyBracketedTagParser)
   minimalTagQuery =
     QueryTerm
       . liftSimpleQueryRing
-      . Ring
+      . Node
       . Right
       . runMinTagExpr
       <$> minimalTagExpressionParser
   filePathTerm =
     QueryTerm
       . liftSimpleQueryRing
-      . Ring
+      . Node
       <$> filePathParser
 
 parenthesized :: Parser a -> Parser a
@@ -312,8 +312,8 @@ ringExprConstructorParser ::
 ringExprConstructorParser =
   ( \so ->
       case so of
-        Union -> (:+)
-        Intersect -> (:*)
-        Difference -> (:-)
+        Union -> (+.)
+        Intersect -> (*.)
+        Difference -> (-.)
   )
     <$> (spaces *> setOpParser)

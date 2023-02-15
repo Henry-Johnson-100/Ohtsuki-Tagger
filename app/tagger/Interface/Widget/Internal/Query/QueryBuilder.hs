@@ -74,7 +74,7 @@ expressionWidget =
     . runIdentity
     . runCounter
     . coerce
-    . evaluateRing
+    . evaluateRingExpression
     . buildExpressionWidget
 
 buildExpressionWidget ::
@@ -86,7 +86,7 @@ buildExpressionWidget (FreeQueryExpression fqe) = do
     ( \(x, y) ->
         let x' =
               (\(QueryExpressionWidgetBuilderG z) -> z)
-                . evaluateRing
+                . evaluateRingExpression
                 . buildExpressionWidget
                 $ x
             y' = (\(TagExpressionWidgetBuilderG z) -> z) . buildTagExpressionWidget $ y
@@ -434,5 +434,5 @@ buildTagExpressionWidget ::
   FreeCompoundExpression RingExpression FreeTree (DTerm Pattern) ->
   TagExpressionWidgetBuilder
 buildTagExpressionWidget =
-  evaluateFreeCompoundExpression evaluateRing evaluateFreeMagma
+  evaluateFreeCompoundExpression evaluateRingExpression evaluateFreeMagma
     . fmap tewbLeaf

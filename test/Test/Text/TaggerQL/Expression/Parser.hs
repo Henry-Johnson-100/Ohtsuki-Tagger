@@ -798,15 +798,15 @@ parserTests =
                         assertEqual
                             "Textual version of AST test by the same name."
                             ( fmap (fmap (fmap distributeK)) . Right $
-                                ( Ring . Right $
+                                ( Node . Right $
                                     ( (tedp . rt $ "a")
                                         ∙ ( (tedp . rt $ "c")
                                                 ∙ (tedp . rt $ "d")
                                           )
                                     )
                                 )
-                                    *. ( (Ring . Left $ "b")
-                                            *. ( Ring . Right $
+                                    *. ( (Node . Left $ "b")
+                                            *. ( Node . Right $
                                                     ( (tedp . rt $ "c")
                                                         ∙ (tedp . rt $ "d")
                                                     )
