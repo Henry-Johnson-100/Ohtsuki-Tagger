@@ -29,7 +29,6 @@ import Control.Monad (unless)
 import Data.Char (toLower, toUpper)
 import Data.Functor (($>))
 import qualified Data.List as L
-import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Text.Parsec (
@@ -97,15 +96,15 @@ patternParser = Pattern <$> patternTextParser
 notRestricted :: Parser Char
 notRestricted = noneOf restrictedChars
 
-setOpParser :: Parser SetOp
-setOpParser = explicitSetOpParser <|> pure Intersect
+setOpParser :: Parser RingOperation
+setOpParser = explicitRingOperationParser <|> pure Multiplication
 
-explicitSetOpParser :: Parser SetOp
-explicitSetOpParser = unionParser <|> intersectParser <|> differenceParser
+explicitRingOperationParser :: Parser RingOperation
+explicitRingOperationParser = unionParser <|> intersectParser <|> differenceParser
  where
-  unionParser = char '|' $> Union
-  intersectParser = char '&' $> Intersect
-  differenceParser = char '!' $> Difference
+  unionParser = char '|' $> Addition
+  intersectParser = char '&' $> Multiplication
+  differenceParser = char '!' $> Subtraction
 
 ichar :: Char -> Parser Char
 ichar c = char (toUpper c) <|> char (toLower c)
@@ -116,7 +115,7 @@ restrictedChars = "(){}!&|. \r\n"
 foldBracketedTags :: Magma b => b -> Maybe b -> b
 foldBracketedTags overTerm = maybe overTerm (overTerm ∙)
 
-parseQueryExpression :: Text -> Either ParseError FreeQueryExpression
+parseQueryExpression :: Text -> Either ParseError QueryExpression
 parseQueryExpression =
   parse
     allInput
@@ -146,10 +145,10 @@ failIfNotConsumed = do
       <> T.unpack remains
       <> "\""
 
-queryExpressionParser :: Parser FreeQueryExpression
+queryExpressionParser :: Parser QueryExpression
 queryExpressionParser =
   spaces
-    *> ( fmap (FreeQueryExpression . (>>= runFreeQueryExpression))
+    *> ( fmap (QueryExpression . (>>= runQueryExpression))
           . ringExprParser
           . fmap runQueryTerm
           $ queryTermParser
@@ -244,14 +243,14 @@ tagTermParser =
   minimalTagTerm = TagTerm . runMinTagExpr <$> minimalTagExpressionParser
 
 newtype ParenthesizedQuery = ParenthesizedQuery
-  {runParenQuery :: FreeQueryExpression}
+  {runParenQuery :: QueryExpression}
   deriving (Show, Eq, Rng)
 
 parenthesizedQueryParser :: Parser ParenthesizedQuery
 parenthesizedQueryParser =
   ParenthesizedQuery <$> parenthesized queryExpressionParser
 
-newtype QueryTerm = QueryTerm {runQueryTerm :: FreeQueryExpression}
+newtype QueryTerm = QueryTerm {runQueryTerm :: QueryExpression}
   deriving (Show, Eq, Rng)
 
 queryTermParser :: Parser QueryTerm
@@ -267,28 +266,28 @@ queryTermParser =
     QueryTerm
       <$> ( ( \(ParenthesizedQuery q) ->
                 maybe q ((q <-#) . runBracketTag) ::
-                  Maybe BracketedTag -> FreeQueryExpression
+                  Maybe BracketedTag -> QueryExpression
             )
               <$> parenthesizedQueryParser <*> zeroOrManyBracketedTagParser
           )
   bracketedQuery =
     QueryTerm
       . liftSimpleQueryRing
-      . Ring
+      . Node
       . Right
       . runBracketTag
       <$> (foldBracketedTags <$> bracketedTagParser <*> zeroOrManyBracketedTagParser)
   minimalTagQuery =
     QueryTerm
       . liftSimpleQueryRing
-      . Ring
+      . Node
       . Right
       . runMinTagExpr
       <$> minimalTagExpressionParser
   filePathTerm =
     QueryTerm
       . liftSimpleQueryRing
-      . Ring
+      . Node
       <$> filePathParser
 
 parenthesized :: Parser a -> Parser a
@@ -313,8 +312,8 @@ ringExprConstructorParser ::
 ringExprConstructorParser =
   ( \so ->
       case so of
-        Union -> (:+)
-        Intersect -> (:*)
-        Difference -> (:-)
+        Addition -> (+.)
+        Multiplication -> (*.)
+        Subtraction -> (-.)
   )
     <$> (spaces *> setOpParser)

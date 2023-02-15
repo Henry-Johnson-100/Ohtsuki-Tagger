@@ -36,10 +36,10 @@ battery name failMsg expectedResult samples =
             )
 
 {- |
- Normalizes a FreeQueryExpression to its non-recursive representation, making
+ Normalizes a QueryExpression to its non-recursive representation, making
  equivalence easier to judge.
 
- This assumes that there are many equivalent ways to express a FreeQueryExpression.
+ This assumes that there are many equivalent ways to express a QueryExpression.
  This is of course true for the purposes of this program.
 
  But it is important to remember that generally, the expressions described in this
@@ -48,10 +48,10 @@ battery name failMsg expectedResult samples =
     to judge structural equality with these structures.
 -}
 distrTEs ::
-    FreeQueryExpression ->
+    QueryExpression ->
     RingExpression
-        (Either Pattern (RingExpression (FreeMagma (DTerm Pattern))))
-distrTEs = fmap (fmap distributeK) . unliftFreeQueryExpression
+        (Either Pattern (RingExpression (MagmaExpression (DTerm Pattern))))
+distrTEs = fmap (fmap distributeK) . unliftQueryExpression
 
 comBatTE ::
     HasCallStack =>
@@ -70,7 +70,7 @@ comBatTE name failMsg expect tsts =
 comTE ::
     HasCallStack =>
     String ->
-    RingExpression (FreeMagma (DTerm Pattern)) ->
+    RingExpression (MagmaExpression (DTerm Pattern)) ->
     Text ->
     Assertion
 comTE msg x y =
@@ -99,7 +99,7 @@ verifyQueryStructure ::
     TestName ->
     String ->
     RingExpression
-        (Either Pattern (RingExpression (FreeMagma (DTerm Pattern)))) ->
+        (Either Pattern (RingExpression (MagmaExpression (DTerm Pattern)))) ->
     Text ->
     [Text] ->
     TestTree
@@ -125,7 +125,7 @@ verifyQueryStructure testName failMsg structure prototype equivalences =
         HasCallStack =>
         String ->
         RingExpression
-            (Either Pattern (RingExpression (FreeMagma (DTerm Pattern)))) ->
+            (Either Pattern (RingExpression (MagmaExpression (DTerm Pattern)))) ->
         Text ->
         Assertion
     com msg x y =
@@ -141,7 +141,7 @@ verifyQueryStructure testName failMsg structure prototype equivalences =
         TestName ->
         String ->
         RingExpression
-            (Either Pattern (RingExpression (FreeMagma (DTerm Pattern)))) ->
+            (Either Pattern (RingExpression (MagmaExpression (DTerm Pattern)))) ->
         [Text] ->
         TestTree
     comBat name failMsg expect tsts =
@@ -246,7 +246,7 @@ parserTests =
                         (p . p . p $ "a")
                         "{{{{{a}}}}}"
                 , verifyQueryStructure
-                    "Minimal Magma Expression"
+                    "Minimal MagmaExpression Expression"
                     "apple {red}"
                     ((p . p . p) ((p . p) "apple" ∙ (p . p) "red"))
                     "apple {red}"
@@ -263,7 +263,7 @@ parserTests =
                     ]
                 , verifyQueryStructure "Explicit Set Operator Annihilates Distribution" "[apple & {red}] /= [apple {red}]" ((p . p . p . p . p $ "apple") *. (p . p . p . p . p $ "red")) "apple & {red}" []
                 , testGroup
-                    "Nested Minimal Magma Expression"
+                    "Nested Minimal MagmaExpression Expression"
                     [ verifyQueryStructure
                         "Implicit Right Association"
                         "apple {peel {red}}"
@@ -448,7 +448,7 @@ parserTests =
                 , verifyQueryStructure
                     "Mixed Parenthesized Tag Leaves"
                     "[p.apple (orange banana)] - Should be three leaves in a \
-                    \FreeQueryExpression, not two."
+                    \QueryExpression, not two."
                     ( let mk = p . p . p . p . p
                        in (p . l) "apple" *. (mk "orange" *. mk "banana")
                     )
@@ -798,15 +798,15 @@ parserTests =
                         assertEqual
                             "Textual version of AST test by the same name."
                             ( fmap (fmap (fmap distributeK)) . Right $
-                                ( Ring . Right $
+                                ( Node . Right $
                                     ( (tedp . rt $ "a")
                                         ∙ ( (tedp . rt $ "c")
                                                 ∙ (tedp . rt $ "d")
                                           )
                                     )
                                 )
-                                    *. ( (Ring . Left $ "b")
-                                            *. ( Ring . Right $
+                                    *. ( (Node . Left $ "b")
+                                            *. ( Node . Right $
                                                     ( (tedp . rt $ "c")
                                                         ∙ (tedp . rt $ "d")
                                                     )
@@ -814,7 +814,7 @@ parserTests =
                                        )
                             )
                             ( fmap (fmap distributeK)
-                                . unliftFreeQueryExpression
+                                . unliftQueryExpression
                                 <$> parseQueryExpression
                                     "(a & p.b){c}{d}"
                             )
