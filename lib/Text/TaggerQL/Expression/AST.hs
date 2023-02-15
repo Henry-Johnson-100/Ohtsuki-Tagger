@@ -32,7 +32,7 @@ module Text.TaggerQL.Expression.AST (
   normalize,
   RingExpression (..),
   evaluateRing,
-  toFreeMagma,
+  toFreeTree,
   FreeTree (..),
   foldFreeMagma1,
   evaluateFreeMagma,
@@ -198,14 +198,14 @@ evaluateRing r = case r of
 
  For example:
 
- >(toList :: RingExpression a -> [a]) == toList . toFreeMagma
+ >(toList :: RingExpression a -> [a]) == toList . toFreeTree
 -}
-toFreeMagma :: RingExpression a -> FreeTree a
-toFreeMagma re = case re of
+toFreeTree :: RingExpression a -> FreeTree a
+toFreeTree re = case re of
   Ring a -> pure a
-  re' :+ re_a -> toFreeMagma re' :∙ toFreeMagma re_a
-  re' :* re_a -> toFreeMagma re' :∙ toFreeMagma re_a
-  re' :- re_a -> toFreeMagma re' :∙ toFreeMagma re_a
+  re' :+ re_a -> toFreeTree re' :∙ toFreeTree re_a
+  re' :* re_a -> toFreeTree re' :∙ toFreeTree re_a
+  re' :- re_a -> toFreeTree re' :∙ toFreeTree re_a
 
 infix 9 :∙
 
