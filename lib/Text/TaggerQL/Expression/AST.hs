@@ -10,6 +10,7 @@
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {- |
@@ -54,12 +55,17 @@ module Text.TaggerQL.Expression.AST (
 ) where
 
 import Control.Monad (ap, join, (<=<))
+import Data.Bifoldable (Bifoldable (bifoldr))
 import Data.Bifunctor (Bifunctor (..), bimap)
+import Data.Bitraversable (Bitraversable (..))
 import qualified Data.Foldable as F
 import Data.Functor.Classes (
   Eq1 (..),
+  Eq2 (..),
   Show1 (liftShowList, liftShowsPrec),
+  Show2 (..),
   showsPrec1,
+  showsPrec2,
   showsUnaryWith,
  )
 import Data.HashSet (HashSet)
@@ -68,6 +74,7 @@ import Data.Hashable (Hashable)
 import qualified Data.List as L
 import Data.Maybe (fromMaybe)
 import Data.String (IsString, fromString)
+import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
 import GHC.Exts (IsList (..))
@@ -206,6 +213,230 @@ toFreeTree re = case re of
   re' :+ re_a -> toFreeTree re' :∙ toFreeTree re_a
   re' :* re_a -> toFreeTree re' :∙ toFreeTree re_a
   re' :- re_a -> toFreeTree re' :∙ toFreeTree re_a
+
+{- |
+ Unrooted binary tree of node type 'a`
+ with edges labeled as type 'l`
+
+ This data structure is used primarily to model any binary operation of type 'l`
+ over the type 'a`
+
+ For instance:
+
+ - An expression for a magma on 'a` can be
+      generally expressed as @LabeledFreeTree () a@
+ - An expression describing ring-like operations (+), (*), and (-) is expressed as
+      @LabeledFreeTree SetOp a@
+
+ Furthermore, expressions over the structure itself can be expressed by simply duplicating
+ the underlying structure:
+
+ > fmap pure x :: LabeledFreeTree b (LabeledFreeTree b a)
+-}
+data LabeledFreeTree l a
+  = Node a
+  | Edge (LabeledFreeTree l a) l (LabeledFreeTree l a)
+  deriving (Functor, Foldable, Traversable)
+
+instance Show2 LabeledFreeTree where
+  liftShowsPrec2 ::
+    (Int -> a -> ShowS) ->
+    ([a] -> ShowS) ->
+    (Int -> b -> ShowS) ->
+    ([b] -> ShowS) ->
+    Int ->
+    LabeledFreeTree a b ->
+    ShowS
+  liftShowsPrec2 lf lfxs af afxs n x = case x of
+    Node b -> showsUnaryWith af "LabeledFreeTree" n b
+    Edge elft a elft' ->
+      let liftS = liftShowsPrec2 lf lfxs af afxs n
+          mShowParens r = showParen (case r of Node _ -> False; _ -> True)
+          edge = showString "Edge "
+          lhs = mShowParens elft $ liftS elft
+          cen = lf n a
+          rhs = mShowParens elft' $ liftS elft'
+       in edge . lhs . cen . rhs
+
+instance Show l => Show1 (LabeledFreeTree l) where
+  liftShowsPrec ::
+    Show l =>
+    (Int -> a -> ShowS) ->
+    ([a] -> ShowS) ->
+    Int ->
+    LabeledFreeTree l a ->
+    ShowS
+  liftShowsPrec = liftShowsPrec2 showsPrec showList
+
+instance (Show l, Show a) => Show (LabeledFreeTree l a) where
+  showsPrec :: (Show l, Show a) => Int -> LabeledFreeTree l a -> ShowS
+  showsPrec = showsPrec2
+
+instance Eq2 LabeledFreeTree where
+  liftEq2 ::
+    (a -> b -> Bool) ->
+    (c -> d -> Bool) ->
+    LabeledFreeTree a c ->
+    LabeledFreeTree b d ->
+    Bool
+  liftEq2 eql eqa x y = case x of
+    Node c ->
+      case y of
+        Node y' -> eqa c y'
+        _ -> False
+    Edge elft a elft' ->
+      case y of
+        Edge yl yc yr ->
+          -- compare edges first to short circuit before traversing deeper.
+          eql a yc
+            && liftEq2 eql eqa elft yl
+            && liftEq2 eql eqa elft' yr
+        _ -> False
+
+instance Eq l => Eq1 (LabeledFreeTree l) where
+  liftEq ::
+    Eq l =>
+    (a -> b -> Bool) ->
+    LabeledFreeTree l a ->
+    LabeledFreeTree l b ->
+    Bool
+  liftEq = liftEq2 (==)
+
+instance (Eq l, Eq a) => Eq (LabeledFreeTree l a) where
+  (==) ::
+    (Eq l, Eq a) =>
+    LabeledFreeTree l a ->
+    LabeledFreeTree l a ->
+    Bool
+  (==) = liftEq2 (==) (==)
+
+instance Applicative (LabeledFreeTree l) where
+  pure :: a -> LabeledFreeTree l a
+  pure = Node
+  (<*>) ::
+    LabeledFreeTree l (a -> b) ->
+    LabeledFreeTree l a ->
+    LabeledFreeTree l b
+  f <*> x = case f of
+    Node fab -> fmap fab x
+    Edge elt l elt' -> Edge (elt <*> x) l (elt' <*> x)
+
+instance Monad (LabeledFreeTree l) where
+  return :: a -> LabeledFreeTree l a
+  return = pure
+  (>>=) ::
+    LabeledFreeTree l a ->
+    (a -> LabeledFreeTree l b) ->
+    LabeledFreeTree l b
+  elt >>= f = case elt of
+    Node a -> f a
+    Edge elt' l elt_la -> Edge (elt' >>= f) l (elt_la >>= f)
+
+instance Bifunctor LabeledFreeTree where
+  second :: (b -> c) -> LabeledFreeTree a b -> LabeledFreeTree a c
+  second = fmap
+  first :: (a -> b) -> LabeledFreeTree a c -> LabeledFreeTree b c
+  first f elt = case elt of
+    Node c -> Node c
+    Edge elft a elft' -> Edge (first f elft) (f a) (first f elft')
+
+instance Bifoldable LabeledFreeTree where
+  bifoldr :: (a -> c -> c) -> (b -> c -> c) -> c -> LabeledFreeTree a b -> c
+  bifoldr f g acc elft = case elft of
+    Node b -> g b acc
+    Edge elft' a elft_ab ->
+      let rhs = bifoldr f g acc elft_ab
+          cen = f a rhs
+          result = bifoldr f g cen elft'
+       in result
+
+instance Bitraversable LabeledFreeTree where
+  bitraverse ::
+    Applicative f =>
+    (a -> f c) ->
+    (b -> f d) ->
+    LabeledFreeTree a b ->
+    f (LabeledFreeTree c d)
+  bitraverse f g elft = case elft of
+    Node b -> Node <$> g b
+    Edge elft' a elft_ab ->
+      Edge
+        <$> bitraverse f g elft'
+          <*> f a
+          <*> bitraverse f g elft_ab
+
+instance Rng (LabeledFreeTree SetOp a) where
+  (+.) ::
+    LabeledFreeTree SetOp a ->
+    LabeledFreeTree SetOp a ->
+    LabeledFreeTree SetOp a
+  x +. y = Edge x Union y
+  (*.) ::
+    LabeledFreeTree SetOp a ->
+    LabeledFreeTree SetOp a ->
+    LabeledFreeTree SetOp a
+  x *. y = Edge x Intersect y
+  (-.) ::
+    LabeledFreeTree SetOp a ->
+    LabeledFreeTree SetOp a ->
+    LabeledFreeTree SetOp a
+  x -. y = Edge x Difference y
+
+instance Magma (LabeledFreeTree () a) where
+  (∙) ::
+    LabeledFreeTree () a ->
+    LabeledFreeTree () a ->
+    LabeledFreeTree () a
+  x ∙ y = Edge x () y
+
+fold1WithEdge :: (l -> a -> a -> a) -> LabeledFreeTree l a -> a
+fold1WithEdge f elft = case elft of
+  Node a -> a
+  Edge elft' l elft_la ->
+    f
+      l
+      (fold1WithEdge f elft')
+      (fold1WithEdge f elft_la)
+
+{- |
+ Evaluates node operands from left to right.
+-}
+fold1WithEdgeMl ::
+  Monad f =>
+  (l -> a -> a -> f a) ->
+  LabeledFreeTree l a ->
+  f a
+fold1WithEdgeMl f elft = case elft of
+  Node a -> pure a
+  Edge elft' l elft_la -> do
+    lhs <- fold1WithEdgeMl f elft'
+    rhs <- fold1WithEdgeMl f elft_la
+    f l lhs rhs
+
+{- |
+ Evaluates node operands from right to left.
+-}
+fold1WithEdgeMr ::
+  Monad f =>
+  (t1 -> t2 -> t2 -> f t2) ->
+  LabeledFreeTree t1 t2 ->
+  f t2
+fold1WithEdgeMr f elft =
+  case elft of
+    Node a -> pure a
+    Edge elft' l elft_la -> do
+      rhs <- fold1WithEdgeMr f elft_la
+      lhs <- fold1WithEdgeMr f elft'
+      f l lhs rhs
+
+evaluateFreeRingTree :: Rng a => LabeledFreeTree SetOp a -> a
+evaluateFreeRingTree =
+  fold1WithEdge
+    ( \so -> case so of
+        Union -> (+.)
+        Intersect -> (*.)
+        Difference -> (-.)
+    )
 
 infix 9 :∙
 
