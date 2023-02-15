@@ -11,7 +11,6 @@ module Interface.Widget (
 import Control.Lens ((%~), (&), (.~), (^.))
 import Data.Event (
   FileSelectionEvent (
-    ClearSelection,
     CycleNextFile,
     CyclePrevFile
   ),

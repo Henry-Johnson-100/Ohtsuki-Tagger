@@ -13,6 +13,8 @@ import Data.Event (
   FileSelectionEvent (
     AddFiles,
     ClearSelection,
+    CycleOrderCriteria,
+    CycleOrderDirection,
     DeleteFileFromFileSystem,
     DoFileSelectionWidgetEvent,
     IncludeTagListInfraToPattern,
@@ -30,7 +32,6 @@ import Data.Event (
     DoFileSelectionEvent,
     DoFocusedFileEvent,
     Mempty,
-    NextCyclicEnum,
     NextHistory,
     PrevHistory,
     ToggleVisibilityLabel,
@@ -72,8 +73,6 @@ import Data.Model.Shared.Core (
 import Data.Model.Shared.Lens (
   HasHistory (history),
   HasHistoryIndex (historyIndex),
-  HasOrderCriteria (orderCriteria),
-  HasOrderDirection (orderDirection),
   HasText (text),
  )
 import qualified Data.Ord as O
@@ -237,17 +236,13 @@ tagListWidget m =
      in styledButton_
           [resizeFactor (-1)]
           btnText
-          ( NextCyclicEnum $
-              TaggerLens (fileSelectionTagListModel . ordering . orderCriteria)
-          )
+          (DoFileSelectionEvent CycleOrderCriteria)
   tagListOrderDirCycleButton =
     let (OrderBy _ ordDir) = m ^. fileSelectionTagListModel . ordering
      in styledButton_
           [resizeFactor (-1)]
           (T.pack . show $ ordDir)
-          ( NextCyclicEnum $
-              TaggerLens (fileSelectionTagListModel . ordering . orderDirection)
-          )
+          (DoFileSelectionEvent CycleOrderDirection)
   tagListLeaf (d, n) =
     hgrid_
       [childSpacing_ 0]

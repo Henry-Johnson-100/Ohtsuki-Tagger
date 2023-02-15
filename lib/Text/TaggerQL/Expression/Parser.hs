@@ -29,7 +29,6 @@ import Control.Monad (unless)
 import Data.Char (toLower, toUpper)
 import Data.Functor (($>))
 import qualified Data.List as L
-import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Text.Parsec (

@@ -22,6 +22,7 @@ Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL.Expression.AST (
   -- * Components
+  SetOp (..),
   Pattern (.., Pattern),
   patternText,
   DTerm (..),
@@ -74,11 +75,19 @@ import Data.Hashable (Hashable)
 import qualified Data.List as L
 import Data.Maybe (fromMaybe)
 import Data.String (IsString, fromString)
-import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
 import GHC.Exts (IsList (..))
 import GHC.Generics (Generic)
+
+{- |
+ A type detailing how set-like collections are to be combined.
+-}
+data SetOp
+  = Union
+  | Intersect
+  | Difference
+  deriving (Show, Eq, Bounded, Enum, Ord)
 
 {- |
  A data type representing an expression of any Ring.
