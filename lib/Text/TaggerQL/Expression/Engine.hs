@@ -181,7 +181,7 @@ instance Semigroup TagInserter where
 insertTagExpression ::
   TaggedConnection ->
   RecordKey File ->
-  FreeCompoundExpression RingExpression FreeMagma Pattern ->
+  FreeCompoundExpression RingExpression FreeTree Pattern ->
   IO ()
 insertTagExpression c fk =
   void

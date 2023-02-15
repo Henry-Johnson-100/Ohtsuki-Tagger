@@ -431,7 +431,7 @@ qewbLeaf ql =
               False
 
 buildTagExpressionWidget ::
-  FreeCompoundExpression RingExpression FreeMagma (DTerm Pattern) ->
+  FreeCompoundExpression RingExpression FreeTree (DTerm Pattern) ->
   TagExpressionWidgetBuilder
 buildTagExpressionWidget =
   evaluateFreeCompoundExpression evaluateRing evaluateFreeMagma

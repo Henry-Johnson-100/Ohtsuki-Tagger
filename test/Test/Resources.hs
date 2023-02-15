@@ -64,7 +64,7 @@ import Test.Tasty.QuickCheck (
 import Text.TaggerQL.Expression.AST (
   DTerm (..),
   FreeCompoundExpression (..),
-  FreeMagma,
+  FreeTree,
   FreeQueryExpression (..),
   Magma ((∙)),
   Pattern,
@@ -113,7 +113,7 @@ instance Function a => Function (RingExpression a)
 
 instance Function a => Function (QCRingExpression a)
 
-newtype QCFreeMagma a = QCFreeMagma {runQCFreeMagma :: FreeMagma a}
+newtype QCFreeMagma a = QCFreeMagma {runQCFreeMagma :: FreeTree a}
   deriving
     ( Show1
     , Show
@@ -140,7 +140,7 @@ instance Arbitrary a => Arbitrary (QCFreeMagma a) where
   arbitrary :: Arbitrary a => Gen (QCFreeMagma a)
   arbitrary = liftArbitrary arbitrary
 
-instance Function a => Function (FreeMagma a)
+instance Function a => Function (FreeTree a)
 
 instance Function a => Function (QCFreeMagma a)
 
@@ -205,7 +205,7 @@ castQCTagQueryExpression ::
     QCRingExpression
     QCFreeMagma
     (QCDTerm QCPattern) ->
-  FreeCompoundExpression RingExpression FreeMagma (DTerm Pattern)
+  FreeCompoundExpression RingExpression FreeTree (DTerm Pattern)
 castQCTagQueryExpression =
   castFreeCompoundExpression
 

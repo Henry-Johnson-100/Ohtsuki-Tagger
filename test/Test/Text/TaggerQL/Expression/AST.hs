@@ -89,7 +89,7 @@ astProperties =
                 )
             ]
         , testGroup
-            "FreeMagma Properties"
+            "FreeTree Properties"
             [ testProperty
                 "Left Monad Identity"
                 ( do

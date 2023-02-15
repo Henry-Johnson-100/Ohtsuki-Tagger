@@ -33,7 +33,7 @@ module Text.TaggerQL.Expression.AST (
   RingExpression (..),
   evaluateRing,
   toFreeMagma,
-  FreeMagma (..),
+  FreeTree (..),
   foldFreeMagma1,
   evaluateFreeMagma,
   FreeCompoundExpression (..),
@@ -190,17 +190,17 @@ evaluateRing r = case r of
   re :- re' -> evaluateRing re -. evaluateRing re'
 
 {- |
- Transform a 'RingExpression` to a more general free expression, 'FreeMagma`.
+ Transform a 'RingExpression` to a more general free expression, 'FreeTree`.
 
- It should be noted that the 'Foldable` instance for a 'RingExpression` and 'FreeMagma`
+ It should be noted that the 'Foldable` instance for a 'RingExpression` and 'FreeTree`
  behave the same. So if the ultimate goal is to perform some kind of associative
-  fold of a 'FreeMagma`, then simply folding the 'RingExpression` will suffice.
+  fold of a 'FreeTree`, then simply folding the 'RingExpression` will suffice.
 
  For example:
 
  >(toList :: RingExpression a -> [a]) == toList . toFreeMagma
 -}
-toFreeMagma :: RingExpression a -> FreeMagma a
+toFreeMagma :: RingExpression a -> FreeTree a
 toFreeMagma re = case re of
   Ring a -> pure a
   re' :+ re_a -> toFreeMagma re' :∙ toFreeMagma re_a
@@ -216,25 +216,25 @@ infix 9 :∙
  This type is just an unrooted binary tree where each node is an operand and each edge
  is an operation.
 -}
-data FreeMagma a
-  = Magma a
-  | (FreeMagma a) :∙ (FreeMagma a)
+data FreeTree a
+  = FreeTree a
+  | (FreeTree a) :∙ (FreeTree a)
   deriving (Functor, Generic, Foldable, Traversable)
 
-instance Show1 FreeMagma where
+instance Show1 FreeTree where
   liftShowsPrec ::
     (Int -> a -> ShowS) ->
     ([a] -> ShowS) ->
     Int ->
-    FreeMagma a ->
+    FreeTree a ->
     ShowS
   liftShowsPrec f g n x = case x of
-    Magma a -> showsUnaryWith f "Magma" n a
+    FreeTree a -> showsUnaryWith f "FreeTree" n a
     fm :∙ fm' ->
       let mWithParens fm'' =
             showParen
               ( case fm'' of
-                  Magma _ -> False
+                  FreeTree _ -> False
                   _ -> True
               )
           lhs = mWithParens fm $ liftShowsPrec f g n fm
@@ -242,70 +242,70 @@ instance Show1 FreeMagma where
           c = showString " :∙ "
        in lhs . c . rhs
 
-instance Show a => Show (FreeMagma a) where
-  showsPrec :: Show a => Int -> FreeMagma a -> ShowS
+instance Show a => Show (FreeTree a) where
+  showsPrec :: Show a => Int -> FreeTree a -> ShowS
   showsPrec = showsPrec1
 
-instance Eq1 FreeMagma where
-  liftEq :: (a -> b -> Bool) -> FreeMagma a -> FreeMagma b -> Bool
+instance Eq1 FreeTree where
+  liftEq :: (a -> b -> Bool) -> FreeTree a -> FreeTree b -> Bool
   liftEq eq x y = case x of
-    Magma a ->
+    FreeTree a ->
       case y of
-        Magma b -> eq a b
+        FreeTree b -> eq a b
         _ -> False
     fm :∙ fm' ->
       case y of
         a :∙ b -> liftEq eq fm a && liftEq eq fm' b
         _ -> False
 
-instance Eq a => Eq (FreeMagma a) where
-  (==) :: Eq a => FreeMagma a -> FreeMagma a -> Bool
+instance Eq a => Eq (FreeTree a) where
+  (==) :: Eq a => FreeTree a -> FreeTree a -> Bool
   (==) = liftEq (==)
 
-instance IsList (FreeMagma a) where
-  type Item (FreeMagma a) = a
-  fromList :: [Item (FreeMagma a)] -> FreeMagma a
-  fromList [] = error "Empty list in fromList :: [a] -> FreeMagma a"
+instance IsList (FreeTree a) where
+  type Item (FreeTree a) = a
+  fromList :: [Item (FreeTree a)] -> FreeTree a
+  fromList [] = error "Empty list in fromList :: [a] -> FreeTree a"
   fromList (x : xs) = F.foldl' (\m a -> m :∙ pure a) (pure x) xs
-  toList :: FreeMagma a -> [Item (FreeMagma a)]
+  toList :: FreeTree a -> [Item (FreeTree a)]
   toList = foldr (:) []
 
-instance Hashable a => Hashable (FreeMagma a)
+instance Hashable a => Hashable (FreeTree a)
 
 -- | Not a structural semigroup
-instance Semigroup (FreeMagma a) where
-  (<>) :: FreeMagma a -> FreeMagma a -> FreeMagma a
+instance Semigroup (FreeTree a) where
+  (<>) :: FreeTree a -> FreeTree a -> FreeTree a
   (<>) = (:∙)
 
-instance Magma (FreeMagma a) where
-  (∙) :: FreeMagma a -> FreeMagma a -> FreeMagma a
+instance Magma (FreeTree a) where
+  (∙) :: FreeTree a -> FreeTree a -> FreeTree a
   (∙) = (:∙)
 
-instance Applicative FreeMagma where
-  pure :: a -> FreeMagma a
-  pure = Magma
-  (<*>) :: FreeMagma (a -> b) -> FreeMagma a -> FreeMagma b
+instance Applicative FreeTree where
+  pure :: a -> FreeTree a
+  pure = FreeTree
+  (<*>) :: FreeTree (a -> b) -> FreeTree a -> FreeTree b
   f <*> x = case f of
-    Magma fab -> fmap fab x
+    FreeTree fab -> fmap fab x
     fm :∙ fm' -> (fm <*> x) :∙ (fm' <*> x)
 
-instance Monad FreeMagma where
-  return :: a -> FreeMagma a
-  return = Magma
-  (>>=) :: FreeMagma a -> (a -> FreeMagma b) -> FreeMagma b
+instance Monad FreeTree where
+  return :: a -> FreeTree a
+  return = FreeTree
+  (>>=) :: FreeTree a -> (a -> FreeTree b) -> FreeTree b
   fm >>= f = case fm of
-    Magma a -> f a
+    FreeTree a -> f a
     fm' :∙ fm_a -> (fm' >>= f) :∙ (fm_a >>= f)
 
 {- |
- Non associative fold of a 'FreeMagma`
+ Non associative fold of a 'FreeTree`
 -}
-foldFreeMagma1 :: (a -> a -> a) -> FreeMagma a -> a
+foldFreeMagma1 :: (a -> a -> a) -> FreeTree a -> a
 foldFreeMagma1 f fm = case fm of
-  Magma a -> a
+  FreeTree a -> a
   fm' :∙ fm_a -> f (foldFreeMagma1 f fm') (foldFreeMagma1 f fm_a)
 
-evaluateFreeMagma :: Magma a => FreeMagma a -> a
+evaluateFreeMagma :: Magma a => FreeTree a -> a
 evaluateFreeMagma = foldFreeMagma1 (∙)
 
 {- |
@@ -378,7 +378,7 @@ unwrapIdentities :: TagQueryExpression -> TagQueryExpression
 unwrapIdentities =
   unwrapTK
     (\re -> case re of Ring x -> Just x; _ -> Nothing)
-    (\fm -> case fm of Magma x -> Just x; _ -> Nothing)
+    (\fm -> case fm of FreeTree x -> Just x; _ -> Nothing)
 
 {- |
  Resolve structural ambiguities and redundancies by distributing the magma expressions
@@ -524,10 +524,10 @@ instance Rng (FreeCompoundExpression t RingExpression a) where
   (*.) = fcebh K (*.) pure pure
   (-.) = fcebh K (-.) pure pure
 
-instance Magma (FreeCompoundExpression FreeMagma k a) where
+instance Magma (FreeCompoundExpression FreeTree k a) where
   (∙) = fcebh T (∙) pure pure
 
-instance Magma (FreeCompoundExpression t FreeMagma a) where
+instance Magma (FreeCompoundExpression t FreeTree a) where
   (∙) = fcebh K (∙) pure pure
 
 {- |
@@ -749,10 +749,10 @@ instance (Magma a, Magma b) => Magma (a, b) where
   x ∙ (a, b) = bimap (∙ a) (∙ b) x
 
 {- |
- > FreeCompoundExpression RingExpression FreeMagma (DTerm Pattern)
+ > FreeCompoundExpression RingExpression FreeTree (DTerm Pattern)
 -}
 type TagQueryExpression =
-  FreeCompoundExpression RingExpression FreeMagma (DTerm Pattern)
+  FreeCompoundExpression RingExpression FreeTree (DTerm Pattern)
 
 newtype FreeQueryExpression = FreeQueryExpression
   { runFreeQueryExpression ::
