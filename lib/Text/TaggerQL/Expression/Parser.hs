@@ -2,7 +2,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# HLINT ignore "Use const" #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
@@ -51,16 +50,7 @@ import Text.Parsec (
   try,
   (<|>),
  )
-import Text.TaggerQL.Expression.AST (
-  DTerm (..),
-  Magma (..),
-  Pattern (Pattern),
-  QueryExpression (..),
-  QueryLeaf (..),
-  RingExpression (..),
-  Rng,
-  TagExpression (TagRing),
- )
+import Text.TaggerQL.Expression.AST
 import Text.TaggerQL.Expression.AST.Editor ((<-#))
 
 type Parser a = Parsec Text () a
@@ -99,7 +89,7 @@ myChainl1 p op defP = do
 
 patternTextParser :: Parser Text
 patternTextParser =
-  T.pack <$> many1 ((char '\\' *> anyChar) <|> notRestricted)
+  T.pack <$> many1 (char '\\' *> anyChar <|> notRestricted)
 
 patternParser :: Parser Pattern
 patternParser = Pattern <$> patternTextParser
@@ -120,13 +110,13 @@ explicitSetOpParser = unionParser <|> intersectParser <|> differenceParser
 ichar :: Char -> Parser Char
 ichar c = char (toUpper c) <|> char (toLower c)
 
-restrictedChars :: [Char]
+restrictedChars :: String
 restrictedChars = "(){}!&|. \r\n"
 
 foldBracketedTags :: Magma b => b -> Maybe b -> b
 foldBracketedTags overTerm = maybe overTerm (overTerm ∙)
 
-parseQueryExpression :: Text -> Either ParseError QueryExpression
+parseQueryExpression :: Text -> Either ParseError FreeQueryExpression
 parseQueryExpression =
   parse
     allInput
@@ -137,7 +127,7 @@ parseQueryExpression =
       <* spaces
       <* failIfNotConsumed
 
-parseTagExpression :: Text -> Either ParseError (TagExpression (DTerm Pattern))
+parseTagExpression :: Text -> Either ParseError TagQueryExpression
 parseTagExpression =
   parse
     allInput
@@ -156,24 +146,29 @@ failIfNotConsumed = do
       <> T.unpack remains
       <> "\""
 
-queryExpressionParser :: Parser QueryExpression
+queryExpressionParser :: Parser FreeQueryExpression
 queryExpressionParser =
   spaces
-    *> ( fmap (QueryExpression . (>>= runQueryExpression))
+    *> ( fmap (FreeQueryExpression . (>>= runFreeQueryExpression))
           . ringExprParser
           . fmap runQueryTerm
           $ queryTermParser
        )
 
-tagExpressionParser :: Parser (TagExpression (DTerm Pattern))
+tagExpressionParser :: Parser TagQueryExpression
 tagExpressionParser =
   spaces
-    *> (TagRing <$> ringExprParser (runTagTerm <$> tagTermParser))
+    *> ( T
+          <$> ringExprParser
+            ( runTagTerm
+                <$> tagTermParser
+            )
+       )
 
-filePathParser :: Parser QueryLeaf
+filePathParser :: Parser (Either Pattern TagQueryExpression)
 filePathParser =
   spaces
-    *> (FileLeaf <$> (ichar 'p' *> char '.' *> patternParser))
+    *> (Left <$> (ichar 'p' *> char '.' *> patternParser))
 
 descriptorPatternParser :: Parser (DTerm Pattern)
 descriptorPatternParser =
@@ -181,7 +176,7 @@ descriptorPatternParser =
     *> (dTermConstructorParser <*> patternParser)
 
 newtype MinimalTagExpression = MinimalTagExpression
-  {runMinTagExpr :: TagExpression (DTerm Pattern)}
+  {runMinTagExpr :: TagQueryExpression}
   deriving (Show, Eq, Rng, Magma)
 
 minimalTagExpressionParser :: Parser MinimalTagExpression
@@ -195,14 +190,14 @@ minimalTagExpressionParser =
       )
 
 newtype ParenthesizedTag = ParenthesizedTag
-  {runParenTag :: TagExpression (DTerm Pattern)}
+  {runParenTag :: TagQueryExpression}
   deriving (Show, Eq, Rng, Magma)
 
 parenthesizedTagParser :: Parser ParenthesizedTag
 parenthesizedTagParser = ParenthesizedTag <$> parenthesized tagExpressionParser
 
 newtype BracketedTag = BracketedTag
-  {runBracketTag :: TagExpression (DTerm Pattern)}
+  {runBracketTag :: TagQueryExpression}
   deriving (Show, Eq, Rng, Magma)
 
 bracketedTagParser :: Parser BracketedTag
@@ -220,10 +215,10 @@ zeroOrManyBracketedTagParser =
         [] -> Nothing
         _notNull -> Just $ L.foldl1' (∙) xs
     )
-    (many . try $ (spaces *> bracketedTagParser))
+    (many . try $ spaces *> bracketedTagParser)
 
 newtype TagTerm = TagTerm
-  {runTagTerm :: TagExpression (DTerm Pattern)}
+  {runTagTerm :: TagQueryExpression}
   deriving (Show, Eq, Rng, Magma)
 
 tagTermParser :: Parser TagTerm
@@ -249,14 +244,14 @@ tagTermParser =
   minimalTagTerm = TagTerm . runMinTagExpr <$> minimalTagExpressionParser
 
 newtype ParenthesizedQuery = ParenthesizedQuery
-  {runParenQuery :: QueryExpression}
+  {runParenQuery :: FreeQueryExpression}
   deriving (Show, Eq, Rng)
 
 parenthesizedQueryParser :: Parser ParenthesizedQuery
 parenthesizedQueryParser =
   ParenthesizedQuery <$> parenthesized queryExpressionParser
 
-newtype QueryTerm = QueryTerm {runQueryTerm :: QueryExpression}
+newtype QueryTerm = QueryTerm {runQueryTerm :: FreeQueryExpression}
   deriving (Show, Eq, Rng)
 
 queryTermParser :: Parser QueryTerm
@@ -272,27 +267,27 @@ queryTermParser =
     QueryTerm
       <$> ( ( \(ParenthesizedQuery q) ->
                 maybe q ((q <-#) . runBracketTag) ::
-                  Maybe BracketedTag -> QueryExpression
+                  Maybe BracketedTag -> FreeQueryExpression
             )
               <$> parenthesizedQueryParser <*> zeroOrManyBracketedTagParser
           )
   bracketedQuery =
     QueryTerm
-      . QueryExpression
+      . liftSimpleQueryRing
       . Ring
-      . TagLeaf
+      . Right
       . runBracketTag
       <$> (foldBracketedTags <$> bracketedTagParser <*> zeroOrManyBracketedTagParser)
   minimalTagQuery =
     QueryTerm
-      . QueryExpression
+      . liftSimpleQueryRing
       . Ring
-      . TagLeaf
+      . Right
       . runMinTagExpr
       <$> minimalTagExpressionParser
   filePathTerm =
     QueryTerm
-      . QueryExpression
+      . liftSimpleQueryRing
       . Ring
       <$> filePathParser
 
@@ -301,9 +296,8 @@ parenthesized = between (char '(') (spaces *> char ')')
 
 dTermConstructorParser :: Parser (a -> DTerm a)
 dTermConstructorParser =
-  ( try (ichar 'r' *> char '.' $> DMetaTerm)
-      <|> try (ichar 'd' *> char '.' $> DTerm)
-  )
+  try (ichar 'r' *> char '.' $> DMetaTerm)
+    <|> try (ichar 'd' *> char '.' $> DTerm)
     <|> pure DMetaTerm
 
 ringExprParser :: Parser a -> Parser (RingExpression a)

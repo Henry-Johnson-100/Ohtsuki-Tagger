@@ -3,17 +3,20 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
-{-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Redundant bracket" #-}
-
-module Test.Resources where
+module Test.Resources (
+  module Test.Resources,
+) where
 
 import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
+import Data.Bifunctor (Bifunctor (bimap))
 import Data.Coerce (coerce)
+import Data.Functor.Classes (Eq1, Show1)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
 import Data.Maybe (catMaybes)
@@ -39,6 +42,7 @@ import Database.Tagger (
   queryForSingleDescriptorByDescriptorId,
   teardownDatabase,
  )
+import GHC.Base (Coercible)
 import GHC.Generics (Generic)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (
@@ -49,6 +53,8 @@ import Test.Tasty.HUnit (
  )
 import Test.Tasty.QuickCheck (
   Arbitrary (arbitrary),
+  Arbitrary1 (..),
+  Arbitrary2 (..),
   Function,
   Gen,
   oneof,
@@ -57,19 +63,24 @@ import Test.Tasty.QuickCheck (
  )
 import Text.TaggerQL.Expression.AST (
   DTerm (..),
+  FreeCompoundExpression (..),
   FreeMagma,
-  Magma,
-  Pattern (..),
-  QueryLeaf (..),
-  RingExpression (Ring),
-  Rng ((+.)),
-  TagExpression (..),
-  (∙),
+  FreeQueryExpression (..),
+  Magma ((∙)),
+  Pattern,
+  RingExpression (..),
+  Rng (..),
+  TagQueryExpression,
+  liftSimpleQueryRing,
+  mapK,
+  mapT,
  )
 
-newtype QCRingExpression a = QCRingExpression (RingExpression a)
+newtype QCRingExpression a = QCRingExpression {runQCRingExpression :: RingExpression a}
   deriving
-    ( Show
+    ( Show1
+    , Show
+    , Eq1
     , Eq
     , Functor
     , Foldable
@@ -81,26 +92,32 @@ newtype QCRingExpression a = QCRingExpression (RingExpression a)
     , Rng
     )
 
-instance Arbitrary a => Arbitrary (QCRingExpression a) where
-  arbitrary :: Arbitrary a => Gen (QCRingExpression a)
-  arbitrary = QCRingExpression <$> sized sizedRing
+instance Arbitrary1 QCRingExpression where
+  liftArbitrary :: Gen a -> Gen (QCRingExpression a)
+  liftArbitrary g = QCRingExpression <$> sized liftSized
    where
-    sizedRing n
-      | n <= 0 = Ring <$> arbitrary
+    liftSized n
+      | n <= 0 = pure <$> g
       | otherwise =
         oneof
-          [ (+.) <$> sizedRing (n `div` 2) <*> sizedRing (n `div` 2)
-          , (+.) <$> sizedRing (n `div` 2) <*> sizedRing (n `div` 2)
-          , (+.) <$> sizedRing (n `div` 2) <*> sizedRing (n `div` 2)
+          [ (+.) <$> liftSized (n `div` 2) <*> liftSized (n `div` 2)
+          , (*.) <$> liftSized (n `div` 2) <*> liftSized (n `div` 2)
+          , (-.) <$> liftSized (n `div` 2) <*> liftSized (n `div` 2)
           ]
+
+instance Arbitrary a => Arbitrary (QCRingExpression a) where
+  arbitrary :: Arbitrary a => Gen (QCRingExpression a)
+  arbitrary = liftArbitrary arbitrary
 
 instance Function a => Function (RingExpression a)
 
 instance Function a => Function (QCRingExpression a)
 
-newtype QCFreeMagma a = QCFreeMagma (FreeMagma a)
+newtype QCFreeMagma a = QCFreeMagma {runQCFreeMagma :: FreeMagma a}
   deriving
-    ( Show
+    ( Show1
+    , Show
+    , Eq1
     , Eq
     , Functor
     , Applicative
@@ -111,18 +128,23 @@ newtype QCFreeMagma a = QCFreeMagma (FreeMagma a)
     , Generic
     )
 
-instance Arbitrary a => Arbitrary (QCFreeMagma a) where
-  arbitrary = QCFreeMagma <$> sized sizedFreeMagma
+instance Arbitrary1 QCFreeMagma where
+  liftArbitrary :: Gen a -> Gen (QCFreeMagma a)
+  liftArbitrary g = QCFreeMagma <$> sized liftSized
    where
-    sizedFreeMagma n
-      | n <= 0 = pure <$> arbitrary
-      | otherwise = (∙) <$> sizedFreeMagma (n `div` 2) <*> sizedFreeMagma (n `div` 2)
+    liftSized n
+      | n <= 0 = pure <$> g
+      | otherwise = (∙) <$> liftSized (n `div` 2) <*> liftSized (n `div` 2)
+
+instance Arbitrary a => Arbitrary (QCFreeMagma a) where
+  arbitrary :: Arbitrary a => Gen (QCFreeMagma a)
+  arbitrary = liftArbitrary arbitrary
 
 instance Function a => Function (FreeMagma a)
 
 instance Function a => Function (QCFreeMagma a)
 
-newtype QCPattern = QCPattern Pattern
+newtype QCPattern = QCPattern {runQCPattern :: Pattern}
   deriving (Show, Eq, Generic, IsString, Semigroup, Monoid, Hashable)
 
 -- change this at some point
@@ -130,7 +152,7 @@ instance Arbitrary QCPattern where
   arbitrary :: Gen QCPattern
   arbitrary = fromString <$> suchThat arbitrary (not . null)
 
-newtype QCDTerm a = QCDTerm (DTerm a)
+newtype QCDTerm a = QCDTerm {runQCDterm :: DTerm a}
   deriving
     ( Show
     , Eq
@@ -151,68 +173,111 @@ instance Function a => Function (DTerm a)
 
 instance Function a => Function (QCDTerm a)
 
-newtype QCTagExpression a = QCTagExpression (TagExpression a)
+newtype QCFreeCompoundExpression t k a = QCFreeCompoundExpression
+  {runQCFreeCompoundExpression :: FreeCompoundExpression t k a}
   deriving
     ( Show
     , Eq
     , Functor
+    , Applicative
+    , Monad
     , Foldable
     , Traversable
     , Generic
-    , Hashable
-    , Applicative
-    , Monad
-    , Rng
-    , Magma
     )
 
-instance Arbitrary a => Arbitrary (QCTagExpression a) where
-  arbitrary :: Arbitrary a => Gen (QCTagExpression a)
-  arbitrary = QCTagExpression <$> sized sizedExpr
+castFreeCompoundExpression ::
+  forall qct qck qca h k a.
+  ( Functor qct
+  , Functor k
+  , Functor qck
+  , Coercible a qca
+  , forall b. Coercible (qct b) (h b)
+  , forall b. Coercible (qck b) (k b)
+  ) =>
+  QCFreeCompoundExpression qct qck qca ->
+  FreeCompoundExpression h k a
+castFreeCompoundExpression (qcef :: QCFreeCompoundExpression qct qck qca) =
+  mapT coerce . mapK coerce . fmap coerce . runQCFreeCompoundExpression $ qcef
+
+castQCTagQueryExpression ::
+  QCFreeCompoundExpression
+    QCRingExpression
+    QCFreeMagma
+    (QCDTerm QCPattern) ->
+  FreeCompoundExpression RingExpression FreeMagma (DTerm Pattern)
+castQCTagQueryExpression =
+  castFreeCompoundExpression
+
+instance (Arbitrary1 t, Arbitrary1 k) => Arbitrary1 (QCFreeCompoundExpression t k) where
+  liftArbitrary ::
+    (Arbitrary1 t, Arbitrary1 k) =>
+    Gen a ->
+    Gen (QCFreeCompoundExpression t k a)
+  liftArbitrary g = QCFreeCompoundExpression <$> sized liftSized
    where
-    sizedExpr n
-      | n <= 0 = TagValue <$> arbitrary
+    liftSized n
+      | n <= 0 = FreeCompoundExpression <$> g
       | otherwise =
-        let tagRing =
-              TagRing <$> do
-                r <-
-                  (coerce :: QCRingExpression () -> RingExpression ())
-                    <$> arbitrary ::
-                    Gen (RingExpression ())
-                let teG = sizedExpr (n `div` 2)
-                sequenceA $ teG <$ r
-            tagMagma =
-              TagMagma <$> do
-                r <-
-                  (coerce :: QCFreeMagma () -> FreeMagma ())
-                    <$> arbitrary ::
-                    Gen (FreeMagma ())
-                let teG = sizedExpr (n `div` 2)
-                sequenceA $ teG <$ r
-         in oneof [tagRing, tagMagma]
+        oneof
+          [ T <$> liftArbitrary (liftSized (n `div` 2))
+          , K <$> liftArbitrary (liftSized (n `div` 2))
+          ]
 
-instance Function a => Function (TagExpression a)
+instance
+  (Arbitrary1 t, Arbitrary1 k, Arbitrary a) =>
+  Arbitrary (QCFreeCompoundExpression t k a)
+  where
+  arbitrary ::
+    (Arbitrary1 t, Arbitrary1 k, Arbitrary a) =>
+    Gen (QCFreeCompoundExpression t k a)
+  arbitrary = liftArbitrary arbitrary
 
-instance Function a => Function (QCTagExpression a)
+newtype QCFreeQueryExpression = QCFreeQueryExpression
+  {runQCFreeQueryExpression :: FreeQueryExpression}
+  deriving (Show, Eq, Rng, Generic)
 
-newtype QCQueryLeaf = QCQueryLeaf QueryLeaf
-  deriving (Show, Eq)
+instance Arbitrary QCFreeQueryExpression where
+  arbitrary :: Gen QCFreeQueryExpression
+  arbitrary = QCFreeQueryExpression <$> sized s
+   where
+    s n
+      | n <= 0 =
+        liftSimpleQueryRing
+          . ( fmap
+                ( bimap
+                    runQCPattern
+                    castQCTagQueryExpression
+                )
+                . runQCRingExpression
+            )
+          <$> arbitrary
+      | otherwise =
+        FreeQueryExpression . runQCRingExpression
+          <$> liftArbitrary
+            ( liftArbitrary2
+                ((,) <$> s (n `div` 2) <*> fmap castQCTagQueryExpression arbitrary)
+                ( bimap
+                    runQCPattern
+                    castQCTagQueryExpression
+                    <$> liftArbitrary2 arbitrary arbitrary
+                )
+            )
 
-instance Arbitrary QCQueryLeaf where
-  arbitrary :: Gen QCQueryLeaf
-  arbitrary =
-    QCQueryLeaf
-      <$> ( oneof
-              [ TagLeaf
-                  . ( coerce ::
-                        QCTagExpression (QCDTerm QCPattern) ->
-                        TagExpression (DTerm Pattern)
-                    )
-                  <$> arbitrary
-              , FileLeaf . (coerce :: QCPattern -> Pattern)
-                  <$> arbitrary
-              ]
-          )
+fe :: Pattern -> FreeQueryExpression
+fe = liftSimpleQueryRing . pure . Left
+
+tle :: TagQueryExpression -> FreeQueryExpression
+tle = liftSimpleQueryRing . pure . Right
+
+tedp :: DTerm Pattern -> TagQueryExpression
+tedp = pure
+
+d :: a -> DTerm a
+d = DTerm
+
+rt :: a -> DTerm a
+rt = DMetaTerm
 
 secureResource :: IO TaggedConnection
 secureResource = openOrCreate "integrated_testing_database.db"

@@ -14,11 +14,12 @@ module Interface.Handler (
   taggerEventHandler,
 ) where
 
-import Control.Lens ((%~), (&), (.~), (<|), (?~), (^.), (|>))
+import Control.Lens ((%~), (&), (.~), (<|), (^.), (|>))
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
+import Data.Bifunctor
 import Data.Either (fromRight)
 import Data.Event
 import qualified Data.Foldable as F
@@ -372,21 +373,12 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
           model & fileSelectionModel . queryModel . expression
             %~ flip
               (withQueryExpression li)
-              ( \qe@(QueryExpression qe') ->
-                  case mi of
-                    Nothing -> qe <-# te
-                    Just n -> case qe' of
-                      Ring ql -> case ql of
-                        TagLeaf te' ->
-                          QueryExpression
-                            . Ring
-                            . TagLeaf
-                            $ withTagExpression
-                              n
-                              te'
-                              (∙ te)
-                        _notTagLeaf -> qe
-                      _notRingValue -> qe
+              ( case mi of
+                  Nothing -> (<-# te)
+                  Just n ->
+                    FreeQueryExpression
+                      . fmap (second (second (flip (withTagExpression n) (∙ te))))
+                      . runFreeQueryExpression
               )
       ]
     PlaceQueryExpression n l ->
@@ -405,23 +397,21 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
           model & fileSelectionModel . queryModel . expression
             %~ flip
               (withQueryExpression li)
-              ( \qe@(QueryExpression qre) ->
-                  case qre of
-                    Ring ql -> case ql of
-                      TagLeaf te ->
-                        QueryExpression
-                          . Ring
-                          . TagLeaf
-                          $ withTagExpression
-                            i
-                            te
-                            ( case lte of
-                                LatLeft te' -> (te' *.)
-                                LatMiddle te' -> const te'
-                                LatRight te' -> (*. te')
+              ( FreeQueryExpression
+                  . fmap
+                    ( second
+                        ( second
+                            ( flip
+                                (withTagExpression i)
+                                ( case lte of
+                                    LatLeft fce -> (fce *.)
+                                    LatMiddle fce -> const fce
+                                    LatRight fce -> (*. fce)
+                                )
                             )
-                      _notTagLeaf -> qe
-                    _notRingValue -> qe
+                        )
+                    )
+                  . runFreeQueryExpression
               )
       ]
     PushExpression ->
@@ -483,12 +473,12 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
             (withQueryExpression qeIndex)
             ( \qe ->
                 maybe
-                  (QueryExpression . f . runQueryExpression $ qe)
+                  (FreeQueryExpression . f . runFreeQueryExpression $ qe)
                   ( \teIndex ->
                       onTagLeaf
                         qe
                         ( \te ->
-                            withTagExpression teIndex te (`onTagRing` f)
+                            withTagExpression teIndex te (mapT f)
                         )
                   )
                   mTeIndex
