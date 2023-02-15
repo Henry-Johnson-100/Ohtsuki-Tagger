@@ -802,6 +802,12 @@ newtype FreeQueryExpression = FreeQueryExpression
   }
   deriving (Show, Eq, Rng, Generic)
 
+instance Ring FreeQueryExpression where
+  aid :: FreeQueryExpression
+  aid = FreeQueryExpression . Ring . Right . Left $ WildCard
+  mid :: FreeQueryExpression
+  mid = aid -. aid
+
 {- |
  To make non-recursive query expressions easier to build.
 -}
