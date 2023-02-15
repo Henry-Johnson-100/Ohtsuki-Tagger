@@ -14,6 +14,7 @@ import Control.Monad.Trans.Maybe (runMaybeT)
 import qualified Data.HashSet as HS
 import qualified Data.Text as T
 import Database.Tagger
+import Test.Resources
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.TaggerQL.Expression.AST
@@ -28,21 +29,6 @@ queryEngineASTTests c =
     , taggingEngineTests c
     , enginePropertyTests
     ]
-
-fe :: Pattern -> QueryExpression
-fe = QueryExpression . pure . FileLeaf
-
-tle :: TagQueryExpression -> QueryExpression
-tle = QueryExpression . pure . TagLeaf
-
-tedp :: DTerm Pattern -> TagQueryExpression
-tedp = pure
-
-d :: a -> DTerm a
-d = DTerm
-
-rt :: a -> DTerm a
-rt = DMetaTerm
 
 des :: Int -> Pattern
 des n = PatternText $ "descriptor_" <> (T.pack . show $ n)

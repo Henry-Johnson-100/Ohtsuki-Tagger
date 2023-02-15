@@ -32,24 +32,19 @@ module Text.TaggerQL.Expression.Engine (
   runQuery,
   tagFile,
 
-  -- * Indexing
-  ExpressionIndex (..),
-  exprAt,
-  foldIxGen,
-  flatten,
-  index,
-  indexWith,
-
   -- * New
   queryQueryExpression,
   insertTagExpression,
 ) where
 
 import Control.Applicative ((<|>))
-import Control.Monad (foldM, guard, void, (>=>))
+import Control.Monad (foldM, guard, void, (<=<), (>=>))
+import Control.Monad.Fix (fix)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (ExceptT, throwE)
-import Data.Bifunctor (Bifunctor (second))
+import Data.Bifunctor (Bifunctor (second), bimap)
+import Data.Bitraversable (bitraverse)
+import Data.Either (fromRight)
 import qualified Data.Foldable as F
 import Data.Functor (($>))
 import Data.HashSet (HashSet)
@@ -81,19 +76,7 @@ import Database.Tagger.Type (
  )
 import Lens.Micro (Lens', lens)
 import Text.Parsec.Error (errorMessages, messageString)
-import Text.TaggerQL.Expression.AST (
-  DTerm (..),
-  FreeCompoundExpression,
-  FreeMagma,
-  Pattern (PatternText, WildCard),
-  QueryExpression (runQueryExpression),
-  QueryLeaf (..),
-  RingExpression,
-  TagQueryExpression,
-  distributeK,
-  evaluateRing,
-  runDTerm,
- )
+import Text.TaggerQL.Expression.AST
 import Text.TaggerQL.Expression.Parser (parseQueryExpression, parseTagExpression)
 import Prelude hiding (lookup, (!!))
 
@@ -134,84 +117,26 @@ toFileSet conn =
 
 -- Tagging Engine
 
-{- |
- Where 'e` is 1-indexed in order of evaluation.
--}
-class ExpressionIndex e where
-  -- | Find a subset of 'e` at the given index if it exists.
-  lookup :: Int -> e -> Maybe e
-
-  -- | Replace a location in the second set with first, if that location exists.
-  replace :: Int -> e -> e -> e
-
-  -- | An infix variant of 'lookup`
-  (!!) :: e -> Int -> Maybe e
-  e !! n = lookup n e
-
-{- |
- Lens for indexing an 'ExpressionIndex`
--}
-exprAt :: ExpressionIndex e => Int -> Lens' e (Maybe e)
-exprAt n =
-  lens
-    (lookup n)
-    (\expr mReplace -> maybe expr (\re -> replace n re expr) mReplace)
-
-{- |
- Flatten an 'ExpressionIndex` into its respective components along with their indices
- in reverse evaluation order.
-
- Such that:
-
- @e = (snd . head . flatten) e@
--}
-flatten :: ExpressionIndex e => e -> [(Int, e)]
-flatten = foldIxGen (flip (:)) []
-
-{- |
- Generate an infinite indexed list in evaluation order from an expression.
-
- Calling @takeWhile (isJust . snd)@
-  will return a finite list of the expression's contents.
--}
-exprIxGen :: ExpressionIndex e => e -> [(Int, Maybe e)]
-exprIxGen e = [(n, e !! n) | n <- [1 ..]]
-
-{- |
- foldl' over a flattened 'ExpressionIndex` in reverse evaluation order.
--}
-foldIxGen :: ExpressionIndex e => (a -> (Int, e) -> a) -> a -> e -> a
-foldIxGen foldF accum = go foldF accum . exprIxGen
- where
-  go _ acc [] = acc
-  go _ acc ((_, Nothing) : _) = acc
-  go f acc (x : xs) = go f (f acc . second fromJust $ x) xs
-
-{- |
- Find the latest evaluating subset of the expression.
--}
-index :: (ExpressionIndex a, Eq a) => a -> a -> Maybe (Int, a)
-index needle = indexWith (== needle)
-
-{- |
- Find the latest evaluating expression that satisfies the predicate.
--}
-indexWith :: ExpressionIndex t => (t -> Bool) -> t -> Maybe (Int, t)
-indexWith p = foldIxGen (\m x@(_, a) -> m <|> (x <$ guard (p a))) Nothing
-
-queryQueryExpression :: TaggedConnection -> QueryExpression -> IO (HashSet File)
+queryQueryExpression ::
+  TaggedConnection ->
+  FreeQueryExpression ->
+  IO (HashSet File)
 queryQueryExpression c =
   fmap evaluateRing
-    . traverse (queryQueryLeaf c)
-    . runQueryExpression
+    . resolveTagFileDisjunction
+    <=< queryTerms
+      . unliftFreeQueryExpression
+ where
+  resolveTagFileDisjunction = traverse (either pure (toFileSet c))
 
-queryQueryLeaf :: TaggedConnection -> QueryLeaf -> IO (HashSet File)
-queryQueryLeaf c ql = case ql of
-  FileLeaf pat ->
-    case pat of
-      WildCard -> HS.fromList <$> allFiles c
-      PatternText t -> HS.fromList <$> queryForFileByPattern t c
-  TagLeaf te -> evaluateTagExpression c te >>= toFileSet c
+  queryTerms =
+    traverse (bitraverse (queryFilePattern c) (evaluateTagExpression c))
+
+queryFilePattern :: TaggedConnection -> Pattern -> IO (HashSet File)
+queryFilePattern c pat =
+  case pat of
+    WildCard -> HS.fromList <$> allFiles c
+    PatternText t -> HS.fromList <$> queryForFileByPattern t c
 
 -- A naive query interpreter, with no caching.
 evaluateTagExpression ::

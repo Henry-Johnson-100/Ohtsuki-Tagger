@@ -19,7 +19,15 @@ module Interface.Widget.Internal.Query.QueryBuilder (
   queryEditorTextFieldKey,
 ) where
 
-import Control.Lens hiding (Magma, index, (#))
+import Control.Lens (
+  Identity (runIdentity),
+  abbreviatedFields,
+  makeLensesWith,
+  (&),
+  (.~),
+  (<&>),
+  (^.),
+ )
 import Control.Monad.Trans.Class (MonadTrans, lift)
 import Data.Coerce (coerce)
 import Data.Data (Typeable)
@@ -27,7 +35,7 @@ import Data.Event (QueryEvent (CycleRingOperator, DeleteRingOperand, LeftDistrib
 import Data.Model (HasQueryEditMode (queryEditMode), Latitude (..), TaggerModel)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Interface.Theme (yuiBlue, yuiOrange, yuiPeach)
+import Interface.Theme (yuiBlue, yuiOrange, yuiPeach, yuiRed)
 import Interface.Widget.Internal.Core
 import Monomer
 import Monomer.Lens (a)
@@ -54,7 +62,7 @@ makeLensesWith abbreviatedFields ''ExpressionWidgetState
 queryEditorTextFieldKey :: Text
 queryEditorTextFieldKey = "queryEditorTextField"
 
-expressionWidget :: QueryExpression -> TaggerWidget
+expressionWidget :: FreeQueryExpression -> TaggerWidget
 expressionWidget =
   box_
     [ alignCenter
@@ -67,8 +75,35 @@ expressionWidget =
     . runCounter
     . coerce
     . evaluateRing
-    . fmap qewbLeaf
-    . runQueryExpression
+    . buildExpressionWidget
+
+buildExpressionWidget ::
+  FreeQueryExpression ->
+  RingExpression QueryExpressionWidgetBuilder
+buildExpressionWidget (FreeQueryExpression fqe) = do
+  fqe' <- fqe
+  either
+    ( \(x, y) ->
+        let x' =
+              (\(QueryExpressionWidgetBuilderG z) -> z)
+                . evaluateRing
+                . buildExpressionWidget
+                $ x
+            y' = (\(TagExpressionWidgetBuilderG z) -> z) . buildTagExpressionWidget $ y
+            combined = do
+              (ExpressionWidgetState xx xy _) <- x'
+              (ExpressionWidgetState yx yy _) <- fst <$> runCounter y'
+              _count <- getIncr
+              incr
+              pure $
+                ExpressionWidgetState
+                  (withStyleBasic [border 1 yuiRed] $ vstack [xx, yx])
+                  (xy <-# yy)
+                  True
+         in pure . QueryExpressionWidgetBuilderG $ combined
+    )
+    (pure . qewbLeaf)
+    fqe'
 
 {- |
  A generic form of 'TagExpressionWidgetBuilder` for deriving newtype instances.
@@ -290,13 +325,13 @@ newtype QueryExpressionWidgetBuilderG m a
   deriving (Functor, Applicative, Monad, MonadTrans)
 
 type QueryExpressionWidgetBuilder =
-  QueryExpressionWidgetBuilderG Identity (ExpressionWidgetState QueryExpression)
+  QueryExpressionWidgetBuilderG Identity (ExpressionWidgetState FreeQueryExpression)
 
 instance
   Rng
     ( QueryExpressionWidgetBuilderG
         Identity
-        (ExpressionWidgetState QueryExpression)
+        (ExpressionWidgetState FreeQueryExpression)
     )
   where
   (+.) = qewbRngHelper (+.) "|"
@@ -363,11 +398,11 @@ qewbRngHelper
      where
       mkParens w = withStyleBasic [border 1 black, padding 3] w
 
-qewbLeaf :: QueryLeaf -> QueryExpressionWidgetBuilder
+qewbLeaf :: Either Pattern TagQueryExpression -> QueryExpressionWidgetBuilder
 qewbLeaf ql =
-  let qe = QueryExpression . pure $ ql
+  let qe = FreeQueryExpression . pure . pure $ ql
    in case ql of
-        FileLeaf pat -> QueryExpressionWidgetBuilderG $ do
+        Left pat -> QueryExpressionWidgetBuilderG $ do
           _count <- getIncr
           incr
           pure $
@@ -376,13 +411,12 @@ qewbLeaf ql =
               )
               qe
               False
-        TagLeaf te -> QueryExpressionWidgetBuilderG $ do
+        Right te -> QueryExpressionWidgetBuilderG $ do
           teews <-
             fmap fst
               . runCounter
               . (\(TagExpressionWidgetBuilderG x) -> x)
-              . evaluateFreeCompoundExpression evaluateRing evaluateFreeMagma
-              . fmap tewbLeaf
+              . buildTagExpressionWidget
               $ te ::
               CounterT Identity (ExpressionWidgetState TagQueryExpression)
           incr
@@ -395,3 +429,10 @@ qewbLeaf ql =
               )
               qe
               False
+
+buildTagExpressionWidget ::
+  FreeCompoundExpression RingExpression FreeMagma (DTerm Pattern) ->
+  TagExpressionWidgetBuilder
+buildTagExpressionWidget =
+  evaluateFreeCompoundExpression evaluateRing evaluateFreeMagma
+    . fmap tewbLeaf

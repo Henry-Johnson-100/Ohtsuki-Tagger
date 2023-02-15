@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
@@ -6,35 +7,27 @@ module Test.Text.TaggerQL.Expression.AST (
 ) where
 
 import Control.Monad ((>=>))
-import Data.Coerce (coerce)
 import Data.Maybe (fromJust, isJust)
 import Test.Resources (
     QCDTerm (..),
-    QCFreeCompoundExpression (runQCFreeCompoundExpression),
-    QCFreeMagma (QCFreeMagma),
-    QCPattern (..),
-    QCQueryLeaf (..),
+    QCFreeCompoundExpression,
+    QCFreeMagma,
+    QCFreeQueryExpression (..),
     QCRingExpression (..),
+    castQCTagQueryExpression,
+    rt,
+    tedp,
  )
 import Test.Tasty
+import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
-import Text.TaggerQL.Expression.AST (
-    DTerm,
-    FreeMagma,
-    Pattern,
-    QueryExpression (QueryExpression),
-    QueryLeaf,
-    RingExpression,
-    TagQueryExpression,
-    mapK,
-    mapT,
-    normalize,
- )
+import Text.TaggerQL.Expression.AST
 import Text.TaggerQL.Expression.AST.Editor (
     findQueryExpression,
     findTagExpression,
     withQueryExpression,
     withTagExpression,
+    (<-#),
  )
 
 astTests :: TestTree
@@ -237,6 +230,63 @@ astProperties =
                     pure testProp
                 )
             ]
+        , testGroup
+            "FreeQueryExpression Properties"
+            [ testCase "Unification Distribution is Right-Associative" $
+                assertEqual
+                    "(a & p.b){c}{d} = a{c{d}} & (p.b & c{d})"
+                    ( ( Ring . Right $
+                            ( (tedp . rt $ "a")
+                                ∙ ( (tedp . rt $ "c")
+                                        ∙ (tedp . rt $ "d")
+                                  )
+                            )
+                      )
+                        *. ( (Ring . Left $ "b")
+                                *. ( Ring . Right $
+                                        ( (tedp . rt $ "c")
+                                            ∙ (tedp . rt $ "d")
+                                        )
+                                   )
+                           )
+                    )
+                    ( unliftFreeQueryExpression $
+                        ( liftSimpleQueryRing
+                            ( (pure . Right . tedp . rt $ "a")
+                                *. (pure . Left $ "b")
+                            )
+                            <-# (tedp . rt $ "c")
+                        )
+                            <-# (tedp . rt $ "d")
+                    )
+            , testCase "Unification Distribution is Associatively Right-Associative" $
+                assertEqual
+                    "(a & p.b){c{d}} = a{c{d}} & (p.b & {c{d}})"
+                    ( ( Ring . Right $
+                            ( (tedp . rt $ "a")
+                                ∙ ( (tedp . rt $ "c")
+                                        ∙ (tedp . rt $ "d")
+                                  )
+                            )
+                      )
+                        *. ( (Ring . Left $ "b")
+                                *. ( Ring . Right $
+                                        ( (tedp . rt $ "c")
+                                            ∙ (tedp . rt $ "d")
+                                        )
+                                   )
+                           )
+                    )
+                    ( unliftFreeQueryExpression $
+                        liftSimpleQueryRing
+                            ( (pure . Right . tedp . rt $ "a")
+                                *. (pure . Left $ "b")
+                            )
+                            <-# ( (tedp . rt $ "c")
+                                    ∙ (tedp . rt $ "d")
+                                )
+                    )
+            ]
         ]
 
 astEditorProperties :: TestTree
@@ -249,13 +299,9 @@ astEditorProperties =
                 "QueryExpression"
                 ( do
                     expr <-
-                        QueryExpression
-                            . ( coerce ::
-                                    QCRingExpression QCQueryLeaf ->
-                                    RingExpression QueryLeaf
-                              )
+                        runQCFreeQueryExpression
                             <$> resize 3 arbitrary ::
-                            Gen QueryExpression
+                            Gen FreeQueryExpression
                     n <- suchThat arbitrary (\n' -> isJust $ findQueryExpression n' expr)
                     let exprAt = fromJust $ findQueryExpression n expr
                         replaceResult = withQueryExpression n expr (const exprAt)
@@ -266,23 +312,7 @@ astEditorProperties =
                 "TagExpression"
                 ( do
                     expr <-
-                        ( ( mapK
-                                ( (\(QCFreeMagma x) -> x) ::
-                                    forall b. QCFreeMagma b -> FreeMagma b
-                                )
-                                . mapT
-                                    ( coerce ::
-                                        forall b. QCRingExpression b -> RingExpression b
-                                    )
-                                . runQCFreeCompoundExpression
-                                . fmap (coerce :: QCDTerm QCPattern -> DTerm Pattern)
-                          ) ::
-                            QCFreeCompoundExpression
-                                QCRingExpression
-                                QCFreeMagma
-                                (QCDTerm QCPattern) ->
-                            TagQueryExpression
-                        )
+                        castQCTagQueryExpression
                             <$> resize 3 arbitrary ::
                             Gen TagQueryExpression
                     n <- suchThat arbitrary (\n' -> isJust $ findTagExpression n' expr)
