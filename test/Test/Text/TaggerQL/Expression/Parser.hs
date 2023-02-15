@@ -57,7 +57,7 @@ comBatTE ::
     HasCallStack =>
     TestName ->
     String ->
-    TagQueryExpression ->
+    TagQuery ->
     [Text] ->
     TestTree
 comBatTE name failMsg expect tsts =

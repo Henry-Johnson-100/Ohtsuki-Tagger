@@ -116,13 +116,13 @@ newtype TagExpressionWidgetBuilderG m a
 type TagExpressionWidgetBuilder =
   TagExpressionWidgetBuilderG
     (CounterT Identity)
-    (ExpressionWidgetState TagQueryExpression)
+    (ExpressionWidgetState TagQuery)
 
 instance
   Rng
     ( TagExpressionWidgetBuilderG
         (CounterT Identity)
-        (ExpressionWidgetState TagQueryExpression)
+        (ExpressionWidgetState TagQuery)
     )
   where
   (+.) x y = tewbBinHelper (+.) (tewbRngWidget "|") x y <&> nestedOperand .~ True
@@ -175,7 +175,7 @@ instance
   Magma
     ( TagExpressionWidgetBuilderG
         (CounterT Identity)
-        (ExpressionWidgetState TagQueryExpression)
+        (ExpressionWidgetState TagQuery)
     )
   where
   (∙) = tewbBinHelper (∙) f
@@ -251,7 +251,7 @@ tewbLeaf d = TagExpressionWidgetBuilderG $ do
                   placeTeDropTargetG
                     li
                     i
-                    (pure :: DTerm Pattern -> TagQueryExpression)
+                    (pure :: DTerm Pattern -> TagQuery)
                     [border 1 yuiBlue]
                 teDT =
                   placeTeDropTargetG
@@ -264,7 +264,7 @@ tewbLeaf d = TagExpressionWidgetBuilderG $ do
                   leftDistributeDropTarget
                     li
                     (Just i)
-                    (pure :: DTerm Pattern -> TagQueryExpression)
+                    (pure :: DTerm Pattern -> TagQuery)
                     [border 1 yuiBlue]
              in dropTargetHGrid (dTermDT .<< teDT) (teDistDT . dTermDistDT)
           ]
@@ -275,7 +275,7 @@ placeTeDropTargetG ::
   Int ->
   (a -> b) ->
   [StyleState] ->
-  (b -> Latitude TagQueryExpression) ->
+  (b -> Latitude TagQuery) ->
   WidgetNode s TaggerEvent ->
   WidgetNode s TaggerEvent
 placeTeDropTargetG leafIndex teIndex toTe sts c =
@@ -287,7 +287,7 @@ leftDistributeDropTarget ::
   (Eq a, Typeable a) =>
   Int ->
   Maybe Int ->
-  (a -> TagQueryExpression) ->
+  (a -> TagQuery) ->
   [StyleState] ->
   WidgetNode s TaggerEvent ->
   WidgetNode s TaggerEvent
@@ -398,7 +398,7 @@ qewbRngHelper
      where
       mkParens w = withStyleBasic [border 1 black, padding 3] w
 
-qewbLeaf :: Either Pattern TagQueryExpression -> QueryExpressionWidgetBuilder
+qewbLeaf :: Either Pattern TagQuery -> QueryExpressionWidgetBuilder
 qewbLeaf ql =
   let qe = FreeQueryExpression . pure . pure $ ql
    in case ql of
@@ -418,7 +418,7 @@ qewbLeaf ql =
               . (\(TagExpressionWidgetBuilderG x) -> x)
               . buildTagExpressionWidget
               $ te ::
-              CounterT Identity (ExpressionWidgetState TagQueryExpression)
+              CounterT Identity (ExpressionWidgetState TagQuery)
           incr
           pure $
             ExpressionWidgetState

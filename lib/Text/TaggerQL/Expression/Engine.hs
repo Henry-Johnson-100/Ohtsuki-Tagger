@@ -136,7 +136,7 @@ queryFilePattern c pat =
 -- A naive query interpreter, with no caching.
 evaluateTagExpression ::
   TaggedConnection ->
-  TagQueryExpression ->
+  TagQuery ->
   IO (HashSet Tag)
 evaluateTagExpression c =
   fmap

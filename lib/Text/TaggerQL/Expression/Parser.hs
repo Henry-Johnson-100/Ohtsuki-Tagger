@@ -96,15 +96,15 @@ patternParser = Pattern <$> patternTextParser
 notRestricted :: Parser Char
 notRestricted = noneOf restrictedChars
 
-setOpParser :: Parser SetOp
-setOpParser = explicitSetOpParser <|> pure Intersect
+setOpParser :: Parser RingOperation
+setOpParser = explicitRingOperationParser <|> pure Multiplication
 
-explicitSetOpParser :: Parser SetOp
-explicitSetOpParser = unionParser <|> intersectParser <|> differenceParser
+explicitRingOperationParser :: Parser RingOperation
+explicitRingOperationParser = unionParser <|> intersectParser <|> differenceParser
  where
-  unionParser = char '|' $> Union
-  intersectParser = char '&' $> Intersect
-  differenceParser = char '!' $> Difference
+  unionParser = char '|' $> Addition
+  intersectParser = char '&' $> Multiplication
+  differenceParser = char '!' $> Subtraction
 
 ichar :: Char -> Parser Char
 ichar c = char (toUpper c) <|> char (toLower c)
@@ -126,7 +126,7 @@ parseQueryExpression =
       <* spaces
       <* failIfNotConsumed
 
-parseTagExpression :: Text -> Either ParseError TagQueryExpression
+parseTagExpression :: Text -> Either ParseError TagQuery
 parseTagExpression =
   parse
     allInput
@@ -154,7 +154,7 @@ queryExpressionParser =
           $ queryTermParser
        )
 
-tagExpressionParser :: Parser TagQueryExpression
+tagExpressionParser :: Parser TagQuery
 tagExpressionParser =
   spaces
     *> ( T
@@ -164,7 +164,7 @@ tagExpressionParser =
             )
        )
 
-filePathParser :: Parser (Either Pattern TagQueryExpression)
+filePathParser :: Parser (Either Pattern TagQuery)
 filePathParser =
   spaces
     *> (Left <$> (ichar 'p' *> char '.' *> patternParser))
@@ -175,7 +175,7 @@ descriptorPatternParser =
     *> (dTermConstructorParser <*> patternParser)
 
 newtype MinimalTagExpression = MinimalTagExpression
-  {runMinTagExpr :: TagQueryExpression}
+  {runMinTagExpr :: TagQuery}
   deriving (Show, Eq, Rng, Magma)
 
 minimalTagExpressionParser :: Parser MinimalTagExpression
@@ -189,14 +189,14 @@ minimalTagExpressionParser =
       )
 
 newtype ParenthesizedTag = ParenthesizedTag
-  {runParenTag :: TagQueryExpression}
+  {runParenTag :: TagQuery}
   deriving (Show, Eq, Rng, Magma)
 
 parenthesizedTagParser :: Parser ParenthesizedTag
 parenthesizedTagParser = ParenthesizedTag <$> parenthesized tagExpressionParser
 
 newtype BracketedTag = BracketedTag
-  {runBracketTag :: TagQueryExpression}
+  {runBracketTag :: TagQuery}
   deriving (Show, Eq, Rng, Magma)
 
 bracketedTagParser :: Parser BracketedTag
@@ -217,7 +217,7 @@ zeroOrManyBracketedTagParser =
     (many . try $ spaces *> bracketedTagParser)
 
 newtype TagTerm = TagTerm
-  {runTagTerm :: TagQueryExpression}
+  {runTagTerm :: TagQuery}
   deriving (Show, Eq, Rng, Magma)
 
 tagTermParser :: Parser TagTerm
@@ -312,8 +312,8 @@ ringExprConstructorParser ::
 ringExprConstructorParser =
   ( \so ->
       case so of
-        Union -> (+.)
-        Intersect -> (*.)
-        Difference -> (-.)
+        Addition -> (+.)
+        Multiplication -> (*.)
+        Subtraction -> (-.)
   )
     <$> (spaces *> setOpParser)

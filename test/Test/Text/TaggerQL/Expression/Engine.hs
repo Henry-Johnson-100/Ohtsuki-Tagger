@@ -134,7 +134,7 @@ queryExpressionEdgeCases c =
                 --       ( BinarySubExpression $
                 --           BinaryOperation
                 --             (SubTag (DescriptorTerm "descriptor_15"))
-                --             Intersect
+                --             Multiplication
                 --             (SubTag (DescriptorTerm "descriptor_16"))
                 --       )
                 -- )
@@ -157,7 +157,7 @@ queryExpressionEdgeCases c =
                 --             (MetaDescriptorTerm "descriptor_12")
                 --             (SubTag (DescriptorTerm "descriptor_15"))
                 --       )
-                --       Intersect
+                --       Multiplication
                 --       ( TagExpression $
                 --           TagTermExtension
                 --             (MetaDescriptorTerm "descriptor_12")
@@ -186,7 +186,7 @@ queryExpressionEdgeCases c =
                 --       ( BinarySubExpression $
                 --           BinaryOperation
                 --             (SubTag (DescriptorTerm "descriptor_15"))
-                --             Intersect
+                --             Multiplication
                 --             (SubTag (DescriptorTerm "descriptor_16"))
                 --       )
                 -- )
@@ -218,7 +218,7 @@ queryExpressionBasicFunctionality c =
             -- ( BinaryExpression $
             --     BinaryOperation
             --       (FileTermValue "%")
-            --       Difference
+            --       Subtraction
             --       (TagTermValue (DescriptorTerm "%"))
             -- )
             a <- c >>= queryForUntaggedFiles
@@ -259,7 +259,7 @@ queryExpressionBasicFunctionality c =
               r
         , testGroup
             "Binary Expressions"
-            [ testCase "Union" $ do
+            [ testCase "Addition" $ do
                 r <-
                   c
                     >>= qqe ((fe . fil $ 1) +. (fe . fil $ 2))
@@ -267,14 +267,14 @@ queryExpressionBasicFunctionality c =
                 -- ( BinaryExpression $
                 --     BinaryOperation
                 --       (FileTermValue "file_1")
-                --       Union
+                --       Addition
                 --       (FileTermValue "file_2")
                 -- )
                 assertEqual
-                  "Union wa union dayo"
+                  "Addition wa union dayo"
                   [file 1, file 2]
                   r
-            , testCase "Intersect - Simple Operands" $ do
+            , testCase "Multiplication - Simple Operands" $ do
                 r <-
                   c
                     >>= qqe
@@ -285,14 +285,14 @@ queryExpressionBasicFunctionality c =
                 -- ( BinaryExpression $
                 --     BinaryOperation
                 --       (TagTermValue (DescriptorTerm "descriptor_5"))
-                --       Intersect
+                --       Multiplication
                 --       (TagTermValue (DescriptorTerm "descriptor_6"))
                 -- )
                 assertEqual
                   ""
                   [file 4, file 5]
                   r
-            , testCase "Intersect - Complex Operand" $ do
+            , testCase "Multiplication - Complex Operand" $ do
                 r <-
                   c
                     >>= qqe
@@ -306,17 +306,17 @@ queryExpressionBasicFunctionality c =
                 --       ( BinaryExpression $
                 --           BinaryOperation
                 --             (TagTermValue (DescriptorTerm "descriptor_5"))
-                --             Union
+                --             Addition
                 --             (FileTermValue "file_3")
                 --       )
-                --       Intersect
+                --       Multiplication
                 --       (TagTermValue (DescriptorTerm "descriptor_6"))
                 -- )
                 assertEqual
                   "Binary Operations should be nestable."
                   [file 3, file 4, file 5]
                   r
-            , testCase "Intersect - Complex Operand - left-associative" $ do
+            , testCase "Multiplication - Complex Operand - left-associative" $ do
                 r <-
                   c
                     >>= qqe
@@ -331,17 +331,17 @@ queryExpressionBasicFunctionality c =
                 --       ( BinaryExpression $
                 --           BinaryOperation
                 --             (TagTermValue (DescriptorTerm "descriptor_5"))
-                --             Union
+                --             Addition
                 --             (FileTermValue "file_3")
                 --       )
-                --       Intersect
+                --       Multiplication
                 --       (TagTermValue (DescriptorTerm "descriptor_6"))
                 -- )
                 assertEqual
                   "Binary Operations should be nestable."
                   [file 3, file 4, file 5]
                   r
-            , testCase "Difference" $ do
+            , testCase "Subtraction" $ do
                 r <-
                   c
                     >>= qqe
@@ -358,19 +358,19 @@ queryExpressionBasicFunctionality c =
                 --       ( BinaryExpression $
                 --           BinaryOperation
                 --             (TagTermValue (DescriptorTerm "descriptor_4"))
-                --             Union
+                --             Addition
                 --             ( BinaryExpression $
                 --                 BinaryOperation
                 --                   (TagTermValue (DescriptorTerm "descriptor_5"))
-                --                   Union
+                --                   Addition
                 --                   (TagTermValue (DescriptorTerm "descriptor_6"))
                 --             )
                 --       )
-                --       Difference
+                --       Subtraction
                 --       (TagTermValue (DescriptorTerm "descriptor_5"))
                 -- )
                 assertEqual
-                  "Difference wa difference dayo"
+                  "Subtraction wa difference dayo"
                   [file 1, file 3]
                   r
             ]
@@ -473,7 +473,7 @@ queryExpressionBasicFunctionality c =
               --           )
               --     assertEqual
               --       "Matches the tags returned by the LHS of the \
-              --       \\"TagExpressions - SubBinary Sub Union\" test."
+              --       \\"TagExpressions - SubBinary Sub Addition\" test."
               --       [ Tag 28 11 17 Nothing
               --       , Tag 32 13 17 Nothing
               --       , Tag 38 15 17 Nothing
@@ -491,14 +491,14 @@ queryExpressionBasicFunctionality c =
               --           )
               --     assertEqual
               --       "Matches the tags returned by the RHS of the \
-              --       \\"TagExpressions - SubBinary Sub Union\" test."
+              --       \\"TagExpressions - SubBinary Sub Addition\" test."
               --       [ Tag 30 12 17 Nothing
               --       , Tag 32 13 17 Nothing
               --       ]
               --       r
               testGroup
                 "TagExpressions - SubBinary"
-                [ testCase "Sub Union" $ do
+                [ testCase "Sub Addition" $ do
                     r <-
                       c
                         >>= qqe
@@ -516,12 +516,12 @@ queryExpressionBasicFunctionality c =
                     --       ( BinarySubExpression $
                     --           BinaryOperation
                     --             (SubTag (DescriptorTerm "descriptor_18"))
-                    --             Union
+                    --             Addition
                     --             (SubTag (DescriptorTerm "descriptor_19"))
                     --       )
                     -- )
                     assertEqual
-                      "SubUnion filters supertags if the supertag\
+                      "SubAddition filters supertags if the supertag\
                       \ is subtagged by either one or the other subtag sets."
                       [ file 11
                       , file 12
@@ -530,7 +530,7 @@ queryExpressionBasicFunctionality c =
                       , file 16
                       ]
                       r
-                , testCase "Sub Intersection" $ do
+                , testCase "Sub Multiplicationion" $ do
                     r <-
                       c
                         >>= qqe
@@ -548,17 +548,17 @@ queryExpressionBasicFunctionality c =
                     --       ( BinarySubExpression $
                     --           BinaryOperation
                     --             (SubTag (DescriptorTerm "descriptor_18"))
-                    --             Intersect
+                    --             Multiplication
                     --             (SubTag (DescriptorTerm "descriptor_19"))
                     --       )
                     -- )
                     assertEqual
-                      "SubUnion filters supertags if the supertag\
+                      "SubAddition filters supertags if the supertag\
                       \ is a member of both subtag sets."
                       [ file 13
                       ]
                       r
-                , testCase "Sub Difference" $ do
+                , testCase "Sub Subtraction" $ do
                     r <-
                       c
                         >>= qqe
@@ -576,12 +576,12 @@ queryExpressionBasicFunctionality c =
                     --       ( BinarySubExpression $
                     --           BinaryOperation
                     --             (SubTag (DescriptorTerm "descriptor_18"))
-                    --             Difference
+                    --             Subtraction
                     --             (SubTag (DescriptorTerm "descriptor_19"))
                     --       )
                     -- )
                     assertEqual
-                      "SubUnion filters supertags if the supertag\
+                      "SubAddition filters supertags if the supertag\
                       \ is a member of the first and not the second subtag set."
                       [ file 11
                       , file 15
@@ -610,7 +610,7 @@ queryExpressionBasicFunctionality c =
                 --       ( BinarySubExpression $
                 --           BinaryOperation
                 --             (SubTag (DescriptorTerm "descriptor_20"))
-                --             Difference
+                --             Subtraction
                 --             (SubTag (DescriptorTerm "descriptor_18"))
                 --       )
                 -- )
@@ -652,7 +652,7 @@ taggingEngineTests c =
                 --     ( BinarySubExpression $
                 --         BinaryOperation
                 --           (SubTag (td 22))
-                --           Intersect
+                --           Multiplication
                 --           (SubTag (td 23))
                 --     )
                 fk = 17
@@ -696,11 +696,11 @@ taggingEngineTests c =
                   --                 ( BinarySubExpression $
                   --                     BinaryOperation
                   --                       (SubTag (td 24))
-                  --                       Intersect
+                  --                       Multiplication
                   --                       (SubTag (td 25))
                   --                 )
                   --           )
-                  --           Intersect
+                  --           Multiplication
                   --           (SubTag (td 23))
                   --     )
                   fk = 17
@@ -752,11 +752,11 @@ taggingEngineTests c =
                   --                             (td 28)
                   --                             (SubTag (td 29))
                   --                       )
-                  --                       Intersect
+                  --                       Multiplication
                   --                       (SubTag (td 30))
                   --                 )
                   --           )
-                  --           Intersect
+                  --           Multiplication
                   --           (SubTag (td 31))
                   --     )
                   fk = 18
@@ -792,10 +792,10 @@ taggingEngineTests c =
                 --     ( BinarySubExpression $
                 --         BinaryOperation
                 --           (SubTag (td 32))
-                --           Intersect
+                --           Multiplication
                 --           (SubTag (td 33))
                 --     )
-                --     Intersect
+                --     Multiplication
                 --     (SubTag (td 34))
                 fk = 19
                 expectedResults =

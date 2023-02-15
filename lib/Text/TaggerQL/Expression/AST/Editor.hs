@@ -48,7 +48,7 @@ import Text.TaggerQL.Expression.AST
 -}
 distributeTagExpression ::
   FreeQueryExpression ->
-  TagQueryExpression ->
+  TagQuery ->
   FreeQueryExpression
 distributeTagExpression fqe tqe = FreeQueryExpression . Node . Left $ (fqe, tqe)
 
@@ -57,7 +57,7 @@ infixl 6 <-#
 {- |
  Infix synonym for 'distributeTagExpression`.
 -}
-(<-#) :: FreeQueryExpression -> TagQueryExpression -> FreeQueryExpression
+(<-#) :: FreeQueryExpression -> TagQuery -> FreeQueryExpression
 (<-#) = distributeTagExpression
 
 {- |
@@ -66,7 +66,7 @@ infixl 6 <-#
 -}
 onTagLeaf ::
   FreeQueryExpression ->
-  (TagQueryExpression -> TagQueryExpression) ->
+  (TagQuery -> TagQuery) ->
   FreeQueryExpression
 onTagLeaf fqe'@(FreeQueryExpression fqe) f = case fqe of
   Node e -> FreeQueryExpression . Node $ bimap (second f) (second f) e
@@ -80,9 +80,9 @@ nextRingOperator r = case r of
   Node _ -> r
   Edge lft so lft' -> flip (Edge lft) lft' $
     case so of
-      Union -> Intersect
-      Intersect -> Difference
-      Difference -> Union
+      Addition -> Multiplication
+      Multiplication -> Subtraction
+      Subtraction -> Addition
 
 {- |
  Drops the right operand from a 'RingExpression` if there is one.

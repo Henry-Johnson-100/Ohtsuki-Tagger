@@ -36,7 +36,7 @@ astProperties =
             [ testProperty
                 "Left Monad Identity"
                 ( do
-                    f <- arbitrary :: Gen (Int -> QCLabeledFreeTree SetOp Int)
+                    f <- arbitrary :: Gen (Int -> QCLabeledFreeTree RingOperation Int)
                     i <- arbitrary
                     let testProp = (pure i >>= f) == f i
                     pure testProp
@@ -44,7 +44,7 @@ astProperties =
             , testProperty
                 "Right Monad Identity"
                 ( do
-                    re <- arbitrary :: Gen (QCLabeledFreeTree SetOp Int)
+                    re <- arbitrary :: Gen (QCLabeledFreeTree RingOperation Int)
                     let testProp = (re >>= pure) == re
                     pure testProp
                 )
@@ -58,7 +58,7 @@ astProperties =
                                 (resize 35 arbitrary)
                                 -- Exclude functions that appear to be identities
                                 (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (QCLabeledFreeTree SetOp Int))
+                                Gen (Fun Int (QCLabeledFreeTree RingOperation Int))
                     f <- genF
                     g <- genF
                     h <- genF
@@ -132,7 +132,7 @@ astProperties =
             [ testProperty
                 "Left Monad Identity"
                 ( do
-                    f <- (resize 3 arbitrary :: Gen (Int -> QCFreeCompoundExpression (QCLabeledFreeTree SetOp) (QCLabeledFreeTree ()) Int))
+                    f <- (resize 3 arbitrary :: Gen (Int -> QCFreeCompoundExpression (QCLabeledFreeTree RingOperation) (QCLabeledFreeTree ()) Int))
                     i <- arbitrary
                     let testProp = (pure i >>= f) == f i
                     pure testProp
@@ -140,7 +140,7 @@ astProperties =
             , testProperty
                 "Right Monad Identity"
                 ( do
-                    re <- resize 3 arbitrary :: Gen (QCFreeCompoundExpression (QCLabeledFreeTree SetOp) (QCLabeledFreeTree ()) Int)
+                    re <- resize 3 arbitrary :: Gen (QCFreeCompoundExpression (QCLabeledFreeTree RingOperation) (QCLabeledFreeTree ()) Int)
                     let testProp = (re >>= pure) == re
                     pure testProp
                 )
@@ -154,7 +154,7 @@ astProperties =
                                 (resize 3 arbitrary)
                                 -- Exclude functions that appear to be identities
                                 (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (QCFreeCompoundExpression (QCLabeledFreeTree SetOp) (QCLabeledFreeTree ()) Int))
+                                Gen (Fun Int (QCFreeCompoundExpression (QCLabeledFreeTree RingOperation) (QCLabeledFreeTree ()) Int))
                     f <- genF
                     g <- genF
                     h <- genF
@@ -305,7 +305,7 @@ astEditorProperties =
                     expr <-
                         castQCTagQueryExpression
                             <$> resize 3 arbitrary ::
-                            Gen TagQueryExpression
+                            Gen TagQuery
                     n <- suchThat arbitrary (\n' -> isJust $ findTagExpression n' expr)
                     let exprAt = fromJust $ findTagExpression n expr
                         replaceResult = normalize $ withTagExpression n expr (const exprAt)

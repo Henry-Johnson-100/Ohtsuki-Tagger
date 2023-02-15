@@ -156,11 +156,11 @@ newtype QCFreeCompoundExpression t k a = QCFreeCompoundExpression
     , Generic
     )
 
-instance Arbitrary SetOp where
-  arbitrary :: Gen SetOp
-  arbitrary = oneof $ map pure [(minBound :: SetOp) .. maxBound]
+instance Arbitrary RingOperation where
+  arbitrary :: Gen RingOperation
+  arbitrary = oneof $ map pure [(minBound :: RingOperation) .. maxBound]
 
-instance Function SetOp
+instance Function RingOperation
 
 castFreeCompoundExpression ::
   forall qct qck qca h k a.
@@ -178,7 +178,7 @@ castFreeCompoundExpression (qcef :: QCFreeCompoundExpression qct qck qca) =
 
 castQCTagQueryExpression ::
   QCFreeCompoundExpression
-    (QCLabeledFreeTree SetOp)
+    (QCLabeledFreeTree RingOperation)
     (QCLabeledFreeTree ())
     (QCDTerm QCPattern) ->
   FreeCompoundExpression RingExpression MagmaExpression (DTerm Pattern)
@@ -243,10 +243,10 @@ instance Arbitrary QCFreeQueryExpression where
 fe :: Pattern -> FreeQueryExpression
 fe = liftSimpleQueryRing . pure . Left
 
-tle :: TagQueryExpression -> FreeQueryExpression
+tle :: TagQuery -> FreeQueryExpression
 tle = liftSimpleQueryRing . pure . Right
 
-tedp :: DTerm Pattern -> TagQueryExpression
+tedp :: DTerm Pattern -> TagQuery
 tedp = pure
 
 d :: a -> DTerm a

@@ -22,14 +22,14 @@ Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL.Expression.AST (
   -- * Components
-  SetOp (..),
+  RingOperation (..),
   Pattern (.., Pattern),
   patternText,
   DTerm (..),
   runDTerm,
 
   -- * Language Expressions
-  TagQueryExpression,
+  TagQuery,
   unwrapIdentities,
   normalize,
   FreeCompoundExpression (..),
@@ -80,26 +80,32 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import GHC.Generics (Generic)
 
-{- |
- A type detailing how set-like collections are to be combined.
--}
-data SetOp
-  = Union
-  | Intersect
-  | Difference
-  deriving (Show, Eq, Bounded, Enum, Ord, Generic)
-
-instance Hashable SetOp
+instance Hashable RingOperation
 
 {- |
- > LabeledFreeTree SetOp
+ > LabeledFreeTree RingOperation
 -}
-type RingExpression = LabeledFreeTree SetOp
+type RingExpression = LabeledFreeTree RingOperation
 
 {- |
  > LabeledFreeTree ()
 -}
 type MagmaExpression = LabeledFreeTree ()
+
+{- |
+ > FreeCompoundExpression RingExpression MagmaExpression (DTerm Pattern)
+-}
+type TagQuery =
+  FreeCompoundExpression RingExpression MagmaExpression (DTerm Pattern)
+
+{- |
+ A type detailing how set-like collections are to be combined.
+-}
+data RingOperation
+  = Addition
+  | Multiplication
+  | Subtraction
+  deriving (Show, Eq, Bounded, Enum, Ord, Generic)
 
 {- |
  Unrooted binary tree of node type 'a`
@@ -113,7 +119,7 @@ type MagmaExpression = LabeledFreeTree ()
  - An expression for a magma on 'a` can be
       generally expressed as @LabeledFreeTree () a@
  - An expression describing ring-like operations (+), (*), and (-) is expressed as
-      @LabeledFreeTree SetOp a@
+      @LabeledFreeTree RingOperation a@
 
  Furthermore, expressions over the structure itself can be expressed by simply duplicating
  the underlying structure:
@@ -254,22 +260,22 @@ instance Bitraversable LabeledFreeTree where
           <*> f a
           <*> bitraverse f g elft_ab
 
-instance Rng (LabeledFreeTree SetOp a) where
+instance Rng (LabeledFreeTree RingOperation a) where
   (+.) ::
-    LabeledFreeTree SetOp a ->
-    LabeledFreeTree SetOp a ->
-    LabeledFreeTree SetOp a
-  x +. y = Edge x Union y
+    LabeledFreeTree RingOperation a ->
+    LabeledFreeTree RingOperation a ->
+    LabeledFreeTree RingOperation a
+  x +. y = Edge x Addition y
   (*.) ::
-    LabeledFreeTree SetOp a ->
-    LabeledFreeTree SetOp a ->
-    LabeledFreeTree SetOp a
-  x *. y = Edge x Intersect y
+    LabeledFreeTree RingOperation a ->
+    LabeledFreeTree RingOperation a ->
+    LabeledFreeTree RingOperation a
+  x *. y = Edge x Multiplication y
   (-.) ::
-    LabeledFreeTree SetOp a ->
-    LabeledFreeTree SetOp a ->
-    LabeledFreeTree SetOp a
-  x -. y = Edge x Difference y
+    LabeledFreeTree RingOperation a ->
+    LabeledFreeTree RingOperation a ->
+    LabeledFreeTree RingOperation a
+  x -. y = Edge x Subtraction y
 
 instance Magma (LabeledFreeTree () a) where
   (∙) ::
@@ -318,13 +324,13 @@ fold1WithEdgeMr f elft =
       lhs <- fold1WithEdgeMr f elft'
       f l lhs rhs
 
-evaluateRingExpression :: Rng a => LabeledFreeTree SetOp a -> a
+evaluateRingExpression :: Rng a => LabeledFreeTree RingOperation a -> a
 evaluateRingExpression =
   fold1WithEdge
     ( \so -> case so of
-        Union -> (+.)
-        Intersect -> (*.)
-        Difference -> (-.)
+        Addition -> (+.)
+        Multiplication -> (*.)
+        Subtraction -> (-.)
     )
 
 evaluateMagmaExpression :: Magma a => LabeledFreeTree () a -> a
@@ -396,7 +402,7 @@ runDTerm (DMetaTerm x) = x
 {- |
  Attempts to remove some redundant monadic identities.
 -}
-unwrapIdentities :: TagQueryExpression -> TagQueryExpression
+unwrapIdentities :: TagQuery -> TagQuery
 unwrapIdentities =
   unwrapTK
     (\re -> case re of Node x -> Just x; _ -> Nothing)
@@ -408,7 +414,7 @@ unwrapIdentities =
 
  > normalize = unwrapIdentities . distribute
 -}
-normalize :: TagQueryExpression -> TagQueryExpression
+normalize :: TagQuery -> TagQuery
 normalize = unwrapIdentities . T . fmap (K . fmap pure) . distributeK
 
 {- |
@@ -484,11 +490,11 @@ instance (Functor t, Functor k) => Functor (FreeCompoundExpression t k) where
     T t -> T (fmap (fmap f) t)
     K k -> K (fmap (fmap f) k)
 
-instance (Applicative t, Applicative k) => Applicative (FreeCompoundExpression t k) where
-  pure :: (Applicative t, Applicative k) => a -> FreeCompoundExpression t k a
+instance (Functor t, Functor k) => Applicative (FreeCompoundExpression t k) where
+  pure :: (Functor t, Functor k) => a -> FreeCompoundExpression t k a
   pure = FreeCompoundExpression
   (<*>) ::
-    (Applicative t, Applicative k) =>
+    (Functor t, Functor k) =>
     FreeCompoundExpression t k (a -> b) ->
     FreeCompoundExpression t k a ->
     FreeCompoundExpression t k b
@@ -497,11 +503,11 @@ instance (Applicative t, Applicative k) => Applicative (FreeCompoundExpression t
     T t -> T (fmap (<*> x) t)
     K k -> K (fmap (<*> x) k)
 
-instance (Monad t, Monad k) => Monad (FreeCompoundExpression t k) where
-  return :: (Monad t, Monad k) => a -> FreeCompoundExpression t k a
+instance (Functor t, Functor k) => Monad (FreeCompoundExpression t k) where
+  return :: (Functor t, Functor k) => a -> FreeCompoundExpression t k a
   return = pure
   (>>=) ::
-    (Monad t, Monad k) =>
+    (Functor t, Functor k) =>
     FreeCompoundExpression t k a ->
     (a -> FreeCompoundExpression t k b) ->
     FreeCompoundExpression t k b
@@ -762,16 +768,11 @@ instance (Magma a, Magma b) => Magma (a, b) where
   (∙) :: (Magma a, Magma b) => (a, b) -> (a, b) -> (a, b)
   x ∙ (a, b) = bimap (∙ a) (∙ b) x
 
-{- |
- > FreeCompoundExpression RingExpression MagmaExpression (DTerm Pattern)
--}
-type TagQueryExpression =
-  FreeCompoundExpression RingExpression MagmaExpression (DTerm Pattern)
-
 newtype FreeQueryExpression = FreeQueryExpression
   { runFreeQueryExpression ::
       -- a ring expression over a set of files
-      (LabeledFreeTree SetOp)
+      LabeledFreeTree
+        RingOperation
         ( -- The disjunction between either a termination of the expression
           -- or a left distribution of a query of type tag over a query of type file.
           --
@@ -780,11 +781,11 @@ newtype FreeQueryExpression = FreeQueryExpression
             -- This product type represents the left-distribution of a tag typed
             -- expression over a FreeQueryExpression.
             --
-            -- Notice how the TagQueryExpression is a proper subset of a
+            -- Notice how the TagQuery is a proper subset of a
             -- FreeQueryExpression in both disjunct cases.
             ( FreeQueryExpression
             , FreeCompoundExpression
-                (LabeledFreeTree SetOp)
+                (LabeledFreeTree RingOperation)
                 (LabeledFreeTree ())
                 (DTerm Pattern)
             )
@@ -794,7 +795,7 @@ newtype FreeQueryExpression = FreeQueryExpression
               Either
                 Pattern
                 ( FreeCompoundExpression
-                    (LabeledFreeTree SetOp)
+                    (LabeledFreeTree RingOperation)
                     (LabeledFreeTree ())
                     (DTerm Pattern)
                 )
@@ -813,7 +814,7 @@ instance Ring FreeQueryExpression where
  To make non-recursive query expressions easier to build.
 -}
 liftSimpleQueryRing ::
-  RingExpression (Either Pattern TagQueryExpression) ->
+  RingExpression (Either Pattern TagQuery) ->
   FreeQueryExpression
 liftSimpleQueryRing = FreeQueryExpression . fmap Right
 
@@ -824,7 +825,7 @@ liftSimpleQueryRing = FreeQueryExpression . fmap Right
 -}
 unliftFreeQueryExpression ::
   FreeQueryExpression ->
-  RingExpression (Either Pattern TagQueryExpression)
+  RingExpression (Either Pattern TagQuery)
 unliftFreeQueryExpression = either unify pure <=< runFreeQueryExpression
  where
   unify (FreeQueryExpression fqe, tqe) =
