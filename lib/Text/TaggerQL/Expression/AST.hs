@@ -32,9 +32,6 @@ module Text.TaggerQL.Expression.AST (
   TagQueryExpression,
   unwrapIdentities,
   normalize,
-  FreeTree (..),
-  foldFreeMagma1,
-  evaluateFreeMagma,
   FreeCompoundExpression (..),
   mapT,
   mapK,
@@ -46,11 +43,13 @@ module Text.TaggerQL.Expression.AST (
   liftSimpleQueryRing,
   unliftFreeQueryExpression,
   RingExpression,
+  MagmaExpression,
   LabeledFreeTree (..),
   fold1WithEdge,
   fold1WithEdgeMl,
   fold1WithEdgeMr,
   evaluateRingExpression,
+  evaluateMagmaExpression,
 
   -- * Classes
   Rng (..),
@@ -62,7 +61,6 @@ import Control.Monad (ap, join, (<=<))
 import Data.Bifoldable (Bifoldable (bifoldr))
 import Data.Bifunctor (Bifunctor (..), bimap)
 import Data.Bitraversable (Bitraversable (..))
-import qualified Data.Foldable as F
 import Data.Functor.Classes (
   Eq1 (..),
   Eq2 (..),
@@ -80,7 +78,6 @@ import Data.Maybe (fromMaybe)
 import Data.String (IsString, fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
-import GHC.Exts (IsList (..))
 import GHC.Generics (Generic)
 
 {- |
@@ -94,7 +91,15 @@ data SetOp
 
 instance Hashable SetOp
 
+{- |
+ > LabeledFreeTree SetOp
+-}
 type RingExpression = LabeledFreeTree SetOp
+
+{- |
+ > LabeledFreeTree ()
+-}
+type MagmaExpression = LabeledFreeTree ()
 
 {- |
  Unrooted binary tree of node type 'a`
@@ -325,107 +330,6 @@ evaluateRingExpression =
 evaluateMagmaExpression :: Magma a => LabeledFreeTree () a -> a
 evaluateMagmaExpression = fold1WithEdge (const (∙))
 
-infix 9 :∙
-
-{- |
- Generalizes a binary operation over type 'a`. Where evaluation is typically
- accomplished by using this structure's 'Foldable` instance.
-
- This type is just an unrooted binary tree where each node is an operand and each edge
- is an operation.
--}
-data FreeTree a
-  = FreeTree a
-  | (FreeTree a) :∙ (FreeTree a)
-  deriving (Functor, Generic, Foldable, Traversable)
-
-instance Show1 FreeTree where
-  liftShowsPrec ::
-    (Int -> a -> ShowS) ->
-    ([a] -> ShowS) ->
-    Int ->
-    FreeTree a ->
-    ShowS
-  liftShowsPrec f g n x = case x of
-    FreeTree a -> showsUnaryWith f "FreeTree" n a
-    fm :∙ fm' ->
-      let mWithParens fm'' =
-            showParen
-              ( case fm'' of
-                  FreeTree _ -> False
-                  _ -> True
-              )
-          lhs = mWithParens fm $ liftShowsPrec f g n fm
-          rhs = mWithParens fm' $ liftShowsPrec f g n fm'
-          c = showString " :∙ "
-       in lhs . c . rhs
-
-instance Show a => Show (FreeTree a) where
-  showsPrec :: Show a => Int -> FreeTree a -> ShowS
-  showsPrec = showsPrec1
-
-instance Eq1 FreeTree where
-  liftEq :: (a -> b -> Bool) -> FreeTree a -> FreeTree b -> Bool
-  liftEq eq x y = case x of
-    FreeTree a ->
-      case y of
-        FreeTree b -> eq a b
-        _ -> False
-    fm :∙ fm' ->
-      case y of
-        a :∙ b -> liftEq eq fm a && liftEq eq fm' b
-        _ -> False
-
-instance Eq a => Eq (FreeTree a) where
-  (==) :: Eq a => FreeTree a -> FreeTree a -> Bool
-  (==) = liftEq (==)
-
-instance IsList (FreeTree a) where
-  type Item (FreeTree a) = a
-  fromList :: [Item (FreeTree a)] -> FreeTree a
-  fromList [] = error "Empty list in fromList :: [a] -> FreeTree a"
-  fromList (x : xs) = F.foldl' (\m a -> m :∙ pure a) (pure x) xs
-  toList :: FreeTree a -> [Item (FreeTree a)]
-  toList = foldr (:) []
-
-instance Hashable a => Hashable (FreeTree a)
-
--- | Not a structural semigroup
-instance Semigroup (FreeTree a) where
-  (<>) :: FreeTree a -> FreeTree a -> FreeTree a
-  (<>) = (:∙)
-
-instance Magma (FreeTree a) where
-  (∙) :: FreeTree a -> FreeTree a -> FreeTree a
-  (∙) = (:∙)
-
-instance Applicative FreeTree where
-  pure :: a -> FreeTree a
-  pure = FreeTree
-  (<*>) :: FreeTree (a -> b) -> FreeTree a -> FreeTree b
-  f <*> x = case f of
-    FreeTree fab -> fmap fab x
-    fm :∙ fm' -> (fm <*> x) :∙ (fm' <*> x)
-
-instance Monad FreeTree where
-  return :: a -> FreeTree a
-  return = FreeTree
-  (>>=) :: FreeTree a -> (a -> FreeTree b) -> FreeTree b
-  fm >>= f = case fm of
-    FreeTree a -> f a
-    fm' :∙ fm_a -> (fm' >>= f) :∙ (fm_a >>= f)
-
-{- |
- Non associative fold of a 'FreeTree`
--}
-foldFreeMagma1 :: (a -> a -> a) -> FreeTree a -> a
-foldFreeMagma1 f fm = case fm of
-  FreeTree a -> a
-  fm' :∙ fm_a -> f (foldFreeMagma1 f fm') (foldFreeMagma1 f fm_a)
-
-evaluateFreeMagma :: Magma a => FreeTree a -> a
-evaluateFreeMagma = foldFreeMagma1 (∙)
-
 {- |
  A string used for searching with SQL LIKE expressions. Where a wildcard is a
  non-zero length sequence of the % character.
@@ -496,7 +400,7 @@ unwrapIdentities :: TagQueryExpression -> TagQueryExpression
 unwrapIdentities =
   unwrapTK
     (\re -> case re of Node x -> Just x; _ -> Nothing)
-    (\fm -> case fm of FreeTree x -> Just x; _ -> Nothing)
+    (\fm -> case fm of Node x -> Just x; _ -> Nothing)
 
 {- |
  Resolve structural ambiguities and redundancies by distributing the magma expressions
@@ -642,10 +546,10 @@ instance Rng (FreeCompoundExpression t RingExpression a) where
   (*.) = fcebh K (*.) pure pure
   (-.) = fcebh K (-.) pure pure
 
-instance Magma (FreeCompoundExpression FreeTree k a) where
+instance Magma (FreeCompoundExpression MagmaExpression k a) where
   (∙) = fcebh T (∙) pure pure
 
-instance Magma (FreeCompoundExpression t FreeTree a) where
+instance Magma (FreeCompoundExpression t MagmaExpression a) where
   (∙) = fcebh K (∙) pure pure
 
 {- |
@@ -859,15 +763,15 @@ instance (Magma a, Magma b) => Magma (a, b) where
   x ∙ (a, b) = bimap (∙ a) (∙ b) x
 
 {- |
- > FreeCompoundExpression RingExpression FreeTree (DTerm Pattern)
+ > FreeCompoundExpression RingExpression MagmaExpression (DTerm Pattern)
 -}
 type TagQueryExpression =
-  FreeCompoundExpression RingExpression FreeTree (DTerm Pattern)
+  FreeCompoundExpression RingExpression MagmaExpression (DTerm Pattern)
 
 newtype FreeQueryExpression = FreeQueryExpression
   { runFreeQueryExpression ::
       -- a ring expression over a set of files
-      RingExpression
+      (LabeledFreeTree SetOp)
         ( -- The disjunction between either a termination of the expression
           -- or a left distribution of a query of type tag over a query of type file.
           --
@@ -879,14 +783,21 @@ newtype FreeQueryExpression = FreeQueryExpression
             -- Notice how the TagQueryExpression is a proper subset of a
             -- FreeQueryExpression in both disjunct cases.
             ( FreeQueryExpression
-            , TagQueryExpression
+            , FreeCompoundExpression
+                (LabeledFreeTree SetOp)
+                (LabeledFreeTree ())
+                (DTerm Pattern)
             )
             ( -- The terminal disjunction between the types of files and tags
               -- where either option is resolvable to a set of files
               -- but evaluation is not forced until later.
               Either
                 Pattern
-                TagQueryExpression
+                ( FreeCompoundExpression
+                    (LabeledFreeTree SetOp)
+                    (LabeledFreeTree ())
+                    (DTerm Pattern)
+                )
             )
         )
   }

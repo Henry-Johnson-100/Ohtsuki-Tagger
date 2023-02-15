@@ -114,37 +114,6 @@ instance (Function l, Function a) => Function (LabeledFreeTree l a)
 
 instance (Function l, Function a) => Function (QCLabeledFreeTree l a)
 
-newtype QCFreeMagma a = QCFreeMagma {runQCFreeMagma :: FreeTree a}
-  deriving
-    ( Show1
-    , Show
-    , Eq1
-    , Eq
-    , Functor
-    , Applicative
-    , Monad
-    , Foldable
-    , Traversable
-    , Hashable
-    , Generic
-    )
-
-instance Arbitrary1 QCFreeMagma where
-  liftArbitrary :: Gen a -> Gen (QCFreeMagma a)
-  liftArbitrary g = QCFreeMagma <$> sized liftSized
-   where
-    liftSized n
-      | n <= 0 = pure <$> g
-      | otherwise = (∙) <$> liftSized (n `div` 2) <*> liftSized (n `div` 2)
-
-instance Arbitrary a => Arbitrary (QCFreeMagma a) where
-  arbitrary :: Arbitrary a => Gen (QCFreeMagma a)
-  arbitrary = liftArbitrary arbitrary
-
-instance Function a => Function (FreeTree a)
-
-instance Function a => Function (QCFreeMagma a)
-
 newtype QCPattern = QCPattern {runQCPattern :: Pattern}
   deriving (Show, Eq, Generic, IsString, Semigroup, Monoid, Hashable)
 
@@ -210,9 +179,9 @@ castFreeCompoundExpression (qcef :: QCFreeCompoundExpression qct qck qca) =
 castQCTagQueryExpression ::
   QCFreeCompoundExpression
     (QCLabeledFreeTree SetOp)
-    QCFreeMagma
+    (QCLabeledFreeTree ())
     (QCDTerm QCPattern) ->
-  FreeCompoundExpression RingExpression FreeTree (DTerm Pattern)
+  FreeCompoundExpression RingExpression MagmaExpression (DTerm Pattern)
 castQCTagQueryExpression =
   castFreeCompoundExpression
 

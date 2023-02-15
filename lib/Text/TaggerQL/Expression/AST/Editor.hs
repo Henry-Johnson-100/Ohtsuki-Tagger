@@ -281,12 +281,12 @@ withQueryExpression n qe f =
 
 findTagExpression ::
   Int ->
-  FreeCompoundExpression RingExpression FreeTree a ->
-  Maybe (FreeCompoundExpression RingExpression FreeTree a)
+  FreeCompoundExpression RingExpression MagmaExpression a ->
+  Maybe (FreeCompoundExpression RingExpression MagmaExpression a)
 findTagExpression n =
   runIdentity
     . evalFinder
-    . evaluateFreeCompoundExpression evaluateRingExpression evaluateFreeMagma
+    . evaluateFreeCompoundExpression evaluateRingExpression evaluateMagmaExpression
     . fmap (mkFinder n . pure)
 
 {- |
@@ -294,14 +294,14 @@ findTagExpression n =
 -}
 withTagExpression ::
   Int ->
-  FreeCompoundExpression RingExpression FreeTree a ->
-  ( FreeCompoundExpression RingExpression FreeTree a ->
-    FreeCompoundExpression RingExpression FreeTree a
+  FreeCompoundExpression RingExpression MagmaExpression a ->
+  ( FreeCompoundExpression RingExpression MagmaExpression a ->
+    FreeCompoundExpression RingExpression MagmaExpression a
   ) ->
-  FreeCompoundExpression RingExpression FreeTree a
+  FreeCompoundExpression RingExpression MagmaExpression a
 withTagExpression n te f =
   runIdentity
     . evalEditor
-    . evaluateFreeCompoundExpression evaluateRingExpression evaluateFreeMagma
+    . evaluateFreeCompoundExpression evaluateRingExpression evaluateMagmaExpression
     . fmap (mkEditor n f . pure)
     $ te

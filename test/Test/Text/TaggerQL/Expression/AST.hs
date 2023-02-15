@@ -80,11 +80,11 @@ astProperties =
                 )
             ]
         , testGroup
-            "FreeTree Properties"
+            "MagmaExpression Properties"
             [ testProperty
                 "Left Monad Identity"
                 ( do
-                    f <- arbitrary :: Gen (Int -> QCFreeMagma Int)
+                    f <- arbitrary :: Gen (Int -> (QCLabeledFreeTree ()) Int)
                     i <- arbitrary
                     let testProp = (pure i >>= f) == f i
                     pure testProp
@@ -92,7 +92,7 @@ astProperties =
             , testProperty
                 "Right Monad Identity"
                 ( do
-                    re <- arbitrary :: Gen (QCFreeMagma Int)
+                    re <- arbitrary :: Gen ((QCLabeledFreeTree ()) Int)
                     let testProp = (re >>= pure) == re
                     pure testProp
                 )
@@ -106,7 +106,7 @@ astProperties =
                                 (resize 35 arbitrary)
                                 -- Exclude functions that appear to be identities
                                 (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (QCFreeMagma Int))
+                                Gen (Fun Int ((QCLabeledFreeTree ()) Int))
                     f <- genF
                     g <- genF
                     h <- genF
@@ -132,7 +132,7 @@ astProperties =
             [ testProperty
                 "Left Monad Identity"
                 ( do
-                    f <- (resize 3 arbitrary :: Gen (Int -> QCFreeCompoundExpression (QCLabeledFreeTree SetOp) QCFreeMagma Int))
+                    f <- (resize 3 arbitrary :: Gen (Int -> QCFreeCompoundExpression (QCLabeledFreeTree SetOp) (QCLabeledFreeTree ()) Int))
                     i <- arbitrary
                     let testProp = (pure i >>= f) == f i
                     pure testProp
@@ -140,7 +140,7 @@ astProperties =
             , testProperty
                 "Right Monad Identity"
                 ( do
-                    re <- resize 3 arbitrary :: Gen (QCFreeCompoundExpression (QCLabeledFreeTree SetOp) QCFreeMagma Int)
+                    re <- resize 3 arbitrary :: Gen (QCFreeCompoundExpression (QCLabeledFreeTree SetOp) (QCLabeledFreeTree ()) Int)
                     let testProp = (re >>= pure) == re
                     pure testProp
                 )
@@ -154,7 +154,7 @@ astProperties =
                                 (resize 3 arbitrary)
                                 -- Exclude functions that appear to be identities
                                 (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (QCFreeCompoundExpression (QCLabeledFreeTree SetOp) QCFreeMagma Int))
+                                Gen (Fun Int (QCFreeCompoundExpression (QCLabeledFreeTree SetOp) (QCLabeledFreeTree ()) Int))
                     f <- genF
                     g <- genF
                     h <- genF
