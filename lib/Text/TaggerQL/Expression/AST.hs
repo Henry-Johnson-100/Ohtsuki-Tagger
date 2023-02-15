@@ -21,22 +21,25 @@ License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL.Expression.AST (
-  -- * Components
-  RingOperation (..),
-  Pattern (.., Pattern),
-  patternText,
-  DTerm (..),
-  runDTerm,
-
   -- * Language Expressions
+
+  -- ** TagQueryExpression
   TagQueryExpression,
   unwrapIdentities,
   normalize,
+
+  -- ** QueryExpression
   QueryExpression (..),
   liftSimpleQueryRing,
   unliftQueryExpression,
+
+  -- ** Primitive Expressions
   RingExpression,
   MagmaExpression,
+
+  -- * Structures
+
+  -- ** FreeDisjunctMonad
   FreeDisjunctMonad (..),
   mapT,
   mapK,
@@ -45,12 +48,21 @@ module Text.TaggerQL.Expression.AST (
   flipTK,
   unwrapTK,
   evaluateFreeCompoundExpression,
+
+  -- ** LabeledFreeTree
   LabeledFreeTree (..),
   fold1WithEdge,
   fold1WithEdgeMl,
   fold1WithEdgeMr,
   evaluateRingExpression,
   evaluateMagmaExpression,
+
+  -- * Primitive Values
+  RingOperation (..),
+  Pattern (.., Pattern),
+  patternText,
+  DTerm (..),
+  runDTerm,
 
   -- * Classes
   Rng (..),
@@ -84,321 +96,10 @@ import GHC.Generics (Generic)
 instance Hashable RingOperation
 
 {- |
- > LabeledFreeTree RingOperation
--}
-type RingExpression = LabeledFreeTree RingOperation
-
-{- |
- > LabeledFreeTree ()
--}
-type MagmaExpression = LabeledFreeTree ()
-
-{- |
  > FreeDisjunctMonad RingExpression MagmaExpression (DTerm Pattern)
 -}
 type TagQueryExpression =
   FreeDisjunctMonad RingExpression MagmaExpression (DTerm Pattern)
-
-{- |
- A type detailing how set-like collections are to be combined.
--}
-data RingOperation
-  = Addition
-  | Multiplication
-  | Subtraction
-  deriving (Show, Eq, Bounded, Enum, Ord, Generic)
-
-{- |
- Unrooted binary tree of node type 'a`
- with edges labeled as type 'l`
-
- This data structure is used primarily to model any binary operation of type 'l`
- over the type 'a`
-
- For instance:
-
- - An expression for a magma on 'a` can be
-      generally expressed as @LabeledFreeTree () a@
- - An expression describing ring-like operations (+), (*), and (-) is expressed as
-      @LabeledFreeTree RingOperation a@
-
- Furthermore, expressions over the structure itself can be expressed by simply duplicating
- the underlying structure:
-
- > fmap pure x :: LabeledFreeTree b (LabeledFreeTree b a)
--}
-data LabeledFreeTree l a
-  = Node a
-  | Edge (LabeledFreeTree l a) l (LabeledFreeTree l a)
-  deriving (Functor, Foldable, Traversable, Generic)
-
-instance (Hashable l, Hashable a) => Hashable (LabeledFreeTree l a)
-
-instance Show2 LabeledFreeTree where
-  liftShowsPrec2 ::
-    (Int -> a -> ShowS) ->
-    ([a] -> ShowS) ->
-    (Int -> b -> ShowS) ->
-    ([b] -> ShowS) ->
-    Int ->
-    LabeledFreeTree a b ->
-    ShowS
-  liftShowsPrec2 lf lfxs af afxs n x = case x of
-    Node b -> showsUnaryWith af "LabeledFreeTree" n b
-    Edge elft a elft' ->
-      let liftS = liftShowsPrec2 lf lfxs af afxs n
-          mShowParens = showParen True
-          edge = showString "Edge "
-          lhs = mShowParens $ liftS elft
-          cen = lf n a
-          rhs = mShowParens $ liftS elft'
-       in edge . lhs . showString " " . cen . showString " " . rhs
-
-instance Show l => Show1 (LabeledFreeTree l) where
-  liftShowsPrec ::
-    Show l =>
-    (Int -> a -> ShowS) ->
-    ([a] -> ShowS) ->
-    Int ->
-    LabeledFreeTree l a ->
-    ShowS
-  liftShowsPrec = liftShowsPrec2 showsPrec showList
-
-instance (Show l, Show a) => Show (LabeledFreeTree l a) where
-  showsPrec :: (Show l, Show a) => Int -> LabeledFreeTree l a -> ShowS
-  showsPrec = showsPrec2
-
-instance Eq2 LabeledFreeTree where
-  liftEq2 ::
-    (a -> b -> Bool) ->
-    (c -> d -> Bool) ->
-    LabeledFreeTree a c ->
-    LabeledFreeTree b d ->
-    Bool
-  liftEq2 eql eqa x y = case x of
-    Node c ->
-      case y of
-        Node y' -> eqa c y'
-        _ -> False
-    Edge elft a elft' ->
-      case y of
-        Edge yl yc yr ->
-          -- compare edges first to short circuit before traversing deeper.
-          eql a yc
-            && liftEq2 eql eqa elft yl
-            && liftEq2 eql eqa elft' yr
-        _ -> False
-
-instance Eq l => Eq1 (LabeledFreeTree l) where
-  liftEq ::
-    Eq l =>
-    (a -> b -> Bool) ->
-    LabeledFreeTree l a ->
-    LabeledFreeTree l b ->
-    Bool
-  liftEq = liftEq2 (==)
-
-instance (Eq l, Eq a) => Eq (LabeledFreeTree l a) where
-  (==) ::
-    (Eq l, Eq a) =>
-    LabeledFreeTree l a ->
-    LabeledFreeTree l a ->
-    Bool
-  (==) = liftEq2 (==) (==)
-
-instance Applicative (LabeledFreeTree l) where
-  pure :: a -> LabeledFreeTree l a
-  pure = Node
-  (<*>) ::
-    LabeledFreeTree l (a -> b) ->
-    LabeledFreeTree l a ->
-    LabeledFreeTree l b
-  f <*> x = case f of
-    Node fab -> fmap fab x
-    Edge elt l elt' -> Edge (elt <*> x) l (elt' <*> x)
-
-instance Monad (LabeledFreeTree l) where
-  return :: a -> LabeledFreeTree l a
-  return = pure
-  (>>=) ::
-    LabeledFreeTree l a ->
-    (a -> LabeledFreeTree l b) ->
-    LabeledFreeTree l b
-  elt >>= f = case elt of
-    Node a -> f a
-    Edge elt' l elt_la -> Edge (elt' >>= f) l (elt_la >>= f)
-
-instance Bifunctor LabeledFreeTree where
-  second :: (b -> c) -> LabeledFreeTree a b -> LabeledFreeTree a c
-  second = fmap
-  first :: (a -> b) -> LabeledFreeTree a c -> LabeledFreeTree b c
-  first f elt = case elt of
-    Node c -> Node c
-    Edge elft a elft' -> Edge (first f elft) (f a) (first f elft')
-
-instance Bifoldable LabeledFreeTree where
-  bifoldr :: (a -> c -> c) -> (b -> c -> c) -> c -> LabeledFreeTree a b -> c
-  bifoldr f g acc elft = case elft of
-    Node b -> g b acc
-    Edge elft' a elft_ab ->
-      let rhs = bifoldr f g acc elft_ab
-          cen = f a rhs
-          result = bifoldr f g cen elft'
-       in result
-
-instance Bitraversable LabeledFreeTree where
-  bitraverse ::
-    Applicative f =>
-    (a -> f c) ->
-    (b -> f d) ->
-    LabeledFreeTree a b ->
-    f (LabeledFreeTree c d)
-  bitraverse f g elft = case elft of
-    Node b -> Node <$> g b
-    Edge elft' a elft_ab ->
-      Edge
-        <$> bitraverse f g elft'
-          <*> f a
-          <*> bitraverse f g elft_ab
-
-instance Rng (LabeledFreeTree RingOperation a) where
-  (+.) ::
-    LabeledFreeTree RingOperation a ->
-    LabeledFreeTree RingOperation a ->
-    LabeledFreeTree RingOperation a
-  x +. y = Edge x Addition y
-  (*.) ::
-    LabeledFreeTree RingOperation a ->
-    LabeledFreeTree RingOperation a ->
-    LabeledFreeTree RingOperation a
-  x *. y = Edge x Multiplication y
-  (-.) ::
-    LabeledFreeTree RingOperation a ->
-    LabeledFreeTree RingOperation a ->
-    LabeledFreeTree RingOperation a
-  x -. y = Edge x Subtraction y
-
-instance Magma (LabeledFreeTree () a) where
-  (∙) ::
-    LabeledFreeTree () a ->
-    LabeledFreeTree () a ->
-    LabeledFreeTree () a
-  x ∙ y = Edge x () y
-
-fold1WithEdge :: (l -> a -> a -> a) -> LabeledFreeTree l a -> a
-fold1WithEdge f elft = case elft of
-  Node a -> a
-  Edge elft' l elft_la ->
-    f
-      l
-      (fold1WithEdge f elft')
-      (fold1WithEdge f elft_la)
-
-{- |
- Evaluates node operands from left to right.
--}
-fold1WithEdgeMl ::
-  Monad f =>
-  (l -> a -> a -> f a) ->
-  LabeledFreeTree l a ->
-  f a
-fold1WithEdgeMl f elft = case elft of
-  Node a -> pure a
-  Edge elft' l elft_la -> do
-    lhs <- fold1WithEdgeMl f elft'
-    rhs <- fold1WithEdgeMl f elft_la
-    f l lhs rhs
-
-{- |
- Evaluates node operands from right to left.
--}
-fold1WithEdgeMr ::
-  Monad f =>
-  (t1 -> t2 -> t2 -> f t2) ->
-  LabeledFreeTree t1 t2 ->
-  f t2
-fold1WithEdgeMr f elft =
-  case elft of
-    Node a -> pure a
-    Edge elft' l elft_la -> do
-      rhs <- fold1WithEdgeMr f elft_la
-      lhs <- fold1WithEdgeMr f elft'
-      f l lhs rhs
-
-evaluateRingExpression :: Rng a => LabeledFreeTree RingOperation a -> a
-evaluateRingExpression =
-  fold1WithEdge
-    ( \so -> case so of
-        Addition -> (+.)
-        Multiplication -> (*.)
-        Subtraction -> (-.)
-    )
-
-evaluateMagmaExpression :: Magma a => LabeledFreeTree () a -> a
-evaluateMagmaExpression = fold1WithEdge (const (∙))
-
-{- |
- A string used for searching with SQL LIKE expressions. Where a wildcard is a
- non-zero length sequence of the % character.
--}
-data Pattern
-  = WildCard
-  | PatternText Text
-  deriving (Show, Eq, Generic)
-
-instance IsString Pattern where
-  fromString :: String -> Pattern
-  fromString = Pattern . T.pack
-
-instance Semigroup Pattern where
-  (<>) :: Pattern -> Pattern -> Pattern
-  WildCard <> WildCard = WildCard
-  (patternText -> x) <> (patternText -> y) = Pattern (x <> y)
-
-instance Monoid Pattern where
-  mempty :: Pattern
-  mempty = PatternText mempty
-
-instance Hashable Pattern
-
-pattern Pattern :: Text -> Pattern
-pattern Pattern t <-
-  (patternText -> t)
-  where
-    Pattern t = if T.all (== '%') t then WildCard else PatternText t
-
-patternText :: Pattern -> Text
-patternText WildCard = "%"
-patternText (PatternText t) = t
-
-data DTerm a
-  = DTerm a
-  | DMetaTerm a
-  deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
-
-instance Hashable a => Hashable (DTerm a)
-
-instance Applicative DTerm where
-  pure :: a -> DTerm a
-  pure = return
-  (<*>) :: DTerm (a -> b) -> DTerm a -> DTerm b
-  (<*>) = ap
-
-instance Monad DTerm where
-  return :: a -> DTerm a
-  return = DMetaTerm
-  (>>=) :: DTerm a -> (a -> DTerm b) -> DTerm b
-  d >>= f = case d of
-    DTerm a ->
-      let result = f a
-       in case result of
-            DTerm _ -> result
-            DMetaTerm b -> DTerm b
-    DMetaTerm a -> f a
-
-runDTerm :: DTerm p -> p
-runDTerm (DTerm x) = x
-runDTerm (DMetaTerm x) = x
 
 {- |
  Attempts to remove some redundant monadic identities.
@@ -417,6 +118,79 @@ unwrapIdentities =
 -}
 normalize :: TagQueryExpression -> TagQueryExpression
 normalize = unwrapIdentities . T . fmap (K . fmap pure) . distributeK
+
+newtype QueryExpression = QueryExpression
+  { runQueryExpression ::
+      -- a ring expression over a set of files
+      LabeledFreeTree
+        RingOperation
+        ( -- The disjunction between either a termination of the expression
+          -- or a left distribution of a query of type tag over a query of type file.
+          --
+          -- Where either of these options are resolvable to a set of files.
+          Either
+            -- This product type represents the left-distribution of a tag typed
+            -- expression over a QueryExpression.
+            --
+            -- Notice how the TagQueryExpression is a proper subset of a
+            -- QueryExpression in both disjunct cases.
+            ( QueryExpression
+            , FreeDisjunctMonad
+                (LabeledFreeTree RingOperation)
+                (LabeledFreeTree ())
+                (DTerm Pattern)
+            )
+            ( -- The terminal disjunction between the types of files and tags
+              -- where either option is resolvable to a set of files
+              -- but evaluation is not forced until later.
+              Either
+                Pattern
+                ( FreeDisjunctMonad
+                    (LabeledFreeTree RingOperation)
+                    (LabeledFreeTree ())
+                    (DTerm Pattern)
+                )
+            )
+        )
+  }
+  deriving (Show, Eq, Rng, Generic)
+
+{- |
+ To make non-recursive query expressions easier to build.
+-}
+liftSimpleQueryRing ::
+  RingExpression (Either Pattern TagQueryExpression) ->
+  QueryExpression
+liftSimpleQueryRing = QueryExpression . fmap Right
+
+{- |
+ Resolves the left product by binding the 'QueryExpression` ring
+ to a left distribution. Expanding terms in place and yielding a non-recursive
+ type.
+-}
+unliftQueryExpression ::
+  QueryExpression ->
+  RingExpression (Either Pattern TagQueryExpression)
+unliftQueryExpression = either unify pure <=< runQueryExpression
+ where
+  unify (QueryExpression fqe, tqe) =
+    fqe
+      >>= either
+        (unify . second (∙ tqe))
+        ( either
+            ((*. (Node . Right $ tqe)) . Node . Left)
+            (Node . Right . (∙ tqe))
+        )
+
+{- |
+ > LabeledFreeTree RingOperation
+-}
+type RingExpression = LabeledFreeTree RingOperation
+
+{- |
+ > LabeledFreeTree ()
+-}
+type MagmaExpression = LabeledFreeTree ()
 
 {- |
  A free monad with disjunct constructors for Functors t and k. Meaning that the
@@ -687,28 +461,292 @@ evaluateFreeCompoundExpression f g fce =
     T t -> f . fmap (evaluateFreeCompoundExpression f g) $ t
     K k -> g . fmap (evaluateFreeCompoundExpression f g) $ k
 
-newtype DefaultRng a = DefaultRng {runDefaultRng :: a}
-  deriving
-    ( Show
-    , Eq
-    , Semigroup
-    , Monoid
-    , Functor
-    , Foldable
-    , Traversable
+{- |
+ Unrooted binary tree of node type 'a`
+ with edges labeled as type 'l`
+
+ This data structure is used primarily to model any binary operation of type 'l`
+ over the type 'a`
+
+ For instance:
+
+ - An expression for a magma on 'a` can be
+      generally expressed as @LabeledFreeTree () a@
+ - An expression describing ring-like operations (+), (*), and (-) is expressed as
+      @LabeledFreeTree RingOperation a@
+
+ Furthermore, expressions over the structure itself can be expressed by simply duplicating
+ the underlying structure:
+
+ > fmap pure x :: LabeledFreeTree b (LabeledFreeTree b a)
+-}
+data LabeledFreeTree l a
+  = Node a
+  | Edge (LabeledFreeTree l a) l (LabeledFreeTree l a)
+  deriving (Functor, Foldable, Traversable, Generic)
+
+instance (Hashable l, Hashable a) => Hashable (LabeledFreeTree l a)
+
+instance Show2 LabeledFreeTree where
+  liftShowsPrec2 ::
+    (Int -> a -> ShowS) ->
+    ([a] -> ShowS) ->
+    (Int -> b -> ShowS) ->
+    ([b] -> ShowS) ->
+    Int ->
+    LabeledFreeTree a b ->
+    ShowS
+  liftShowsPrec2 lf lfxs af afxs n x = case x of
+    Node b -> showsUnaryWith af "LabeledFreeTree" n b
+    Edge elft a elft' ->
+      let liftS = liftShowsPrec2 lf lfxs af afxs n
+          mShowParens = showParen True
+          edge = showString "Edge "
+          lhs = mShowParens $ liftS elft
+          cen = lf n a
+          rhs = mShowParens $ liftS elft'
+       in edge . lhs . showString " " . cen . showString " " . rhs
+
+instance Show l => Show1 (LabeledFreeTree l) where
+  liftShowsPrec ::
+    Show l =>
+    (Int -> a -> ShowS) ->
+    ([a] -> ShowS) ->
+    Int ->
+    LabeledFreeTree l a ->
+    ShowS
+  liftShowsPrec = liftShowsPrec2 showsPrec showList
+
+instance (Show l, Show a) => Show (LabeledFreeTree l a) where
+  showsPrec :: (Show l, Show a) => Int -> LabeledFreeTree l a -> ShowS
+  showsPrec = showsPrec2
+
+instance Eq2 LabeledFreeTree where
+  liftEq2 ::
+    (a -> b -> Bool) ->
+    (c -> d -> Bool) ->
+    LabeledFreeTree a c ->
+    LabeledFreeTree b d ->
+    Bool
+  liftEq2 eql eqa x y = case x of
+    Node c ->
+      case y of
+        Node y' -> eqa c y'
+        _ -> False
+    Edge elft a elft' ->
+      case y of
+        Edge yl yc yr ->
+          -- compare edges first to short circuit before traversing deeper.
+          eql a yc
+            && liftEq2 eql eqa elft yl
+            && liftEq2 eql eqa elft' yr
+        _ -> False
+
+instance Eq l => Eq1 (LabeledFreeTree l) where
+  liftEq ::
+    Eq l =>
+    (a -> b -> Bool) ->
+    LabeledFreeTree l a ->
+    LabeledFreeTree l b ->
+    Bool
+  liftEq = liftEq2 (==)
+
+instance (Eq l, Eq a) => Eq (LabeledFreeTree l a) where
+  (==) ::
+    (Eq l, Eq a) =>
+    LabeledFreeTree l a ->
+    LabeledFreeTree l a ->
+    Bool
+  (==) = liftEq2 (==) (==)
+
+instance Applicative (LabeledFreeTree l) where
+  pure :: a -> LabeledFreeTree l a
+  pure = Node
+  (<*>) ::
+    LabeledFreeTree l (a -> b) ->
+    LabeledFreeTree l a ->
+    LabeledFreeTree l b
+  f <*> x = case f of
+    Node fab -> fmap fab x
+    Edge elt l elt' -> Edge (elt <*> x) l (elt' <*> x)
+
+instance Monad (LabeledFreeTree l) where
+  return :: a -> LabeledFreeTree l a
+  return = pure
+  (>>=) ::
+    LabeledFreeTree l a ->
+    (a -> LabeledFreeTree l b) ->
+    LabeledFreeTree l b
+  elt >>= f = case elt of
+    Node a -> f a
+    Edge elt' l elt_la -> Edge (elt' >>= f) l (elt_la >>= f)
+
+instance Bifunctor LabeledFreeTree where
+  second :: (b -> c) -> LabeledFreeTree a b -> LabeledFreeTree a c
+  second = fmap
+  first :: (a -> b) -> LabeledFreeTree a c -> LabeledFreeTree b c
+  first f elt = case elt of
+    Node c -> Node c
+    Edge elft a elft' -> Edge (first f elft) (f a) (first f elft')
+
+instance Bifoldable LabeledFreeTree where
+  bifoldr :: (a -> c -> c) -> (b -> c -> c) -> c -> LabeledFreeTree a b -> c
+  bifoldr f g acc elft = case elft of
+    Node b -> g b acc
+    Edge elft' a elft_ab ->
+      let rhs = bifoldr f g acc elft_ab
+          cen = f a rhs
+          result = bifoldr f g cen elft'
+       in result
+
+instance Bitraversable LabeledFreeTree where
+  bitraverse ::
+    Applicative f =>
+    (a -> f c) ->
+    (b -> f d) ->
+    LabeledFreeTree a b ->
+    f (LabeledFreeTree c d)
+  bitraverse f g elft = case elft of
+    Node b -> Node <$> g b
+    Edge elft' a elft_ab ->
+      Edge
+        <$> bitraverse f g elft'
+          <*> f a
+          <*> bitraverse f g elft_ab
+
+instance Rng (LabeledFreeTree RingOperation a) where
+  x +. y = Edge x Addition y
+
+  x *. y = Edge x Multiplication y
+
+  x -. y = Edge x Subtraction y
+
+instance Magma (LabeledFreeTree () a) where
+  x ∙ y = Edge x () y
+
+fold1WithEdge :: (l -> a -> a -> a) -> LabeledFreeTree l a -> a
+fold1WithEdge f elft = case elft of
+  Node a -> a
+  Edge elft' l elft_la ->
+    f
+      l
+      (fold1WithEdge f elft')
+      (fold1WithEdge f elft_la)
+
+{- |
+ Evaluates node operands from left to right.
+-}
+fold1WithEdgeMl ::
+  Monad f =>
+  (l -> a -> a -> f a) ->
+  LabeledFreeTree l a ->
+  f a
+fold1WithEdgeMl f elft = case elft of
+  Node a -> pure a
+  Edge elft' l elft_la -> do
+    lhs <- fold1WithEdgeMl f elft'
+    rhs <- fold1WithEdgeMl f elft_la
+    f l lhs rhs
+
+{- |
+ Evaluates node operands from right to left.
+-}
+fold1WithEdgeMr ::
+  Monad f =>
+  (t1 -> t2 -> t2 -> f t2) ->
+  LabeledFreeTree t1 t2 ->
+  f t2
+fold1WithEdgeMr f elft =
+  case elft of
+    Node a -> pure a
+    Edge elft' l elft_la -> do
+      rhs <- fold1WithEdgeMr f elft_la
+      lhs <- fold1WithEdgeMr f elft'
+      f l lhs rhs
+
+evaluateRingExpression :: Rng a => LabeledFreeTree RingOperation a -> a
+evaluateRingExpression =
+  fold1WithEdge
+    ( \so -> case so of
+        Addition -> (+.)
+        Multiplication -> (*.)
+        Subtraction -> (-.)
     )
 
-instance Applicative DefaultRng where
-  pure :: a -> DefaultRng a
-  pure = DefaultRng
-  (<*>) :: DefaultRng (a -> b) -> DefaultRng a -> DefaultRng b
-  (DefaultRng f) <*> (DefaultRng x) = DefaultRng (f x)
+evaluateMagmaExpression :: Magma a => LabeledFreeTree () a -> a
+evaluateMagmaExpression = fold1WithEdge (const (∙))
 
-instance Monad DefaultRng where
-  return :: a -> DefaultRng a
-  return = pure
-  (>>=) :: DefaultRng a -> (a -> DefaultRng b) -> DefaultRng b
-  (DefaultRng x) >>= f = f x
+{- |
+ A type detailing how set-like collections are to be combined.
+-}
+data RingOperation
+  = Addition
+  | Multiplication
+  | Subtraction
+  deriving (Show, Eq, Bounded, Enum, Ord, Generic)
+
+{- |
+ A string used for searching with SQL LIKE expressions. Where a wildcard is a
+ non-zero length sequence of the % character.
+-}
+data Pattern
+  = WildCard
+  | PatternText Text
+  deriving (Show, Eq, Generic)
+
+instance IsString Pattern where
+  fromString :: String -> Pattern
+  fromString = Pattern . T.pack
+
+instance Semigroup Pattern where
+  (<>) :: Pattern -> Pattern -> Pattern
+  WildCard <> WildCard = WildCard
+  (patternText -> x) <> (patternText -> y) = Pattern (x <> y)
+
+instance Monoid Pattern where
+  mempty :: Pattern
+  mempty = PatternText mempty
+
+instance Hashable Pattern
+
+pattern Pattern :: Text -> Pattern
+pattern Pattern t <-
+  (patternText -> t)
+  where
+    Pattern t = if T.all (== '%') t then WildCard else PatternText t
+
+patternText :: Pattern -> Text
+patternText WildCard = "%"
+patternText (PatternText t) = t
+
+data DTerm a
+  = DTerm a
+  | DMetaTerm a
+  deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
+
+instance Hashable a => Hashable (DTerm a)
+
+instance Applicative DTerm where
+  pure :: a -> DTerm a
+  pure = return
+  (<*>) :: DTerm (a -> b) -> DTerm a -> DTerm b
+  (<*>) = ap
+
+instance Monad DTerm where
+  return :: a -> DTerm a
+  return = DMetaTerm
+  (>>=) :: DTerm a -> (a -> DTerm b) -> DTerm b
+  d >>= f = case d of
+    DTerm a ->
+      let result = f a
+       in case result of
+            DTerm _ -> result
+            DMetaTerm b -> DTerm b
+    DMetaTerm a -> f a
+
+runDTerm :: DTerm p -> p
+runDTerm (DTerm x) = x
+runDTerm (DMetaTerm x) = x
 
 infixl 7 +.
 infixl 7 *.
@@ -723,15 +761,6 @@ class Rng r where
 
   -- | The inverse of '(+.)`
   (-.) :: r -> r -> r
-
--- | Uses the semigroup operation for all ring operations.
-instance Semigroup a => Rng (DefaultRng a) where
-  (+.) :: Semigroup a => DefaultRng a -> DefaultRng a -> DefaultRng a
-  (+.) = (<>)
-  (*.) :: Semigroup a => DefaultRng a -> DefaultRng a -> DefaultRng a
-  (*.) = (<>)
-  (-.) :: Semigroup a => DefaultRng a -> DefaultRng a -> DefaultRng a
-  (-.) = (<>)
 
 instance Hashable a => Rng (HashSet a) where
   (+.) :: Hashable a => HashSet a -> HashSet a -> HashSet a
@@ -784,6 +813,12 @@ instance Ring Int where
   mid :: Int
   mid = 1
 
+instance Ring QueryExpression where
+  aid :: QueryExpression
+  aid = QueryExpression . Node . Right . Left $ WildCard
+  mid :: QueryExpression
+  mid = aid -. aid
+
 infix 9 ∙
 
 {- |
@@ -796,72 +831,3 @@ class Magma m where
 instance (Magma a, Magma b) => Magma (a, b) where
   (∙) :: (Magma a, Magma b) => (a, b) -> (a, b) -> (a, b)
   x ∙ (a, b) = bimap (∙ a) (∙ b) x
-
-newtype QueryExpression = QueryExpression
-  { runQueryExpression ::
-      -- a ring expression over a set of files
-      LabeledFreeTree
-        RingOperation
-        ( -- The disjunction between either a termination of the expression
-          -- or a left distribution of a query of type tag over a query of type file.
-          --
-          -- Where either of these options are resolvable to a set of files.
-          Either
-            -- This product type represents the left-distribution of a tag typed
-            -- expression over a QueryExpression.
-            --
-            -- Notice how the TagQueryExpression is a proper subset of a
-            -- QueryExpression in both disjunct cases.
-            ( QueryExpression
-            , FreeDisjunctMonad
-                (LabeledFreeTree RingOperation)
-                (LabeledFreeTree ())
-                (DTerm Pattern)
-            )
-            ( -- The terminal disjunction between the types of files and tags
-              -- where either option is resolvable to a set of files
-              -- but evaluation is not forced until later.
-              Either
-                Pattern
-                ( FreeDisjunctMonad
-                    (LabeledFreeTree RingOperation)
-                    (LabeledFreeTree ())
-                    (DTerm Pattern)
-                )
-            )
-        )
-  }
-  deriving (Show, Eq, Rng, Generic)
-
-instance Ring QueryExpression where
-  aid :: QueryExpression
-  aid = QueryExpression . Node . Right . Left $ WildCard
-  mid :: QueryExpression
-  mid = aid -. aid
-
-{- |
- To make non-recursive query expressions easier to build.
--}
-liftSimpleQueryRing ::
-  RingExpression (Either Pattern TagQueryExpression) ->
-  QueryExpression
-liftSimpleQueryRing = QueryExpression . fmap Right
-
-{- |
- Resolves the left product by binding the 'QueryExpression` ring
- to a left distribution. Expanding terms in place and yielding a non-recursive
- type.
--}
-unliftQueryExpression ::
-  QueryExpression ->
-  RingExpression (Either Pattern TagQueryExpression)
-unliftQueryExpression = either unify pure <=< runQueryExpression
- where
-  unify (QueryExpression fqe, tqe) =
-    fqe
-      >>= either
-        (unify . second (∙ tqe))
-        ( either
-            ((*. (Node . Right $ tqe)) . Node . Left)
-            (Node . Right . (∙ tqe))
-        )
