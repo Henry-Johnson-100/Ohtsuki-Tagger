@@ -14,10 +14,9 @@ module Text.TaggerQL.Expression.AST.Editor (
   withTagExpression,
 
   -- * Structure Specific Operations
-  flipRingExpression,
   nextRingOperator,
-  dropLeftRing,
-  dropRightRing,
+  dropLeftTree,
+  dropRightTree,
   duplicateRing,
   onTagLeaf,
   distributeTagExpression,
@@ -33,9 +32,9 @@ module Text.TaggerQL.Expression.AST.Editor (
 import Control.Applicative ((<|>))
 import Control.Monad.Trans.Class (MonadTrans (..))
 import Control.Monad.Trans.State.Strict (StateT (..), get, modify)
+import Data.Bifunctor
 import Data.Functor.Identity (runIdentity)
 import Text.TaggerQL.Expression.AST
-import Data.Bifunctor
 
 {- |
  A function handling left-distribution of a 'TagExpression` into a 'QueryExpression`.
@@ -51,7 +50,7 @@ distributeTagExpression ::
   FreeQueryExpression ->
   TagQueryExpression ->
   FreeQueryExpression
-distributeTagExpression fqe tqe = FreeQueryExpression . Ring . Left $ (fqe, tqe)
+distributeTagExpression fqe tqe = FreeQueryExpression . Node . Left $ (fqe, tqe)
 
 infixl 6 <-#
 
@@ -62,16 +61,6 @@ infixl 6 <-#
 (<-#) = distributeTagExpression
 
 {- |
- Flips the operands of a binary expression.
--}
-flipRingExpression :: RingExpression a -> RingExpression a
-flipRingExpression r = case r of
-  Ring _ -> r
-  re :+ re' -> re' :+ re
-  re :* re' -> re' :* re
-  re :- re' -> re' :- re
-
-{- |
  Modifies the TagExpression in a TagLeaf of a QueryExpression if it is a ring value
  and not a binary operation.
 -}
@@ -79,53 +68,43 @@ onTagLeaf ::
   FreeQueryExpression ->
   (TagQueryExpression -> TagQueryExpression) ->
   FreeQueryExpression
-onTagLeaf fqe'@(FreeQueryExpression fqe) f =
-  case fqe of
-    Ring ql -> FreeQueryExpression . Ring $ bimap (second f) (second f) ql
-    _notRing -> fqe'
-
--- onTagLeaf qe@(QueryExpression qe') f = case qe' of
---   Ring ql -> case ql of
---     TagLeaf te -> QueryExpression . Ring . TagLeaf . f $ te
---     _notTagLeaf -> qe
---   _notRingValue -> qe
+onTagLeaf fqe'@(FreeQueryExpression fqe) f = case fqe of
+  Node e -> FreeQueryExpression . Node $ bimap (second f) (second f) e
+  _notNode -> fqe'
 
 {- |
  Cycles 'RingExpression` constructors for a single binary expression.
 -}
 nextRingOperator :: RingExpression a -> RingExpression a
 nextRingOperator r = case r of
-  Ring _ -> r
-  re :+ re' -> re *. re'
-  re :* re' -> re -. re'
-  re :- re' -> re +. re'
+  Node _ -> r
+  Edge lft so lft' -> flip (Edge lft) lft' $
+    case so of
+      Union -> Intersect
+      Intersect -> Difference
+      Difference -> Union
 
 {- |
  Drops the right operand from a 'RingExpression` if there is one.
 -}
-dropRightRing :: RingExpression a -> RingExpression a
-dropRightRing r = case r of
-  Ring _ -> r
-  re :+ _ -> re
-  re :* _ -> re
-  re :- _ -> re
+dropRightTree :: LabeledFreeTree l a -> LabeledFreeTree l a
+dropRightTree r = case r of
+  Node _ -> r
+  Edge x _ _ -> x
 
 {- |
  Drops the left operand from a 'RingExpression` if there is one.
 -}
-dropLeftRing :: RingExpression a -> RingExpression a
-dropLeftRing r =
-  case r of
-    Ring _ -> r
-    _ :+ re -> re
-    _ :* re -> re
-    _ :- re -> re
+dropLeftTree :: LabeledFreeTree l a -> LabeledFreeTree l a
+dropLeftTree r = case r of
+  Node _ -> r
+  Edge _ _ x -> x
 
 {- |
  Duplicate a ring in place by intersecting it with itself.
 -}
 duplicateRing :: RingExpression a -> RingExpression a
-duplicateRing r = r :* r
+duplicateRing r = r *. r
 
 {- |
  A state monad transformer for 1-indexed incremental operations.
@@ -254,19 +233,19 @@ findQueryExpression :: Int -> FreeQueryExpression -> Maybe FreeQueryExpression
 findQueryExpression n =
   runIdentity
     . evalFinder
-    . evaluateRing
+    . evaluateRingExpression
     . mkFinderRing
  where
   mkFinderRing =
     fmap
       ( either
           ( \(x, y) ->
-              bindFinder (evaluateRing . mkFinderRing $ x) $
+              bindFinder (evaluateRingExpression . mkFinderRing $ x) $
                 mkFinder n . (<-# y)
           )
           ( either
-              (mkFinder n . FreeQueryExpression . Ring . Right . Left)
-              (mkFinder n . FreeQueryExpression . Ring . Right . Right)
+              (mkFinder n . FreeQueryExpression . Node . Right . Left)
+              (mkFinder n . FreeQueryExpression . Node . Right . Right)
           )
       )
       . runFreeQueryExpression
@@ -282,7 +261,7 @@ withQueryExpression ::
 withQueryExpression n qe f =
   runIdentity
     . evalEditor
-    . evaluateRing
+    . evaluateRingExpression
     . mkEditorRing
     $ qe
  where
@@ -290,24 +269,24 @@ withQueryExpression n qe f =
     fmap
       ( either
           ( \(x, y) ->
-              bindEditor (evaluateRing . mkEditorRing $ x) $
+              bindEditor (evaluateRingExpression . mkEditorRing $ x) $
                 mkEditor n f . (<-# y)
           )
           ( either
-              (mkEditor n f . FreeQueryExpression . Ring . Right . Left)
-              (mkEditor n f . FreeQueryExpression . Ring . Right . Right)
+              (mkEditor n f . FreeQueryExpression . Node . Right . Left)
+              (mkEditor n f . FreeQueryExpression . Node . Right . Right)
           )
       )
       . runFreeQueryExpression
 
 findTagExpression ::
   Int ->
-  FreeCompoundExpression RingExpression FreeTree a ->
-  Maybe (FreeCompoundExpression RingExpression FreeTree a)
+  FreeCompoundExpression RingExpression MagmaExpression a ->
+  Maybe (FreeCompoundExpression RingExpression MagmaExpression a)
 findTagExpression n =
   runIdentity
     . evalFinder
-    . evaluateFreeCompoundExpression evaluateRing evaluateFreeMagma
+    . evaluateFreeCompoundExpression evaluateRingExpression evaluateMagmaExpression
     . fmap (mkFinder n . pure)
 
 {- |
@@ -315,14 +294,14 @@ findTagExpression n =
 -}
 withTagExpression ::
   Int ->
-  FreeCompoundExpression RingExpression FreeTree a ->
-  ( FreeCompoundExpression RingExpression FreeTree a ->
-    FreeCompoundExpression RingExpression FreeTree a
+  FreeCompoundExpression RingExpression MagmaExpression a ->
+  ( FreeCompoundExpression RingExpression MagmaExpression a ->
+    FreeCompoundExpression RingExpression MagmaExpression a
   ) ->
-  FreeCompoundExpression RingExpression FreeTree a
+  FreeCompoundExpression RingExpression MagmaExpression a
 withTagExpression n te f =
   runIdentity
     . evalEditor
-    . evaluateFreeCompoundExpression evaluateRing evaluateFreeMagma
+    . evaluateFreeCompoundExpression evaluateRingExpression evaluateMagmaExpression
     . fmap (mkEditor n f . pure)
     $ te

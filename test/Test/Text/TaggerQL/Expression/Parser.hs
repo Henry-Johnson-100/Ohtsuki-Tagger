@@ -50,7 +50,7 @@ battery name failMsg expectedResult samples =
 distrTEs ::
     FreeQueryExpression ->
     RingExpression
-        (Either Pattern (RingExpression (FreeTree (DTerm Pattern))))
+        (Either Pattern (RingExpression (MagmaExpression (DTerm Pattern))))
 distrTEs = fmap (fmap distributeK) . unliftFreeQueryExpression
 
 comBatTE ::
@@ -70,7 +70,7 @@ comBatTE name failMsg expect tsts =
 comTE ::
     HasCallStack =>
     String ->
-    RingExpression (FreeTree (DTerm Pattern)) ->
+    RingExpression (MagmaExpression (DTerm Pattern)) ->
     Text ->
     Assertion
 comTE msg x y =
@@ -99,7 +99,7 @@ verifyQueryStructure ::
     TestName ->
     String ->
     RingExpression
-        (Either Pattern (RingExpression (FreeTree (DTerm Pattern)))) ->
+        (Either Pattern (RingExpression (MagmaExpression (DTerm Pattern)))) ->
     Text ->
     [Text] ->
     TestTree
@@ -125,7 +125,7 @@ verifyQueryStructure testName failMsg structure prototype equivalences =
         HasCallStack =>
         String ->
         RingExpression
-            (Either Pattern (RingExpression (FreeTree (DTerm Pattern)))) ->
+            (Either Pattern (RingExpression (MagmaExpression (DTerm Pattern)))) ->
         Text ->
         Assertion
     com msg x y =
@@ -141,7 +141,7 @@ verifyQueryStructure testName failMsg structure prototype equivalences =
         TestName ->
         String ->
         RingExpression
-            (Either Pattern (RingExpression (FreeTree (DTerm Pattern)))) ->
+            (Either Pattern (RingExpression (MagmaExpression (DTerm Pattern)))) ->
         [Text] ->
         TestTree
     comBat name failMsg expect tsts =
@@ -246,7 +246,7 @@ parserTests =
                         (p . p . p $ "a")
                         "{{{{{a}}}}}"
                 , verifyQueryStructure
-                    "Minimal FreeTree Expression"
+                    "Minimal MagmaExpression Expression"
                     "apple {red}"
                     ((p . p . p) ((p . p) "apple" ∙ (p . p) "red"))
                     "apple {red}"
@@ -263,7 +263,7 @@ parserTests =
                     ]
                 , verifyQueryStructure "Explicit Set Operator Annihilates Distribution" "[apple & {red}] /= [apple {red}]" ((p . p . p . p . p $ "apple") *. (p . p . p . p . p $ "red")) "apple & {red}" []
                 , testGroup
-                    "Nested Minimal FreeTree Expression"
+                    "Nested Minimal MagmaExpression Expression"
                     [ verifyQueryStructure
                         "Implicit Right Association"
                         "apple {peel {red}}"
@@ -798,15 +798,15 @@ parserTests =
                         assertEqual
                             "Textual version of AST test by the same name."
                             ( fmap (fmap (fmap distributeK)) . Right $
-                                ( Ring . Right $
+                                ( Node . Right $
                                     ( (tedp . rt $ "a")
                                         ∙ ( (tedp . rt $ "c")
                                                 ∙ (tedp . rt $ "d")
                                           )
                                     )
                                 )
-                                    *. ( (Ring . Left $ "b")
-                                            *. ( Ring . Right $
+                                    *. ( (Node . Left $ "b")
+                                            *. ( Node . Right $
                                                     ( (tedp . rt $ "c")
                                                         ∙ (tedp . rt $ "d")
                                                     )

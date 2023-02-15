@@ -33,7 +33,6 @@ import Data.Model
 import Data.Model.Shared
 import Data.Sequence (Seq ((:<|), (:|>)))
 import qualified Data.Sequence as Seq
-import Data.Tagger
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Version (showVersion)
@@ -107,8 +106,6 @@ taggerEventHandler
       Unit _ -> []
       AnonymousEvent (fmap (\(TaggerAnonymousEvent e) -> e) -> es) -> es
       Mempty (TaggerLens l) -> [Model $ model & l .~ mempty]
-      NextCyclicEnum (TaggerLens l) -> [Model $ model & l %~ next]
-      PrevCyclicEnum (TaggerLens l) -> [Model $ model & l %~ prev]
       NextHistory (TaggerLens l) ->
         [ Model $
             model
@@ -167,6 +164,10 @@ fileSelectionEventHandler
             [ Event . DoFocusedFileEvent . PutFile $ f
             , Model $ model & fileSelectionModel . selection .~ (f <| (fs |> f'))
             ]
+      CycleOrderCriteria ->
+        [Model $ model & fileSelectionTagListModel . ordering %~ cycleOrderCriteria]
+      CycleOrderDirection ->
+        [Model $ model & fileSelectionTagListModel . ordering %~ cycleOrderDir]
       CyclePrevFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []
@@ -365,9 +366,8 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
   case event of
     CycleRingOperator li mi -> [onDisjunctRingExpression li mi nextRingOperator]
     DeleteRingOperand li mi eo ->
-      let removeOperand = either (const dropLeftRing) (const dropRightRing) eo
+      let removeOperand = either (const dropLeftTree) (const dropRightTree) eo
        in [onDisjunctRingExpression li mi removeOperand]
-    FlipRingOperands li mi -> [onDisjunctRingExpression li mi flipRingExpression]
     LeftDistribute li mi te ->
       [ Model $
           model & fileSelectionModel . queryModel . expression

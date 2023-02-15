@@ -37,14 +37,10 @@ module Text.TaggerQL.Expression.Engine (
   insertTagExpression,
 ) where
 
-import Control.Applicative ((<|>))
-import Control.Monad (foldM, guard, void, (<=<), (>=>))
-import Control.Monad.Fix (fix)
+import Control.Monad (foldM, void, (<=<), (>=>))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (ExceptT, throwE)
-import Data.Bifunctor (Bifunctor (second), bimap)
 import Data.Bitraversable (bitraverse)
-import Data.Either (fromRight)
 import qualified Data.Foldable as F
 import Data.Functor (($>))
 import Data.HashSet (HashSet)
@@ -74,7 +70,6 @@ import Database.Tagger.Type (
   TaggedConnection,
   descriptorId,
  )
-import Lens.Micro (Lens', lens)
 import Text.Parsec.Error (errorMessages, messageString)
 import Text.TaggerQL.Expression.AST
 import Text.TaggerQL.Expression.Parser (parseQueryExpression, parseTagExpression)
@@ -122,7 +117,7 @@ queryQueryExpression ::
   FreeQueryExpression ->
   IO (HashSet File)
 queryQueryExpression c =
-  fmap evaluateRing
+  fmap evaluateRingExpression
     . resolveTagFileDisjunction
     <=< queryTerms
       . unliftFreeQueryExpression
@@ -145,7 +140,7 @@ evaluateTagExpression ::
   IO (HashSet Tag)
 evaluateTagExpression c =
   fmap
-    ( evaluateRing
+    ( evaluateRingExpression
         . fmap (F.foldr1 rightAssocJoinTags)
         . distributeK
     )
@@ -181,7 +176,7 @@ instance Semigroup TagInserter where
 insertTagExpression ::
   TaggedConnection ->
   RecordKey File ->
-  FreeCompoundExpression RingExpression FreeTree Pattern ->
+  FreeCompoundExpression RingExpression MagmaExpression Pattern ->
   IO ()
 insertTagExpression c fk =
   void

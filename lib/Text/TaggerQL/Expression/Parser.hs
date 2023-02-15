@@ -29,7 +29,6 @@ import Control.Monad (unless)
 import Data.Char (toLower, toUpper)
 import Data.Functor (($>))
 import qualified Data.List as L
-import Data.Tagger (SetOp (..))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Text.Parsec (
@@ -274,21 +273,21 @@ queryTermParser =
   bracketedQuery =
     QueryTerm
       . liftSimpleQueryRing
-      . Ring
+      . Node
       . Right
       . runBracketTag
       <$> (foldBracketedTags <$> bracketedTagParser <*> zeroOrManyBracketedTagParser)
   minimalTagQuery =
     QueryTerm
       . liftSimpleQueryRing
-      . Ring
+      . Node
       . Right
       . runMinTagExpr
       <$> minimalTagExpressionParser
   filePathTerm =
     QueryTerm
       . liftSimpleQueryRing
-      . Ring
+      . Node
       <$> filePathParser
 
 parenthesized :: Parser a -> Parser a
@@ -313,8 +312,8 @@ ringExprConstructorParser ::
 ringExprConstructorParser =
   ( \so ->
       case so of
-        Union -> (:+)
-        Intersect -> (:*)
-        Difference -> (:-)
+        Union -> (+.)
+        Intersect -> (*.)
+        Difference -> (-.)
   )
     <$> (spaces *> setOpParser)
