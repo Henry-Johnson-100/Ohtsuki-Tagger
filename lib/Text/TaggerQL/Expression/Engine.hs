@@ -40,6 +40,7 @@ module Text.TaggerQL.Expression.Engine (
 import Control.Monad (foldM, void, (<=<), (>=>))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (ExceptT, throwE)
+import Data.Bifunctor (second)
 import Data.Bitraversable (bitraverse)
 import qualified Data.Foldable as F
 import Data.Functor (($>))
@@ -118,35 +119,29 @@ queryQueryExpression ::
   IO (HashSet File)
 queryQueryExpression c =
   fmap evaluateRingExpression
-    . resolveTagFileDisjunction
-    <=< queryTerms
-      . unliftQueryExpression
- where
-  resolveTagFileDisjunction = traverse (either pure (toFileSet c))
-
-  queryTerms =
-    traverse (bitraverse (queryFilePattern c) (evaluateTagExpression c))
+    . traverse (either pure (toFileSet c))
+    <=< fmap
+      ( fmap
+          ( second
+              ( evaluateRingExpression
+                  . fmap
+                    ( F.foldr1
+                        ( \superTagSet subTagSet ->
+                            joinSubtags superTagSet (HS.map tagSubtagOfId subTagSet)
+                        )
+                    )
+                  . distributeK
+              )
+          )
+          . simplifyQueryExpression
+      )
+      . bitraverse (queryFilePattern c) (traverse (queryDTerm c))
 
 queryFilePattern :: TaggedConnection -> Pattern -> IO (HashSet File)
 queryFilePattern c pat =
   case pat of
     WildCard -> HS.fromList <$> allFiles c
     PatternText t -> HS.fromList <$> queryForFileByPattern t c
-
--- A naive query interpreter, with no caching.
-evaluateTagExpression ::
-  TaggedConnection ->
-  TagQueryExpression ->
-  IO (HashSet Tag)
-evaluateTagExpression c =
-  fmap
-    ( evaluateRingExpression
-        . fmap (F.foldr1 rightAssocJoinTags)
-        . distributeK
-    )
-    . traverse (queryDTerm c)
- where
-  rightAssocJoinTags supers subs = joinSubtags supers (HS.map tagSubtagOfId subs)
 
 queryDTerm :: TaggedConnection -> DTerm Pattern -> IO (HashSet Tag)
 queryDTerm c dt = case dt of

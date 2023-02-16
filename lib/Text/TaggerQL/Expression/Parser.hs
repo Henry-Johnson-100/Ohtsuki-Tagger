@@ -148,7 +148,7 @@ failIfNotConsumed = do
 queryExpressionParser :: Parser QueryExpression
 queryExpressionParser =
   spaces
-    *> ( fmap (QueryExpression . (>>= runQueryExpression))
+    *> ( fmap (TraversableQueryExpression . (>>= runTraversableQueryExpression))
           . ringExprParser
           . fmap runQueryTerm
           $ queryTermParser

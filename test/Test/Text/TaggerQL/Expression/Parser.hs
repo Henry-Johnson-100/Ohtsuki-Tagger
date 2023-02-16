@@ -51,7 +51,7 @@ distrTEs ::
     QueryExpression ->
     RingExpression
         (Either Pattern (RingExpression (MagmaExpression (DTerm Pattern))))
-distrTEs = fmap (fmap distributeK) . unliftQueryExpression
+distrTEs = fmap (fmap distributeK) . simplifyQueryExpression
 
 comBatTE ::
     HasCallStack =>
@@ -814,7 +814,7 @@ parserTests =
                                        )
                             )
                             ( fmap (fmap distributeK)
-                                . unliftQueryExpression
+                                . simplifyQueryExpression
                                 <$> parseQueryExpression
                                     "(a & p.b){c}{d}"
                             )

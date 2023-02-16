@@ -376,9 +376,9 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
               ( case mi of
                   Nothing -> (<-# te)
                   Just n ->
-                    QueryExpression
+                    TraversableQueryExpression
                       . fmap (second (second (flip (withTagExpression n) (∙ te))))
-                      . runQueryExpression
+                      . runTraversableQueryExpression
               )
       ]
     PlaceQueryExpression n l ->
@@ -397,7 +397,7 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
           model & fileSelectionModel . queryModel . expression
             %~ flip
               (withQueryExpression li)
-              ( QueryExpression
+              ( TraversableQueryExpression
                   . fmap
                     ( second
                         ( second
@@ -411,7 +411,7 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
                             )
                         )
                     )
-                  . runQueryExpression
+                  . runTraversableQueryExpression
               )
       ]
     PushExpression ->
@@ -473,7 +473,7 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
             (withQueryExpression qeIndex)
             ( \qe ->
                 maybe
-                  (QueryExpression . f . runQueryExpression $ qe)
+                  (TraversableQueryExpression . f . runTraversableQueryExpression $ qe)
                   ( \teIndex ->
                       onTagLeaf
                         qe

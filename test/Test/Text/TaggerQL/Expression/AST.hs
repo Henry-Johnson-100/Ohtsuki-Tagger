@@ -30,13 +30,13 @@ astTests =
 astProperties :: TestTree
 astProperties =
     testGroup
-        "Expression Properties"
+        "LabeledFreeTree Properties"
         [ testGroup
-            "RingExpression Properties"
+            "LabeledFreeTree Properties"
             [ testProperty
                 "Left Monad Identity"
                 ( do
-                    f <- arbitrary :: Gen (Int -> QCLabeledFreeTree RingOperation Int)
+                    f <- arbitrary :: Gen (Int -> LabeledFreeTree Int Int)
                     i <- arbitrary
                     let testProp = (pure i >>= f) == f i
                     pure testProp
@@ -44,7 +44,7 @@ astProperties =
             , testProperty
                 "Right Monad Identity"
                 ( do
-                    re <- arbitrary :: Gen (QCLabeledFreeTree RingOperation Int)
+                    re <- arbitrary :: Gen (LabeledFreeTree Int Int)
                     let testProp = (re >>= pure) == re
                     pure testProp
                 )
@@ -58,7 +58,7 @@ astProperties =
                                 (resize 35 arbitrary)
                                 -- Exclude functions that appear to be identities
                                 (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (QCLabeledFreeTree RingOperation Int))
+                                Gen (Fun Int (LabeledFreeTree Int Int))
                     f <- genF
                     g <- genF
                     h <- genF
@@ -80,11 +80,11 @@ astProperties =
                 )
             ]
         , testGroup
-            "MagmaExpression Properties"
+            "FreeDisjunctMonad Properties"
             [ testProperty
                 "Left Monad Identity"
                 ( do
-                    f <- arbitrary :: Gen (Int -> (QCLabeledFreeTree ()) Int)
+                    f <- (resize 3 arbitrary :: Gen (Int -> FreeDisjunctMonad (LabeledFreeTree Int) (LabeledFreeTree Int) Int))
                     i <- arbitrary
                     let testProp = (pure i >>= f) == f i
                     pure testProp
@@ -92,55 +92,7 @@ astProperties =
             , testProperty
                 "Right Monad Identity"
                 ( do
-                    re <- arbitrary :: Gen ((QCLabeledFreeTree ()) Int)
-                    let testProp = (re >>= pure) == re
-                    pure testProp
-                )
-            , testProperty
-                "Kleisli Arrow Associativity"
-                ( do
-                    let genF =
-                            suchThat
-                                -- Use relatively small functions so it doesn't
-                                -- take forever to run.
-                                (resize 35 arbitrary)
-                                -- Exclude functions that appear to be identities
-                                (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int ((QCLabeledFreeTree ()) Int))
-                    f <- genF
-                    g <- genF
-                    h <- genF
-                    dt <- arbitrary :: Gen Int
-                    let testProp =
-                            ( applyFun f
-                                >=> ( applyFun g
-                                        >=> applyFun h
-                                    )
-                            )
-                                dt
-                                == ( ( applyFun f
-                                        >=> applyFun g
-                                     )
-                                        >=> applyFun h
-                                   )
-                                    dt
-                    pure testProp
-                )
-            ]
-        , testGroup
-            "TagExpression Properties"
-            [ testProperty
-                "Left Monad Identity"
-                ( do
-                    f <- (resize 3 arbitrary :: Gen (Int -> QCFreeCompoundExpression (QCLabeledFreeTree RingOperation) (QCLabeledFreeTree ()) Int))
-                    i <- arbitrary
-                    let testProp = (pure i >>= f) == f i
-                    pure testProp
-                )
-            , testProperty
-                "Right Monad Identity"
-                ( do
-                    re <- resize 3 arbitrary :: Gen (QCFreeCompoundExpression (QCLabeledFreeTree RingOperation) (QCLabeledFreeTree ()) Int)
+                    re <- resize 3 arbitrary :: Gen (FreeDisjunctMonad (LabeledFreeTree Int) (LabeledFreeTree Int) Int)
                     let testProp = (re >>= pure) == re
                     pure testProp
                 )
@@ -154,7 +106,7 @@ astProperties =
                                 (resize 3 arbitrary)
                                 -- Exclude functions that appear to be identities
                                 (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (QCFreeCompoundExpression (QCLabeledFreeTree RingOperation) (QCLabeledFreeTree ()) Int))
+                                Gen (Fun Int (FreeDisjunctMonad (LabeledFreeTree Int) (LabeledFreeTree Int) Int))
                     f <- genF
                     g <- genF
                     h <- genF
@@ -180,14 +132,14 @@ astProperties =
             [ testProperty
                 "Left Monad Identity"
                 ( do
-                    f <- arbitrary :: Gen (Int -> QCDTerm Int)
+                    f <- arbitrary :: Gen (Int -> DTerm Int)
                     i <- arbitrary :: Gen Int
                     pure $ (pure i >>= f) == f i
                 )
             , testProperty
                 "Right Monad Identity"
                 ( do
-                    dt <- arbitrary :: Gen (QCDTerm Int)
+                    dt <- arbitrary :: Gen (DTerm Int)
                     pure $ (dt >>= pure) == dt
                 )
             , testProperty
@@ -200,7 +152,7 @@ astProperties =
                                 (resize 35 arbitrary)
                                 -- Exclude functions that appear to be identities
                                 (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (QCDTerm Int))
+                                Gen (Fun Int (DTerm Int))
                     f <- genF
                     g <- genF
                     h <- genF
@@ -241,7 +193,7 @@ astProperties =
                                    )
                            )
                     )
-                    ( unliftQueryExpression $
+                    ( simplifyQueryExpression $
                         ( liftSimpleQueryRing
                             ( (pure . Right . tedp . rt $ "a")
                                 *. (pure . Left $ "b")
@@ -268,7 +220,7 @@ astProperties =
                                    )
                            )
                     )
-                    ( unliftQueryExpression $
+                    ( simplifyQueryExpression $
                         liftSimpleQueryRing
                             ( (pure . Right . tedp . rt $ "a")
                                 *. (pure . Left $ "b")
@@ -289,10 +241,7 @@ astEditorProperties =
             [ testProperty
                 "QueryExpression"
                 ( do
-                    expr <-
-                        runQCFreeQueryExpression
-                            <$> resize 3 arbitrary ::
-                            Gen QueryExpression
+                    expr <- resize 3 arbitrary
                     n <- suchThat arbitrary (\n' -> isJust $ findQueryExpression n' expr)
                     let exprAt = fromJust $ findQueryExpression n expr
                         replaceResult = withQueryExpression n expr (const exprAt)
@@ -303,8 +252,7 @@ astEditorProperties =
                 "TagExpression"
                 ( do
                     expr <-
-                        castQCTagQueryExpression
-                            <$> resize 3 arbitrary ::
+                        resize 3 arbitrary ::
                             Gen TagQueryExpression
                     n <- suchThat arbitrary (\n' -> isJust $ findTagExpression n' expr)
                     let exprAt = fromJust $ findTagExpression n expr

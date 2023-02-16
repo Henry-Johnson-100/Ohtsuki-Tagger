@@ -50,7 +50,7 @@ distributeTagExpression ::
   QueryExpression ->
   TagQueryExpression ->
   QueryExpression
-distributeTagExpression fqe tqe = QueryExpression . Node . Left $ (fqe, tqe)
+distributeTagExpression fqe tqe = TraversableQueryExpression . Node . Left $ (fqe, tqe)
 
 infixl 6 <-#
 
@@ -68,8 +68,8 @@ onTagLeaf ::
   QueryExpression ->
   (TagQueryExpression -> TagQueryExpression) ->
   QueryExpression
-onTagLeaf fqe'@(QueryExpression fqe) f = case fqe of
-  Node e -> QueryExpression . Node $ bimap (second f) (second f) e
+onTagLeaf fqe'@(TraversableQueryExpression fqe) f = case fqe of
+  Node e -> TraversableQueryExpression . Node $ bimap (second f) (second f) e
   _notNode -> fqe'
 
 {- |
@@ -244,11 +244,11 @@ findQueryExpression n =
                 mkFinder n . (<-# y)
           )
           ( either
-              (mkFinder n . QueryExpression . Node . Right . Left)
-              (mkFinder n . QueryExpression . Node . Right . Right)
+              (mkFinder n . TraversableQueryExpression . Node . Right . Left)
+              (mkFinder n . TraversableQueryExpression . Node . Right . Right)
           )
       )
-      . runQueryExpression
+      . runTraversableQueryExpression
 
 {- |
  Modify the 'QueryExpression` at the given index.
@@ -273,11 +273,11 @@ withQueryExpression n qe f =
                 mkEditor n f . (<-# y)
           )
           ( either
-              (mkEditor n f . QueryExpression . Node . Right . Left)
-              (mkEditor n f . QueryExpression . Node . Right . Right)
+              (mkEditor n f . TraversableQueryExpression . Node . Right . Left)
+              (mkEditor n f . TraversableQueryExpression . Node . Right . Right)
           )
       )
-      . runQueryExpression
+      . runTraversableQueryExpression
 
 findTagExpression ::
   Int ->
