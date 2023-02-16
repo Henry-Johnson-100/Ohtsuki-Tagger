@@ -155,6 +155,146 @@ newtype QueryExpression = QueryExpression
   }
   deriving (Show, Eq, Rng, Generic)
 
+newtype Foo a b
+  = Foo
+      ( LabeledFreeTree
+          RingOperation
+          ( Either
+              (Foo a b, b)
+              ( Either
+                  a
+                  b
+              )
+          )
+      )
+  deriving (Generic, Rng)
+
+instance Show2 Foo where
+  liftShowsPrec2 ::
+    (Int -> a -> ShowS) ->
+    ([a] -> ShowS) ->
+    (Int -> b -> ShowS) ->
+    ([b] -> ShowS) ->
+    Int ->
+    Foo a b ->
+    ShowS
+  liftShowsPrec2 af axs bf bxs n (Foo o) =
+    showsUnaryWith
+      ( liftShowsPrec2
+          showsPrec
+          showList
+          ( liftShowsPrec2
+              ( liftShowsPrec2
+                  (liftShowsPrec2 af axs bf bxs)
+                  (liftShowList2 af axs bf bxs)
+                  bf
+                  bxs
+              )
+              ( liftShowList2
+                  (liftShowsPrec2 af axs bf bxs)
+                  (liftShowList2 af axs bf bxs)
+                  bf
+                  bxs
+              )
+              (liftShowsPrec2 af axs bf bxs)
+              (liftShowList2 af axs bf bxs)
+          )
+          ( liftShowList2
+              ( liftShowsPrec2
+                  (liftShowsPrec2 af axs bf bxs)
+                  (liftShowList2 af axs bf bxs)
+                  bf
+                  bxs
+              )
+              ( liftShowList2
+                  (liftShowsPrec2 af axs bf bxs)
+                  (liftShowList2 af axs bf bxs)
+                  bf
+                  bxs
+              )
+              (liftShowsPrec2 af axs bf bxs)
+              (liftShowList2 af axs bf bxs)
+          )
+      )
+      "Foo"
+      n
+      o
+
+instance Show a => Show1 (Foo a) where
+  liftShowsPrec ::
+    Show a =>
+    (Int -> a1 -> ShowS) ->
+    ([a1] -> ShowS) ->
+    Int ->
+    Foo a a1 ->
+    ShowS
+  liftShowsPrec = liftShowsPrec2 showsPrec showList
+
+instance (Show a, Show b) => Show (Foo a b) where
+  showsPrec :: (Show a, Show b) => Int -> Foo a b -> ShowS
+  showsPrec = showsPrec2
+
+instance Eq2 Foo where
+  liftEq2 :: (a -> b -> Bool) -> (c -> d -> Bool) -> Foo a c -> Foo b d -> Bool
+  liftEq2 aeq beq (Foo x) (Foo y) =
+    liftEq2 (==) (liftEq2 (liftEq2 (liftEq2 aeq beq) beq) (liftEq2 aeq beq)) x y
+
+instance Eq a => Eq1 (Foo a) where
+  liftEq :: Eq a => (a1 -> b -> Bool) -> Foo a a1 -> Foo a b -> Bool
+  liftEq beq = liftEq2 (==) beq
+
+instance (Eq a, Eq b) => Eq (Foo a b) where
+  (==) :: (Eq a, Eq b) => Foo a b -> Foo a b -> Bool
+  (==) = liftEq2 (==) (==)
+
+instance Bifunctor Foo where
+  first :: (a -> b) -> Foo a c -> Foo b c
+  first f (Foo o) = Foo $ fmap (bimap (first (first f)) (first f)) o
+  second :: (b -> c) -> Foo a b -> Foo a c
+  second f (Foo o) = Foo $ fmap (bimap (bimap (second f) f) (second f)) o
+
+instance Bifoldable Foo where
+  bifoldr :: (a -> c -> c) -> (b -> c -> c) -> c -> Foo a b -> c
+  bifoldr f g acc (Foo o) =
+    foldr
+      ( flip
+          ( bifoldr
+              (flip (bifoldr (flip (bifoldr f g)) g))
+              (flip (bifoldr f g))
+          )
+      )
+      acc
+      o
+
+instance Bitraversable Foo where
+  bitraverse :: Applicative f => (a -> f c) -> (b -> f d) -> Foo a b -> f (Foo c d)
+  bitraverse f g (Foo o) =
+    Foo
+      <$> traverse (bitraverse (bitraverse (bitraverse f g) g) (bitraverse f g)) o
+
+simplifyLeftProduct ::
+  -- | How to resolve a simple term to the target expression type
+  (Either a c -> LabeledFreeTree RingOperation b) ->
+  -- | Describe how successive left products are folded:
+  -- > (a) {b} {c} {d} -> (a) {b{c{d}}}
+  (c -> c -> c) ->
+  -- | The expression to simplify
+  Foo a c ->
+  -- | Continuation describing how type c is applied to an expression of type b
+  ( c ->
+    LabeledFreeTree RingOperation b ->
+    LabeledFreeTree RingOperation b
+  ) ->
+  LabeledFreeTree RingOperation b
+simplifyLeftProduct onLeaf foldrBApplication (Foo o) applyB =
+  o >>= either rec' onLeaf
+ where
+  rec' (Foo o', b) =
+    o'
+      >>= either
+        (rec' . second (foldrBApplication b))
+        (applyB b . onLeaf)
+
 {- |
  To make non-recursive query expressions easier to build.
 -}
