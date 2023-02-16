@@ -80,7 +80,7 @@ expressionWidget =
 buildExpressionWidget ::
   QueryExpression ->
   RingExpression QueryExpressionWidgetBuilder
-buildExpressionWidget (QueryExpression fqe) = do
+buildExpressionWidget (TraversableQueryExpression fqe) = do
   fqe' <- fqe
   either
     ( \(x, y) ->
@@ -400,7 +400,7 @@ qewbRngHelper
 
 qewbLeaf :: Either Pattern TagQueryExpression -> QueryExpressionWidgetBuilder
 qewbLeaf ql =
-  let qe = QueryExpression . pure . pure $ ql
+  let qe = TraversableQueryExpression . pure . pure $ ql
    in case ql of
         Left pat -> QueryExpressionWidgetBuilderG $ do
           _count <- getIncr

@@ -29,7 +29,9 @@ module Text.TaggerQL.Expression.AST (
   normalize,
 
   -- ** QueryExpression
-  QueryExpression (..),
+  QueryExpression,
+  TraversableQueryExpression (..),
+  simplifyLeftProduct,
   liftSimpleQueryRing,
   unliftQueryExpression,
 
@@ -119,66 +121,32 @@ unwrapIdentities =
 normalize :: TagQueryExpression -> TagQueryExpression
 normalize = unwrapIdentities . T . fmap (K . fmap pure) . distributeK
 
-newtype QueryExpression = QueryExpression
-  { runQueryExpression ::
-      -- a ring expression over a set of files
+type QueryExpression = TraversableQueryExpression Pattern TagQueryExpression
+
+newtype TraversableQueryExpression a b = TraversableQueryExpression
+  { runTraversableQueryExpression ::
       LabeledFreeTree
         RingOperation
-        ( -- The disjunction between either a termination of the expression
-          -- or a left distribution of a query of type tag over a query of type file.
-          --
-          -- Where either of these options are resolvable to a set of files.
-          Either
-            -- This product type represents the left-distribution of a tag typed
-            -- expression over a QueryExpression.
-            --
-            -- Notice how the TagQueryExpression is a proper subset of a
-            -- QueryExpression in both disjunct cases.
-            ( QueryExpression
-            , FreeDisjunctMonad
-                (LabeledFreeTree RingOperation)
-                (LabeledFreeTree ())
-                (DTerm Pattern)
-            )
-            ( -- The terminal disjunction between the types of files and tags
-              -- where either option is resolvable to a set of files
-              -- but evaluation is not forced until later.
-              Either
-                Pattern
-                ( FreeDisjunctMonad
-                    (LabeledFreeTree RingOperation)
-                    (LabeledFreeTree ())
-                    (DTerm Pattern)
-                )
+        ( Either
+            (TraversableQueryExpression a b, b)
+            ( Either
+                a
+                b
             )
         )
   }
-  deriving (Show, Eq, Rng, Generic)
-
-newtype Foo a b
-  = Foo
-      ( LabeledFreeTree
-          RingOperation
-          ( Either
-              (Foo a b, b)
-              ( Either
-                  a
-                  b
-              )
-          )
-      )
   deriving (Generic, Rng)
 
-instance Show2 Foo where
+instance Show2 TraversableQueryExpression where
   liftShowsPrec2 ::
     (Int -> a -> ShowS) ->
     ([a] -> ShowS) ->
     (Int -> b -> ShowS) ->
     ([b] -> ShowS) ->
     Int ->
-    Foo a b ->
+    TraversableQueryExpression a b ->
     ShowS
-  liftShowsPrec2 af axs bf bxs n (Foo o) =
+  liftShowsPrec2 af axs bf bxs n (TraversableQueryExpression o) =
     showsUnaryWith
       ( liftShowsPrec2
           showsPrec
@@ -220,42 +188,58 @@ instance Show2 Foo where
       n
       o
 
-instance Show a => Show1 (Foo a) where
+instance Show a => Show1 (TraversableQueryExpression a) where
   liftShowsPrec ::
     Show a =>
     (Int -> a1 -> ShowS) ->
     ([a1] -> ShowS) ->
     Int ->
-    Foo a a1 ->
+    TraversableQueryExpression a a1 ->
     ShowS
   liftShowsPrec = liftShowsPrec2 showsPrec showList
 
-instance (Show a, Show b) => Show (Foo a b) where
-  showsPrec :: (Show a, Show b) => Int -> Foo a b -> ShowS
+instance (Show a, Show b) => Show (TraversableQueryExpression a b) where
+  showsPrec :: (Show a, Show b) => Int -> TraversableQueryExpression a b -> ShowS
   showsPrec = showsPrec2
 
-instance Eq2 Foo where
-  liftEq2 :: (a -> b -> Bool) -> (c -> d -> Bool) -> Foo a c -> Foo b d -> Bool
-  liftEq2 aeq beq (Foo x) (Foo y) =
+instance Eq2 TraversableQueryExpression where
+  liftEq2 ::
+    (a -> b -> Bool) ->
+    (c -> d -> Bool) ->
+    TraversableQueryExpression a c ->
+    TraversableQueryExpression b d ->
+    Bool
+  liftEq2 aeq beq (TraversableQueryExpression x) (TraversableQueryExpression y) =
     liftEq2 (==) (liftEq2 (liftEq2 (liftEq2 aeq beq) beq) (liftEq2 aeq beq)) x y
 
-instance Eq a => Eq1 (Foo a) where
-  liftEq :: Eq a => (a1 -> b -> Bool) -> Foo a a1 -> Foo a b -> Bool
+instance Eq a => Eq1 (TraversableQueryExpression a) where
+  liftEq ::
+    Eq a =>
+    (a1 -> b -> Bool) ->
+    TraversableQueryExpression a a1 ->
+    TraversableQueryExpression a b ->
+    Bool
   liftEq beq = liftEq2 (==) beq
 
-instance (Eq a, Eq b) => Eq (Foo a b) where
-  (==) :: (Eq a, Eq b) => Foo a b -> Foo a b -> Bool
+instance (Eq a, Eq b) => Eq (TraversableQueryExpression a b) where
+  (==) ::
+    (Eq a, Eq b) =>
+    TraversableQueryExpression a b ->
+    TraversableQueryExpression a b ->
+    Bool
   (==) = liftEq2 (==) (==)
 
-instance Bifunctor Foo where
-  first :: (a -> b) -> Foo a c -> Foo b c
-  first f (Foo o) = Foo $ fmap (bimap (first (first f)) (first f)) o
-  second :: (b -> c) -> Foo a b -> Foo a c
-  second f (Foo o) = Foo $ fmap (bimap (bimap (second f) f) (second f)) o
+instance Bifunctor TraversableQueryExpression where
+  first :: (a -> b) -> TraversableQueryExpression a c -> TraversableQueryExpression b c
+  first f (TraversableQueryExpression o) =
+    TraversableQueryExpression $ fmap (bimap (first (first f)) (first f)) o
+  second :: (b -> c) -> TraversableQueryExpression a b -> TraversableQueryExpression a c
+  second f (TraversableQueryExpression o) =
+    TraversableQueryExpression $ fmap (bimap (bimap (second f) f) (second f)) o
 
-instance Bifoldable Foo where
-  bifoldr :: (a -> c -> c) -> (b -> c -> c) -> c -> Foo a b -> c
-  bifoldr f g acc (Foo o) =
+instance Bifoldable TraversableQueryExpression where
+  bifoldr :: (a -> c -> c) -> (b -> c -> c) -> c -> TraversableQueryExpression a b -> c
+  bifoldr f g acc (TraversableQueryExpression o) =
     foldr
       ( flip
           ( bifoldr
@@ -266,10 +250,15 @@ instance Bifoldable Foo where
       acc
       o
 
-instance Bitraversable Foo where
-  bitraverse :: Applicative f => (a -> f c) -> (b -> f d) -> Foo a b -> f (Foo c d)
-  bitraverse f g (Foo o) =
-    Foo
+instance Bitraversable TraversableQueryExpression where
+  bitraverse ::
+    Applicative f =>
+    (a -> f c) ->
+    (b -> f d) ->
+    TraversableQueryExpression a b ->
+    f (TraversableQueryExpression c d)
+  bitraverse f g (TraversableQueryExpression o) =
+    TraversableQueryExpression
       <$> traverse (bitraverse (bitraverse (bitraverse f g) g) (bitraverse f g)) o
 
 simplifyLeftProduct ::
@@ -279,17 +268,17 @@ simplifyLeftProduct ::
   -- > (a) {b} {c} {d} -> (a) {b{c{d}}}
   (c -> c -> c) ->
   -- | The expression to simplify
-  Foo a c ->
+  TraversableQueryExpression a c ->
   -- | Continuation describing how type c is applied to an expression of type b
   ( c ->
     LabeledFreeTree RingOperation b ->
     LabeledFreeTree RingOperation b
   ) ->
   LabeledFreeTree RingOperation b
-simplifyLeftProduct onLeaf foldrBApplication (Foo o) applyB =
+simplifyLeftProduct onLeaf foldrBApplication (TraversableQueryExpression o) applyB =
   o >>= either rec' onLeaf
  where
-  rec' (Foo o', b) =
+  rec' (TraversableQueryExpression o', b) =
     o'
       >>= either
         (rec' . second (foldrBApplication b))
@@ -299,9 +288,9 @@ simplifyLeftProduct onLeaf foldrBApplication (Foo o) applyB =
  To make non-recursive query expressions easier to build.
 -}
 liftSimpleQueryRing ::
-  RingExpression (Either Pattern TagQueryExpression) ->
-  QueryExpression
-liftSimpleQueryRing = QueryExpression . fmap Right
+  RingExpression (Either a b) ->
+  TraversableQueryExpression a b
+liftSimpleQueryRing = TraversableQueryExpression . fmap Right
 
 {- |
  Resolves the left product by binding the 'QueryExpression` ring
@@ -311,9 +300,9 @@ liftSimpleQueryRing = QueryExpression . fmap Right
 unliftQueryExpression ::
   QueryExpression ->
   RingExpression (Either Pattern TagQueryExpression)
-unliftQueryExpression = either unify pure <=< runQueryExpression
+unliftQueryExpression = either unify pure <=< runTraversableQueryExpression
  where
-  unify (QueryExpression fqe, tqe) =
+  unify (TraversableQueryExpression fqe, tqe) =
     fqe
       >>= either
         (unify . second (∙ tqe))
@@ -955,7 +944,7 @@ instance Ring Int where
 
 instance Ring QueryExpression where
   aid :: QueryExpression
-  aid = QueryExpression . Node . Right . Left $ WildCard
+  aid = TraversableQueryExpression . Node . Right . Left $ WildCard
   mid :: QueryExpression
   mid = aid -. aid
 
