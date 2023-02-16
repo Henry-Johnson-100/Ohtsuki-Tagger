@@ -11,16 +11,12 @@ module Test.Text.TaggerQL.Expression.Engine (
 ) where
 
 import Control.Monad.Trans.Maybe (runMaybeT)
-import Control.Monad.Trans.Reader (runReaderT)
 import qualified Data.HashSet as HS
-import Data.Maybe (fromJust, isJust)
-import Data.Tagger
-import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger
+import Test.Resources
 import Test.Tasty
 import Test.Tasty.HUnit
-import Test.Tasty.QuickCheck
 import Text.TaggerQL.Expression.AST
 import Text.TaggerQL.Expression.Engine
 
@@ -33,21 +29,6 @@ queryEngineASTTests c =
     , taggingEngineTests c
     , enginePropertyTests
     ]
-
-fe :: Pattern -> QueryExpression
-fe = QueryExpression . pure . FileLeaf
-
-tle :: TagExpression (DTerm Pattern) -> QueryExpression
-tle = QueryExpression . pure . TagLeaf
-
-tedp :: DTerm Pattern -> TagExpression (DTerm Pattern)
-tedp = pure
-
-d :: a -> DTerm a
-d = DTerm
-
-rt :: a -> DTerm a
-rt = DMetaTerm
 
 des :: Int -> Pattern
 des n = PatternText $ "descriptor_" <> (T.pack . show $ n)
@@ -68,8 +49,8 @@ queryExpressionEdgeCases c =
                     >>= qqe
                       ( tle
                           ( (tedp . d . des $ 8)
-                              # ( (tedp . d . des $ 9)
-                                    # (tedp . d . des $ 10)
+                              ∙ ( (tedp . d . des $ 9)
+                                    ∙ (tedp . d . des $ 10)
                                 )
                           )
                       )
@@ -91,7 +72,7 @@ queryExpressionEdgeCases c =
                 r <-
                   c
                     >>= qqe
-                      (tle ((tedp . d . des $ 8) # (tedp . d . des $ 9)))
+                      (tle ((tedp . d . des $ 8) ∙ (tedp . d . des $ 9)))
                 -- runExpr
                 -- ( TagExpression $
                 --     TagTermExtension
@@ -106,7 +87,7 @@ queryExpressionEdgeCases c =
                 r <-
                   c
                     >>= qqe
-                      (tle ((tedp . d . des $ 9) # (tedp . d . des $ 10)))
+                      (tle ((tedp . d . des $ 9) ∙ (tedp . d . des $ 10)))
                 -- runExpr
                 -- ( TagExpression $
                 --     TagTermExtension
@@ -121,7 +102,7 @@ queryExpressionEdgeCases c =
                 r <-
                   c
                     >>= qqe
-                      (tle ((tedp . d . des $ 11) # (tedp . d . des $ 9)))
+                      (tle ((tedp . d . des $ 11) ∙ (tedp . d . des $ 9)))
                 -- runExpr
                 -- ( TagExpression $
                 --     TagTermExtension
@@ -141,7 +122,7 @@ queryExpressionEdgeCases c =
                     >>= qqe
                       ( tle
                           ( (tedp . rt . des $ 12)
-                              # ( (tedp . d . des $ 15)
+                              ∙ ( (tedp . d . des $ 15)
                                     *. (tedp . d . des $ 16)
                                 )
                           )
@@ -153,7 +134,7 @@ queryExpressionEdgeCases c =
                 --       ( BinarySubExpression $
                 --           BinaryOperation
                 --             (SubTag (DescriptorTerm "descriptor_15"))
-                --             Intersect
+                --             Multiplication
                 --             (SubTag (DescriptorTerm "descriptor_16"))
                 --       )
                 -- )
@@ -165,8 +146,8 @@ queryExpressionEdgeCases c =
                 r <-
                   c
                     >>= qqe
-                      ( tle ((tedp . rt . des $ 12) # (tedp . d . des $ 15))
-                          *. tle ((tedp . rt . des $ 12) # (tedp . d . des $ 16))
+                      ( tle ((tedp . rt . des $ 12) ∙ (tedp . d . des $ 15))
+                          *. tle ((tedp . rt . des $ 12) ∙ (tedp . d . des $ 16))
                       )
                 -- runExpr
                 -- ( BinaryExpression $
@@ -176,7 +157,7 @@ queryExpressionEdgeCases c =
                 --             (MetaDescriptorTerm "descriptor_12")
                 --             (SubTag (DescriptorTerm "descriptor_15"))
                 --       )
-                --       Intersect
+                --       Multiplication
                 --       ( TagExpression $
                 --           TagTermExtension
                 --             (MetaDescriptorTerm "descriptor_12")
@@ -193,7 +174,7 @@ queryExpressionEdgeCases c =
                     >>= qqe
                       ( tle
                           ( (tedp . d . des $ 13)
-                              # ( (tedp . d . des $ 15)
+                              ∙ ( (tedp . d . des $ 15)
                                     *. (tedp . d . des $ 16)
                                 )
                           )
@@ -205,7 +186,7 @@ queryExpressionEdgeCases c =
                 --       ( BinarySubExpression $
                 --           BinaryOperation
                 --             (SubTag (DescriptorTerm "descriptor_15"))
-                --             Intersect
+                --             Multiplication
                 --             (SubTag (DescriptorTerm "descriptor_16"))
                 --       )
                 -- )
@@ -237,7 +218,7 @@ queryExpressionBasicFunctionality c =
             -- ( BinaryExpression $
             --     BinaryOperation
             --       (FileTermValue "%")
-            --       Difference
+            --       Subtraction
             --       (TagTermValue (DescriptorTerm "%"))
             -- )
             a <- c >>= queryForUntaggedFiles
@@ -278,7 +259,7 @@ queryExpressionBasicFunctionality c =
               r
         , testGroup
             "Binary Expressions"
-            [ testCase "Union" $ do
+            [ testCase "Addition" $ do
                 r <-
                   c
                     >>= qqe ((fe . fil $ 1) +. (fe . fil $ 2))
@@ -286,14 +267,14 @@ queryExpressionBasicFunctionality c =
                 -- ( BinaryExpression $
                 --     BinaryOperation
                 --       (FileTermValue "file_1")
-                --       Union
+                --       Addition
                 --       (FileTermValue "file_2")
                 -- )
                 assertEqual
-                  "Union wa union dayo"
+                  "Addition wa union dayo"
                   [file 1, file 2]
                   r
-            , testCase "Intersect - Simple Operands" $ do
+            , testCase "Multiplication - Simple Operands" $ do
                 r <-
                   c
                     >>= qqe
@@ -304,14 +285,14 @@ queryExpressionBasicFunctionality c =
                 -- ( BinaryExpression $
                 --     BinaryOperation
                 --       (TagTermValue (DescriptorTerm "descriptor_5"))
-                --       Intersect
+                --       Multiplication
                 --       (TagTermValue (DescriptorTerm "descriptor_6"))
                 -- )
                 assertEqual
                   ""
                   [file 4, file 5]
                   r
-            , testCase "Intersect - Complex Operand" $ do
+            , testCase "Multiplication - Complex Operand" $ do
                 r <-
                   c
                     >>= qqe
@@ -325,17 +306,17 @@ queryExpressionBasicFunctionality c =
                 --       ( BinaryExpression $
                 --           BinaryOperation
                 --             (TagTermValue (DescriptorTerm "descriptor_5"))
-                --             Union
+                --             Addition
                 --             (FileTermValue "file_3")
                 --       )
-                --       Intersect
+                --       Multiplication
                 --       (TagTermValue (DescriptorTerm "descriptor_6"))
                 -- )
                 assertEqual
                   "Binary Operations should be nestable."
                   [file 3, file 4, file 5]
                   r
-            , testCase "Intersect - Complex Operand - left-associative" $ do
+            , testCase "Multiplication - Complex Operand - left-associative" $ do
                 r <-
                   c
                     >>= qqe
@@ -350,17 +331,17 @@ queryExpressionBasicFunctionality c =
                 --       ( BinaryExpression $
                 --           BinaryOperation
                 --             (TagTermValue (DescriptorTerm "descriptor_5"))
-                --             Union
+                --             Addition
                 --             (FileTermValue "file_3")
                 --       )
-                --       Intersect
+                --       Multiplication
                 --       (TagTermValue (DescriptorTerm "descriptor_6"))
                 -- )
                 assertEqual
                   "Binary Operations should be nestable."
                   [file 3, file 4, file 5]
                   r
-            , testCase "Difference" $ do
+            , testCase "Subtraction" $ do
                 r <-
                   c
                     >>= qqe
@@ -377,19 +358,19 @@ queryExpressionBasicFunctionality c =
                 --       ( BinaryExpression $
                 --           BinaryOperation
                 --             (TagTermValue (DescriptorTerm "descriptor_4"))
-                --             Union
+                --             Addition
                 --             ( BinaryExpression $
                 --                 BinaryOperation
                 --                   (TagTermValue (DescriptorTerm "descriptor_5"))
-                --                   Union
+                --                   Addition
                 --                   (TagTermValue (DescriptorTerm "descriptor_6"))
                 --             )
                 --       )
-                --       Difference
+                --       Subtraction
                 --       (TagTermValue (DescriptorTerm "descriptor_5"))
                 -- )
                 assertEqual
-                  "Difference wa difference dayo"
+                  "Subtraction wa difference dayo"
                   [file 1, file 3]
                   r
             ]
@@ -401,7 +382,7 @@ queryExpressionBasicFunctionality c =
                     >>= qqe
                       ( tle
                           ( (tedp . d . des $ 5)
-                              # (tedp . d . des $ 6)
+                              ∙ (tedp . d . des $ 6)
                           )
                       )
                 -- runExpr
@@ -420,7 +401,7 @@ queryExpressionBasicFunctionality c =
                     >>= qqe
                       ( tle
                           ( (tedp . d . des $ 6)
-                              # (tedp . d . des $ 7)
+                              ∙ (tedp . d . des $ 7)
                           )
                       )
                 -- runExpr
@@ -439,8 +420,8 @@ queryExpressionBasicFunctionality c =
                     >>= qqe
                       ( tle
                           ( (tedp . d . des $ 17)
-                              # ( (tedp . d . des $ 18)
-                                    # (tedp . d . des $ 20)
+                              ∙ ( (tedp . d . des $ 18)
+                                    ∙ (tedp . d . des $ 20)
                                 )
                           )
                       )
@@ -464,7 +445,7 @@ queryExpressionBasicFunctionality c =
                     >>= qqe
                       ( tle
                           ( (tedp . d . des $ 17)
-                              # (tedp . d . des $ 18)
+                              ∙ (tedp . d . des $ 18)
                           )
                       )
                 --  runExpr
@@ -481,49 +462,49 @@ queryExpressionBasicFunctionality c =
                   , file 16
                   ]
                   r
-            -- , testCase "SubExpression Tags - 0" $ do
-            --     h <- c >>= queryTags (DescriptorTerm "descriptor_17")
-            --     r <-
-            --       c
-            --         >>= runReaderT
-            --           ( evalSubExpression
-            --               (SubTag (DescriptorTerm "descriptor_18"))
-            --               (HS.fromList h)
-            --           )
-            --     assertEqual
-            --       "Matches the tags returned by the LHS of the \
-            --       \\"TagExpressions - SubBinary Sub Union\" test."
-            --       [ Tag 28 11 17 Nothing
-            --       , Tag 32 13 17 Nothing
-            --       , Tag 38 15 17 Nothing
-            --       , Tag 41 16 17 Nothing
-            --       ]
-            --       r
-            -- , testCase "SubExpression Tags - 1" $ do
-            --     h <- c >>= queryTags (DescriptorTerm "descriptor_17")
-            --     r <-
-            --       c
-            --         >>= runReaderT
-            --           ( evalSubExpression
-            --               (SubTag (DescriptorTerm "descriptor_19"))
-            --               (HS.fromList h)
-            --           )
-            --     assertEqual
-            --       "Matches the tags returned by the RHS of the \
-            --       \\"TagExpressions - SubBinary Sub Union\" test."
-            --       [ Tag 30 12 17 Nothing
-            --       , Tag 32 13 17 Nothing
-            --       ]
-            --       r
-            , testGroup
+            , -- , testCase "SubExpression Tags - 0" $ do
+              --     h <- c >>= queryTags (DescriptorTerm "descriptor_17")
+              --     r <-
+              --       c
+              --         >>= runReaderT
+              --           ( evalSubExpression
+              --               (SubTag (DescriptorTerm "descriptor_18"))
+              --               (HS.fromList h)
+              --           )
+              --     assertEqual
+              --       "Matches the tags returned by the LHS of the \
+              --       \\"TagExpressions - SubBinary Sub Addition\" test."
+              --       [ Tag 28 11 17 Nothing
+              --       , Tag 32 13 17 Nothing
+              --       , Tag 38 15 17 Nothing
+              --       , Tag 41 16 17 Nothing
+              --       ]
+              --       r
+              -- , testCase "SubExpression Tags - 1" $ do
+              --     h <- c >>= queryTags (DescriptorTerm "descriptor_17")
+              --     r <-
+              --       c
+              --         >>= runReaderT
+              --           ( evalSubExpression
+              --               (SubTag (DescriptorTerm "descriptor_19"))
+              --               (HS.fromList h)
+              --           )
+              --     assertEqual
+              --       "Matches the tags returned by the RHS of the \
+              --       \\"TagExpressions - SubBinary Sub Addition\" test."
+              --       [ Tag 30 12 17 Nothing
+              --       , Tag 32 13 17 Nothing
+              --       ]
+              --       r
+              testGroup
                 "TagExpressions - SubBinary"
-                [ testCase "Sub Union" $ do
+                [ testCase "Sub Addition" $ do
                     r <-
                       c
                         >>= qqe
                           ( tle
                               ( (tedp . d . des $ 17)
-                                  # ( (tedp . d . des $ 18)
+                                  ∙ ( (tedp . d . des $ 18)
                                         +. (tedp . d . des $ 19)
                                     )
                               )
@@ -535,12 +516,12 @@ queryExpressionBasicFunctionality c =
                     --       ( BinarySubExpression $
                     --           BinaryOperation
                     --             (SubTag (DescriptorTerm "descriptor_18"))
-                    --             Union
+                    --             Addition
                     --             (SubTag (DescriptorTerm "descriptor_19"))
                     --       )
                     -- )
                     assertEqual
-                      "SubUnion filters supertags if the supertag\
+                      "SubAddition filters supertags if the supertag\
                       \ is subtagged by either one or the other subtag sets."
                       [ file 11
                       , file 12
@@ -549,13 +530,13 @@ queryExpressionBasicFunctionality c =
                       , file 16
                       ]
                       r
-                , testCase "Sub Intersection" $ do
+                , testCase "Sub Multiplicationion" $ do
                     r <-
                       c
                         >>= qqe
                           ( tle
                               ( (tedp . d . des $ 17)
-                                  # ( (tedp . d . des $ 18)
+                                  ∙ ( (tedp . d . des $ 18)
                                         *. (tedp . d . des $ 19)
                                     )
                               )
@@ -567,23 +548,23 @@ queryExpressionBasicFunctionality c =
                     --       ( BinarySubExpression $
                     --           BinaryOperation
                     --             (SubTag (DescriptorTerm "descriptor_18"))
-                    --             Intersect
+                    --             Multiplication
                     --             (SubTag (DescriptorTerm "descriptor_19"))
                     --       )
                     -- )
                     assertEqual
-                      "SubUnion filters supertags if the supertag\
+                      "SubAddition filters supertags if the supertag\
                       \ is a member of both subtag sets."
                       [ file 13
                       ]
                       r
-                , testCase "Sub Difference" $ do
+                , testCase "Sub Subtraction" $ do
                     r <-
                       c
                         >>= qqe
                           ( tle
                               ( (tedp . d . des $ 17)
-                                  # ( (tedp . d . des $ 18)
+                                  ∙ ( (tedp . d . des $ 18)
                                         -. (tedp . d . des $ 19)
                                     )
                               )
@@ -595,12 +576,12 @@ queryExpressionBasicFunctionality c =
                     --       ( BinarySubExpression $
                     --           BinaryOperation
                     --             (SubTag (DescriptorTerm "descriptor_18"))
-                    --             Difference
+                    --             Subtraction
                     --             (SubTag (DescriptorTerm "descriptor_19"))
                     --       )
                     -- )
                     assertEqual
-                      "SubUnion filters supertags if the supertag\
+                      "SubAddition filters supertags if the supertag\
                       \ is a member of the first and not the second subtag set."
                       [ file 11
                       , file 15
@@ -617,7 +598,7 @@ queryExpressionBasicFunctionality c =
                     >>= qqe
                       ( tle
                           ( (tedp . d $ WildCard)
-                              # ( (tedp . d . des $ 20)
+                              ∙ ( (tedp . d . des $ 20)
                                     -. (tedp . d . des $ 18)
                                 )
                           )
@@ -629,7 +610,7 @@ queryExpressionBasicFunctionality c =
                 --       ( BinarySubExpression $
                 --           BinaryOperation
                 --             (SubTag (DescriptorTerm "descriptor_20"))
-                --             Difference
+                --             Subtraction
                 --             (SubTag (DescriptorTerm "descriptor_18"))
                 --       )
                 -- )
@@ -644,8 +625,8 @@ queryExpressionBasicFunctionality c =
                 r <-
                   c
                     >>= qqe
-                      ( tle ((tedp . d $ WildCard) # (tedp . d . des $ 20))
-                          -. tle ((tedp . d $ WildCard) # (tedp . d . des $ 18))
+                      ( tle ((tedp . d $ WildCard) ∙ (tedp . d . des $ 20))
+                          -. tle ((tedp . d $ WildCard) ∙ (tedp . d . des $ 18))
                       )
                 assertEqual
                   ""
@@ -662,7 +643,7 @@ taggingEngineTests c =
         [ testCase "Tagging Engine - 0" $ do
             let se =
                   (pure . des $ 21)
-                    # ( (pure . des $ 22)
+                    ∙ ( (pure . des $ 22)
                           *. (pure . des $ 23)
                       )
                 -- SubExpression $
@@ -671,7 +652,7 @@ taggingEngineTests c =
                 --     ( BinarySubExpression $
                 --         BinaryOperation
                 --           (SubTag (td 22))
-                --           Intersect
+                --           Multiplication
                 --           (SubTag (td 23))
                 --     )
                 fk = 17
@@ -697,8 +678,8 @@ taggingEngineTests c =
             testCase "Tagging Engine - 1" $ do
               let se =
                     (pure . des $ 21)
-                      # ( ( (pure . des $ 22)
-                              # ( (pure . des $ 24)
+                      ∙ ( ( (pure . des $ 22)
+                              ∙ ( (pure . des $ 24)
                                     *. (pure . des $ 25)
                                 )
                           )
@@ -715,11 +696,11 @@ taggingEngineTests c =
                   --                 ( BinarySubExpression $
                   --                     BinaryOperation
                   --                       (SubTag (td 24))
-                  --                       Intersect
+                  --                       Multiplication
                   --                       (SubTag (td 25))
                   --                 )
                   --           )
-                  --           Intersect
+                  --           Multiplication
                   --           (SubTag (td 23))
                   --     )
                   fk = 17
@@ -747,9 +728,9 @@ taggingEngineTests c =
             testCase "Tagging Engine - 2" $ do
               let se =
                     (pure . des $ 26)
-                      # ( ( (pure . des $ 27)
-                              # ( ( (pure . des $ 28)
-                                      # (pure . des $ 29)
+                      ∙ ( ( (pure . des $ 27)
+                              ∙ ( ( (pure . des $ 28)
+                                      ∙ (pure . des $ 29)
                                   )
                                     *. (pure . des $ 30)
                                 )
@@ -771,11 +752,11 @@ taggingEngineTests c =
                   --                             (td 28)
                   --                             (SubTag (td 29))
                   --                       )
-                  --                       Intersect
+                  --                       Multiplication
                   --                       (SubTag (td 30))
                   --                 )
                   --           )
-                  --           Intersect
+                  --           Multiplication
                   --           (SubTag (td 31))
                   --     )
                   fk = 18
@@ -811,10 +792,10 @@ taggingEngineTests c =
                 --     ( BinarySubExpression $
                 --         BinaryOperation
                 --           (SubTag (td 32))
-                --           Intersect
+                --           Multiplication
                 --           (SubTag (td 33))
                 --     )
-                --     Intersect
+                --     Multiplication
                 --     (SubTag (td 34))
                 fk = 19
                 expectedResults =
@@ -838,7 +819,7 @@ taggingEngineTests c =
         , after AllSucceed "Tagging Engine - 3" . testCase "Tagging Engine - 4" $ do
             let se =
                   (pure . des $ 33)
-                    # (pure . des $ 32)
+                    ∙ (pure . des $ 32)
                 -- SubExpression $ TagTermExtension (td 33) (SubTag (td 32))
                 fk = 19
                 expectedResults =
@@ -865,7 +846,7 @@ taggingEngineTests c =
                   ( (pure . des $ 35)
                       *. (pure . des $ 36)
                   )
-                    # (pure . des $ 37)
+                    ∙ (pure . des $ 37)
                 fk = 20
                 expectedResults =
                   [ Tag 59 20 35 Nothing
@@ -885,10 +866,10 @@ taggingEngineTests c =
             let se =
                   ( (pure . des $ 38)
                       *. ( (pure . des $ 39)
-                            # (pure . des $ 40)
+                            ∙ (pure . des $ 40)
                          )
                   )
-                    # (pure . des $ 41)
+                    ∙ (pure . des $ 41)
                 fk = 21
                 expectedResults =
                   [ Tag 63 21 38 Nothing
@@ -915,55 +896,3 @@ enginePropertyTests =
   testGroup
     "enginePropertyTests"
     []
-
--- testGroup
---   "Indexing tests"
---   [ testProperty
---       "Original Expression can be retrieved from flatten"
---       ( do
---           expr <- arbitrary :: Gen Expression
---           return . (==) expr . snd . head . flatten $ expr
---       )
---   , testProperty
---       "Replace an index with itself as an identity"
---       ( do
---           expr <- arbitrary :: Gen Expression
---           n <-
---             suchThat
---               arbitrary
---               (\n' -> isJust . Text.TaggerQL.Expression.Engine.lookup n' $ expr)
---           let exprAt' = fromJust $ Text.TaggerQL.Expression.Engine.lookup n expr
---               replaceResult = replace n exprAt' expr
---           let tr = expr == replaceResult
---           return $
---             whenFail
---               ( do
---                   print expr
---                   print replaceResult
---               )
---               tr
---       )
---   , testProperty
---       "index works"
---       ( do
---           expr <- arbitrary :: Gen Expression
---           n <-
---             suchThat
---               arbitrary
---               ( \n ->
---                   isJust
---                     . Text.TaggerQL.Expression.Engine.lookup n
---                     $ expr
---               )
---           let indexResult = fromJust $ Text.TaggerQL.Expression.Engine.lookup n expr
---               ix' = index indexResult expr
---           return $
---             whenFail
---               ( print n
---                   >> print indexResult
---                   >> print (fmap fst ix')
---                   >> print (fmap snd ix')
---               )
---               $ maybe False (\(ixN, ixE) -> ixE == indexResult && ixN == n) ix'
---       )
---   ]

@@ -1,6 +1,5 @@
-{-# LANGUAGE InstanceSigs #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
 module Test.Text.TaggerQL.Expression.AST (
@@ -8,85 +7,36 @@ module Test.Text.TaggerQL.Expression.AST (
 ) where
 
 import Control.Monad ((>=>))
-import qualified Data.Foldable as F
-import qualified Data.Text as T
+import Data.Maybe (fromJust, isJust)
+import Test.Resources
 import Test.Tasty
+import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 import Text.TaggerQL.Expression.AST
-
--- change this at some point
-instance Arbitrary Pattern where
-    arbitrary :: Gen Pattern
-    arbitrary = Pattern . T.pack <$> suchThat arbitrary (not . null)
-
-instance Arbitrary a => Arbitrary (DTerm a) where
-    arbitrary :: Arbitrary a => Gen (DTerm a)
-    arbitrary = oneof (pure <$> [DTerm, DMetaTerm]) <*> arbitrary
-
-instance Function a => Function (DTerm a)
-
-instance Arbitrary a => Arbitrary (RingExpression a) where
-    arbitrary :: Arbitrary a => Gen (RingExpression a)
-    arbitrary = sized sizedRing
-      where
-        sizedRing n
-            | n <= 0 = Ring <$> arbitrary
-            | otherwise =
-                oneof
-                    [ (:+) <$> sizedRing (n `div` 2) <*> sizedRing (n `div` 2)
-                    , (:*) <$> sizedRing (n `div` 2) <*> sizedRing (n `div` 2)
-                    , (:-) <$> sizedRing (n `div` 2) <*> sizedRing (n `div` 2)
-                    ]
-
-instance Function a => Function (RingExpression a)
-
-instance Arbitrary a => Arbitrary (MagmaExpression a) where
-    arbitrary :: Arbitrary a => Gen (MagmaExpression a)
-    arbitrary = do
-        xs' <- arbitrary
-        case xs' of
-            (x : xs) -> pure $ F.foldl' over (pure x) xs
-            _emptyList -> Magma <$> arbitrary
-
-instance Function a => Function (MagmaExpression a)
-
-instance Arbitrary a => Arbitrary (TagExpression a) where
-    arbitrary :: Arbitrary a => Gen (TagExpression a)
-    arbitrary = sized sizedExpr
-      where
-        sizedExpr n
-            | n <= 0 = TagValue <$> arbitrary
-            | otherwise =
-                let tagRing =
-                        TagRing <$> do
-                            r <- arbitrary :: Gen (RingExpression ())
-                            let teG = sizedExpr (n `div` 2)
-                            sequenceA $ teG <$ r
-                    tagMagma =
-                        TagMagma <$> do
-                            r <- arbitrary :: Gen (MagmaExpression ())
-                            let teG = sizedExpr (n `div` 2)
-                            sequenceA $ teG <$ r
-                 in oneof [tagRing, tagMagma]
-
-instance Function a => Function (TagExpression a)
+import Text.TaggerQL.Expression.AST.Editor (
+    findQueryExpression,
+    findTagExpression,
+    withQueryExpression,
+    withTagExpression,
+    (<-#),
+ )
 
 astTests :: TestTree
 astTests =
     testGroup
         "AST Tests"
-        [astProperties]
+        [astProperties, astEditorProperties]
 
 astProperties :: TestTree
 astProperties =
     testGroup
-        "Expression Properties"
+        "LabeledFreeTree Properties"
         [ testGroup
-            "RingExpression Properties"
+            "LabeledFreeTree Properties"
             [ testProperty
                 "Left Monad Identity"
                 ( do
-                    f <- arbitrary :: Gen (Int -> RingExpression Int)
+                    f <- arbitrary :: Gen (Int -> LabeledFreeTree Int Int)
                     i <- arbitrary
                     let testProp = (pure i >>= f) == f i
                     pure testProp
@@ -94,7 +44,7 @@ astProperties =
             , testProperty
                 "Right Monad Identity"
                 ( do
-                    re <- arbitrary :: Gen (RingExpression Int)
+                    re <- arbitrary :: Gen (LabeledFreeTree Int Int)
                     let testProp = (re >>= pure) == re
                     pure testProp
                 )
@@ -108,7 +58,7 @@ astProperties =
                                 (resize 35 arbitrary)
                                 -- Exclude functions that appear to be identities
                                 (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (RingExpression Int))
+                                Gen (Fun Int (LabeledFreeTree Int Int))
                     f <- genF
                     g <- genF
                     h <- genF
@@ -130,11 +80,11 @@ astProperties =
                 )
             ]
         , testGroup
-            "MagmaExpression Properties"
+            "FreeDisjunctMonad Properties"
             [ testProperty
                 "Left Monad Identity"
                 ( do
-                    f <- arbitrary :: Gen (Int -> MagmaExpression Int)
+                    f <- (resize 3 arbitrary :: Gen (Int -> FreeDisjunctMonad (LabeledFreeTree Int) (LabeledFreeTree Int) Int))
                     i <- arbitrary
                     let testProp = (pure i >>= f) == f i
                     pure testProp
@@ -142,55 +92,7 @@ astProperties =
             , testProperty
                 "Right Monad Identity"
                 ( do
-                    re <- arbitrary :: Gen (MagmaExpression Int)
-                    let testProp = (re >>= pure) == re
-                    pure testProp
-                )
-            , testProperty
-                "Kleisli Arrow Associativity"
-                ( do
-                    let genF =
-                            suchThat
-                                -- Use relatively small functions so it doesn't
-                                -- take forever to run.
-                                (resize 35 arbitrary)
-                                -- Exclude functions that appear to be identities
-                                (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (MagmaExpression Int))
-                    f <- genF
-                    g <- genF
-                    h <- genF
-                    dt <- arbitrary :: Gen Int
-                    let testProp =
-                            ( applyFun f
-                                >=> ( applyFun g
-                                        >=> applyFun h
-                                    )
-                            )
-                                dt
-                                == ( ( applyFun f
-                                        >=> applyFun g
-                                     )
-                                        >=> applyFun h
-                                   )
-                                    dt
-                    pure testProp
-                )
-            ]
-        , testGroup
-            "TagExpression Properties"
-            [ testProperty
-                "Left Monad Identity"
-                ( do
-                    f <- resize 3 arbitrary :: Gen (Int -> TagExpression Int)
-                    i <- arbitrary
-                    let testProp = (pure i >>= f) == f i
-                    pure testProp
-                )
-            , testProperty
-                "Right Monad Identity"
-                ( do
-                    re <- resize 3 arbitrary :: Gen (TagExpression Int)
+                    re <- resize 3 arbitrary :: Gen (FreeDisjunctMonad (LabeledFreeTree Int) (LabeledFreeTree Int) Int)
                     let testProp = (re >>= pure) == re
                     pure testProp
                 )
@@ -204,7 +106,7 @@ astProperties =
                                 (resize 3 arbitrary)
                                 -- Exclude functions that appear to be identities
                                 (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (TagExpression Int))
+                                Gen (Fun Int (FreeDisjunctMonad (LabeledFreeTree Int) (LabeledFreeTree Int) Int))
                     f <- genF
                     g <- genF
                     h <- genF
@@ -269,6 +171,102 @@ astProperties =
                                    )
                                     dt
                     pure testProp
+                )
+            ]
+        , testGroup
+            "QueryExpression Properties"
+            [ testCase "Unification Distribution is Right-Associative" $
+                assertEqual
+                    "(a & p.b){c}{d} = a{c{d}} & (p.b & c{d})"
+                    ( ( Node . Right $
+                            ( (tedp . rt $ "a")
+                                ∙ ( (tedp . rt $ "c")
+                                        ∙ (tedp . rt $ "d")
+                                  )
+                            )
+                      )
+                        *. ( (Node . Left $ "b")
+                                *. ( Node . Right $
+                                        ( (tedp . rt $ "c")
+                                            ∙ (tedp . rt $ "d")
+                                        )
+                                   )
+                           )
+                    )
+                    ( simplifyQueryExpression $
+                        ( liftSimpleQueryRing
+                            ( (pure . Right . tedp . rt $ "a")
+                                *. (pure . Left $ "b")
+                            )
+                            <-# (tedp . rt $ "c")
+                        )
+                            <-# (tedp . rt $ "d")
+                    )
+            , testCase "Unification Distribution is Associatively Right-Associative" $
+                assertEqual
+                    "(a & p.b){c{d}} = a{c{d}} & (p.b & {c{d}})"
+                    ( ( Node . Right $
+                            ( (tedp . rt $ "a")
+                                ∙ ( (tedp . rt $ "c")
+                                        ∙ (tedp . rt $ "d")
+                                  )
+                            )
+                      )
+                        *. ( (Node . Left $ "b")
+                                *. ( Node . Right $
+                                        ( (tedp . rt $ "c")
+                                            ∙ (tedp . rt $ "d")
+                                        )
+                                   )
+                           )
+                    )
+                    ( simplifyQueryExpression $
+                        liftSimpleQueryRing
+                            ( (pure . Right . tedp . rt $ "a")
+                                *. (pure . Left $ "b")
+                            )
+                            <-# ( (tedp . rt $ "c")
+                                    ∙ (tedp . rt $ "d")
+                                )
+                    )
+            ]
+        ]
+
+astEditorProperties :: TestTree
+astEditorProperties =
+    testGroup
+        "AST Editor Properties"
+        [ testGroup
+            "Replacing Indices With Themselves"
+            [ testProperty
+                "QueryExpression"
+                ( do
+                    expr <- resize 3 arbitrary
+                    n <- suchThat arbitrary (\n' -> isJust $ findQueryExpression n' expr)
+                    let exprAt = fromJust $ findQueryExpression n expr
+                        replaceResult = withQueryExpression n expr (const exprAt)
+                    let propTest = expr == replaceResult
+                    pure propTest
+                )
+            , testProperty
+                "TagExpression"
+                ( do
+                    expr <-
+                        resize 3 arbitrary ::
+                            Gen TagQueryExpression
+                    n <- suchThat arbitrary (\n' -> isJust $ findTagExpression n' expr)
+                    let exprAt = fromJust $ findTagExpression n expr
+                        replaceResult = normalize $ withTagExpression n expr (const exprAt)
+                    let propTest = normalize expr == replaceResult
+                    pure $
+                        whenFail
+                            ( do
+                                print n
+                                print exprAt
+                                print expr
+                                print replaceResult
+                            )
+                            propTest
                 )
             ]
         ]

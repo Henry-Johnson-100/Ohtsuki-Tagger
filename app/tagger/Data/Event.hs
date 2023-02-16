@@ -17,16 +17,14 @@ module Data.Event (
   TaggerInfoEvent (..),
 ) where
 
-import Control.Lens (Lens')
 import Data.HashMap.Strict (HashMap)
 import Data.IntMap.Strict (IntMap)
-import Data.Model.Core (DescriptorInfo, QueryModel, TaggerModel)
+import Data.Model.Core (DescriptorInfo, Latitude, TaggerModel)
 import Data.Model.Lens (TaggerLens)
 import Data.Model.Shared (Visibility)
 import Data.Model.Shared.Core (TextInput)
 import Data.Sequence (Seq)
 import Data.String (IsString)
-import Data.Tagger (CyclicEnum)
 import Data.Text (Text)
 import Database.Tagger.Type (
   ConcreteTag,
@@ -57,12 +55,6 @@ data TaggerEvent
   | -- | Existentially quantified event that replaces the given lens
     --  with a Monoid instance with its identity
     forall m. Monoid m => Mempty (TaggerLens TaggerModel m)
-  | -- | Existentially quantified event that advances a lens with a 'CyclicEnum` instance
-    -- with 'next`
-    forall c. (CyclicEnum c) => NextCyclicEnum (TaggerLens TaggerModel c)
-  | -- | Existentially quantified event that advances a lens with a 'CyclicEnum` instance
-    -- with 'prev`
-    forall c. (CyclicEnum c) => PrevCyclicEnum (TaggerLens TaggerModel c)
   | NextHistory (TaggerLens TaggerModel TextInput)
   | PrevHistory (TaggerLens TaggerModel TextInput)
   | ToggleVisibilityLabel (TaggerLens TaggerModel Visibility) Text
@@ -87,6 +79,8 @@ data FileSelectionEvent
   = AddFiles
   | ClearSelection
   | CycleNextFile
+  | CycleOrderCriteria
+  | CycleOrderDirection
   | CyclePrevFile
   | DeleteFileFromFileSystem (RecordKey File)
   | DoFileSelectionWidgetEvent FileSelectionWidgetEvent
@@ -111,14 +105,19 @@ data FileSelectionEvent
   deriving (Show, Eq)
 
 data QueryEvent
-  = CycleExprSetOpAt Int
-  | CycleSubExprSetOpAt Int Int
+  = -- | If a second Int is provided, then it attempts to edit a TagExpression
+    -- with the combined argument coordinates
+    CycleRingOperator Int (Maybe Int)
+  | -- | If a second Int is provided, then it attempts to edit a TagExpression
+    -- with the combined argument coordinates.
+    --
+    -- The Either spine is matched on its constructor to determine which operand to drop.
+    DeleteRingOperand Int (Maybe Int) (Either () ())
+  | LeftDistribute Int (Maybe Int) TagQueryExpression
+  | PlaceQueryExpression Int (Latitude QueryExpression)
+  | PlaceTagExpression Int Int (Latitude TagQueryExpression)
   | PushExpression
-  | -- | Adds an operand to the end of a Ring expression by an intersection.
-    forall r. (Ring r) => RingProduct (Lens' QueryModel r) r
   | RunQuery
-  | UpdateExpression Int QueryExpression
-  | UpdateSubExpression Int Int (TagExpression (DTerm Pattern))
 
 data FileSelectionWidgetEvent
   = CycleNextChunk

@@ -1,258 +1,438 @@
-{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# HLINT ignore "Redundant if" #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# HLINT ignore "Redundant ^." #-}
+{-# HLINT ignore "Use let" #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# HLINT ignore "Redundant multi-way if" #-}
+{-# HLINT ignore "Use const" #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Redundant multi-way if" #-}
 
 module Interface.Widget.Internal.Query.QueryBuilder (
   expressionWidget,
   queryEditorTextFieldKey,
 ) where
 
-import Control.Lens ((^.))
-import Control.Monad.Trans.State.Strict (
-  State,
-  evalState,
-  get,
-  modify,
+import Control.Lens (
+  Identity (runIdentity),
+  abbreviatedFields,
+  makeLensesWith,
+  (&),
+  (.~),
+  (<&>),
+  (^.),
  )
-import Data.Event (FileSelectionEvent (ClearSelection), QueryEvent (CycleExprSetOpAt, PushExpression, RingProduct, RunQuery, UpdateExpression, UpdateSubExpression), TaggerEvent (DoFileSelectionEvent, DoQueryEvent, ToggleQueryEditMode, Unit), anonymousEvent)
-import Data.Model (TaggerModel, fileSelectionModel, queryEditMode, queryModel)
-import Data.Model.Lens (expression, input)
-import Data.Model.Shared.Lens (HasText (text))
-import Data.Monoid (Sum (..))
-import Data.Tagger (SetOp (..))
+import Control.Monad.Trans.Class (MonadTrans, lift)
+import Data.Coerce (coerce)
+import Data.Data (Typeable)
+import Data.Event (QueryEvent (CycleRingOperator, DeleteRingOperand, LeftDistribute, PlaceTagExpression), TaggerEvent (..))
+import Data.Model (HasQueryEditMode (queryEditMode), Latitude (..), TaggerModel)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger (Descriptor (Descriptor), concreteTagDescriptor, descriptor)
-import Interface.Theme
+import Interface.Theme (yuiBlue, yuiOrange, yuiPeach, yuiRed)
 import Interface.Widget.Internal.Core
 import Monomer
+import Monomer.Lens (a)
 import Text.TaggerQL.Expression.AST
-import Text.TaggerQL.Expression.Engine
+import Text.TaggerQL.Expression.AST.Editor
 
 type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
-tShowSetOp :: SetOp -> Text
-tShowSetOp Union = "|"
-tShowSetOp Intersect = "&"
-tShowSetOp Difference = "!"
+{- |
+ A stateful accumulator that builds a total widget out of some given expression e.
+-}
+data ExpressionWidgetState e = ExpressionWidgetState
+  { _expressionwidgetstateWidget :: TaggerWidget
+  , _expressionwidgetstateAccumExpression :: e
+  , _expressionwidgetstateNestedOperand :: Bool
+  }
+  deriving (Functor)
+
+makeLensesWith abbreviatedFields ''ExpressionWidgetState
+
+-- testquery:
+-- o%yui {(gym_clothes | swimsuit | kimono){blue} hair{r%bow}! (suggestive | sweetie_cute_new_year {+})}
 
 queryEditorTextFieldKey :: Text
 queryEditorTextFieldKey = "queryEditorTextField"
 
-expressionWidget _ = label "Please Understand"
+expressionWidget :: QueryExpression -> TaggerWidget
+expressionWidget =
+  box_
+    [ alignCenter
+    , -- Only trigger a merge if this widget is actually visible
+      mergeRequired (\_wenv _x y -> y ^. queryEditMode)
+    ]
+    . (^. widget)
+    . fst
+    . runIdentity
+    . runCounter
+    . coerce
+    . evaluateRingExpression
+    . buildExpressionWidget
 
--- expressionWidget :: Expression -> TaggerWidget
--- expressionWidget expr =
---   keystroke
---     [ ("Ctrl-e", ToggleQueryEditMode)
---     , ("Ctrl-u", DoFileSelectionEvent ClearSelection)
---     , ("Enter", DoQueryEvent PushExpression)
---     , ("Shift-Enter", DoQueryEvent RunQuery)
---     ]
---     $ vstack
---       [ hstack
---           [ toggleButton_ "Exit" queryEditMode [resizeFactor (-1)]
---           ]
---       , queryEditorWidget expr
---       , box_ [alignMiddle, alignBottom]
---           . withNodeKey queryEditorTextFieldKey
---           $ textField (fileSelectionModel . queryModel . input . text)
---       ]
+buildExpressionWidget ::
+  QueryExpression ->
+  RingExpression QueryExpressionWidgetBuilder
+buildExpressionWidget (TraversableQueryExpression fqe) = do
+  fqe' <- fqe
+  either
+    ( \(x, y) ->
+        let x' =
+              (\(QueryExpressionWidgetBuilderG z) -> z)
+                . evaluateRingExpression
+                . buildExpressionWidget
+                $ x
+            y' = (\(TagExpressionWidgetBuilderG z) -> z) . buildTagExpressionWidget $ y
+            combined = do
+              (ExpressionWidgetState xx xy _) <- x'
+              (ExpressionWidgetState yx yy _) <- fst <$> runCounter y'
+              _count <- getIncr
+              incr
+              pure $
+                ExpressionWidgetState
+                  (withStyleBasic [border 1 yuiRed] $ vstack [xx, yx])
+                  (xy <-# yy)
+                  True
+         in pure . QueryExpressionWidgetBuilderG $ combined
+    )
+    (pure . qewbLeaf)
+    fqe'
 
--- queryEditorWidget :: Expression -> TaggerWidget
--- queryEditorWidget =
---   vscroll_ [wheelRate 50]
---     . withStyleBasic [border 1 green]
---     . box_ [alignCenter, alignMiddle]
---     . snd
---     . flip evalState 1
---     . runExpressionInterpreter expressionWidgetBuilder
+{- |
+ A generic form of 'TagExpressionWidgetBuilder` for deriving newtype instances.
+-}
+newtype TagExpressionWidgetBuilderG m a
+  = TagExpressionWidgetBuilderG
+      (CounterT m a)
+  deriving (Functor, Applicative, Monad, MonadTrans)
 
--- expressionWidgetBuilder ::
---   ExpressionInterpreter
---     (State Int)
---     (SubExpression, Int -> TaggerWidget)
---     (Expression, TaggerWidget)
--- expressionWidgetBuilder =
---   ExpressionInterpreter
---     { subExpressionInterpreter = subExpressionWidgetBuilder
---     , interpretFileTerm = \(FileTerm t) -> do
---         pos <- get
---         let ex = FileTermValue . FileTerm $ t
---             w =
---               dragDropUpdater pos ex $
---                 label_ ("p." <> t) [resizeFactor (-1)]
---         modify (1 +)
---         return (ex, w)
---     , interpretTagTerm = \tt -> do
---         pos <- get
---         let ex = TagTermValue tt
---             w =
---               dragDropUpdater pos ex $
---                 label_ (tt ^. tagTermPatternL) [resizeFactor (-1)]
---         modify (1 +)
---         return (ex, w)
---     , interpretBinaryExpression =
---         \bn@(BinaryOperation lhst@(lhs, lhsw) so rhst@(rhs, rhsw)) -> do
---           pos <- get
---           let mkBin =
---                 let ex = BinaryExpression $ fmap fst bn
---                     mkEitherOperandWidget e =
---                       withStyleHover [border 1 yuiOrange] $
---                         hstack
---                           [ snd . either id id $ e
---                           , withStyleBasic [textSize 5]
---                               . box_ [alignTop, alignRight]
---                               $ styledButton_
---                                 [resizeFactor (-1)]
---                                 "x"
---                                 ( DoQueryEvent
---                                     . UpdateExpression pos
---                                     $ ( case e of
---                                           Right _ -> lhs
---                                           Left _ -> rhs
---                                       )
---                                 )
---                           ]
---                     w =
---                       hstack
---                         [ mkEitherOperandWidget . Left $ lhst
---                         , dropTarget_
---                             (DoQueryEvent . UpdateExpression pos)
---                             [dropTargetStyle [border 1 yuiOrange]]
---                             $ styledButton_
---                               [resizeFactor (-1)]
---                               (tShowSetOp so)
---                               (DoQueryEvent $ CycleExprSetOpAt pos)
---                         , if ( case rhs of
---                                 BinaryExpression _ -> True
---                                 _notNested -> False
---                              )
---                             then
---                               hstack
---                                 [ label_ "(" [resizeFactor (-1)]
---                                 , mkEitherOperandWidget . Right $ rhst
---                                 , label_ ")" [resizeFactor (-1)]
---                                 ]
---                             else mkEitherOperandWidget . Right $ rhst
---                         ]
---                  in ( ex
---                     , draggable ex $
---                         if ex == aid
---                           then
---                             dragDropUpdater pos (aid :: Expression) $
---                               label_ "∅" [resizeFactor (-1)]
---                           else w
---                     )
---               mkWidget = case so of
---                 Union ->
---                   if
---                       | lhs == aid -> (rhs, rhsw)
---                       | rhs == aid -> (lhs, lhsw)
---                       | otherwise -> mkBin
---                 Intersect ->
---                   if
---                       | lhs == mid -> (rhs, rhsw)
---                       | rhs == mid -> (lhs, lhsw)
---                       | otherwise -> mkBin
---                 Difference ->
---                   if
---                       | lhs == aid ->
---                         ( aid
---                         , dragDropUpdater pos (aid :: Expression) $
---                             label_ "∅" [resizeFactor (-1)]
---                         )
---                       | rhs == aid -> (lhs, lhsw)
---                       | otherwise -> mkBin
---           modify (1 +)
---           return mkWidget
---     , interpretTagExpression = \(TagTermExtension tt se') -> do
---         pos <- get
---         let (se, sew) = evalState se' 1
---             ex = TagExpression $ TagTermExtension tt se
---             w =
---               dragDropUpdater pos ex $
---                 hstack
---                   [ label_ (tt ^. tagTermPatternL) [resizeFactor (-1)]
---                   , hstack
---                       [ label_ "{" [resizeFactor (-1)]
---                       , sew pos
---                       , label_ "}" [resizeFactor (-1)]
---                       ]
---                   ]
---         modify (1 +)
---         return (ex, w)
---     }
---  where
---   dragDropUpdater n dragExpr =
---     dropTarget_ (DoQueryEvent . UpdateExpression n) [dropTargetStyle [border 1 yuiOrange]]
---       . draggable dragExpr
+type TagExpressionWidgetBuilder =
+  TagExpressionWidgetBuilderG
+    (CounterT Identity)
+    (ExpressionWidgetState TagQueryExpression)
 
--- relativeToParent ::
---   (Eq b, ExpressionIndex b) =>
---   b ->
---   b ->
---   Maybe (Sum Int)
--- relativeToParent parentExpr childExpr = do
---   let parentSize = fst . head . flatten $ parentExpr
---   relChildPos <- fst <$> index childExpr parentExpr
---   return . Sum $ relChildPos - parentSize
+instance
+  Rng
+    ( TagExpressionWidgetBuilderG
+        (CounterT Identity)
+        (ExpressionWidgetState TagQueryExpression)
+    )
+  where
+  (+.) x y = tewbBinHelper (+.) (tewbRngWidget "|") x y <&> nestedOperand .~ True
+  (*.) x y = tewbBinHelper (*.) (tewbRngWidget "&") x y <&> nestedOperand .~ True
+  (-.) x y = tewbBinHelper (-.) (tewbRngWidget "!") x y <&> nestedOperand .~ True
 
--- subExpressionWidgetBuilder ::
---   SubExpressionInterpreter
---     -- State tracking the index of the SubExpression as it is traversed
---     (State Int)
---     -- Where the snd function is a reader taking the parent Expression's index
---     (SubExpression, Int -> TaggerWidget)
--- subExpressionWidgetBuilder =
---   SubExpressionInterpreter
---     { interpretSubTag = \tt -> do
---         sePos <- get
---         let se = SubTag tt
---             w exprPos =
---               dragDropUpdater exprPos sePos se $
---                 label_ (tt ^. tagTermPatternL) [resizeFactor (-1)]
---         modify (1 +)
---         return (se, w)
---     , interpretBinarySubExpression =
---         \bn@(BinaryOperation (_, lhsw) so (rhs, rhsw)) -> do
---           _pos <- get
---           let w exprPos =
---                 hstack
---                   [ lhsw exprPos
---                   , label_ (tShowSetOp so) [resizeFactor (-1)]
---                   , if (case rhs of BinarySubExpression _ -> True; _notNested -> False)
---                       then
---                         hstack
---                           [ label_ "(" [resizeFactor (-1)]
---                           , rhsw exprPos
---                           , label_ ")" [resizeFactor (-1)]
---                           ]
---                       else rhsw exprPos
---                   ]
---           modify (1 +)
---           return (BinarySubExpression $ fmap fst bn, w)
---     , interpretSubExpression = \(TagTermExtension tt se') -> do
---         (se, sew) <- se'
---         sePos <- get
---         let ttese = SubExpression $ TagTermExtension tt se
---             w exprPos =
---               draggable ttese $
---                 hstack
---                   [ draggable tt $ label_ (tt ^. tagTermPatternL) [resizeFactor (-1)]
---                   , label_ "{" [resizeFactor (-1)]
---                   , sew exprPos
---                   , label_ "}" [resizeFactor (-1)]
---                   ]
---         modify (1 +)
---         return (ttese, w)
---     }
---  where
---   dragDropUpdater exprPos sePos se =
---     dropTarget_
---       (DoQueryEvent . UpdateSubExpression exprPos sePos)
---       [dropTargetStyle [border 1 yuiOrange]]
---       . draggable se
+tewbRngWidget ::
+  ( HasNestedOperand s1 Bool
+  , HasWidget s2 (WidgetNode TaggerModel TaggerEvent)
+  , HasWidget s1 (WidgetNode TaggerModel TaggerEvent)
+  ) =>
+  Text ->
+  Int ->
+  Int ->
+  s2 ->
+  s1 ->
+  WidgetNode TaggerModel TaggerEvent
+tewbRngWidget labelText li i x y =
+  withStyleBasic [paddingT 3, paddingR 3, paddingB 3] $
+    vstack
+      [ hstack
+          [ x ^. widget
+          , withStyleBasic [textColor $ black & a .~ defaultElementOpacity / 2] $
+              styledButton_
+                []
+                "X"
+                (DoQueryEvent $ DeleteRingOperand li (Just i) (Left ()))
+          ]
+      , hstack
+          [ styledButton_ [] labelText (DoQueryEvent $ CycleRingOperator li (Just i))
+          , spacer
+          , hstack
+              [ ( if y ^. nestedOperand
+                    then mkParens
+                    else id
+                )
+                  $ y ^. widget
+              , withStyleBasic [textColor $ black & a .~ defaultElementOpacity / 2] $
+                  styledButton_
+                    []
+                    "X"
+                    (DoQueryEvent $ DeleteRingOperand li (Just i) (Right ()))
+              ]
+          ]
+      ]
+ where
+  mkParens w = withStyleBasic [border 1 black, padding 3] w
+
+instance
+  Magma
+    ( TagExpressionWidgetBuilderG
+        (CounterT Identity)
+        (ExpressionWidgetState TagQueryExpression)
+    )
+  where
+  (∙) = tewbBinHelper (∙) f
+   where
+    f _li _i x y =
+      withStyleBasic [border 1 black, padding 3] $
+        vstack
+          [ box_ [alignTop, ignoreEmptyArea] $ x ^. widget
+          , withStyleBasic [paddingB 3] $
+              vstack
+                [ withStyleBasic
+                    [paddingB 5]
+                    separatorLine
+                , separatorLine
+                ]
+          , box_ [alignTop, alignCenter, ignoreEmptyArea] $ y ^. widget
+          ]
+
+tewbBinHelper ::
+  ( Monad m
+  , Eq e
+  , Typeable e
+  , HasAccumExpression s1 t1
+  , HasAccumExpression s2 t2
+  ) =>
+  (t1 -> t2 -> e) ->
+  (Int -> Int -> s1 -> s2 -> WidgetNode TaggerModel TaggerEvent) ->
+  TagExpressionWidgetBuilderG (CounterT m) s1 ->
+  TagExpressionWidgetBuilderG (CounterT m) s2 ->
+  TagExpressionWidgetBuilderG
+    (CounterT m)
+    (ExpressionWidgetState e)
+tewbBinHelper
+  binComb
+  wf
+  (TagExpressionWidgetBuilderG lhs)
+  (TagExpressionWidgetBuilderG rhs) = TagExpressionWidgetBuilderG $ do
+    lhs' <- lhs
+    rhs' <- rhs
+    leafCount <- lift getIncr
+    teCount <- getIncr
+    incr
+    pure $ f leafCount teCount lhs' rhs'
+   where
+    f li i x y =
+      let combinedExpr = binComb (x ^. accumExpression) (y ^. accumExpression)
+       in ExpressionWidgetState
+            (wf li i x y)
+            combinedExpr
+            False
+
+tewbLeaf ::
+  DTerm Pattern -> TagExpressionWidgetBuilder
+tewbLeaf d = TagExpressionWidgetBuilderG $ do
+  leafCount <- lift getIncr
+  teCount <- getIncr
+  incr
+  pure $ f leafCount teCount d
+ where
+  f li i d' = ExpressionWidgetState w (pure d') False
+   where
+    dTermLabelText = case d' of
+      DTerm (Pattern t) -> "d." <> t
+      DMetaTerm (Pattern t) -> t
+      _synonymNotMatched -> T.pack . show $ d'
+    w =
+      withStyleHover [bgColor $ yuiBlue & a .~ defaultElementOpacity]
+        . draggable d
+        $ zstack_
+          [onlyTopActive_ False]
+          [ label dTermLabelText
+          , let dTermDT =
+                  placeTeDropTargetG
+                    li
+                    i
+                    (pure :: DTerm Pattern -> TagQueryExpression)
+                    [border 1 yuiBlue]
+                teDT =
+                  placeTeDropTargetG
+                    li
+                    i
+                    id
+                    [border 1 yuiOrange]
+                teDistDT = leftDistributeDropTarget li (Just i) id [border 1 yuiOrange]
+                dTermDistDT =
+                  leftDistributeDropTarget
+                    li
+                    (Just i)
+                    (pure :: DTerm Pattern -> TagQueryExpression)
+                    [border 1 yuiBlue]
+             in dropTargetHGrid (dTermDT .<< teDT) (teDistDT . dTermDistDT)
+          ]
+
+placeTeDropTargetG ::
+  (Eq a, Typeable a) =>
+  Int ->
+  Int ->
+  (a -> b) ->
+  [StyleState] ->
+  (b -> Latitude TagQueryExpression) ->
+  WidgetNode s TaggerEvent ->
+  WidgetNode s TaggerEvent
+placeTeDropTargetG leafIndex teIndex toTe sts c =
+  dropTarget_
+    (DoQueryEvent . PlaceTagExpression leafIndex teIndex . c . toTe)
+    [dropTargetStyle sts]
+
+leftDistributeDropTarget ::
+  (Eq a, Typeable a) =>
+  Int ->
+  Maybe Int ->
+  (a -> TagQueryExpression) ->
+  [StyleState] ->
+  WidgetNode s TaggerEvent ->
+  WidgetNode s TaggerEvent
+leftDistributeDropTarget leafIndex mTeIndex toTe sts =
+  dropTarget_
+    (DoQueryEvent . LeftDistribute leafIndex mTeIndex . toTe)
+    [dropTargetStyle sts]
+
+{- |
+ Construct an hgrid with 3 zones where each zone corresponds to a 'Latitude`
+-}
+dropTargetHGrid ::
+  ((a -> Latitude a) -> WidgetNode s1 e1 -> WidgetNode s2 e2) ->
+  (WidgetNode s3 e3 -> WidgetNode s2 e2) ->
+  WidgetNode s2 e2
+dropTargetHGrid dts distdts =
+  vgrid
+    [ hgrid ((`dts` spacer) <$> [LatLeft, LatMiddle, LatRight])
+    , hgrid [distdts spacer]
+    ]
+
+infixr 9 .<<
+
+{- |
+ Compose functions that can share a common argument
+-}
+(.<<) :: (t -> b -> c) -> (t -> a -> b) -> t -> a -> c
+(.<<) = cmpWith
+ where
+  cmpWith g f x = g x . f x
+
+newtype QueryExpressionWidgetBuilderG m a
+  = QueryExpressionWidgetBuilderG
+      (CounterT m a)
+  deriving (Functor, Applicative, Monad, MonadTrans)
+
+type QueryExpressionWidgetBuilder =
+  QueryExpressionWidgetBuilderG Identity (ExpressionWidgetState QueryExpression)
+
+instance
+  Rng
+    ( QueryExpressionWidgetBuilderG
+        Identity
+        (ExpressionWidgetState QueryExpression)
+    )
+  where
+  (+.) = qewbRngHelper (+.) "|"
+  (*.) = qewbRngHelper (*.) "&"
+  (-.) = qewbRngHelper (-.) "!"
+
+qewbRngHelper ::
+  ( Monad m
+  , HasNestedOperand s1 Bool
+  , HasWidget s2 (WidgetNode TaggerModel TaggerEvent)
+  , HasWidget s1 (WidgetNode TaggerModel TaggerEvent)
+  , HasAccumExpression s2 t1
+  , HasAccumExpression s1 t2
+  , Eq e
+  , Typeable e
+  ) =>
+  (t1 -> t2 -> e) ->
+  Text ->
+  QueryExpressionWidgetBuilderG m s2 ->
+  QueryExpressionWidgetBuilderG m s1 ->
+  QueryExpressionWidgetBuilderG m (ExpressionWidgetState e)
+qewbRngHelper
+  c
+  l
+  (QueryExpressionWidgetBuilderG lhs)
+  (QueryExpressionWidgetBuilderG rhs) = QueryExpressionWidgetBuilderG $ do
+    x' <- lhs
+    y' <- rhs
+    count <- getIncr
+    incr
+    pure $ f count x' y'
+   where
+    f i x y =
+      let combinedExpr = c (x ^. accumExpression) (y ^. accumExpression)
+       in ExpressionWidgetState
+            ( withStyleBasic [paddingT 3, paddingR 3, paddingB 3] $
+                vstack
+                  [ hstack
+                      [ x ^. widget
+                      , styledButton_
+                          []
+                          "X"
+                          (DoQueryEvent $ DeleteRingOperand i Nothing (Left ()))
+                      ]
+                  , hstack
+                      [ styledButton_ [] l (DoQueryEvent $ CycleRingOperator i Nothing)
+                      , spacer
+                      , hstack
+                          [ ( if y ^. nestedOperand
+                                then mkParens
+                                else id
+                            )
+                              $ y ^. widget
+                          , styledButton_
+                              []
+                              "X"
+                              (DoQueryEvent $ DeleteRingOperand i Nothing (Right ()))
+                          ]
+                      ]
+                  ]
+            )
+            combinedExpr
+            True
+     where
+      mkParens w = withStyleBasic [border 1 black, padding 3] w
+
+qewbLeaf :: Either Pattern TagQueryExpression -> QueryExpressionWidgetBuilder
+qewbLeaf ql =
+  let qe = TraversableQueryExpression . pure . pure $ ql
+   in case ql of
+        Left pat -> QueryExpressionWidgetBuilderG $ do
+          _count <- getIncr
+          incr
+          pure $
+            ExpressionWidgetState
+              ( label_ ("p." <> patternText pat) [resizeFactor (-1)]
+              )
+              qe
+              False
+        Right te -> QueryExpressionWidgetBuilderG $ do
+          teews <-
+            fmap fst
+              . runCounter
+              . (\(TagExpressionWidgetBuilderG x) -> x)
+              . buildTagExpressionWidget
+              $ te ::
+              CounterT Identity (ExpressionWidgetState TagQueryExpression)
+          incr
+          pure $
+            ExpressionWidgetState
+              ( withStyleBasic [border 1 yuiBlue]
+                  . withStyleHover [bgColor $ yuiPeach & a .~ defaultElementOpacity]
+                  . draggable (teews ^. accumExpression)
+                  $ teews ^. widget
+              )
+              qe
+              False
+
+buildTagExpressionWidget ::
+  FreeDisjunctMonad RingExpression MagmaExpression (DTerm Pattern) ->
+  TagExpressionWidgetBuilder
+buildTagExpressionWidget =
+  evaluateFreeCompoundExpression evaluateRingExpression evaluateMagmaExpression
+    . fmap tewbLeaf

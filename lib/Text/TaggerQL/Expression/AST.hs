@@ -1,21 +1,17 @@
 {-# HLINT ignore "Use lambda-case" #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# HLINT ignore "Redundant if" #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use infix" #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.AST
@@ -25,28 +21,50 @@ License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL.Expression.AST (
-  -- * Components
+  -- * Language Expressions
+
+  -- ** TagQueryExpression
+  TagQueryExpression,
+  unwrapIdentities,
+  normalize,
+
+  -- ** QueryExpression
+  QueryExpression,
+  TraversableQueryExpression (..),
+  simplifyLeftProduct,
+  liftSimpleQueryRing,
+  simplifyQueryExpression,
+
+  -- ** Primitive Expressions
+  RingExpression,
+  MagmaExpression,
+
+  -- * Structures
+
+  -- ** FreeDisjunctMonad
+  FreeDisjunctMonad (..),
+  mapT,
+  mapK,
+  distributeT,
+  distributeK,
+  flipTK,
+  unwrapTK,
+  evaluateFreeCompoundExpression,
+
+  -- ** LabeledFreeTree
+  LabeledFreeTree (..),
+  fold1WithEdge,
+  fold1WithEdgeMl,
+  fold1WithEdgeMr,
+  evaluateRingExpression,
+  evaluateMagmaExpression,
+
+  -- * Primitive Values
+  RingOperation (..),
   Pattern (.., Pattern),
   patternText,
   DTerm (..),
   runDTerm,
-
-  -- * Language Expressions
-  QueryExpression (..),
-  QueryLeaf (..),
-  TagExpression (..),
-  evaluateTagExpressionR,
-  evaluateTagExpressionL,
-  distribute,
-  RingExpression (..),
-  evaluateRing,
-  MagmaExpression (..),
-  foldMagmaExpression,
-  foldMagmaExpressionL,
-  partitionLeft,
-  appliedTo,
-  over,
-  DefaultRng (..),
 
   -- * Classes
   Rng (..),
@@ -54,187 +72,749 @@ module Text.TaggerQL.Expression.AST (
   Magma (..),
 ) where
 
-import Control.Monad (ap, join)
-import Data.Bifunctor (bimap)
-import qualified Data.Foldable as F
-import Data.Functor ((<&>))
+import Control.Monad (ap, join, (<=<))
+import Data.Bifoldable (Bifoldable (bifoldr))
+import Data.Bifunctor (Bifunctor (..), bimap)
+import Data.Bitraversable (Bitraversable (..))
+import Data.Functor.Classes (
+  Eq1 (..),
+  Eq2 (..),
+  Show1 (liftShowList, liftShowsPrec),
+  Show2 (..),
+  showsPrec1,
+  showsPrec2,
+  showsUnaryWith,
+ )
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.Hashable (Hashable)
 import qualified Data.List as L
+import Data.Maybe (fromMaybe)
 import Data.String (IsString, fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
-import GHC.Exts (IsList (..))
 import GHC.Generics (Generic)
 
-{- |
- A data type representing an expression of any Ring.
--}
-data RingExpression a
-  = Ring a
-  | RingExpression a :+ RingExpression a
-  | RingExpression a :* RingExpression a
-  | RingExpression a :- RingExpression a
-  deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
-
-instance Hashable a => Hashable (RingExpression a)
-
-instance Applicative RingExpression where
-  pure :: a -> RingExpression a
-  pure = return
-  (<*>) :: RingExpression (a -> b) -> RingExpression a -> RingExpression b
-  (<*>) = ap
-
-instance Monad RingExpression where
-  return :: a -> RingExpression a
-  return = Ring
-  (>>=) :: RingExpression a -> (a -> RingExpression b) -> RingExpression b
-  r >>= f = case r of
-    Ring a -> f a
-    re :+ re' -> (re >>= f) :+ (re' >>= f)
-    re :* re' -> (re >>= f) :* (re' >>= f)
-    re :- re' -> (re >>= f) :- (re' >>= f)
+instance Hashable RingOperation
 
 {- |
- Run the computation defined by a 'RingExpression`
+ > FreeDisjunctMonad RingExpression MagmaExpression (DTerm Pattern)
 -}
-evaluateRing :: Rng a => RingExpression a -> a
-evaluateRing r = case r of
-  Ring a -> a
-  re :+ re' -> evaluateRing re +. evaluateRing re'
-  re :* re' -> evaluateRing re *. evaluateRing re'
-  re :- re' -> evaluateRing re -. evaluateRing re'
+type TagQueryExpression =
+  FreeDisjunctMonad RingExpression MagmaExpression (DTerm Pattern)
 
 {- |
- A data type representing an expression over a magma. A sequence of operations can
- be concatenated and composed before or after another sequence.
-
- All expressions can be evaluated with the '1' variant of a foldable function,
- since they are non-empty.
-
- This type is more efficiently folded with a right-to-left fold. Therefore, foldr'
- is the most optimal.
-
- It is essentially a reversed, non-empty list.
+ Attempts to remove some redundant monadic identities.
 -}
-data MagmaExpression a
-  = Magma a
-  | (MagmaExpression a) :$ a
-  deriving (Show, Eq, Functor, Generic)
-
-instance Hashable a => Hashable (MagmaExpression a)
-
-instance IsList (MagmaExpression a) where
-  type Item (MagmaExpression a) = a
-  fromList :: [Item (MagmaExpression a)] -> MagmaExpression a
-  fromList [] = error "Empty list in fromList :: [a] -> MagmaExpression a"
-  fromList (x : xs) = F.foldl' over (return x) xs
-  toList :: MagmaExpression a -> [Item (MagmaExpression a)]
-  toList = foldr (:) []
-
-instance Foldable MagmaExpression where
-  foldr :: (a -> b -> b) -> b -> MagmaExpression a -> b
-  foldr f acc me = case me of
-    Magma a -> f a acc
-    dme :$ a -> foldr f (f a acc) dme
+unwrapIdentities :: TagQueryExpression -> TagQueryExpression
+unwrapIdentities =
+  unwrapTK
+    (\re -> case re of Node x -> Just x; _ -> Nothing)
+    (\fm -> case fm of Node x -> Just x; _ -> Nothing)
 
 {- |
- An alias for a fold @foldr1'@ over a 'MagmaExpression`
--}
-foldMagmaExpression :: (a -> a -> a) -> MagmaExpression a -> a
-foldMagmaExpression _ (Magma x) = x
-foldMagmaExpression f (dme :$ x) = F.foldr' f x dme
+ Resolve structural ambiguities and redundancies by distributing the magma expressions
+ throughout and unwrapping any redundant monadic identities.
 
-{- |
- Lazy, left-associative fold over a 'MagmaExpression`
+ > normalize = unwrapIdentities . distributeK
 -}
-foldMagmaExpressionL :: (a -> a -> a) -> MagmaExpression a -> a
-foldMagmaExpressionL = F.foldl1
+normalize :: TagQueryExpression -> TagQueryExpression
+normalize = unwrapIdentities . T . fmap (K . fmap pure) . distributeK
 
-{- |
- Separates the left-most term in a 'MagmaExpression` from the
- rest of the expression.
--}
-partitionLeft :: MagmaExpression a -> (a, Maybe (MagmaExpression a))
-partitionLeft me = case me of
-  Magma a -> (a, Nothing)
-  me' :$ a -> case me' of
-    Magma a' -> (a', Just . pure $ a)
-    (partitionLeft -> (l, mea)) :$ a' ->
-      let rm = a' `appliedTo` pure a
-       in (l, Just $ maybe rm (<> rm) mea)
+type QueryExpression = TraversableQueryExpression Pattern TagQueryExpression
 
-instance Traversable MagmaExpression where
-  traverse ::
+newtype TraversableQueryExpression a b = TraversableQueryExpression
+  { runTraversableQueryExpression ::
+      LabeledFreeTree
+        RingOperation
+        ( Either
+            (TraversableQueryExpression a b, b)
+            ( Either
+                a
+                b
+            )
+        )
+  }
+  deriving (Generic, Rng)
+
+instance Show2 TraversableQueryExpression where
+  liftShowsPrec2 ::
+    (Int -> a -> ShowS) ->
+    ([a] -> ShowS) ->
+    (Int -> b -> ShowS) ->
+    ([b] -> ShowS) ->
+    Int ->
+    TraversableQueryExpression a b ->
+    ShowS
+  liftShowsPrec2 af axs bf bxs n (TraversableQueryExpression o) =
+    showsUnaryWith
+      ( liftShowsPrec2
+          showsPrec
+          showList
+          ( liftShowsPrec2
+              ( liftShowsPrec2
+                  (liftShowsPrec2 af axs bf bxs)
+                  (liftShowList2 af axs bf bxs)
+                  bf
+                  bxs
+              )
+              ( liftShowList2
+                  (liftShowsPrec2 af axs bf bxs)
+                  (liftShowList2 af axs bf bxs)
+                  bf
+                  bxs
+              )
+              (liftShowsPrec2 af axs bf bxs)
+              (liftShowList2 af axs bf bxs)
+          )
+          ( liftShowList2
+              ( liftShowsPrec2
+                  (liftShowsPrec2 af axs bf bxs)
+                  (liftShowList2 af axs bf bxs)
+                  bf
+                  bxs
+              )
+              ( liftShowList2
+                  (liftShowsPrec2 af axs bf bxs)
+                  (liftShowList2 af axs bf bxs)
+                  bf
+                  bxs
+              )
+              (liftShowsPrec2 af axs bf bxs)
+              (liftShowList2 af axs bf bxs)
+          )
+      )
+      "Foo"
+      n
+      o
+
+instance Show a => Show1 (TraversableQueryExpression a) where
+  liftShowsPrec ::
+    Show a =>
+    (Int -> a1 -> ShowS) ->
+    ([a1] -> ShowS) ->
+    Int ->
+    TraversableQueryExpression a a1 ->
+    ShowS
+  liftShowsPrec = liftShowsPrec2 showsPrec showList
+
+instance (Show a, Show b) => Show (TraversableQueryExpression a b) where
+  showsPrec :: (Show a, Show b) => Int -> TraversableQueryExpression a b -> ShowS
+  showsPrec = showsPrec2
+
+instance Eq2 TraversableQueryExpression where
+  liftEq2 ::
+    (a -> b -> Bool) ->
+    (c -> d -> Bool) ->
+    TraversableQueryExpression a c ->
+    TraversableQueryExpression b d ->
+    Bool
+  liftEq2 aeq beq (TraversableQueryExpression x) (TraversableQueryExpression y) =
+    liftEq2 (==) (liftEq2 (liftEq2 (liftEq2 aeq beq) beq) (liftEq2 aeq beq)) x y
+
+instance Eq a => Eq1 (TraversableQueryExpression a) where
+  liftEq ::
+    Eq a =>
+    (a1 -> b -> Bool) ->
+    TraversableQueryExpression a a1 ->
+    TraversableQueryExpression a b ->
+    Bool
+  liftEq beq = liftEq2 (==) beq
+
+instance (Eq a, Eq b) => Eq (TraversableQueryExpression a b) where
+  (==) ::
+    (Eq a, Eq b) =>
+    TraversableQueryExpression a b ->
+    TraversableQueryExpression a b ->
+    Bool
+  (==) = liftEq2 (==) (==)
+
+instance Bifunctor TraversableQueryExpression where
+  first :: (a -> b) -> TraversableQueryExpression a c -> TraversableQueryExpression b c
+  first f (TraversableQueryExpression o) =
+    TraversableQueryExpression $ fmap (bimap (first (first f)) (first f)) o
+  second :: (b -> c) -> TraversableQueryExpression a b -> TraversableQueryExpression a c
+  second f (TraversableQueryExpression o) =
+    TraversableQueryExpression $ fmap (bimap (bimap (second f) f) (second f)) o
+
+instance Bifoldable TraversableQueryExpression where
+  bifoldr :: (a -> c -> c) -> (b -> c -> c) -> c -> TraversableQueryExpression a b -> c
+  bifoldr f g acc (TraversableQueryExpression o) =
+    foldr
+      ( flip
+          ( bifoldr
+              (flip (bifoldr (flip (bifoldr f g)) g))
+              (flip (bifoldr f g))
+          )
+      )
+      acc
+      o
+
+instance Bitraversable TraversableQueryExpression where
+  bitraverse ::
     Applicative f =>
-    (a -> f b) ->
-    MagmaExpression a ->
-    f (MagmaExpression b)
-  traverse f me = case me of
-    Magma a -> Magma <$> f a
-    dme :$ a -> (traverse f dme <&> (:$)) <*> f a
+    (a -> f c) ->
+    (b -> f d) ->
+    TraversableQueryExpression a b ->
+    f (TraversableQueryExpression c d)
+  bitraverse f g (TraversableQueryExpression o) =
+    TraversableQueryExpression
+      <$> traverse (bitraverse (bitraverse (bitraverse f g) g) (bitraverse f g)) o
+
+simplifyLeftProduct ::
+  -- | How to resolve a simple term to the target expression type
+  (Either a c -> LabeledFreeTree RingOperation b) ->
+  -- | Describe how successive left products are folded:
+  -- > (a) {b} {c} {d} -> (a) {b{c{d}}}
+  (c -> c -> c) ->
+  -- | The expression to simplify
+  TraversableQueryExpression a c ->
+  -- | Continuation describing how type c is applied to an expression of type b
+  ( c ->
+    LabeledFreeTree RingOperation b ->
+    LabeledFreeTree RingOperation b
+  ) ->
+  LabeledFreeTree RingOperation b
+simplifyLeftProduct onLeaf foldrBApplication (TraversableQueryExpression o) applyB =
+  o >>= either rec' onLeaf
+ where
+  rec' (TraversableQueryExpression o', b) =
+    o'
+      >>= either
+        (rec' . second (foldrBApplication b))
+        (applyB b . onLeaf)
 
 {- |
- Left-to-right composition of a 'MagmaExpression`
+ To make non-recursive query expressions easier to build.
 -}
-instance Semigroup (MagmaExpression a) where
-  (<>) ::
-    MagmaExpression a ->
-    MagmaExpression a ->
-    MagmaExpression a
-  r <> d = case r of
-    Magma a -> a `appliedTo` d
-    _leftDistTerm -> case d of
-      Magma a -> r :$ a
-      rd :$ a -> (r <> rd) :$ a
+liftSimpleQueryRing ::
+  RingExpression (Either a b) ->
+  TraversableQueryExpression a b
+liftSimpleQueryRing = TraversableQueryExpression . fmap Right
 
 {- |
- Prepend a value to an expression, distributing it over
- all subsequent values.
-
- @
-  let x = Magma 0
-    in 1 \`appliedTo\` x == Magma 1 :$ 0
- @
+ Resolves the left product by binding the 'QueryExpression` ring
+ to a left distribution. Expanding terms in place and yielding a non-recursive
+ type.
 -}
-appliedTo :: a -> MagmaExpression a -> MagmaExpression a
-x `appliedTo` rdx = case rdx of
-  Magma a -> Magma x :$ a
-  rd :$ a -> x `appliedTo` rd :$ a
+simplifyQueryExpression ::
+  Magma b =>
+  TraversableQueryExpression a b ->
+  LabeledFreeTree RingOperation (Either a b)
+simplifyQueryExpression tqe =
+  simplifyLeftProduct
+    pure
+    (flip (∙))
+    tqe
+    ( \x ->
+        either
+          ((*. (Node . Right $ x)) . Node . Left)
+          (Node . Right . (∙ x))
+          <=< id
+    )
 
 {- |
- Append a value to the distribution. Where the previous bottom value is
- now distributed over the given pure value, after all previous distributions have taken
- place.
-
- @
-  let x = Magma 0
-    in x \`over\` 1 == Magma 0 :$ 1
- @
+ > LabeledFreeTree RingOperation
 -}
-over :: MagmaExpression a -> a -> MagmaExpression a
-over = (:$)
+type RingExpression = LabeledFreeTree RingOperation
 
-instance Applicative MagmaExpression where
-  pure :: a -> MagmaExpression a
-  pure = return
+{- |
+ > LabeledFreeTree ()
+-}
+type MagmaExpression = LabeledFreeTree ()
+
+{- |
+ A free monad with disjunct constructors for Functors t and k. Meaning that the
+ structure can be interspersed with either type throughout.
+
+ Conceptually it is like a type @t(k(t(k(t(k(t(...(a))))))))@
+ where types t or k can occur in any order any number of times, but eventually terminate
+ in some type a.
+
+ This type is used primarily to create arbitrary expressions of operations 't` and 'k`
+  over type 'a`.
+
+ For example,
+ let @T a :: *@ be a functor representing an expression of addition over type 'a`.
+  and @K a :: *@ be a functor representing an expression of multiplication over type 'a`.
+  and 'a`, 'b`, 'c`, 'd`, 'w`, 'x`, 'y`, and 'z` are values belonging to a type 'a`
+
+consider that T can also be represented as \"w + x\"
+and K can be represented as \"y * z\"
+
+Therefore, the type @FreeDisjunctMonad T K a@ can be represented as: \"(a + b) * (c * d)"
+  or any arbitrary combination of values in types T, K, and a.
+-}
+data FreeDisjunctMonad t k a
+  = -- | The \"Disjunct\" refers to the higher-kinded disjunction.
+    PureDisjunct a
+  | T (t (FreeDisjunctMonad t k a))
+  | K (k (FreeDisjunctMonad t k a))
+  deriving (Generic)
+
+instance (Show1 t, Show1 k) => Show1 (FreeDisjunctMonad t k) where
+  liftShowsPrec ::
+    (Show1 t, Show1 k) =>
+    (Int -> a -> ShowS) ->
+    ([a] -> ShowS) ->
+    Int ->
+    FreeDisjunctMonad t k a ->
+    ShowS
+  liftShowsPrec f g n x = case x of
+    PureDisjunct a -> showsUnaryWith f "PureDisjunct" n a
+    T t -> showsUnaryWith (liftShowsPrec (liftShowsPrec f g) (liftShowList f g)) "T" n t
+    K k -> showsUnaryWith (liftShowsPrec (liftShowsPrec f g) (liftShowList f g)) "K" n k
+
+instance (Show1 t, Show1 k, Show a) => Show (FreeDisjunctMonad t k a) where
+  showsPrec ::
+    (Show1 t, Show1 k, Show a) =>
+    Int ->
+    FreeDisjunctMonad t k a ->
+    ShowS
+  showsPrec = showsPrec1
+
+instance (Eq1 t, Eq1 k) => Eq1 (FreeDisjunctMonad t k) where
+  liftEq ::
+    (Eq1 t, Eq1 k) =>
+    (a -> b -> Bool) ->
+    FreeDisjunctMonad t k a ->
+    FreeDisjunctMonad t k b ->
+    Bool
+  liftEq eq x y = case x of
+    PureDisjunct a -> case y of
+      PureDisjunct b -> eq a b
+      _ -> False
+    T t ->
+      case y of
+        T tb -> liftEq (liftEq eq) t tb
+        _ -> False
+    K k ->
+      case y of
+        K kb -> liftEq (liftEq eq) k kb
+        _ -> False
+
+instance (Eq1 t, Eq1 k, Eq a) => Eq (FreeDisjunctMonad t k a) where
+  (==) ::
+    (Eq1 t, Eq1 k, Eq a) =>
+    FreeDisjunctMonad t k a ->
+    FreeDisjunctMonad t k a ->
+    Bool
+  (==) = liftEq (==)
+
+instance (Functor t, Functor k) => Functor (FreeDisjunctMonad t k) where
+  fmap ::
+    (Functor t, Functor k) =>
+    (a -> b) ->
+    FreeDisjunctMonad t k a ->
+    FreeDisjunctMonad t k b
+  fmap f fce = case fce of
+    PureDisjunct a -> PureDisjunct (f a)
+    T t -> T (fmap (fmap f) t)
+    K k -> K (fmap (fmap f) k)
+
+instance (Functor t, Functor k) => Applicative (FreeDisjunctMonad t k) where
+  pure :: (Functor t, Functor k) => a -> FreeDisjunctMonad t k a
+  pure = PureDisjunct
   (<*>) ::
-    MagmaExpression (a -> b) ->
-    MagmaExpression a ->
-    MagmaExpression b
-  (<*>) = ap
+    (Functor t, Functor k) =>
+    FreeDisjunctMonad t k (a -> b) ->
+    FreeDisjunctMonad t k a ->
+    FreeDisjunctMonad t k b
+  fcef <*> x = case fcef of
+    PureDisjunct fab -> fmap fab x
+    T t -> T (fmap (<*> x) t)
+    K k -> K (fmap (<*> x) k)
 
-instance Monad MagmaExpression where
-  return :: a -> MagmaExpression a
-  return = Magma
+instance (Functor t, Functor k) => Monad (FreeDisjunctMonad t k) where
+  return :: (Functor t, Functor k) => a -> FreeDisjunctMonad t k a
+  return = pure
   (>>=) ::
-    MagmaExpression a ->
-    (a -> MagmaExpression b) ->
-    MagmaExpression b
-  rd >>= f = case rd of
-    Magma a -> f a
-    rd' :$ a -> (rd' >>= f) <> f a
+    (Functor t, Functor k) =>
+    FreeDisjunctMonad t k a ->
+    (a -> FreeDisjunctMonad t k b) ->
+    FreeDisjunctMonad t k b
+  fce >>= f = case fce of
+    PureDisjunct a -> f a
+    T t -> T (fmap (>>= f) t)
+    K k -> K (fmap (>>= f) k)
+
+instance (Foldable t, Foldable k) => Foldable (FreeDisjunctMonad t k) where
+  foldr ::
+    (Foldable t, Foldable k) =>
+    (a -> b -> b) ->
+    b ->
+    FreeDisjunctMonad t k a ->
+    b
+  foldr f acc fce = case fce of
+    PureDisjunct a -> f a acc
+    T t -> foldr (flip (foldr f)) acc t
+    K k -> foldr (flip (foldr f)) acc k
+
+instance (Traversable t, Traversable k) => Traversable (FreeDisjunctMonad t k) where
+  traverse ::
+    (Traversable t, Traversable k, Applicative f) =>
+    (a -> f b) ->
+    FreeDisjunctMonad t k a ->
+    f (FreeDisjunctMonad t k b)
+  traverse f fce = case fce of
+    PureDisjunct a -> PureDisjunct <$> f a
+    T t -> T <$> traverse (traverse f) t
+    K k -> K <$> traverse (traverse f) k
+
+instance Rng (FreeDisjunctMonad RingExpression k a) where
+  (+.) = fdmbh T (+.) pure pure
+  (*.) = fdmbh T (*.) pure pure
+  (-.) = fdmbh T (-.) pure pure
+
+-- This should be literally the same thing as
+-- > flipTK . (+.) . flipTK
+-- only it does not require an additional Functor constraint.
+instance Rng (FreeDisjunctMonad t RingExpression a) where
+  (+.) = fdmbh K (+.) pure pure
+  (*.) = fdmbh K (*.) pure pure
+  (-.) = fdmbh K (-.) pure pure
+
+instance Magma (FreeDisjunctMonad MagmaExpression k a) where
+  (∙) = fdmbh T (∙) pure pure
+
+instance Magma (FreeDisjunctMonad t MagmaExpression a) where
+  (∙) = fdmbh K (∙) pure pure
+
+{- |
+ A helper for defining a binary operation over a preconstruction.
+
+  where
+
+  > fcebh constructor combinator preconstrX preconstrY x y
+
+  Applies the function @combinator@ to @preconstrX x@ and @preconstrY y@
+    before application of the final function, @constructor@
+
+ Stands for FreeDisjunctMonad-Binary-Helper since it used to defined
+ (*) kinded typeclasses for this type.
+-}
+fdmbh ::
+  (t1 -> t2) ->
+  (t3 -> t4 -> t1) ->
+  (t5 -> t3) ->
+  (t6 -> t4) ->
+  t5 ->
+  t6 ->
+  t2
+fdmbh dc cm cx cy x y = dc $ cm (cx x) (cy y)
+
+mapT ::
+  (Functor t, Functor k) =>
+  (forall a1. t a1 -> h a1) ->
+  FreeDisjunctMonad t k a ->
+  FreeDisjunctMonad h k a
+mapT f fce = case fce of
+  PureDisjunct a -> PureDisjunct a
+  T t -> T . f . fmap (mapT f) $ t
+  K k -> K . fmap (mapT f) $ k
+
+mapK ::
+  (Functor t, Functor k) =>
+  (forall a1. k a1 -> h a1) ->
+  FreeDisjunctMonad t k a ->
+  FreeDisjunctMonad t h a
+mapK f fce = case fce of
+  PureDisjunct a -> PureDisjunct a
+  T t -> T . fmap (mapK f) $ t
+  K k -> K . f . fmap (mapK f) $ k
+
+{- |
+ Distributes the operation denoted by K over the operation denoted by T.
+-}
+distributeT ::
+  (Monad t, Monad k, Traversable t) =>
+  FreeDisjunctMonad t k a ->
+  k (t a)
+distributeT fce = case fce of
+  PureDisjunct a -> pure . pure $ a
+  T t -> fmap join . traverse distributeT $ t
+  K k -> k >>= distributeT
+
+{- |
+ Distributes the operation denoted by K over the operation denoted by T.
+-}
+distributeK ::
+  (Monad t, Monad k, Traversable k) =>
+  FreeDisjunctMonad t k a ->
+  t (k a)
+distributeK fce = case fce of
+  PureDisjunct a -> pure . pure $ a
+  T t -> t >>= distributeK
+  K k -> fmap join . traverse distributeK $ k
+
+{- |
+ Simply flips the constructors.
+-}
+flipTK ::
+  (Functor t, Functor k) =>
+  FreeDisjunctMonad t k a ->
+  FreeDisjunctMonad k t a
+flipTK fce = case fce of
+  PureDisjunct a -> PureDisjunct a
+  T t -> K . fmap flipTK $ t
+  K k -> T . fmap flipTK $ k
+
+{- |
+ Apply unwrapping functions to the inner constructors of a 'FreeDisjunctMonad`
+
+ This can be used to remove redundant layers of monadic identities for example.
+-}
+unwrapTK ::
+  (Functor t, Functor k) =>
+  (forall a1. t a1 -> Maybe a1) ->
+  (forall a1. k a1 -> Maybe a1) ->
+  FreeDisjunctMonad t k a ->
+  FreeDisjunctMonad t k a
+unwrapTK tf kf fce =
+  case fce of
+    PureDisjunct _ -> fce
+    T t ->
+      let mappedUnwrap = unwrapTK tf kf <$> t
+       in fromMaybe (T mappedUnwrap) . tf $ mappedUnwrap
+    K k ->
+      let mappedUnwrap = unwrapTK tf kf <$> k
+       in fromMaybe (K mappedUnwrap) . kf $ mappedUnwrap
+
+evaluateFreeCompoundExpression ::
+  (Functor f1, Functor f2) =>
+  (f1 b -> b) ->
+  (f2 b -> b) ->
+  FreeDisjunctMonad f1 f2 b ->
+  b
+evaluateFreeCompoundExpression f g fce =
+  case fce of
+    PureDisjunct a -> a
+    T t -> f . fmap (evaluateFreeCompoundExpression f g) $ t
+    K k -> g . fmap (evaluateFreeCompoundExpression f g) $ k
+
+{- |
+ Unrooted binary tree of node type 'a`
+ with edges labeled as type 'l`
+
+ This data structure is used primarily to model any binary operation of type 'l`
+ over the type 'a`
+
+ For instance:
+
+ - An expression for a magma on 'a` can be
+      generally expressed as @LabeledFreeTree () a@
+ - An expression describing ring-like operations (+), (*), and (-) is expressed as
+      @LabeledFreeTree RingOperation a@
+
+ Furthermore, expressions over the structure itself can be expressed by simply duplicating
+ the underlying structure:
+
+ > fmap pure x :: LabeledFreeTree b (LabeledFreeTree b a)
+-}
+data LabeledFreeTree l a
+  = Node a
+  | Edge (LabeledFreeTree l a) l (LabeledFreeTree l a)
+  deriving (Functor, Foldable, Traversable, Generic)
+
+instance (Hashable l, Hashable a) => Hashable (LabeledFreeTree l a)
+
+instance Show2 LabeledFreeTree where
+  liftShowsPrec2 ::
+    (Int -> a -> ShowS) ->
+    ([a] -> ShowS) ->
+    (Int -> b -> ShowS) ->
+    ([b] -> ShowS) ->
+    Int ->
+    LabeledFreeTree a b ->
+    ShowS
+  liftShowsPrec2 lf lfxs af afxs n x = case x of
+    Node b -> showsUnaryWith af "LabeledFreeTree" n b
+    Edge elft a elft' ->
+      let liftS = liftShowsPrec2 lf lfxs af afxs n
+          mShowParens = showParen True
+          edge = showString "Edge "
+          lhs = mShowParens $ liftS elft
+          cen = lf n a
+          rhs = mShowParens $ liftS elft'
+       in edge . lhs . showString " " . cen . showString " " . rhs
+
+instance Show l => Show1 (LabeledFreeTree l) where
+  liftShowsPrec ::
+    Show l =>
+    (Int -> a -> ShowS) ->
+    ([a] -> ShowS) ->
+    Int ->
+    LabeledFreeTree l a ->
+    ShowS
+  liftShowsPrec = liftShowsPrec2 showsPrec showList
+
+instance (Show l, Show a) => Show (LabeledFreeTree l a) where
+  showsPrec :: (Show l, Show a) => Int -> LabeledFreeTree l a -> ShowS
+  showsPrec = showsPrec2
+
+instance Eq2 LabeledFreeTree where
+  liftEq2 ::
+    (a -> b -> Bool) ->
+    (c -> d -> Bool) ->
+    LabeledFreeTree a c ->
+    LabeledFreeTree b d ->
+    Bool
+  liftEq2 eql eqa x y = case x of
+    Node c ->
+      case y of
+        Node y' -> eqa c y'
+        _ -> False
+    Edge elft a elft' ->
+      case y of
+        Edge yl yc yr ->
+          -- compare edges first to short circuit before traversing deeper.
+          eql a yc
+            && liftEq2 eql eqa elft yl
+            && liftEq2 eql eqa elft' yr
+        _ -> False
+
+instance Eq l => Eq1 (LabeledFreeTree l) where
+  liftEq ::
+    Eq l =>
+    (a -> b -> Bool) ->
+    LabeledFreeTree l a ->
+    LabeledFreeTree l b ->
+    Bool
+  liftEq = liftEq2 (==)
+
+instance (Eq l, Eq a) => Eq (LabeledFreeTree l a) where
+  (==) ::
+    (Eq l, Eq a) =>
+    LabeledFreeTree l a ->
+    LabeledFreeTree l a ->
+    Bool
+  (==) = liftEq2 (==) (==)
+
+instance Applicative (LabeledFreeTree l) where
+  pure :: a -> LabeledFreeTree l a
+  pure = Node
+  (<*>) ::
+    LabeledFreeTree l (a -> b) ->
+    LabeledFreeTree l a ->
+    LabeledFreeTree l b
+  f <*> x = case f of
+    Node fab -> fmap fab x
+    Edge elt l elt' -> Edge (elt <*> x) l (elt' <*> x)
+
+instance Monad (LabeledFreeTree l) where
+  return :: a -> LabeledFreeTree l a
+  return = pure
+  (>>=) ::
+    LabeledFreeTree l a ->
+    (a -> LabeledFreeTree l b) ->
+    LabeledFreeTree l b
+  elt >>= f = case elt of
+    Node a -> f a
+    Edge elt' l elt_la -> Edge (elt' >>= f) l (elt_la >>= f)
+
+instance Bifunctor LabeledFreeTree where
+  second :: (b -> c) -> LabeledFreeTree a b -> LabeledFreeTree a c
+  second = fmap
+  first :: (a -> b) -> LabeledFreeTree a c -> LabeledFreeTree b c
+  first f elt = case elt of
+    Node c -> Node c
+    Edge elft a elft' -> Edge (first f elft) (f a) (first f elft')
+
+instance Bifoldable LabeledFreeTree where
+  bifoldr :: (a -> c -> c) -> (b -> c -> c) -> c -> LabeledFreeTree a b -> c
+  bifoldr f g acc elft = case elft of
+    Node b -> g b acc
+    Edge elft' a elft_ab ->
+      let rhs = bifoldr f g acc elft_ab
+          cen = f a rhs
+          result = bifoldr f g cen elft'
+       in result
+
+instance Bitraversable LabeledFreeTree where
+  bitraverse ::
+    Applicative f =>
+    (a -> f c) ->
+    (b -> f d) ->
+    LabeledFreeTree a b ->
+    f (LabeledFreeTree c d)
+  bitraverse f g elft = case elft of
+    Node b -> Node <$> g b
+    Edge elft' a elft_ab ->
+      Edge
+        <$> bitraverse f g elft'
+          <*> f a
+          <*> bitraverse f g elft_ab
+
+instance Rng (LabeledFreeTree RingOperation a) where
+  x +. y = Edge x Addition y
+
+  x *. y = Edge x Multiplication y
+
+  x -. y = Edge x Subtraction y
+
+instance Magma (LabeledFreeTree () a) where
+  x ∙ y = Edge x () y
+
+fold1WithEdge :: (l -> a -> a -> a) -> LabeledFreeTree l a -> a
+fold1WithEdge f elft = case elft of
+  Node a -> a
+  Edge elft' l elft_la ->
+    f
+      l
+      (fold1WithEdge f elft')
+      (fold1WithEdge f elft_la)
+
+{- |
+ Evaluates node operands from left to right.
+-}
+fold1WithEdgeMl ::
+  Monad f =>
+  (l -> a -> a -> f a) ->
+  LabeledFreeTree l a ->
+  f a
+fold1WithEdgeMl f elft = case elft of
+  Node a -> pure a
+  Edge elft' l elft_la -> do
+    lhs <- fold1WithEdgeMl f elft'
+    rhs <- fold1WithEdgeMl f elft_la
+    f l lhs rhs
+
+{- |
+ Evaluates node operands from right to left.
+-}
+fold1WithEdgeMr ::
+  Monad f =>
+  (t1 -> t2 -> t2 -> f t2) ->
+  LabeledFreeTree t1 t2 ->
+  f t2
+fold1WithEdgeMr f elft =
+  case elft of
+    Node a -> pure a
+    Edge elft' l elft_la -> do
+      rhs <- fold1WithEdgeMr f elft_la
+      lhs <- fold1WithEdgeMr f elft'
+      f l lhs rhs
+
+evaluateRingExpression :: Rng a => LabeledFreeTree RingOperation a -> a
+evaluateRingExpression =
+  fold1WithEdge
+    ( \so -> case so of
+        Addition -> (+.)
+        Multiplication -> (*.)
+        Subtraction -> (-.)
+    )
+
+evaluateMagmaExpression :: Magma a => LabeledFreeTree () a -> a
+evaluateMagmaExpression = fold1WithEdge (const (∙))
+
+{- |
+ A type detailing how set-like collections are to be combined.
+-}
+data RingOperation
+  = Addition
+  | Multiplication
+  | Subtraction
+  deriving (Show, Eq, Bounded, Enum, Ord, Generic)
 
 {- |
  A string used for searching with SQL LIKE expressions. Where a wildcard is a
@@ -299,272 +879,6 @@ runDTerm :: DTerm p -> p
 runDTerm (DTerm x) = x
 runDTerm (DMetaTerm x) = x
 
-{- |
- A recursive expression that is ultimately resolvable to a ring expression
- of magma expressions.
--}
-data TagExpression a
-  = TagValue a
-  | TagRing (RingExpression (TagExpression a))
-  | TagMagma (MagmaExpression (TagExpression a))
-  deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
-
-instance Hashable a => Hashable (TagExpression a)
-
-instance Applicative TagExpression where
-  pure :: a -> TagExpression a
-  pure = return
-  (<*>) :: TagExpression (a -> b) -> TagExpression a -> TagExpression b
-  (<*>) = ap
-
-instance Monad TagExpression where
-  return :: a -> TagExpression a
-  return = TagValue
-  (>>=) :: TagExpression a -> (a -> TagExpression b) -> TagExpression b
-  ye >>= f = case ye of
-    TagValue a -> f a
-    TagRing re -> TagRing . fmap (>>= f) $ re
-    TagMagma me -> TagMagma . fmap (>>= f) $ me
-
-{- |
- Distribute all magma expressions over ring expressions.
- This alters the structure of the 'TagExpression` and if the function used to
- evaluate the expression is not distributive, then this function will effect the
- outcome of that as well.
--}
-distribute :: TagExpression a -> TagExpression a
-distribute = TagRing . fmap (TagMagma . fmap pure) . toNonRecursive
- where
-  -- Distribute all magma expressions through a non-recursive intermediate structure
-  -- then convert back to a TagExpression.
-  toNonRecursive :: TagExpression a -> RingExpression (MagmaExpression a)
-  toNonRecursive te = case te of
-    TagValue a -> Ring . Magma $ a
-    TagRing re -> re >>= toNonRecursive
-    TagMagma me -> fmap join . traverse toNonRecursive $ me
-
-{-
-BEGIN Factoring - An experimental set of functions meant to be the inverse of
-  distribute.
-
-How would this factor?
-
-right factor
-a{c} | b{c} -> (a | b){c}
-
-left factor
-a{b} | a{c} -> a{b | c}
-
-left-right factor
-a{b{c}} | a{d{c}} -> a{(b | d){c}}
-
-right factor
-a{b{c}} | d{b{c}} -> (a | d){b{c}}
-
-Simplify then factor?
-
-right factoring involves comparing the bottom magma of two operands in a ring.
-There is no point in factoring a single term.
-(a | b{c}){d} -> a{d} | b{c{d}} -> (a | b{c}){d}
-
-left factoring is looking at the top magma value of two operands.
-a{b | c{d}} -> a{b} | a{c{d}} -> a{b | c{d}}
-
-(a | b){(c & d){e ! f}} -> (a{c{e}} ! a{c{f}} & (a{d{e}} ! a{d{f}})) | (b{c{e}} ! b{c{f}} & (b{d{e}} ! b{d{f}}))
-    'or' left operator:
-  -> a{(c{e} ! c{f}) & (d{e} ! d{f})} -> a{c{e ! f} & d{e ! f}} -> a{(c & d){e ! f}}
--}
-
--- data MagmaFactorization a = MagmaFactorization
---   { -- | Left factors are from right distribution.
---     leftFactors :: Maybe (MagmaExpression a)
---   , -- | Right factors are from left distribution.
---     rightFactors :: Maybe (MagmaExpression a)
---   , -- | The remaining terms that cannot be factored in comparison with the right
---     -- quotient.
---     leftQuotient :: MagmaExpression a
---   , -- | The remaining terms that cannot be factored in comparison with the left
---     -- quotient.
---     rightQuotient :: MagmaExpression a
---   }
---   deriving (Show, Eq, Functor)
-
--- constructFactorResults ::
---   (MagmaExpression a -> MagmaExpression a -> t) ->
---   MagmaFactorization a ->
---   t
--- constructFactorResults c (MagmaFactorization mLeft mRight l r) = withEnds l `c` withEnds r
---  where
---   withEnds m =
---     let leftFactorCons = maybe m (<> m) mLeft
---         rightFactorCons = maybe leftFactorCons (leftFactorCons <>) mRight
---      in rightFactorCons
-
--- {- |
---  Separate factors that have been produced from left and right distribution
---  if there are any.
-
---  Return the left and right remainders of the factored expressions.
-
---  This function assumes that the magma is a non-associative, non-commutative operation.
--- -}
--- factorMagma ::
---   Eq a =>
---   MagmaExpression a ->
---   MagmaExpression a ->
---   MagmaFactorization a
--- factorMagma l r =
---   let lList = F.foldr (:) [] l
---       rList = F.foldr (:) [] r
---       safeFromList xs = case xs of
---         [] -> Nothing
---         (x : xs') -> Just $ F.foldl' over (Magma x) xs'
-
---       -- Left factors are a product of right-distribution
---       ( mapMaybe fst ->
---           lFactors
---         , unzip -> lFactorRemainders
---         ) =
---           L.span (fromMaybe False . uncurry (liftA2 (==))) $ zipLongest [] lList rList
-
---       -- Right factors are a product of left-distribution and are taken the same
---       -- way as left factors, only over a reversed list.
---       ( mapMaybe fst . reverse ->
---           rFactors
---         , both reverse . unzip ->
---             (xlRem, ylRem)
---         ) =
---           L.span (fromMaybe False . uncurry (liftA2 (==)))
---             . uncurry (zipLongest [])
---             . both (reverse . catMaybes)
---             $ lFactorRemainders
-
---       remainders = both catMaybes (xlRem, ylRem)
---    in if l == r
---         then MagmaFactorization Nothing Nothing l r
---         else case remainders of
---           -- inputs are already fully factored so they are returned.
---           -- Simply a case match for the above if-expr that skips these computations.
---           ([], []) ->
---             MagmaFactorization Nothing Nothing l r
---           (l' : ls, r' : rs) ->
---             MagmaFactorization
---               { leftFactors = safeFromList lFactors
---               , rightFactors = safeFromList rFactors
---               , leftQuotient = F.foldl' over (pure l') ls
---               , rightQuotient = F.foldl' over (pure r') rs
---               }
---           _oneRemIsEmpty ->
---             remainders
---               &
---               -- One remainder is empty, so in order to return a
---               -- Magma expression remainder, it attempts to borrow a factor,
---               -- first from the left side.
---               case safeFromList lFactors of
---                 Just me ->
---                   let foldFactorInto fact = both (F.foldl' over fact)
---                    in case me of
---                         Magma _ ->
---                           uncurry (MagmaFactorization Nothing (safeFromList rFactors))
---                             . foldFactorInto me
---                         me' :$ a ->
---                           uncurry (MagmaFactorization (Just me') (safeFromList rFactors))
---                             . foldFactorInto (pure a)
---                 -- There are no left factors so it tries the right side.
---                 Nothing -> case safeFromList rFactors of
---                   Just me ->
---                     let foldFactorInto fact = both (F.foldr appliedTo fact)
---                      in case me of
---                           Magma _ ->
---                             uncurry (MagmaFactorization Nothing Nothing)
---                               . foldFactorInto me
---                           (partitionLeft -> (lhead, lMag)) ->
---                             uncurry (MagmaFactorization Nothing lMag)
---                               . foldFactorInto (pure lhead)
---                   -- This scenario should absolutely never happen. It means that
---                   -- one remainder is empty and yet there are no factors.
---                   -- Which means that a remainder was removed
---                   -- when it should not have been.
---                   -- To avoid a partial function, this returns the input as unfactorable.
---                   Nothing -> const (uncurry (MagmaFactorization Nothing Nothing) (l, r))
-
--- zipLongest :: [(Maybe a, Maybe a)] -> [a] -> [a] -> [(Maybe a, Maybe a)]
--- zipLongest acc [] [] = reverse acc
--- zipLongest acc (part' -> (x, xs)) (part' -> (y, ys)) = zipLongest ((x, y) : acc) xs ys
-
--- both :: Bifunctor p => (a -> d) -> p a a -> p d d
--- both f = bimap f f
-
--- part' :: [a] -> (Maybe a, [a])
--- part' [] = (Nothing, [])
--- part' (x : xs) = (Just x, xs)
-
-{-
-END Factoring
--}
-
-{- |
- Evaluate a 'TagExpression` with a right-associative function over its 'MagmaExpression`.
--}
-evaluateTagExpressionR :: Rng a => (a -> a -> a) -> TagExpression a -> a
-evaluateTagExpressionR f = evaluateTagExpressionWithMagma (foldMagmaExpression f)
-
-{- |
- Evaluate a 'TagExpression` with a left-associative function over its 'MagmaExpression`.
--}
-evaluateTagExpressionL :: Rng a => (a -> a -> a) -> TagExpression a -> a
-evaluateTagExpressionL f = evaluateTagExpressionWithMagma (foldMagmaExpressionL f)
-
-evaluateTagExpressionWithMagma ::
-  Rng b =>
-  (MagmaExpression b -> b) ->
-  TagExpression b ->
-  b
-evaluateTagExpressionWithMagma mf te =
-  case te of
-    TagValue a -> a
-    TagRing re -> evaluateRing . fmap (evaluateTagExpressionWithMagma mf) $ re
-    TagMagma me -> mf . fmap (evaluateTagExpressionWithMagma mf) $ me
-
-{- |
- Newtype wrapper for a query expression, which is a ring expression of leaves
- where each leaf is resolvable to a set of files.
--}
-newtype QueryExpression = QueryExpression {runQueryExpression :: RingExpression QueryLeaf}
-  deriving (Show, Eq, Rng)
-
-{- |
- A disjunction between filepath patterns and tag expressions that are resolvable
- to an expression of file sets.
--}
-data QueryLeaf
-  = FileLeaf Pattern
-  | TagLeaf (TagExpression (DTerm Pattern))
-  deriving (Show, Eq)
-
-newtype DefaultRng a = DefaultRng {runDefaultRng :: a}
-  deriving
-    ( Show
-    , Eq
-    , Semigroup
-    , Monoid
-    , Functor
-    , Foldable
-    , Traversable
-    )
-
-instance Applicative DefaultRng where
-  pure :: a -> DefaultRng a
-  pure = DefaultRng
-  (<*>) :: DefaultRng (a -> b) -> DefaultRng a -> DefaultRng b
-  (DefaultRng f) <*> (DefaultRng x) = DefaultRng (f x)
-
-instance Monad DefaultRng where
-  return :: a -> DefaultRng a
-  return = pure
-  (>>=) :: DefaultRng a -> (a -> DefaultRng b) -> DefaultRng b
-  (DefaultRng x) >>= f = f x
-
 infixl 7 +.
 infixl 7 *.
 infixl 7 -.
@@ -578,15 +892,6 @@ class Rng r where
 
   -- | The inverse of '(+.)`
   (-.) :: r -> r -> r
-
--- | Uses the semigroup operation for all ring operations.
-instance Semigroup a => Rng (DefaultRng a) where
-  (+.) :: Semigroup a => DefaultRng a -> DefaultRng a -> DefaultRng a
-  (+.) = (<>)
-  (*.) :: Semigroup a => DefaultRng a -> DefaultRng a -> DefaultRng a
-  (*.) = (<>)
-  (-.) :: Semigroup a => DefaultRng a -> DefaultRng a -> DefaultRng a
-  (-.) = (<>)
 
 instance Hashable a => Rng (HashSet a) where
   (+.) :: Hashable a => HashSet a -> HashSet a -> HashSet a
@@ -611,25 +916,6 @@ instance Rng Int where
   (*.) = (*)
   (-.) :: Int -> Int -> Int
   (-.) = (-)
-
-instance Rng (RingExpression a) where
-  (+.) :: RingExpression a -> RingExpression a -> RingExpression a
-  (+.) = (:+)
-  (*.) :: RingExpression a -> RingExpression a -> RingExpression a
-  (*.) = (:*)
-  (-.) :: RingExpression a -> RingExpression a -> RingExpression a
-  (-.) = (:-)
-
-{- |
- Not technically a rng as the constructors are not associative.
--}
-instance Rng (TagExpression a) where
-  (+.) :: TagExpression a -> TagExpression a -> TagExpression a
-  x +. y = TagRing $ pure x +. pure y
-  (*.) :: TagExpression a -> TagExpression a -> TagExpression a
-  x *. y = TagRing $ pure x *. pure y
-  (-.) :: TagExpression a -> TagExpression a -> TagExpression a
-  x -. y = TagRing $ pure x -. pure y
 
 instance (Rng a, Rng b) => Rng (a, b) where
   (+.) :: (Rng a, Rng b) => (a, b) -> (a, b) -> (a, b)
@@ -659,34 +945,20 @@ instance Ring Int where
   mid = 1
 
 instance Ring QueryExpression where
-  -- The set of all files
-  mid :: QueryExpression
-  mid = QueryExpression . Ring . FileLeaf $ WildCard
-
-  -- The set of all files minus itself, an empty set.
   aid :: QueryExpression
-  aid = mid -. mid
+  aid = TraversableQueryExpression . Node . Right . Left $ WildCard
+  mid :: QueryExpression
+  mid = aid -. aid
 
-infix 9 #
+infix 9 ∙
 
 {- |
  Class for any magma.
 -}
 class Magma m where
-  -- | A binary operation.
-  (#) :: m -> m -> m
+  -- | A closed binary operation.
+  (∙) :: m -> m -> m
 
 instance (Magma a, Magma b) => Magma (a, b) where
-  (#) :: (Magma a, Magma b) => (a, b) -> (a, b) -> (a, b)
-  x # (a, b) = bimap (# a) (# b) x
-
-instance Magma (MagmaExpression a) where
-  (#) :: MagmaExpression a -> MagmaExpression a -> MagmaExpression a
-  (#) = (<>)
-
-{- |
- A non-associative, distributive function.
--}
-instance Magma (TagExpression a) where
-  (#) :: TagExpression a -> TagExpression a -> TagExpression a
-  x # y = TagMagma $ pure x :$ y
+  (∙) :: (Magma a, Magma b) => (a, b) -> (a, b) -> (a, b)
+  x ∙ (a, b) = bimap (∙ a) (∙ b) x

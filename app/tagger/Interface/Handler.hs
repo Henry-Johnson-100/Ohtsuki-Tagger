@@ -1,23 +1,25 @@
 {-# LANGUAGE BangPatterns #-}
 {-# HLINT ignore "Use list comprehension" #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# HLINT ignore "Redundant if" #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# HLINT ignore "Use const" #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Redundant if" #-}
-
 module Interface.Handler (
   taggerEventHandler,
 ) where
 
-import Control.Lens ((%~), (&), (.~), (<|), (?~), (^.), (|>))
+import Control.Lens ((%~), (&), (.~), (<|), (^.), (|>))
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
+import Data.Bifunctor
 import Data.Either (fromRight)
 import Data.Event
 import qualified Data.Foldable as F
@@ -31,7 +33,6 @@ import Data.Model
 import Data.Model.Shared
 import Data.Sequence (Seq ((:<|), (:|>)))
 import qualified Data.Sequence as Seq
-import Data.Tagger
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Version (showVersion)
@@ -47,6 +48,7 @@ import System.IO
 import Tagger.Info (taggerVersion)
 import Text.TaggerQL
 import Text.TaggerQL.Expression.AST
+import Text.TaggerQL.Expression.AST.Editor
 import Text.TaggerQL.Expression.Engine
 import Text.TaggerQL.Expression.Parser
 import Util
@@ -104,8 +106,6 @@ taggerEventHandler
       Unit _ -> []
       AnonymousEvent (fmap (\(TaggerAnonymousEvent e) -> e) -> es) -> es
       Mempty (TaggerLens l) -> [Model $ model & l .~ mempty]
-      NextCyclicEnum (TaggerLens l) -> [Model $ model & l %~ next]
-      PrevCyclicEnum (TaggerLens l) -> [Model $ model & l %~ prev]
       NextHistory (TaggerLens l) ->
         [ Model $
             model
@@ -164,6 +164,10 @@ fileSelectionEventHandler
             [ Event . DoFocusedFileEvent . PutFile $ f
             , Model $ model & fileSelectionModel . selection .~ (f <| (fs |> f'))
             ]
+      CycleOrderCriteria ->
+        [Model $ model & fileSelectionTagListModel . ordering %~ cycleOrderCriteria]
+      CycleOrderDirection ->
+        [Model $ model & fileSelectionTagListModel . ordering %~ cycleOrderDir]
       CyclePrevFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []
@@ -360,31 +364,56 @@ queryEventHandler ::
   [AppEventResponse TaggerModel TaggerEvent]
 queryEventHandler _wenv _node model@((^. connection) -> conn) event =
   case event of
-    CycleExprSetOpAt n ->
-      []
-    -- Model $
-    --   model & fileSelectionModel . queryModel . expression . exprAt n
-    --     %~ ( \mexpr -> do
-    --           expr <- mexpr
-    --           case expr of
-    --             BinaryExpression bn -> Just . BinaryExpression $ bn & soL %~ next
-    --             _notBinary -> Nothing
-    --        )
-
-    CycleSubExprSetOpAt exprIx seIx ->
-      []
-    -- Model $
-    --   model
-    --     & fileSelectionModel
-    --       . queryModel
-    --       . expression
-    --       . subExprAtL exprIx seIx
-    --     %~ fmap
-    --       ( \se -> case se of
-    --           BinarySubExpression bn -> BinarySubExpression $ bn & soL %~ next
-    --           _notBN -> se
-    --       )
-
+    CycleRingOperator li mi -> [onDisjunctRingExpression li mi nextRingOperator]
+    DeleteRingOperand li mi eo ->
+      let removeOperand = either (const dropLeftTree) (const dropRightTree) eo
+       in [onDisjunctRingExpression li mi removeOperand]
+    LeftDistribute li mi te ->
+      [ Model $
+          model & fileSelectionModel . queryModel . expression
+            %~ flip
+              (withQueryExpression li)
+              ( case mi of
+                  Nothing -> (<-# te)
+                  Just n ->
+                    TraversableQueryExpression
+                      . fmap (second (second (flip (withTagExpression n) (∙ te))))
+                      . runTraversableQueryExpression
+              )
+      ]
+    PlaceQueryExpression n l ->
+      [ Model $
+          model & fileSelectionModel . queryModel . expression
+            %~ flip
+              (withQueryExpression n)
+              ( case l of
+                  LatLeft qe -> (qe *.)
+                  LatMiddle qe -> const qe
+                  LatRight qe -> (*. qe)
+              )
+      ]
+    PlaceTagExpression li i lte ->
+      [ Model $
+          model & fileSelectionModel . queryModel . expression
+            %~ flip
+              (withQueryExpression li)
+              ( TraversableQueryExpression
+                  . fmap
+                    ( second
+                        ( second
+                            ( flip
+                                (withTagExpression i)
+                                ( case lte of
+                                    LatLeft fce -> (fce *.)
+                                    LatMiddle fce -> const fce
+                                    LatRight fce -> (*. fce)
+                                )
+                            )
+                        )
+                    )
+                  . runTraversableQueryExpression
+              )
+      ]
     PushExpression ->
       let !rawQuery = T.strip $ model ^. fileSelectionModel . queryModel . input . text
        in ( if model ^. queryEditMode
@@ -430,22 +459,30 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
           . queryQueryExpression conn
           $ model ^. fileSelectionModel . queryModel . expression
       ]
-    RingProduct l r ->
-      [Model $ model & fileSelectionModel . queryModel . l %~ (*. r)]
-    UpdateExpression n expr ->
-      []
-    -- Model $ model & fileSelectionModel . queryModel . expression . exprAt n ?~ expr
-
-    UpdateSubExpression exprIx seIx se ->
-      []
-
--- Model $
---   model
---     & fileSelectionModel
---       . queryModel
---       . expression
---       . subExprAtL exprIx seIx
---     ?~ se
+ where
+  -- Run a function that only modifies the structure of a RingExpression
+  -- on the QueryExpression at the given index or the TagExpression at the given
+  -- coordinates if not Nothing.
+  onDisjunctRingExpression
+    qeIndex
+    mTeIndex
+    (f :: forall a. RingExpression a -> RingExpression a) =
+      Model $
+        model & fileSelectionModel . queryModel . expression
+          %~ flip
+            (withQueryExpression qeIndex)
+            ( \qe ->
+                maybe
+                  (TraversableQueryExpression . f . runTraversableQueryExpression $ qe)
+                  ( \teIndex ->
+                      onTagLeaf
+                        qe
+                        ( \te ->
+                            withTagExpression teIndex te (mapT f)
+                        )
+                  )
+                  mTeIndex
+            )
 
 fileSelectionWidgetEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
