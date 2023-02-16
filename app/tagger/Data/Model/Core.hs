@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
@@ -7,6 +8,10 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Data.Model.Core (
+  -- * General
+  Latitude (..),
+
+  -- * Data Models
   TaggerModel (..),
   createTaggerModel,
   FileSelectionModel (..),
@@ -47,6 +52,15 @@ import qualified Data.Sequence as Seq
 import Data.Text (Text)
 import Database.Tagger.Type
 import Text.TaggerQL.Expression.AST
+
+{- |
+ A sum type for describing a general lateral position: Left, Right, and Middle.
+-}
+data Latitude a
+  = LatLeft a
+  | LatMiddle a
+  | LatRight a
+  deriving (Show, Eq, Functor)
 
 data TaggerModel = TaggerModel
   { _taggermodelDescriptorTreeModel :: DescriptorTreeModel
@@ -114,7 +128,7 @@ createFileSelectionModel =
 
 data QueryModel = QueryModel
   { _queryInput :: TextInput
-  , _queryExpression :: Expression
+  , _queryExpression :: QueryExpression
   }
   deriving (Show, Eq)
 

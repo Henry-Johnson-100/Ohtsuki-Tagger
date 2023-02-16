@@ -30,7 +30,6 @@ import Data.Sequence (Seq ((:<|)), (<|))
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as S
-import Data.Tagger (CyclicEnum (next))
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -87,11 +86,11 @@ togglePaneVis x y =
 
 data OrderDirection = Asc | Desc
   deriving
-    (Show, Eq, Ord, Enum, Bounded, CyclicEnum)
+    (Show, Eq, Ord, Enum, Bounded)
 
 data OrderCriteria = Alphabetic | Numeric
   deriving
-    (Show, Eq, Ord, Enum, Bounded, CyclicEnum)
+    (Show, Eq, Ord, Enum, Bounded)
 
 data OrderBy = OrderBy
   { _orderbyOrderCriteria :: OrderCriteria
@@ -100,10 +99,12 @@ data OrderBy = OrderBy
   deriving (Show, Eq)
 
 cycleOrderCriteria :: OrderBy -> OrderBy
-cycleOrderCriteria (OrderBy c d) = OrderBy (next c) d
+cycleOrderCriteria (OrderBy c d) =
+  OrderBy (case c of Alphabetic -> Numeric; Numeric -> Alphabetic) d
 
 cycleOrderDir :: OrderBy -> OrderBy
-cycleOrderDir (OrderBy c d) = OrderBy c (next d)
+cycleOrderDir (OrderBy c d) =
+  OrderBy c (case d of Asc -> Desc; Desc -> Asc)
 
 {- |
  Data type that has Text and a TextHistory
