@@ -33,7 +33,7 @@ module Text.TaggerQL.Expression.AST (
   TraversableQueryExpression (..),
   simplifyLeftProduct,
   liftSimpleQueryRing,
-  unliftQueryExpression,
+  simplifyQueryExpression,
 
   -- ** Primitive Expressions
   RingExpression,
@@ -297,19 +297,21 @@ liftSimpleQueryRing = TraversableQueryExpression . fmap Right
  to a left distribution. Expanding terms in place and yielding a non-recursive
  type.
 -}
-unliftQueryExpression ::
-  QueryExpression ->
-  RingExpression (Either Pattern TagQueryExpression)
-unliftQueryExpression = either unify pure <=< runTraversableQueryExpression
- where
-  unify (TraversableQueryExpression fqe, tqe) =
-    fqe
-      >>= either
-        (unify . second (∙ tqe))
-        ( either
-            ((*. (Node . Right $ tqe)) . Node . Left)
-            (Node . Right . (∙ tqe))
-        )
+simplifyQueryExpression ::
+  Magma b =>
+  TraversableQueryExpression a b ->
+  LabeledFreeTree RingOperation (Either a b)
+simplifyQueryExpression tqe =
+  simplifyLeftProduct
+    pure
+    (flip (∙))
+    tqe
+    ( \x ->
+        either
+          ((*. (Node . Right $ x)) . Node . Left)
+          (Node . Right . (∙ x))
+          <=< id
+    )
 
 {- |
  > LabeledFreeTree RingOperation

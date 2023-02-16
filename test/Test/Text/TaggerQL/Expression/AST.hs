@@ -193,7 +193,7 @@ astProperties =
                                    )
                            )
                     )
-                    ( unliftQueryExpression $
+                    ( simplifyQueryExpression $
                         ( liftSimpleQueryRing
                             ( (pure . Right . tedp . rt $ "a")
                                 *. (pure . Left $ "b")
@@ -220,7 +220,7 @@ astProperties =
                                    )
                            )
                     )
-                    ( unliftQueryExpression $
+                    ( simplifyQueryExpression $
                         liftSimpleQueryRing
                             ( (pure . Right . tedp . rt $ "a")
                                 *. (pure . Left $ "b")
