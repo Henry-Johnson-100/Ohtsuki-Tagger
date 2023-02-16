@@ -14,11 +14,12 @@ module Interface.Handler (
   taggerEventHandler,
 ) where
 
-import Control.Lens ((%~), (&), (.~), (<|), (?~), (^.), (|>))
+import Control.Lens ((%~), (&), (.~), (<|), (^.), (|>))
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
+import Data.Bifunctor
 import Data.Either (fromRight)
 import Data.Event
 import qualified Data.Foldable as F
@@ -32,7 +33,6 @@ import Data.Model
 import Data.Model.Shared
 import Data.Sequence (Seq ((:<|), (:|>)))
 import qualified Data.Sequence as Seq
-import Data.Tagger
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Version (showVersion)
@@ -106,8 +106,6 @@ taggerEventHandler
       Unit _ -> []
       AnonymousEvent (fmap (\(TaggerAnonymousEvent e) -> e) -> es) -> es
       Mempty (TaggerLens l) -> [Model $ model & l .~ mempty]
-      NextCyclicEnum (TaggerLens l) -> [Model $ model & l %~ next]
-      PrevCyclicEnum (TaggerLens l) -> [Model $ model & l %~ prev]
       NextHistory (TaggerLens l) ->
         [ Model $
             model
@@ -166,6 +164,10 @@ fileSelectionEventHandler
             [ Event . DoFocusedFileEvent . PutFile $ f
             , Model $ model & fileSelectionModel . selection .~ (f <| (fs |> f'))
             ]
+      CycleOrderCriteria ->
+        [Model $ model & fileSelectionTagListModel . ordering %~ cycleOrderCriteria]
+      CycleOrderDirection ->
+        [Model $ model & fileSelectionTagListModel . ordering %~ cycleOrderDir]
       CyclePrevFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []
@@ -364,29 +366,19 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
   case event of
     CycleRingOperator li mi -> [onDisjunctRingExpression li mi nextRingOperator]
     DeleteRingOperand li mi eo ->
-      let removeOperand = either (const dropLeftRing) (const dropRightRing) eo
+      let removeOperand = either (const dropLeftTree) (const dropRightTree) eo
        in [onDisjunctRingExpression li mi removeOperand]
-    FlipRingOperands li mi -> [onDisjunctRingExpression li mi flipRingExpression]
     LeftDistribute li mi te ->
       [ Model $
           model & fileSelectionModel . queryModel . expression
             %~ flip
               (withQueryExpression li)
-              ( \qe@(QueryExpression qe') ->
-                  case mi of
-                    Nothing -> qe <-# te
-                    Just n -> case qe' of
-                      Ring ql -> case ql of
-                        TagLeaf te' ->
-                          QueryExpression
-                            . Ring
-                            . TagLeaf
-                            $ withTagExpression
-                              n
-                              te'
-                              (\te'' -> TagMagma $ Magma te'' :$ te)
-                        _notTagLeaf -> qe
-                      _notRingValue -> qe
+              ( case mi of
+                  Nothing -> (<-# te)
+                  Just n ->
+                    TraversableQueryExpression
+                      . fmap (second (second (flip (withTagExpression n) (∙ te))))
+                      . runTraversableQueryExpression
               )
       ]
     PlaceQueryExpression n l ->
@@ -405,23 +397,21 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
           model & fileSelectionModel . queryModel . expression
             %~ flip
               (withQueryExpression li)
-              ( \qe@(QueryExpression qre) ->
-                  case qre of
-                    Ring ql -> case ql of
-                      TagLeaf te ->
-                        QueryExpression
-                          . Ring
-                          . TagLeaf
-                          $ withTagExpression
-                            i
-                            te
-                            ( case lte of
-                                LatLeft te' -> (te' *.)
-                                LatMiddle te' -> const te'
-                                LatRight te' -> (*. te')
+              ( TraversableQueryExpression
+                  . fmap
+                    ( second
+                        ( second
+                            ( flip
+                                (withTagExpression i)
+                                ( case lte of
+                                    LatLeft fce -> (fce *.)
+                                    LatMiddle fce -> const fce
+                                    LatRight fce -> (*. fce)
+                                )
                             )
-                      _notTagLeaf -> qe
-                    _notRingValue -> qe
+                        )
+                    )
+                  . runTraversableQueryExpression
               )
       ]
     PushExpression ->
@@ -483,12 +473,12 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
             (withQueryExpression qeIndex)
             ( \qe ->
                 maybe
-                  (QueryExpression . f . runQueryExpression $ qe)
+                  (TraversableQueryExpression . f . runTraversableQueryExpression $ qe)
                   ( \teIndex ->
                       onTagLeaf
                         qe
                         ( \te ->
-                            withTagExpression teIndex te (`onTagRing` f)
+                            withTagExpression teIndex te (mapT f)
                         )
                   )
                   mTeIndex

@@ -14,15 +14,11 @@ module Text.TaggerQL.Expression.AST.Editor (
   withTagExpression,
 
   -- * Structure Specific Operations
-  flipRingExpression,
   nextRingOperator,
-  dropLeftRing,
-  dropRightRing,
+  dropLeftTree,
+  dropRightTree,
   duplicateRing,
-  onTagRing,
   onTagLeaf,
-  cutMagmaExpression,
-  onTagMagma,
   distributeTagExpression,
   (<-#),
 
@@ -36,20 +32,9 @@ module Text.TaggerQL.Expression.AST.Editor (
 import Control.Applicative ((<|>))
 import Control.Monad.Trans.Class (MonadTrans (..))
 import Control.Monad.Trans.State.Strict (StateT (..), get, modify)
+import Data.Bifunctor
 import Data.Functor.Identity (runIdentity)
-import Text.TaggerQL.Expression.AST (
-  DTerm,
-  Magma (..),
-  MagmaExpression (..),
-  Pattern,
-  QueryExpression (..),
-  QueryLeaf (..),
-  RingExpression (..),
-  Rng (..),
-  TagExpression (..),
-  evaluateRing,
-  evaluateTagExpressionR,
- )
+import Text.TaggerQL.Expression.AST
 
 {- |
  A function handling left-distribution of a 'TagExpression` into a 'QueryExpression`.
@@ -63,50 +48,17 @@ import Text.TaggerQL.Expression.AST (
 -}
 distributeTagExpression ::
   QueryExpression ->
-  TagExpression (DTerm Pattern) ->
+  TagQueryExpression ->
   QueryExpression
-distributeTagExpression (QueryExpression qe) te =
-  QueryExpression $ qe >>= distributeUnderQueryLeaf te
- where
-  distributeUnderQueryLeaf ::
-    TagExpression (DTerm Pattern) ->
-    QueryLeaf ->
-    RingExpression QueryLeaf
-  distributeUnderQueryLeaf te' ql = case ql of
-    FileLeaf _ -> Ring ql *. (Ring . TagLeaf $ te')
-    TagLeaf te'' -> Ring . TagLeaf $ te'' # te'
+distributeTagExpression fqe tqe = TraversableQueryExpression . Node . Left $ (fqe, tqe)
 
 infixl 6 <-#
 
 {- |
  Infix synonym for 'distributeTagExpression`.
 -}
-(<-#) :: QueryExpression -> TagExpression (DTerm Pattern) -> QueryExpression
+(<-#) :: QueryExpression -> TagQueryExpression -> QueryExpression
 (<-#) = distributeTagExpression
-
-{- |
- Flips the operands of a binary expression.
--}
-flipRingExpression :: RingExpression a -> RingExpression a
-flipRingExpression r = case r of
-  Ring _ -> r
-  re :+ re' -> re' :+ re
-  re :* re' -> re' :* re
-  re :- re' -> re' :- re
-
-{- |
- Manipulate the ring operation of the given 'TagExpression` if it is a ring operation.
--}
-onTagRing ::
-  TagExpression a ->
-  ( forall a1.
-    RingExpression a1 ->
-    RingExpression a1
-  ) ->
-  TagExpression a
-onTagRing te f = case te of
-  TagRing re -> TagRing . f $ re
-  _notRing -> te
 
 {- |
  Modifies the TagExpression in a TagLeaf of a QueryExpression if it is a ring value
@@ -114,70 +66,45 @@ onTagRing te f = case te of
 -}
 onTagLeaf ::
   QueryExpression ->
-  (forall a. TagExpression a -> TagExpression a) ->
+  (TagQueryExpression -> TagQueryExpression) ->
   QueryExpression
-onTagLeaf qe@(QueryExpression qe') f = case qe' of
-  Ring ql -> case ql of
-    TagLeaf te -> QueryExpression . Ring . TagLeaf . f $ te
-    _notTagLeaf -> qe
-  _notRingValue -> qe
-
-onTagMagma ::
-  TagExpression a ->
-  ( forall a1.
-    MagmaExpression a1 ->
-    MagmaExpression a1
-  ) ->
-  TagExpression a
-onTagMagma te f =
-  case te of
-    TagMagma m -> TagMagma . f $ m
-    _notMagma -> te
+onTagLeaf fqe'@(TraversableQueryExpression fqe) f = case fqe of
+  Node e -> TraversableQueryExpression . Node $ bimap (second f) (second f) e
+  _notNode -> fqe'
 
 {- |
  Cycles 'RingExpression` constructors for a single binary expression.
 -}
 nextRingOperator :: RingExpression a -> RingExpression a
 nextRingOperator r = case r of
-  Ring _ -> r
-  re :+ re' -> re *. re'
-  re :* re' -> re -. re'
-  re :- re' -> re +. re'
+  Node _ -> r
+  Edge lft so lft' -> flip (Edge lft) lft' $
+    case so of
+      Addition -> Multiplication
+      Multiplication -> Subtraction
+      Subtraction -> Addition
 
 {- |
  Drops the right operand from a 'RingExpression` if there is one.
 -}
-dropRightRing :: RingExpression a -> RingExpression a
-dropRightRing r = case r of
-  Ring _ -> r
-  re :+ _ -> re
-  re :* _ -> re
-  re :- _ -> re
+dropRightTree :: LabeledFreeTree l a -> LabeledFreeTree l a
+dropRightTree r = case r of
+  Node _ -> r
+  Edge x _ _ -> x
 
 {- |
  Drops the left operand from a 'RingExpression` if there is one.
 -}
-dropLeftRing :: RingExpression a -> RingExpression a
-dropLeftRing r =
-  case r of
-    Ring _ -> r
-    _ :+ re -> re
-    _ :* re -> re
-    _ :- re -> re
+dropLeftTree :: LabeledFreeTree l a -> LabeledFreeTree l a
+dropLeftTree r = case r of
+  Node _ -> r
+  Edge _ _ x -> x
 
 {- |
  Duplicate a ring in place by intersecting it with itself.
 -}
 duplicateRing :: RingExpression a -> RingExpression a
-duplicateRing r = r :* r
-
-{- |
- Remove the last term from a 'MagmaExpression`
--}
-cutMagmaExpression :: MagmaExpression a -> MagmaExpression a
-cutMagmaExpression m = case m of
-  Magma _ -> m
-  me :$ _ -> me
+duplicateRing r = r *. r
 
 {- |
  A state monad transformer for 1-indexed incremental operations.
@@ -200,6 +127,9 @@ getIncr = CounterT get
 runCounter :: Monad m => CounterT m a -> m (a, Int)
 runCounter (CounterT s) = runStateT s 1
 
+{- |
+ Has a bind function 'bindFinder` but no monadic identity.
+-}
 newtype FinderT m a = FinderT (CounterT m (a, Int, Maybe a))
 
 instance (Rng a, Monad m) => Rng (FinderT m a) where
@@ -211,8 +141,8 @@ instance (Rng a, Monad m) => Rng (FinderT m a) where
   (-.) = finderBinHelper (-.)
 
 instance (Magma a, Monad m) => Magma (FinderT m a) where
-  (#) :: (Magma a, Monad m) => FinderT m a -> FinderT m a -> FinderT m a
-  (#) = finderBinHelper (#)
+  (∙) :: (Magma a, Monad m) => FinderT m a -> FinderT m a -> FinderT m a
+  (∙) = finderBinHelper (∙)
 
 finderBinHelper ::
   Monad m =>
@@ -239,6 +169,18 @@ evalFinder (FinderT c) =
   let r (_, _, mr) = mr
    in fmap (r . fst) . runCounter $ c
 
+{- |
+ Bind the pure value in a 'FinderT` to a function that produces a 'FinderT`
+-}
+bindFinder :: Monad m => FinderT m a -> (a -> FinderT m a) -> FinderT m a
+bindFinder (FinderT x) f = FinderT $ do
+  (x', n, mx) <- x
+  (r, _, mr) <- (\(FinderT z) -> z) . f $ x'
+  pure (r, n, mx <|> mr)
+
+{- |
+ A has a bind function 'BindEditor` but no monadic identity.
+-}
 newtype EditorT m a = EditorT (CounterT m (a, Int, a -> a))
 
 instance (Rng a, Monad m) => Rng (EditorT m a) where
@@ -250,8 +192,8 @@ instance (Rng a, Monad m) => Rng (EditorT m a) where
   (-.) = editorTBinHelper (-.)
 
 instance (Magma a, Monad m) => Magma (EditorT m a) where
-  (#) :: (Magma a, Monad m) => EditorT m a -> EditorT m a -> EditorT m a
-  (#) = editorTBinHelper (#)
+  (∙) :: (Magma a, Monad m) => EditorT m a -> EditorT m a -> EditorT m a
+  (∙) = editorTBinHelper (∙)
 
 editorTBinHelper ::
   Monad m =>
@@ -278,13 +220,35 @@ evalEditor (EditorT c) =
   let r (x, _, _) = x
    in r . fst <$> runCounter c
 
+{- |
+ Bind the pure value in an 'EditorT` to a function that produces an 'EditorT`.
+-}
+bindEditor :: Monad m => EditorT m a1 -> (a1 -> EditorT m a2) -> EditorT m a2
+bindEditor (EditorT x) f = EditorT $ do
+  (x', _, _) <- x
+  (r, n, g) <- (\(EditorT z) -> z) . f $ x'
+  pure (r, n, g)
+
 findQueryExpression :: Int -> QueryExpression -> Maybe QueryExpression
 findQueryExpression n =
   runIdentity
     . evalFinder
-    . evaluateRing
-    . fmap (mkFinder n . QueryExpression . Ring)
-    . runQueryExpression
+    . evaluateRingExpression
+    . mkFinderRing
+ where
+  mkFinderRing =
+    fmap
+      ( either
+          ( \(x, y) ->
+              bindFinder (evaluateRingExpression . mkFinderRing $ x) $
+                mkFinder n . (<-# y)
+          )
+          ( either
+              (mkFinder n . TraversableQueryExpression . Node . Right . Left)
+              (mkFinder n . TraversableQueryExpression . Node . Right . Right)
+          )
+      )
+      . runTraversableQueryExpression
 
 {- |
  Modify the 'QueryExpression` at the given index.
@@ -297,16 +261,32 @@ withQueryExpression ::
 withQueryExpression n qe f =
   runIdentity
     . evalEditor
-    . evaluateRing
-    . fmap (mkEditor n f . QueryExpression . Ring)
-    . runQueryExpression
+    . evaluateRingExpression
+    . mkEditorRing
     $ qe
+ where
+  mkEditorRing =
+    fmap
+      ( either
+          ( \(x, y) ->
+              bindEditor (evaluateRingExpression . mkEditorRing $ x) $
+                mkEditor n f . (<-# y)
+          )
+          ( either
+              (mkEditor n f . TraversableQueryExpression . Node . Right . Left)
+              (mkEditor n f . TraversableQueryExpression . Node . Right . Right)
+          )
+      )
+      . runTraversableQueryExpression
 
-findTagExpression :: Int -> TagExpression a -> Maybe (TagExpression a)
+findTagExpression ::
+  Int ->
+  FreeDisjunctMonad RingExpression MagmaExpression a ->
+  Maybe (FreeDisjunctMonad RingExpression MagmaExpression a)
 findTagExpression n =
   runIdentity
     . evalFinder
-    . evaluateTagExpressionR (#)
+    . evaluateFreeCompoundExpression evaluateRingExpression evaluateMagmaExpression
     . fmap (mkFinder n . pure)
 
 {- |
@@ -314,12 +294,14 @@ findTagExpression n =
 -}
 withTagExpression ::
   Int ->
-  TagExpression a ->
-  (TagExpression a -> TagExpression a) ->
-  TagExpression a
+  FreeDisjunctMonad RingExpression MagmaExpression a ->
+  ( FreeDisjunctMonad RingExpression MagmaExpression a ->
+    FreeDisjunctMonad RingExpression MagmaExpression a
+  ) ->
+  FreeDisjunctMonad RingExpression MagmaExpression a
 withTagExpression n te f =
   runIdentity
     . evalEditor
-    . evaluateTagExpressionR (#)
+    . evaluateFreeCompoundExpression evaluateRingExpression evaluateMagmaExpression
     . fmap (mkEditor n f . pure)
     $ te

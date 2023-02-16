@@ -1,15 +1,25 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
+
 module Test.Text.TaggerQL.Expression.AST (
     astTests,
 ) where
 
 import Control.Monad ((>=>))
-import Data.Coerce (coerce)
 import Data.Maybe (fromJust, isJust)
 import Test.Resources
 import Test.Tasty
+import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 import Text.TaggerQL.Expression.AST
-import Text.TaggerQL.Expression.AST.Editor
+import Text.TaggerQL.Expression.AST.Editor (
+    findQueryExpression,
+    findTagExpression,
+    withQueryExpression,
+    withTagExpression,
+    (<-#),
+ )
 
 astTests :: TestTree
 astTests =
@@ -20,13 +30,13 @@ astTests =
 astProperties :: TestTree
 astProperties =
     testGroup
-        "Expression Properties"
+        "LabeledFreeTree Properties"
         [ testGroup
-            "RingExpression Properties"
+            "LabeledFreeTree Properties"
             [ testProperty
                 "Left Monad Identity"
                 ( do
-                    f <- arbitrary :: Gen (Int -> QCRingExpression Int)
+                    f <- arbitrary :: Gen (Int -> LabeledFreeTree Int Int)
                     i <- arbitrary
                     let testProp = (pure i >>= f) == f i
                     pure testProp
@@ -34,7 +44,7 @@ astProperties =
             , testProperty
                 "Right Monad Identity"
                 ( do
-                    re <- arbitrary :: Gen (QCRingExpression Int)
+                    re <- arbitrary :: Gen (LabeledFreeTree Int Int)
                     let testProp = (re >>= pure) == re
                     pure testProp
                 )
@@ -48,7 +58,7 @@ astProperties =
                                 (resize 35 arbitrary)
                                 -- Exclude functions that appear to be identities
                                 (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (QCRingExpression Int))
+                                Gen (Fun Int (LabeledFreeTree Int Int))
                     f <- genF
                     g <- genF
                     h <- genF
@@ -70,11 +80,11 @@ astProperties =
                 )
             ]
         , testGroup
-            "MagmaExpression Properties"
+            "FreeDisjunctMonad Properties"
             [ testProperty
                 "Left Monad Identity"
                 ( do
-                    f <- arbitrary :: Gen (Int -> QCMagmaExpression Int)
+                    f <- (resize 3 arbitrary :: Gen (Int -> FreeDisjunctMonad (LabeledFreeTree Int) (LabeledFreeTree Int) Int))
                     i <- arbitrary
                     let testProp = (pure i >>= f) == f i
                     pure testProp
@@ -82,55 +92,7 @@ astProperties =
             , testProperty
                 "Right Monad Identity"
                 ( do
-                    re <- arbitrary :: Gen (QCMagmaExpression Int)
-                    let testProp = (re >>= pure) == re
-                    pure testProp
-                )
-            , testProperty
-                "Kleisli Arrow Associativity"
-                ( do
-                    let genF =
-                            suchThat
-                                -- Use relatively small functions so it doesn't
-                                -- take forever to run.
-                                (resize 35 arbitrary)
-                                -- Exclude functions that appear to be identities
-                                (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (QCMagmaExpression Int))
-                    f <- genF
-                    g <- genF
-                    h <- genF
-                    dt <- arbitrary :: Gen Int
-                    let testProp =
-                            ( applyFun f
-                                >=> ( applyFun g
-                                        >=> applyFun h
-                                    )
-                            )
-                                dt
-                                == ( ( applyFun f
-                                        >=> applyFun g
-                                     )
-                                        >=> applyFun h
-                                   )
-                                    dt
-                    pure testProp
-                )
-            ]
-        , testGroup
-            "TagExpression Properties"
-            [ testProperty
-                "Left Monad Identity"
-                ( do
-                    f <- resize 3 arbitrary :: Gen (Int -> QCTagExpression Int)
-                    i <- arbitrary
-                    let testProp = (pure i >>= f) == f i
-                    pure testProp
-                )
-            , testProperty
-                "Right Monad Identity"
-                ( do
-                    re <- resize 3 arbitrary :: Gen (QCTagExpression Int)
+                    re <- resize 3 arbitrary :: Gen (FreeDisjunctMonad (LabeledFreeTree Int) (LabeledFreeTree Int) Int)
                     let testProp = (re >>= pure) == re
                     pure testProp
                 )
@@ -144,7 +106,7 @@ astProperties =
                                 (resize 3 arbitrary)
                                 -- Exclude functions that appear to be identities
                                 (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (QCTagExpression Int))
+                                Gen (Fun Int (FreeDisjunctMonad (LabeledFreeTree Int) (LabeledFreeTree Int) Int))
                     f <- genF
                     g <- genF
                     h <- genF
@@ -170,14 +132,14 @@ astProperties =
             [ testProperty
                 "Left Monad Identity"
                 ( do
-                    f <- arbitrary :: Gen (Int -> QCDTerm Int)
+                    f <- arbitrary :: Gen (Int -> DTerm Int)
                     i <- arbitrary :: Gen Int
                     pure $ (pure i >>= f) == f i
                 )
             , testProperty
                 "Right Monad Identity"
                 ( do
-                    dt <- arbitrary :: Gen (QCDTerm Int)
+                    dt <- arbitrary :: Gen (DTerm Int)
                     pure $ (dt >>= pure) == dt
                 )
             , testProperty
@@ -190,7 +152,7 @@ astProperties =
                                 (resize 35 arbitrary)
                                 -- Exclude functions that appear to be identities
                                 (\(Fn fun) -> fun 1 /= pure 1) ::
-                                Gen (Fun Int (QCDTerm Int))
+                                Gen (Fun Int (DTerm Int))
                     f <- genF
                     g <- genF
                     h <- genF
@@ -211,6 +173,63 @@ astProperties =
                     pure testProp
                 )
             ]
+        , testGroup
+            "QueryExpression Properties"
+            [ testCase "Unification Distribution is Right-Associative" $
+                assertEqual
+                    "(a & p.b){c}{d} = a{c{d}} & (p.b & c{d})"
+                    ( ( Node . Right $
+                            ( (tedp . rt $ "a")
+                                ∙ ( (tedp . rt $ "c")
+                                        ∙ (tedp . rt $ "d")
+                                  )
+                            )
+                      )
+                        *. ( (Node . Left $ "b")
+                                *. ( Node . Right $
+                                        ( (tedp . rt $ "c")
+                                            ∙ (tedp . rt $ "d")
+                                        )
+                                   )
+                           )
+                    )
+                    ( simplifyQueryExpression $
+                        ( liftSimpleQueryRing
+                            ( (pure . Right . tedp . rt $ "a")
+                                *. (pure . Left $ "b")
+                            )
+                            <-# (tedp . rt $ "c")
+                        )
+                            <-# (tedp . rt $ "d")
+                    )
+            , testCase "Unification Distribution is Associatively Right-Associative" $
+                assertEqual
+                    "(a & p.b){c{d}} = a{c{d}} & (p.b & {c{d}})"
+                    ( ( Node . Right $
+                            ( (tedp . rt $ "a")
+                                ∙ ( (tedp . rt $ "c")
+                                        ∙ (tedp . rt $ "d")
+                                  )
+                            )
+                      )
+                        *. ( (Node . Left $ "b")
+                                *. ( Node . Right $
+                                        ( (tedp . rt $ "c")
+                                            ∙ (tedp . rt $ "d")
+                                        )
+                                   )
+                           )
+                    )
+                    ( simplifyQueryExpression $
+                        liftSimpleQueryRing
+                            ( (pure . Right . tedp . rt $ "a")
+                                *. (pure . Left $ "b")
+                            )
+                            <-# ( (tedp . rt $ "c")
+                                    ∙ (tedp . rt $ "d")
+                                )
+                    )
+            ]
         ]
 
 astEditorProperties :: TestTree
@@ -222,14 +241,7 @@ astEditorProperties =
             [ testProperty
                 "QueryExpression"
                 ( do
-                    expr <-
-                        QueryExpression
-                            . ( coerce ::
-                                    QCRingExpression QCQueryLeaf ->
-                                    RingExpression QueryLeaf
-                              )
-                            <$> resize 3 arbitrary ::
-                            Gen QueryExpression
+                    expr <- resize 3 arbitrary
                     n <- suchThat arbitrary (\n' -> isJust $ findQueryExpression n' expr)
                     let exprAt = fromJust $ findQueryExpression n expr
                         replaceResult = withQueryExpression n expr (const exprAt)
@@ -240,16 +252,12 @@ astEditorProperties =
                 "TagExpression"
                 ( do
                     expr <-
-                        ( coerce ::
-                            QCTagExpression (QCDTerm QCPattern) ->
-                            TagExpression (DTerm Pattern)
-                        )
-                            <$> resize 3 arbitrary ::
-                            Gen (TagExpression (DTerm Pattern))
+                        resize 3 arbitrary ::
+                            Gen TagQueryExpression
                     n <- suchThat arbitrary (\n' -> isJust $ findTagExpression n' expr)
                     let exprAt = fromJust $ findTagExpression n expr
-                        replaceResult = distribute $ withTagExpression n expr (const exprAt)
-                    let propTest = distribute expr == replaceResult
+                        replaceResult = normalize $ withTagExpression n expr (const exprAt)
+                    let propTest = normalize expr == replaceResult
                     pure $
                         whenFail
                             ( do

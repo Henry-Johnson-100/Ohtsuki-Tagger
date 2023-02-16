@@ -38,6 +38,7 @@ common tagger-common
                       ,StrictData
                       ,ViewPatterns
                       ,InstanceSigs
+                      ,RankNTypes
 
   other-modules:       Paths_tagger
 
@@ -107,7 +108,6 @@ library tagger-lib
                       ,Database.Tagger.Type
                       ,Data.HierarchyMap
                       ,Data.OccurrenceMap
-                      ,Data.Tagger
                       ,Tagger.Info
                       ,Text.TaggerQL
                       ,Text.TaggerQL.Expression.AST
