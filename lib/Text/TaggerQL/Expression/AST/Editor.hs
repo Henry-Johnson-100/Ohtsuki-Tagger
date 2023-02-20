@@ -243,10 +243,7 @@ findQueryExpression n =
               bindFinder (evaluateRingExpression . mkFinderRing $ x) $
                 mkFinder n . (<-# y)
           )
-          ( either
-              (mkFinder n . TraversableQueryExpression . Node . Right . Left)
-              (mkFinder n . TraversableQueryExpression . Node . Right . Right)
-          )
+          (mkFinder n . TraversableQueryExpression . Node . Right)
       )
       . runTraversableQueryExpression
 
@@ -272,10 +269,7 @@ withQueryExpression n qe f =
               bindEditor (evaluateRingExpression . mkEditorRing $ x) $
                 mkEditor n f . (<-# y)
           )
-          ( either
-              (mkEditor n f . TraversableQueryExpression . Node . Right . Left)
-              (mkEditor n f . TraversableQueryExpression . Node . Right . Right)
-          )
+          (mkEditor n f . TraversableQueryExpression . Node . Right)
       )
       . runTraversableQueryExpression
 
