@@ -132,7 +132,7 @@ module Database.Tagger.Query (
 import Control.Monad (guard, join)
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT, throwE)
-import Control.Monad.Trans.Maybe (MaybeT)
+import Control.Monad.Trans.Maybe (MaybeT (MaybeT))
 import Data.Bifunctor (second)
 import qualified Data.HashSet as HashSet
 import Data.HierarchyMap (HierarchyMap)
@@ -187,10 +187,8 @@ queryForFileByPattern p tc = query tc q [p]
 {- |
  Query for a single 'File` with its id.
 -}
-queryForSingleFileByFileId :: RecordKey File -> TaggedConnection -> MaybeT IO File
-queryForSingleFileByFileId rk tc = do
-  result <- lift $ query tc q [rk] :: MaybeT IO [File]
-  hoistMaybe . head' $ result
+queryForSingleFileByFileId :: RecordKey File -> TaggedConnection -> IO (Maybe File)
+queryForSingleFileByFileId rk tc = head' <$> query tc q [rk]
  where
   q =
     [r|
@@ -397,7 +395,7 @@ queryForConcreteTaggedFileWithFileId ::
   MaybeT IO ConcreteTaggedFile
 queryForConcreteTaggedFileWithFileId rk tc =
   ConcreteTaggedFile
-    <$> queryForSingleFileByFileId rk tc
+    <$> MaybeT (queryForSingleFileByFileId rk tc)
     <*> lift (queryForFileTagHierarchyMapByFileId rk tc)
 
 {- |

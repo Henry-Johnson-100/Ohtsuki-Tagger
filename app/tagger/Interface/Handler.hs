@@ -237,12 +237,10 @@ fileSelectionEventHandler
         [Model $ model & fileSelectionTagListModel . occurrences .~ ohm]
       RefreshSpecificFile fk ->
         [ Task
-            ( do
-                f <- runMaybeT $ queryForSingleFileByFileId fk conn
-                maybe
-                  (return . Unit $ ())
-                  (return . DoFileSelectionEvent . RefreshSpecificFile_)
-                  f
+            ( maybe
+                (Unit ())
+                (DoFileSelectionEvent . RefreshSpecificFile_)
+                <$> queryForSingleFileByFileId fk conn
             )
         ]
       RefreshSpecificFile_ f@(File fk fp) ->
@@ -299,9 +297,9 @@ fileSelectionEventHandler
            in Task
                 ( do
                     -- refetch the fk from the db,
-                    -- to put the calculation in the MaybeT monad
-                    result <- runMaybeT $ do
-                      lift $ mvFile conn fk newRenameText
+                    -- to put the calculation in the Maybe monad
+                    result <- do
+                      mvFile conn fk newRenameText
                       queryForSingleFileByFileId fk conn
                     maybe
                       (return $ Unit ())

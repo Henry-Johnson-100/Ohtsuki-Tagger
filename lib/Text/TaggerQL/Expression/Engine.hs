@@ -37,7 +37,7 @@ module Text.TaggerQL.Expression.Engine (
   insertTagExpression,
 ) where
 
-import Control.Monad (foldM, void, (<=<), (>=>))
+import Control.Monad (void, (<=<), (>=>))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Except (ExceptT, throwE)
 import Data.Bifunctor (second)
@@ -56,10 +56,11 @@ import Database.Tagger (
   allTags,
   insertTags,
   queryForDescriptorByPattern,
-  queryForFileByTagId,
+  queryForSingleFileByFileId,
   queryForTagByDescriptorPattern,
   queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf,
   queryForTagByMetaDescriptorPattern,
+  tagFileId,
  )
 import Database.Tagger.Query (
   queryForFileByPattern,
@@ -100,58 +101,53 @@ tagFile fk c =
     (fmap (const Nothing) . insertTagExpression c fk . fmap runDTerm)
     . parseTagExpression
 
-toFileSet :: TaggedConnection -> HashSet Tag -> IO (HashSet File)
-toFileSet conn =
-  foldM
-    ( \acc rt ->
-        maybe acc (`HS.insert` acc)
-          <$> queryForFileByTagId rt conn
-    )
-    HS.empty
-    . map tagId
-    . HS.toList
-
--- Tagging Engine
-
 queryQueryExpression ::
   TaggedConnection ->
   QueryExpression ->
   IO (HashSet File)
 queryQueryExpression c =
   fmap evaluateRingExpression
-    . traverse (either pure (toFileSet c))
+    . traverse (either pure toFileSet)
     <=< fmap
       ( fmap
           ( second
               ( evaluateRingExpression
-                  . fmap
-                    ( F.foldr1
-                        ( \superTagSet subTagSet ->
-                            joinSubtags superTagSet (HS.map tagSubtagOfId subTagSet)
-                        )
-                    )
+                  . fmap (F.foldr1 tagMagma)
                   . distributeK
               )
           )
           . simplifyQueryExpression
       )
-      . bitraverse (queryFilePattern c) (traverse (queryDTerm c))
+      . bitraverse queryFilePattern (traverse queryDTerm)
+ where
+  queryFilePattern pat =
+    case pat of
+      WildCard -> HS.fromList <$> allFiles c
+      PatternText t -> HS.fromList <$> queryForFileByPattern t c
 
-queryFilePattern :: TaggedConnection -> Pattern -> IO (HashSet File)
-queryFilePattern c pat =
-  case pat of
-    WildCard -> HS.fromList <$> allFiles c
-    PatternText t -> HS.fromList <$> queryForFileByPattern t c
+  queryDTerm dt = case dt of
+    DTerm (PatternText t) ->
+      HS.fromList
+        <$> queryForTagByDescriptorPattern t c
+    DMetaTerm (PatternText t) ->
+      HS.fromList
+        <$> queryForTagByMetaDescriptorPattern t c
+    _wildcard -> HS.fromList <$> allTags c
 
-queryDTerm :: TaggedConnection -> DTerm Pattern -> IO (HashSet Tag)
-queryDTerm c dt = case dt of
-  DTerm (PatternText t) ->
-    HS.fromList
-      <$> queryForTagByDescriptorPattern t c
-  DMetaTerm (PatternText t) ->
-    HS.fromList
-      <$> queryForTagByMetaDescriptorPattern t c
-  _wildcard -> HS.fromList <$> allTags c
+  toFileSet =
+    HS.foldl'
+      ( \acc fk ->
+          (\x -> maybe x (`HS.insert` x))
+            <$> acc
+              <*> queryForSingleFileByFileId fk c
+      )
+      (pure HS.empty)
+      . HS.map tagFileId
+
+  tagMagma superTagSet subTagSet =
+    joinSubtags superTagSet (HS.map tagSubtagOfId subTagSet)
+
+-- Tagging Engine
 
 {- |
  A newtype used to provide a Rng instance when inserting tags defined by a
