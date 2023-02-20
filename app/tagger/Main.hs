@@ -256,7 +256,7 @@ mainProgram (WithDB dbPath cm) = do
         Audit -> runReaderT mainReportAudit c
         Query (T.pack -> q) rel -> do
           let (T.unpack -> connPath) = c ^. connName
-          eQueryResults <- runExceptT $ runQuery c q
+          eQueryResults <- runQuery c q
           either
             (mapM_ T.IO.putStrLn)
             ( \queryResults ->
