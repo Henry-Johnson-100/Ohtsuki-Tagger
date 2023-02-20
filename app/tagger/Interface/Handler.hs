@@ -454,7 +454,7 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
     RunQuery ->
       [ Task
           . fmap (DoFileSelectionEvent . PutFilesNoCombine . HS.foldl' (Seq.|>) Seq.empty)
-          . queryQueryExpression conn
+          . runFileQuery conn
           $ model ^. fileSelectionModel . queryModel . expression
       ]
  where

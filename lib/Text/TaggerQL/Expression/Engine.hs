@@ -14,12 +14,12 @@ Contains functions that interprets the TaggerQL query language to either run que
   or tag a file with a certain expression.
 -}
 module Text.TaggerQL.Expression.Engine (
-  runQuery,
+  fileQuery,
   tagFile,
 
   -- * New
-  queryQueryExpression,
-  insertTagExpression,
+  runFileQuery,
+  runTagFile,
 ) where
 
 import Control.Monad (void, (<=<), (>=>))
@@ -71,11 +71,11 @@ import Text.TaggerQL.Expression.Parser (parseQueryExpression, parseTagExpression
 {- |
  Run a TaggerQL query on the given database.
 -}
-runQuery :: TaggedConnection -> Text -> IO (Either [Text] (HashSet File))
-runQuery c =
+fileQuery :: TaggedConnection -> Text -> IO (Either [Text] (HashSet File))
+fileQuery c =
   either
     (pure . Left . map (T.pack . messageString) . errorMessages)
-    (fmap pure . queryQueryExpression c)
+    (fmap pure . runFileQuery c)
     . parseQueryExpression
 
 {- |
@@ -85,14 +85,14 @@ tagFile :: RecordKey File -> TaggedConnection -> Text -> IO (Maybe Text)
 tagFile fk c =
   either
     (pure . Just . T.pack . show)
-    (fmap (const Nothing) . insertTagExpression c fk . fmap runDTerm)
+    (fmap (const Nothing) . runTagFile c fk . fmap runDTerm)
     . parseTagExpression
 
-queryQueryExpression ::
+runFileQuery ::
   TaggedConnection ->
   QueryExpression ->
   IO (HashSet File)
-queryQueryExpression c =
+runFileQuery c =
   fmap evaluateRingExpression
     . traverse (either pure toFileSet)
     <=< fmap
@@ -140,12 +140,12 @@ queryQueryExpression c =
 newtype TagInserter = TagInserter
   {runTagInserter :: Maybe [RecordKey Tag] -> IO [RecordKey Tag]}
 
-insertTagExpression ::
+runTagFile ::
   TaggedConnection ->
   RecordKey File ->
   FreeDisjunctMonad RingExpression MagmaExpression Pattern ->
   IO ()
-insertTagExpression c fk =
+runTagFile c fk =
   void
     . flip runTagInserter Nothing
     . F.foldl1 sequenceTagInserters
