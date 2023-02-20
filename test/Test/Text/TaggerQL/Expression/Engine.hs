@@ -38,7 +38,7 @@ fil n = PatternText $ "file_" <> (T.pack . show $ n)
 
 queryExpressionEdgeCases :: IO TaggedConnection -> TestTree
 queryExpressionEdgeCases c =
-  let qqe = flip queryQueryExpression
+  let qqe = flip runFileQuery
    in testGroup
         "Query Engine AST - Edge Cases"
         [ testGroup
@@ -199,7 +199,7 @@ queryExpressionEdgeCases c =
 
 queryExpressionBasicFunctionality :: IO TaggedConnection -> TestTree
 queryExpressionBasicFunctionality c =
-  let qqe = flip queryQueryExpression
+  let qqe = flip runFileQuery
    in testGroup
         "Query Engine AST Tests - Basic"
         [ testCase "Pattern Wildcard" $ do
@@ -637,7 +637,7 @@ queryExpressionBasicFunctionality c =
 
 taggingEngineTests :: IO TaggedConnection -> TestTree
 taggingEngineTests c =
-  let insert se fk c' = insertTagExpression c' fk se
+  let insert se fk c' = runTagFile c' fk se
    in testGroup
         "Tagging Engine Tests"
         [ testCase "Tagging Engine - 0" $ do
