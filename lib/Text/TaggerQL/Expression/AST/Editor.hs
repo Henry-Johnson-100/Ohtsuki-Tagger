@@ -241,7 +241,7 @@ findQueryExpression n =
       ( either
           ( \(x, y) ->
               bindFinder (evaluateRingExpression . mkFinderRing $ x) $
-                mkFinder n . (<-# y)
+                mkFinder n . (`distributeTagExpression` y)
           )
           (mkFinder n . TraversableQueryExpression . Node . Right)
       )
@@ -267,7 +267,7 @@ withQueryExpression n qe f =
       ( either
           ( \(x, y) ->
               bindEditor (evaluateRingExpression . mkEditorRing $ x) $
-                mkEditor n f . (<-# y)
+                mkEditor n f . (`distributeTagExpression` y)
           )
           (mkEditor n f . TraversableQueryExpression . Node . Right)
       )
