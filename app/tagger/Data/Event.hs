@@ -19,7 +19,7 @@ module Data.Event (
 
 import Data.HashMap.Strict (HashMap)
 import Data.IntMap.Strict (IntMap)
-import Data.Model.Core (DescriptorInfo, Latitude, TaggerModel)
+import Data.Model.Core (DescriptorInfo, TaggerModel)
 import Data.Model.Lens (TaggerLens)
 import Data.Model.Shared (Visibility)
 import Data.Model.Shared.Core (TextInput)
@@ -105,19 +105,12 @@ data FileSelectionEvent
   deriving (Show, Eq)
 
 data QueryEvent
-  = -- | If a second Int is provided, then it attempts to edit a TagExpression
-    -- with the combined argument coordinates
-    CycleRingOperator Int (Maybe Int)
-  | -- | If a second Int is provided, then it attempts to edit a TagExpression
-    -- with the combined argument coordinates.
-    --
-    -- The Either spine is matched on its constructor to determine which operand to drop.
-    DeleteRingOperand Int (Maybe Int) (Either () ())
-  | LeftDistribute Int (Maybe Int) TagQueryExpression
-  | PlaceQueryExpression Int (Latitude QueryExpression)
-  | PlaceTagExpression Int Int (Latitude TagQueryExpression)
-  | PushExpression
+  = ClearEditorFocus
+  | ParseQuery
+  | ReplaceEditorFocus
+  | RunEditorFocus
   | RunQuery
+  | SetEditorFocus QueryExpression Int
 
 data FileSelectionWidgetEvent
   = CycleNextChunk
