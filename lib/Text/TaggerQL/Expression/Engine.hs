@@ -1,7 +1,14 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE TupleSections #-}
+{-# HLINT ignore "Use lambda-case" #-}
+{-# HLINT ignore "Use <=<" #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_HADDOCK prune #-}
+
+{-# HLINT ignore "Use const" #-}
 
 {- |
 Module      : Text.TaggerQL.Expression.Engine
@@ -16,6 +23,7 @@ Contains functions that interprets the TaggerQL query language to either run que
 module Text.TaggerQL.Expression.Engine (
   fileQuery,
   tagFile,
+  formatQueryExpression,
 
   -- * New
   runFileQuery,
@@ -57,12 +65,18 @@ import Text.Parsec.Error (errorMessages, messageString)
 import Text.TaggerQL.Expression.AST (
   DTerm (DMetaTerm, DTerm),
   FreeDisjunctMonad,
+  LabeledFreeTree (..),
   MagmaExpression,
   Pattern (PatternText, WildCard),
   QueryExpression,
   RingExpression,
+  RingOperation (..),
+  TagQueryExpression,
+  TraversableQueryExpression (runTraversableQueryExpression),
   distributeK,
+  evaluateFreeCompoundExpression,
   evaluateRingExpression,
+  patternText,
   runDTerm,
   simplifyQueryExpression,
  )
@@ -201,3 +215,135 @@ runTagFile c fk =
               <$> mapM
                 (`queryForTagBySubTagTriple` c)
                 (third fromJust <$> tagTriples)
+
+-- formatQueryExpression :: QueryExpression -> Text
+-- formatQueryExpression (runTraversableQueryExpression -> tqe) =
+--   catLFT (\ro rhs -> formatRo ro <> rhs) inParens $
+--     do
+--       term <- tqe
+--       case term of
+--         Left (tqe', b) ->
+--           pure $
+--             inParens (formatQueryExpression tqe')
+--               <> inBrackets (formatTagQueryExpression b)
+--         Right e -> pure $ either patternText formatTagQueryExpression e
+--  where
+--   formatTagQueryExpression =
+--     evaluateFreeCompoundExpression
+--       (inParens . catLFT (\ro rhs -> formatRo ro <> rhs) inParens)
+--       (catLFT (\_ rhs -> inBrackets rhs) id)
+--       . fmap
+--         ( \dt -> case dt of
+--             DTerm p -> "d." <> patternText p
+--             DMetaTerm p -> patternText p
+--         )
+--   catLFT formatL formatRHS lft =
+--     case lft of
+--       Node x -> x
+--       Edge lhs l rhs ->
+--         catLFT formatL formatRHS lhs
+--           <> formatL
+--             l
+--             ( case rhs of
+--                 Node y -> y
+--                 Edge{} -> formatRHS (catLFT formatL formatRHS rhs)
+--             )
+
+type FCont = (Text -> Text) -> Text
+
+{- |
+ Modifies text based on a condition
+-}
+type FCondCont = (Bool -> Text -> Text) -> Text
+
+liftText :: Text -> FCont
+liftText t ret = ret t
+
+liftFCont :: FCont -> FCondCont
+liftFCont f ret = f (ret False)
+
+formatQueryExpression :: QueryExpression -> Text
+formatQueryExpression
+  (runTraversableQueryExpression -> tqe) =
+    case tqe of
+      Node e -> formatNode e
+      Edge
+        ulhs
+        (formatRo -> ro)
+        urhs ->
+          let lhsF =
+                formatRingExpression
+                  (fmap (liftFCont . liftText . formatNode) ulhs)
+                  (const id)
+              rhsF =
+                formatRingExpression
+                  (fmap (liftFCont . liftText . formatNode) urhs)
+                  (\b t -> if b then inParens t id else t)
+           in lhsF <> ro <> rhsF
+   where
+    formatNode e = case e of
+      Left (qe', te') ->
+        let qe'F =
+              inParens
+                ( formatQueryExpression
+                    qe'
+                )
+                id
+                <> inBrackets (formatTagExpression te') id
+         in qe'F
+      Right e' ->
+        either
+          (\p -> "p." <> formatPattern p)
+          (flip inBrackets id . formatTagExpression)
+          e'
+
+formatTagExpression :: TagQueryExpression -> Text
+formatTagExpression tqe =
+  evaluateFreeCompoundExpression
+    formatRingExpression
+    formatMagmaExpression
+    (fmap (liftFCont . liftText . formatDTerm) tqe)
+    (const id)
+ where
+  formatMagmaExpression :: MagmaExpression FCondCont -> FCondCont
+  formatMagmaExpression me cret = case me of
+    Node f -> f cret
+    Edge
+      (formatMagmaExpression -> lhs)
+      ()
+      (formatMagmaExpression -> rhs) ->
+        let lhsF = lhs (\b t -> if b then inParens t id else t)
+            rhsF = inBrackets (rhs (const id)) id
+         in cret False $ lhsF <> rhsF
+
+  formatDTerm dt =
+    case dt of
+      DTerm p -> "d." <> formatPattern p
+      DMetaTerm p -> formatPattern p
+
+formatRingExpression :: RingExpression FCondCont -> FCondCont
+formatRingExpression re cret = case re of
+  Node f -> f cret
+  Edge
+    (formatRingExpression -> lhs)
+    (formatRo -> ro)
+    (formatRingExpression -> rhs) ->
+      let lhsF = lhs (const id)
+          rhsF = rhs (\b t -> if b then inParens t id else t)
+       in cret True $ lhsF <> ro <> rhsF
+
+formatPattern :: Pattern -> Text
+formatPattern = patternText
+
+formatRo :: RingOperation -> Text
+formatRo ro =
+  case ro of
+    Addition -> " | "
+    Multiplication -> " & "
+    Subtraction -> " ! "
+
+inParens :: Text -> (Text -> Text) -> Text
+inParens x ret = "(" <> ret x <> ")"
+
+inBrackets :: Text -> (Text -> Text) -> Text
+inBrackets x ret = "{" <> ret x <> "}"
