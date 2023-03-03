@@ -8,14 +8,13 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Data.Model.Core (
-  -- * General
-  Latitude (..),
-
   -- * Data Models
   TaggerModel (..),
   createTaggerModel,
   FileSelectionModel (..),
   QueryModel (..),
+  QueryEditorModel (..),
+  createQueryEditorModel,
   getSelectionChunk,
   selectionChunkLength,
   FileSelectionTagListModel (..),
@@ -52,15 +51,6 @@ import qualified Data.Sequence as Seq
 import Data.Text (Text)
 import Database.Tagger.Type
 import Text.TaggerQL.Expression.AST
-
-{- |
- A sum type for describing a general lateral position: Left, Right, and Middle.
--}
-data Latitude a
-  = LatLeft a
-  | LatMiddle a
-  | LatRight a
-  deriving (Show, Eq, Functor)
 
 data TaggerModel = TaggerModel
   { _taggermodelDescriptorTreeModel :: DescriptorTreeModel
@@ -129,6 +119,7 @@ createFileSelectionModel =
 data QueryModel = QueryModel
   { _queryInput :: TextInput
   , _queryExpression :: QueryExpression
+  , _queryEditorFocus :: Maybe QueryEditorModel
   }
   deriving (Show, Eq)
 
@@ -137,6 +128,22 @@ createQueryModel =
   QueryModel
     { _queryInput = createTextInput 10
     , _queryExpression = mid
+    , _queryEditorFocus = Nothing
+    }
+
+data QueryEditorModel = QueryEditorModel
+  { _queryeditormodelExpression :: QueryExpression
+  , _queryeditormodelInput :: TextInput
+  , _queryeditormodelExpressionIndex :: Int
+  }
+  deriving (Show, Eq)
+
+createQueryEditorModel :: QueryExpression -> Int -> QueryEditorModel
+createQueryEditorModel qe location =
+  QueryEditorModel
+    { _queryeditormodelExpression = qe
+    , _queryeditormodelInput = createTextInput 10
+    , _queryeditormodelExpressionIndex = location
     }
 
 data FileSelectionTagListModel = FileSelectionTagListModel

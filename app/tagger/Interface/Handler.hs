@@ -14,12 +14,11 @@ module Interface.Handler (
   taggerEventHandler,
 ) where
 
-import Control.Lens ((%~), (&), (.~), (<|), (^.), (|>))
+import Control.Lens ((%~), (&), (.~), (<|), (?~), (^.), (|>))
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
-import Data.Bifunctor
 import Data.Either (fromRight)
 import Data.Event
 import qualified Data.Foldable as F
@@ -362,125 +361,72 @@ queryEventHandler ::
   [AppEventResponse TaggerModel TaggerEvent]
 queryEventHandler _wenv _node model@((^. connection) -> conn) event =
   case event of
-    CycleRingOperator li mi -> [onDisjunctRingExpression li mi nextRingOperator]
-    DeleteRingOperand li mi eo ->
-      let removeOperand = either (const dropLeftTree) (const dropRightTree) eo
-       in [onDisjunctRingExpression li mi removeOperand]
-    LeftDistribute li mi te ->
-      [ Model $
-          model & fileSelectionModel . queryModel . expression
-            %~ flip
-              (withQueryExpression li)
-              ( case mi of
-                  Nothing -> (<-# te)
-                  Just n ->
-                    TraversableQueryExpression
-                      . fmap (second (second (flip (withTagExpression n) (∙ te))))
-                      . runTraversableQueryExpression
-              )
-      ]
-    PlaceQueryExpression n l ->
-      [ Model $
-          model & fileSelectionModel . queryModel . expression
-            %~ flip
-              (withQueryExpression n)
-              ( case l of
-                  LatLeft qe -> (qe *.)
-                  LatMiddle qe -> const qe
-                  LatRight qe -> (*. qe)
-              )
-      ]
-    PlaceTagExpression li i lte ->
-      [ Model $
-          model & fileSelectionModel . queryModel . expression
-            %~ flip
-              (withQueryExpression li)
-              ( TraversableQueryExpression
-                  . fmap
-                    ( second
-                        ( second
-                            ( flip
-                                (withTagExpression i)
-                                ( case lte of
-                                    LatLeft fce -> (fce *.)
-                                    LatMiddle fce -> const fce
-                                    LatRight fce -> (*. fce)
-                                )
-                            )
-                        )
-                    )
-                  . runTraversableQueryExpression
-              )
-      ]
-    PushExpression ->
+    ClearEditorFocus ->
+      [Model $ model & fileSelectionModel . queryModel . editorFocus .~ Nothing]
+    ParseQuery ->
       let !rawQuery = T.strip $ model ^. fileSelectionModel . queryModel . input . text
-       in ( if model ^. queryEditMode
-              then
-                [ let action modelExpr = case T.splitAt 1 rawQuery of
-                        ("!", r) ->
-                          either (const modelExpr) (modelExpr -.)
-                            . parseQueryExpression
-                            $ r
-                        ("&", r) ->
-                          either (const modelExpr) (modelExpr *.)
-                            . parseQueryExpression
-                            $ r
-                        ("|", r) ->
-                          either (const modelExpr) (modelExpr +.)
-                            . parseQueryExpression
-                            $ r
-                        (_defaultAction, _) ->
-                          either (const modelExpr) (modelExpr *.)
-                            . parseQueryExpression
-                            $ rawQuery
-                   in Model $
-                        model
-                          & fileSelectionModel . queryModel . expression %~ action
-                ]
-              else
-                [ Model $
-                    model
-                      & fileSelectionModel
+       in [ Model
+              $! model
+              & fileSelectionModel
+                . queryModel
+                . expression
+                %~ flip fromRight (parseQueryExpression rawQuery)
+          , Event . DoQueryEvent $ RunQuery
+          , Event . Mempty $
+              TaggerLens $
+                fileSelectionModel . queryModel . input . text
+          ]
+    ReplaceEditorFocus ->
+      let withEditorModel ret =
+            maybe [Event (Unit ())] ret $
+              model ^. fileSelectionModel . queryModel . editorFocus
+
+          withParsedExpr (editorModel :: QueryEditorModel) ret =
+            either (const [Event (Unit ())]) ret
+              . parseQueryExpression
+              . T.strip
+              $ editorModel ^. input . text
+       in withEditorModel $ \editorModel ->
+            withParsedExpr editorModel $ \parsedExpr ->
+              [ let replaceWithNewExpr =
+                      fileSelectionModel
                         . queryModel
                         . expression
-                        %~ flip fromRight (parseQueryExpression rawQuery)
-                , Event . DoQueryEvent $ RunQuery
-                ]
-          )
-            ++ [ Event . Mempty $
-                  TaggerLens $
-                    fileSelectionModel . queryModel . input . text
-               ]
+                        %~ flip
+                          (withQueryExpression (editorModel ^. expressionIndex))
+                          ( const parsedExpr
+                          )
+
+                    updateEditorFocusWithNewExpr =
+                      fileSelectionModel
+                        . queryModel
+                        . editorFocus
+                        ?~ createQueryEditorModel
+                          parsedExpr
+                          (editorModel ^. expressionIndex)
+                 in Model
+                      . updateEditorFocusWithNewExpr
+                      . replaceWithNewExpr
+                      $ model
+              ]
+    RunEditorFocus ->
+      [ maybe (Event (Unit ())) (runQueryExpressionTask . (^. expression)) $
+          model ^. fileSelectionModel . queryModel . editorFocus
+      ]
     RunQuery ->
-      [ Task
-          . fmap (DoFileSelectionEvent . PutFilesNoCombine . HS.foldl' (Seq.|>) Seq.empty)
-          . runFileQuery conn
-          $ model ^. fileSelectionModel . queryModel . expression
+      [ runQueryExpressionTask $
+          model ^. fileSelectionModel . queryModel . expression
+      ]
+    SetEditorFocus qe n ->
+      [ Model $
+          model & fileSelectionModel . queryModel . editorFocus
+            ?~ createQueryEditorModel qe n
       ]
  where
-  -- Run a function that only modifies the structure of a RingExpression
-  -- on the QueryExpression at the given index or the TagExpression at the given
-  -- coordinates if not Nothing.
-  onDisjunctRingExpression
-    qeIndex
-    mTeIndex
-    (f :: forall a. RingExpression a -> RingExpression a) =
-      Model $
-        model & fileSelectionModel . queryModel . expression
-          %~ flip
-            (withQueryExpression qeIndex)
-            ( \qe ->
-                maybe
-                  (TraversableQueryExpression . f . runTraversableQueryExpression $ qe)
-                  ( \teIndex ->
-                      onTagLeaf
-                        qe
-                        ( \te ->
-                            withTagExpression teIndex te (mapT f)
-                        )
-                  )
-                  mTeIndex
-            )
+  runQueryExpressionTask =
+    Task
+      . fmap (DoFileSelectionEvent . PutFilesNoCombine . HS.foldl' (Seq.|>) Seq.empty)
+      . runFileQuery conn
 
 fileSelectionWidgetEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->

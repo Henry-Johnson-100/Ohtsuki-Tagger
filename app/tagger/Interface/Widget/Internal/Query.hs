@@ -11,7 +11,7 @@ module Interface.Widget.Internal.Query (
 
 import Control.Lens ((&), (.~))
 import Data.Event (
-  QueryEvent (PushExpression, RunQuery),
+  QueryEvent (ParseQuery, RunQuery),
   TaggerEvent (
     AppendText,
     DoQueryEvent,
@@ -77,7 +77,7 @@ widget _ =
 queryTextField :: TaggerWidget
 queryTextField =
   keystroke_
-    [ ("Enter", DoQueryEvent PushExpression)
+    [ ("Enter", DoQueryEvent ParseQuery)
     , ("Shift-Enter", DoQueryEvent RunQuery)
     , ("Up", NextHistory $ TaggerLens (fileSelectionModel . queryModel . input))
     , ("Down", PrevHistory $ TaggerLens (fileSelectionModel . queryModel . input))
