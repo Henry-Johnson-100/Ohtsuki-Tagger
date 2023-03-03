@@ -29,13 +29,9 @@ import Data.Model.Core (
   defaultSelectionAndQueryPositioningModel,
  )
 import Data.Model.Lens (
-  HasExpression (expression),
   HasFileDetailAndDescriptorTreePosH (fileDetailAndDescriptorTreePosH),
   HasFileDetailAndDescriptorTreePosV (fileDetailAndDescriptorTreePosV),
-  HasFileSelectionModel (fileSelectionModel),
   HasPositioningModel (positioningModel),
-  HasQueryEditMode (queryEditMode),
-  HasQueryModel (queryModel),
   HasSelectionAndQueryPosH (selectionAndQueryPosH),
   HasSelectionAndQueryPosV (selectionAndQueryPosV),
   HasVisibilityModel (visibilityModel),
@@ -50,17 +46,12 @@ import Interface.Theme (yuiLightPeach)
 import Interface.Widget.Internal.Core (
   defaultElementOpacity,
   withNodeHidden,
-  withNodeVisible,
   withStyleBasic,
  )
 import qualified Interface.Widget.Internal.DescriptorTree as DescriptorTree
 import qualified Interface.Widget.Internal.FileDetail as FileDetail
 import qualified Interface.Widget.Internal.FilePreview as FilePreview
 import qualified Interface.Widget.Internal.Query as Query
-import Interface.Widget.Internal.Query.QueryBuilder (
-  expressionWidget,
-  queryEditorTextFieldKey,
- )
 import qualified Interface.Widget.Internal.Selection as Selection
 import Interface.Widget.Internal.Type (TaggerWidget)
 import Monomer (
@@ -79,10 +70,8 @@ import Monomer (
   WidgetKey (WidgetKey),
   black,
   box_,
-  expandContent,
   hsplit_,
   keystroke_,
-  onlyTopActive,
   onlyTopActive_,
   spacer_,
   splitHandlePos,
@@ -97,25 +86,12 @@ taggerApplicationUI ::
   TaggerModel ->
   TaggerWidget
 taggerApplicationUI _ m =
-  globalKeystrokes m . zstack_ [onlyTopActive] $
-    [ baseZStack
-        m
-        [ selectionQueryLayer m
-        , fileDetailAndDescriptorTreeLayer m
-        ]
-    , queryEditorPane m
-    ]
-
-queryEditorPane :: TaggerModel -> TaggerWidget
-queryEditorPane m =
-  withNodeVisible (m ^. queryEditMode)
-    . withStyleBasic [bgColor yuiLightPeach]
-    . box_ [expandContent]
-    . expressionWidget
-    $ m
-      ^. fileSelectionModel
-        . queryModel
-        . expression
+  globalKeystrokes m $
+    baseZStack
+      m
+      [ selectionQueryLayer m
+      , fileDetailAndDescriptorTreeLayer m
+      ]
 
 globalWidgetHideLabel :: Text
 globalWidgetHideLabel = "global-widget-hide"
@@ -210,10 +186,7 @@ globalKeystrokes m =
       ( "Ctrl-f"
       , anonymousEvent $
           let setFocusEvent =
-                SetFocusOnKey . WidgetKey $
-                  if m ^. queryEditMode
-                    then queryEditorTextFieldKey
-                    else Query.queryTextFieldKey
+                SetFocusOnKey . WidgetKey $ Query.queryTextFieldKey
            in if (m ^. visibilityModel) `hasVis` VisibilityLabel selectionQueryHideLabel
                 then
                   [ Event $

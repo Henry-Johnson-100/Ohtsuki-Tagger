@@ -69,9 +69,6 @@ cradle:
     - path: "app/tagger/Interface/Widget/Internal/Query.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/tagger/Interface/Widget/Internal/Query/QueryBuilder.hs"
-      component: "tagger:exe:tagger"
-
     - path: "app/tagger/Interface/Widget/Internal/Selection.hs"
       component: "tagger:exe:tagger"
 
