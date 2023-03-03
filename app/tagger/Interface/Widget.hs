@@ -1,5 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Redundant if" #-}
 
 module Interface.Widget (
   taggerApplicationUI,
@@ -8,33 +11,30 @@ module Interface.Widget (
 import Control.Lens ((%~), (&), (.~), (^.))
 import Data.Event (
   FileSelectionEvent (
-    ClearSelection,
     CycleNextFile,
     CyclePrevFile
   ),
   TaggerEvent (
     DoFileSelectionEvent,
-    NextCyclicEnum,
-    PrevCyclicEnum,
     RefreshUI,
     ToggleVisibilityLabel
   ),
   anonymousEvent,
  )
-import Data.Model (
-  HasFileDetailAndDescriptorTreePosH (fileDetailAndDescriptorTreePosH),
-  HasFileDetailAndDescriptorTreePosV (fileDetailAndDescriptorTreePosV),
-  HasFileSelectionModel (fileSelectionModel),
-  HasPositioningModel (positioningModel),
-  HasSelectionAndQueryPosH (selectionAndQueryPosH),
-  HasSelectionAndQueryPosV (selectionAndQueryPosV),
-  HasSetOp (setOp),
-  HasVisibilityModel (visibilityModel),
-  TaggerLens (TaggerLens),
+import Data.Model.Core (
   TaggerModel,
   createPositioningModel,
   defaultFileDetailAndDescriptorTreePositioningModel,
   defaultSelectionAndQueryPositioningModel,
+ )
+import Data.Model.Lens (
+  HasFileDetailAndDescriptorTreePosH (fileDetailAndDescriptorTreePosH),
+  HasFileDetailAndDescriptorTreePosV (fileDetailAndDescriptorTreePosV),
+  HasPositioningModel (positioningModel),
+  HasSelectionAndQueryPosH (selectionAndQueryPosH),
+  HasSelectionAndQueryPosV (selectionAndQueryPosV),
+  HasVisibilityModel (visibilityModel),
+  TaggerLens (TaggerLens),
  )
 import Data.Model.Shared.Core (
   Visibility (VisibilityLabel),
@@ -85,9 +85,10 @@ taggerApplicationUI ::
   TaggerModel ->
   TaggerWidget
 taggerApplicationUI _ m =
-  globalKeystrokes m
-    . baseZStack m
-    $ [ selectionQueryLayer m
+  globalKeystrokes m $
+    baseZStack
+      m
+      [ selectionQueryLayer m
       , fileDetailAndDescriptorTreeLayer m
       ]
 
@@ -183,19 +184,18 @@ globalKeystrokes m =
     ,
       ( "Ctrl-f"
       , anonymousEvent $
-          if (m ^. visibilityModel) `hasVis` VisibilityLabel selectionQueryHideLabel
-            then
-              [ Event $
-                  ToggleVisibilityLabel
-                    (TaggerLens visibilityModel)
-                    selectionQueryHideLabel
-              , SetFocusOnKey . WidgetKey $ Query.queryTextFieldKey
-              ]
-            else [SetFocusOnKey . WidgetKey $ Query.queryTextFieldKey]
+          let setFocusEvent =
+                SetFocusOnKey . WidgetKey $ Query.queryTextFieldKey
+           in if (m ^. visibilityModel) `hasVis` VisibilityLabel selectionQueryHideLabel
+                then
+                  [ Event $
+                      ToggleVisibilityLabel
+                        (TaggerLens visibilityModel)
+                        selectionQueryHideLabel
+                  , setFocusEvent
+                  ]
+                else [setFocusEvent]
       )
-    , ("Ctrl-g", NextCyclicEnum $ TaggerLens (fileSelectionModel . setOp))
-    , ("Ctrl-Shift-g", PrevCyclicEnum $ TaggerLens (fileSelectionModel . setOp))
-    , ("Ctrl-u", DoFileSelectionEvent ClearSelection)
     ,
       ( "Ctrl-h"
       , anonymousEvent

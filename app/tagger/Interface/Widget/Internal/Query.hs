@@ -11,24 +11,17 @@ module Interface.Widget.Internal.Query (
 
 import Control.Lens ((&), (.~))
 import Data.Event (
-  FileSelectionEvent (
-    Query
-  ),
+  QueryEvent (RunQuery),
   TaggerEvent (
     AppendText,
-    DoFileSelectionEvent,
+    DoQueryEvent,
     Mempty,
     NextHistory,
     PrevHistory,
     Unit
   ),
  )
-import Data.Model.Core (TaggerModel)
-import Data.Model.Lens (
-  HasFileSelectionModel (fileSelectionModel),
-  HasQueryInput (queryInput),
-  TaggerLens (TaggerLens),
- )
+import Data.Model
 import Data.Model.Shared.Lens (
   HasHistoryIndex (historyIndex),
   history,
@@ -78,27 +71,37 @@ widget _ =
 queryTextField :: TaggerWidget
 queryTextField =
   keystroke_
-    [ ("Enter", DoFileSelectionEvent Query)
-    , ("Up", NextHistory $ TaggerLens (fileSelectionModel . queryInput))
-    , ("Down", PrevHistory $ TaggerLens (fileSelectionModel . queryInput))
+    [ ("Enter", DoQueryEvent RunQuery)
+    , ("Up", NextHistory $ TaggerLens (fileSelectionModel . queryModel . input))
+    , ("Down", PrevHistory $ TaggerLens (fileSelectionModel . queryModel . input))
     ]
     []
     . dropTarget_
-      ( AppendText (TaggerLens $ fileSelectionModel . queryInput . text)
+      ( AppendText (TaggerLens $ fileSelectionModel . queryModel . input . text)
           . descriptor
           . concreteTagDescriptor
       )
       [dropTargetStyle [border 1 yuiRed]]
     . dropTarget_
-      (AppendText (TaggerLens $ fileSelectionModel . queryInput . text) . filePath)
+      ( AppendText
+          ( TaggerLens $
+              fileSelectionModel . queryModel . input . text
+          )
+          . filePath
+      )
       [dropTargetStyle [border 1 yuiOrange]]
     . dropTarget_
-      (AppendText (TaggerLens $ fileSelectionModel . queryInput . text) . descriptor)
+      ( AppendText
+          ( TaggerLens $
+              fileSelectionModel . queryModel . input . text
+          )
+          . descriptor
+      )
       [dropTargetStyle [border 1 yuiBlue]]
     . withNodeKey queryTextFieldKey
     . withStyleBasic [bgColor (yuiLightPeach & a .~ defaultElementOpacity)]
     $ textField_
-      (fileSelectionModel . queryInput . text)
+      (fileSelectionModel . queryModel . input . text)
       [ onChange
           ( \t ->
               if T.null . T.strip $ t
@@ -106,7 +109,8 @@ queryTextField =
                   Mempty $
                     TaggerLens
                       ( fileSelectionModel
-                          . queryInput
+                          . queryModel
+                          . input
                           . history
                           . historyIndex
                       )
@@ -124,3 +128,5 @@ container w =
 queryTextFieldKey :: Text
 queryTextFieldKey = "queryTextField"
 {-# INLINE queryTextFieldKey #-}
+
+-- Query builder widget stuff

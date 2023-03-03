@@ -1,4 +1,7 @@
+{-# HLINT ignore "Use lambda-case" #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# HLINT ignore "Use const" #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
@@ -10,31 +13,22 @@ License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
 module Text.TaggerQL.Expression.Parser (
-  parseExpr,
-  parseTagExpr,
+  parseQueryExpression,
+  parseTagExpression,
   ParseError,
 
   -- * For Testing
   parse,
 
-  -- ** Expression Parsers
-  expressionParser,
-
-  -- ** SubExpression Parsers
-  subExpressionParser,
-
-  -- ** Term Parsers
-  tagTermParser,
-  fileTermParser,
-
   -- ** Misc
+  patternTextParser,
   patternParser,
 ) where
 
-import Control.Applicative ((<**>))
+import Control.Monad (unless)
 import Data.Char (toLower, toUpper)
-import Data.Functor (($>), (<&>))
-import Data.Tagger (SetOp (..))
+import Data.Functor (($>))
+import qualified Data.List as L
 import Data.Text (Text)
 import qualified Data.Text as T
 import Text.Parsec (
@@ -45,6 +39,8 @@ import Text.Parsec (
   anyChar,
   between,
   char,
+  getInput,
+  many,
   many1,
   noneOf,
   optionMaybe,
@@ -53,106 +49,10 @@ import Text.Parsec (
   try,
   (<|>),
  )
-import Text.TaggerQL.Expression.AST (
-  BinaryOperation (BinaryOperation),
-  Expression (..),
-  FileTerm (..),
-  SubExpression (..),
-  TagTerm (..),
-  TagTermExtension (TagTermExtension),
- )
+import Text.TaggerQL.Expression.AST
+import Text.TaggerQL.Expression.AST.Editor ((<-#))
 
 type Parser a = Parsec Text () a
-
-{- |
- Parse an 'Expression` from a TaggerQL query.
--}
-parseExpr :: Text -> Either ParseError Expression
-parseExpr = parse expressionParser "TaggerQL"
-
-{- |
- Parse a 'SubExpression` from a TaggerQL query.
-
- Used to parse expressions that tag images, rather than query.
--}
-parseTagExpr :: Text -> Either ParseError SubExpression
-parseTagExpr = parse subExpressionParser "TaggerQL"
-
-expressionParser :: Parser Expression
-expressionParser =
-  spaces
-    *> ( try
-          ( myChainl1
-              lhsExprParser
-              ( (\so lhs rhs -> BinaryExpression (BinaryOperation lhs so rhs))
-                  <$> (spaces *> setOpParser)
-              )
-              pure
-          )
-          <|> lhsExprParser
-       )
- where
-  lhsExprParser :: Parser Expression
-  lhsExprParser =
-    spaces
-      *> ( precedentExpressionParser
-            <|> ( try fileTermValueParser
-                    <|> ( tagTermParser
-                            <**> ( tagExpressionLookAhead
-                                    <|> pure TagTermValue
-                                 )
-                        )
-                )
-         )
-   where
-    precedentExpressionParser =
-      between (char '(') (spaces *> char ')') expressionParser
-    tagExpressionLookAhead =
-      (\se tt -> TagExpression (TagTermExtension tt se))
-        <$> between
-          (try (spaces *> char '{'))
-          (spaces *> char '}')
-          subExpressionParser
-
-fileTermValueParser :: Parser Expression
-fileTermValueParser = FileTermValue <$> fileTermParser
-
-subExpressionParser :: Parser SubExpression
-subExpressionParser =
-  spaces
-    *> ( try
-          ( myChainl1
-              lhsSubExpressionParser
-              ( (\so lhs rhs -> BinarySubExpression (BinaryOperation lhs so rhs))
-                  <$> (spaces *> setOpParser)
-              )
-              pure
-          )
-          <|> lhsSubExpressionParser
-       )
- where
-  lhsSubExpressionParser :: Parser SubExpression
-  lhsSubExpressionParser =
-    spaces
-      *> ( precedentSubExpressionParser
-            <|> ( tagTermParser
-                    <**> ( subExpressionLookAheadParser
-                            <|> pure SubTag
-                         )
-                )
-         )
-   where
-    precedentSubExpressionParser =
-      between
-        (char '(')
-        (spaces *> char ')')
-        subExpressionParser
-    subExpressionLookAheadParser =
-      (\se tt -> SubExpression (TagTermExtension tt se))
-        <$> between
-          (try (spaces *> char '{'))
-          (spaces *> char '}')
-          subExpressionParser
 
 {-# INLINEABLE myChainl1 #-}
 
@@ -186,37 +86,234 @@ myChainl1 p op defP = do
     )
       <|> return x
 
-fileTermParser :: Parser FileTerm
-fileTermParser = ichar 'p' *> char '.' *> patternParser <&> FileTerm
+patternTextParser :: Parser Text
+patternTextParser =
+  T.pack <$> many1 (char '\\' *> anyChar <|> notRestricted)
 
-tagTermParser :: Parser TagTerm
-tagTermParser =
-  ( ( try (ichar 'r' *> char '.' $> MetaDescriptorTerm)
-        <|> try (ichar 'd' *> char '.' $> DescriptorTerm)
-    )
-      <|> pure MetaDescriptorTerm
-  )
-    <*> patternParser
-
-patternParser :: Parser Text
-patternParser =
-  T.pack <$> many1 ((char '\\' *> anyChar) <|> notRestricted)
+patternParser :: Parser Pattern
+patternParser = Pattern <$> patternTextParser
 
 notRestricted :: Parser Char
 notRestricted = noneOf restrictedChars
 
-setOpParser :: Parser SetOp
-setOpParser = explicitSetOpParser <|> pure Intersect
+setOpParser :: Parser RingOperation
+setOpParser = explicitRingOperationParser <|> pure Multiplication
 
-explicitSetOpParser :: Parser SetOp
-explicitSetOpParser = unionParser <|> intersectParser <|> differenceParser
+explicitRingOperationParser :: Parser RingOperation
+explicitRingOperationParser = unionParser <|> intersectParser <|> differenceParser
  where
-  unionParser = char '|' $> Union
-  intersectParser = char '&' $> Intersect
-  differenceParser = char '!' $> Difference
+  unionParser = char '|' $> Addition
+  intersectParser = char '&' $> Multiplication
+  differenceParser = char '!' $> Subtraction
 
 ichar :: Char -> Parser Char
 ichar c = char (toUpper c) <|> char (toLower c)
 
-restrictedChars :: [Char]
+restrictedChars :: String
 restrictedChars = "(){}!&|. \r\n"
+
+foldBracketedTags :: Magma b => b -> Maybe b -> b
+foldBracketedTags overTerm = maybe overTerm (overTerm ∙)
+
+parseQueryExpression :: Text -> Either ParseError QueryExpression
+parseQueryExpression =
+  parse
+    allInput
+    "TaggerQL"
+ where
+  allInput =
+    queryExpressionParser
+      <* spaces
+      <* failIfNotConsumed
+
+parseTagExpression :: Text -> Either ParseError TagQueryExpression
+parseTagExpression =
+  parse
+    allInput
+    "TaggerQL - Tag"
+ where
+  allInput =
+    tagExpressionParser
+      <* spaces
+      <* failIfNotConsumed
+
+failIfNotConsumed :: Parser ()
+failIfNotConsumed = do
+  remains <- getInput
+  unless (T.null remains) . fail $
+    "Failed to consume all text, remainder: \""
+      <> T.unpack remains
+      <> "\""
+
+queryExpressionParser :: Parser QueryExpression
+queryExpressionParser =
+  spaces
+    *> ( fmap (TraversableQueryExpression . (>>= runTraversableQueryExpression))
+          . ringExprParser
+          . fmap runQueryTerm
+          $ queryTermParser
+       )
+
+tagExpressionParser :: Parser TagQueryExpression
+tagExpressionParser =
+  spaces
+    *> ( T
+          <$> ringExprParser
+            ( runTagTerm
+                <$> tagTermParser
+            )
+       )
+
+filePathParser :: Parser (Either Pattern TagQueryExpression)
+filePathParser =
+  spaces
+    *> (Left <$> (ichar 'p' *> char '.' *> patternParser))
+
+descriptorPatternParser :: Parser (DTerm Pattern)
+descriptorPatternParser =
+  spaces
+    *> (dTermConstructorParser <*> patternParser)
+
+newtype MinimalTagExpression = MinimalTagExpression
+  {runMinTagExpr :: TagQueryExpression}
+  deriving (Show, Eq, Rng, Magma)
+
+minimalTagExpressionParser :: Parser MinimalTagExpression
+minimalTagExpressionParser =
+  spaces
+    *> fmap
+      MinimalTagExpression
+      ( foldBracketedTags
+          <$> fmap pure descriptorPatternParser
+          <*> (fmap runBracketTag <$> zeroOrManyBracketedTagParser)
+      )
+
+newtype ParenthesizedTag = ParenthesizedTag
+  {runParenTag :: TagQueryExpression}
+  deriving (Show, Eq, Rng, Magma)
+
+parenthesizedTagParser :: Parser ParenthesizedTag
+parenthesizedTagParser = ParenthesizedTag <$> parenthesized tagExpressionParser
+
+newtype BracketedTag = BracketedTag
+  {runBracketTag :: TagQueryExpression}
+  deriving (Show, Eq, Rng, Magma)
+
+bracketedTagParser :: Parser BracketedTag
+bracketedTagParser =
+  BracketedTag
+    <$> between (char '{') (spaces *> char '}') tagExpressionParser
+
+{- |
+ Parses zero or many 'BracketedTag` then folds them together.
+-}
+zeroOrManyBracketedTagParser :: Parser (Maybe BracketedTag)
+zeroOrManyBracketedTagParser =
+  fmap
+    ( \xs -> case xs of
+        [] -> Nothing
+        _notNull -> Just $ L.foldl1' (∙) xs
+    )
+    (many . try $ spaces *> bracketedTagParser)
+
+newtype TagTerm = TagTerm
+  {runTagTerm :: TagQueryExpression}
+  deriving (Show, Eq, Rng, Magma)
+
+tagTermParser :: Parser TagTerm
+tagTermParser =
+  spaces
+    *> ( bracketedTagTerm
+          <|> parenthesizedTagTerm
+          <|> minimalTagTerm
+       )
+ where
+  bracketedTagTerm =
+    TagTerm . runBracketTag
+      <$> ( foldBracketedTags
+              <$> bracketedTagParser
+                <*> zeroOrManyBracketedTagParser
+          )
+  parenthesizedTagTerm =
+    TagTerm
+      <$> ( foldBracketedTags
+              <$> fmap runParenTag parenthesizedTagParser
+                <*> (fmap runBracketTag <$> zeroOrManyBracketedTagParser)
+          )
+  minimalTagTerm = TagTerm . runMinTagExpr <$> minimalTagExpressionParser
+
+newtype ParenthesizedQuery = ParenthesizedQuery
+  {runParenQuery :: QueryExpression}
+  deriving (Show, Eq, Rng)
+
+parenthesizedQueryParser :: Parser ParenthesizedQuery
+parenthesizedQueryParser =
+  ParenthesizedQuery <$> parenthesized queryExpressionParser
+
+newtype QueryTerm = QueryTerm {runQueryTerm :: QueryExpression}
+  deriving (Show, Eq, Rng)
+
+queryTermParser :: Parser QueryTerm
+queryTermParser =
+  spaces
+    *> ( bracketedQuery
+          <|> parenthesizedQuery
+          <|> try filePathTerm
+          <|> minimalTagQuery
+       )
+ where
+  parenthesizedQuery =
+    QueryTerm
+      <$> ( ( \(ParenthesizedQuery q) ->
+                maybe q ((q <-#) . runBracketTag) ::
+                  Maybe BracketedTag -> QueryExpression
+            )
+              <$> parenthesizedQueryParser <*> zeroOrManyBracketedTagParser
+          )
+  bracketedQuery =
+    QueryTerm
+      . liftSimpleQueryRing
+      . Node
+      . Right
+      . runBracketTag
+      <$> (foldBracketedTags <$> bracketedTagParser <*> zeroOrManyBracketedTagParser)
+  minimalTagQuery =
+    QueryTerm
+      . liftSimpleQueryRing
+      . Node
+      . Right
+      . runMinTagExpr
+      <$> minimalTagExpressionParser
+  filePathTerm =
+    QueryTerm
+      . liftSimpleQueryRing
+      . Node
+      <$> filePathParser
+
+parenthesized :: Parser a -> Parser a
+parenthesized = between (char '(') (spaces *> char ')')
+
+dTermConstructorParser :: Parser (a -> DTerm a)
+dTermConstructorParser =
+  try (ichar 'r' *> char '.' $> DMetaTerm)
+    <|> try (ichar 'd' *> char '.' $> DTerm)
+    <|> pure DMetaTerm
+
+ringExprParser :: Parser a -> Parser (RingExpression a)
+ringExprParser termP =
+  myChainl1
+    (pure <$> termP)
+    ringExprConstructorParser
+    pure
+
+ringExprConstructorParser ::
+  Parser
+    (RingExpression a -> RingExpression a -> RingExpression a)
+ringExprConstructorParser =
+  ( \so ->
+      case so of
+        Addition -> (+.)
+        Multiplication -> (*.)
+        Subtraction -> (-.)
+  )
+    <$> (spaces *> setOpParser)

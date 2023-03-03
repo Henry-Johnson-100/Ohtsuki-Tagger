@@ -1,15 +1,155 @@
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Test.Resources where
+module Test.Resources (
+  module Test.Resources,
+) where
 
-import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
 import qualified Data.HashSet as HS
 import Data.Maybe (catMaybes)
+import Data.String (fromString)
 import qualified Data.Text as T
-import Database.Tagger
-import Test.Tasty
-import Test.Tasty.HUnit
+import Database.Tagger (
+  Descriptor (Descriptor, descriptor),
+  File (File, filePath),
+  RecordKey,
+  Tag (Tag),
+  TaggedConnection,
+  allDescriptors,
+  allFiles,
+  allMetaDescriptorRows,
+  allTags,
+  close,
+  getAllInfra,
+  insertDescriptorRelation,
+  insertDescriptors,
+  insertFiles,
+  insertTags,
+  openOrCreate,
+  queryForSingleDescriptorByDescriptorId,
+  teardownDatabase,
+ )
+import Test.Tasty (TestTree, testGroup)
+import Test.Tasty.HUnit (
+  assertBool,
+  assertEqual,
+  testCase,
+  testCaseSteps,
+ )
+import Test.Tasty.QuickCheck (
+  Arbitrary (arbitrary),
+  Arbitrary1 (..),
+  Arbitrary2 (..),
+  Function,
+  Gen,
+  oneof,
+  sized,
+  suchThat,
+ )
+import Text.TaggerQL.Expression.AST
+
+instance Arbitrary2 LabeledFreeTree where
+  liftArbitrary2 :: Gen a -> Gen b -> Gen (LabeledFreeTree a b)
+  liftArbitrary2 l a = sized liftSized
+   where
+    liftSized n
+      | n <= 0 = pure <$> a
+      | otherwise = Edge <$> liftSized (n `div` 2) <*> l <*> liftSized (n `div` 2)
+
+instance Arbitrary l => Arbitrary1 (LabeledFreeTree l) where
+  liftArbitrary :: Arbitrary l => Gen a -> Gen (LabeledFreeTree l a)
+  liftArbitrary a = liftArbitrary2 arbitrary a
+
+instance (Arbitrary l, Arbitrary a) => Arbitrary (LabeledFreeTree l a) where
+  arbitrary :: (Arbitrary l, Arbitrary a) => Gen (LabeledFreeTree l a)
+  arbitrary = liftArbitrary2 arbitrary arbitrary
+
+instance (Function l, Function a) => Function (LabeledFreeTree l a)
+
+instance Arbitrary Pattern where
+  arbitrary :: Gen Pattern
+  arbitrary = fromString <$> suchThat arbitrary (not . null)
+
+instance Arbitrary1 DTerm where
+  liftArbitrary a = oneof [DTerm <$> a, DMetaTerm <$> a]
+
+instance Arbitrary a => Arbitrary (DTerm a) where
+  arbitrary :: Arbitrary a => Gen (DTerm a)
+  arbitrary = liftArbitrary arbitrary
+
+instance Function a => Function (DTerm a)
+
+instance Arbitrary RingOperation where
+  arbitrary :: Gen RingOperation
+  arbitrary = oneof $ map pure [(minBound :: RingOperation) .. maxBound]
+
+instance Function RingOperation
+
+instance (Arbitrary1 t, Arbitrary1 k) => Arbitrary1 (FreeDisjunctMonad t k) where
+  liftArbitrary ::
+    (Arbitrary1 t, Arbitrary1 k) =>
+    Gen a ->
+    Gen (FreeDisjunctMonad t k a)
+  liftArbitrary g = sized liftSized
+   where
+    liftSized n
+      | n <= 0 = PureDisjunct <$> g
+      | otherwise =
+        oneof
+          [ T <$> liftArbitrary (liftSized (n `div` 2))
+          , K <$> liftArbitrary (liftSized (n `div` 2))
+          ]
+
+instance
+  (Arbitrary1 t, Arbitrary1 k, Arbitrary a) =>
+  Arbitrary (FreeDisjunctMonad t k a)
+  where
+  arbitrary ::
+    (Arbitrary1 t, Arbitrary1 k, Arbitrary a) =>
+    Gen (FreeDisjunctMonad t k a)
+  arbitrary = liftArbitrary arbitrary
+
+instance Arbitrary2 TraversableQueryExpression where
+  liftArbitrary2 :: Gen a -> Gen b -> Gen (TraversableQueryExpression a b)
+  liftArbitrary2 a b = sized liftSized
+   where
+    liftSized n
+      | n <= 0 =
+        liftSimpleQueryRing <$> liftArbitrary (liftArbitrary2 a b)
+      | otherwise =
+        TraversableQueryExpression
+          <$> liftArbitrary
+            (liftArbitrary2 ((,) <$> liftSized (n `div` 2) <*> b) (liftArbitrary2 a b))
+
+instance Arbitrary a => Arbitrary1 (TraversableQueryExpression a) where
+  liftArbitrary :: Arbitrary a => Gen a1 -> Gen (TraversableQueryExpression a a1)
+  liftArbitrary b = liftArbitrary2 arbitrary b
+
+instance (Arbitrary a, Arbitrary b) => Arbitrary (TraversableQueryExpression a b) where
+  arbitrary :: (Arbitrary a, Arbitrary b) => Gen (TraversableQueryExpression a b)
+  arbitrary = liftArbitrary2 arbitrary arbitrary
+
+fe :: Pattern -> QueryExpression
+fe = liftSimpleQueryRing . pure . Left
+
+tle :: TagQueryExpression -> QueryExpression
+tle = liftSimpleQueryRing . pure . Right
+
+tedp :: DTerm Pattern -> TagQueryExpression
+tedp = pure
+
+d :: a -> DTerm a
+d = DTerm
+
+rt :: a -> DTerm a
+rt = DMetaTerm
 
 secureResource :: IO TaggedConnection
 secureResource = openOrCreate "integrated_testing_database.db"
@@ -153,6 +293,19 @@ testTags =
 
     -- tag file_19 "33{32}"
     Tag 58 19 32 (Just 56)
+
+    -- tag file_20 "(35 36){37}"
+    Tag 59 20 35 Nothing
+    Tag 60 20 37 (Just 59)
+    Tag 61 20 36 Nothing
+    Tag 62 20 37 (Just 61)
+
+    -- tag file_21 "(38 39{40}){41}"
+    Tag 63 21 38 Nothing
+    Tag 64 21 41 (Just 63)
+    Tag 65 21 39 Nothing
+    Tag 66 21 40 (Just 65)
+    Tag 67 21 41 (Just 66)
   -}
   ]
 

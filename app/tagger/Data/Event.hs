@@ -10,6 +10,7 @@ module Data.Event (
   TaggerAnonymousEvent (..),
   anonymousEvent,
   FileSelectionEvent (..),
+  QueryEvent (..),
   FileSelectionWidgetEvent (..),
   DescriptorTreeEvent (..),
   FocusedFileEvent (..),
@@ -17,7 +18,6 @@ module Data.Event (
 ) where
 
 import Data.HashMap.Strict (HashMap)
-import Data.HashSet (HashSet)
 import Data.IntMap.Strict (IntMap)
 import Data.Model.Core (DescriptorInfo, TaggerModel)
 import Data.Model.Lens (TaggerLens)
@@ -25,7 +25,6 @@ import Data.Model.Shared (Visibility)
 import Data.Model.Shared.Core (TextInput)
 import Data.Sequence (Seq)
 import Data.String (IsString)
-import Data.Tagger (CyclicEnum)
 import Data.Text (Text)
 import Database.Tagger.Type (
   ConcreteTag,
@@ -42,6 +41,7 @@ data TaggerEvent
   | DoFileSelectionEvent FileSelectionEvent
   | DoDescriptorTreeEvent DescriptorTreeEvent
   | DoTaggerInfoEvent TaggerInfoEvent
+  | DoQueryEvent QueryEvent
   | TaggerInit
   | RefreshUI
   | CloseConnection
@@ -53,12 +53,6 @@ data TaggerEvent
   | -- | Existentially quantified event that replaces the given lens
     --  with a Monoid instance with its identity
     forall m. Monoid m => Mempty (TaggerLens TaggerModel m)
-  | -- | Existentially quantified event that advances a lens with a 'CyclicEnum` instance
-    -- with 'next`
-    forall c. (CyclicEnum c) => NextCyclicEnum (TaggerLens TaggerModel c)
-  | -- | Existentially quantified event that advances a lens with a 'CyclicEnum` instance
-    -- with 'prev`
-    forall c. (CyclicEnum c) => PrevCyclicEnum (TaggerLens TaggerModel c)
   | NextHistory (TaggerLens TaggerModel TextInput)
   | PrevHistory (TaggerLens TaggerModel TextInput)
   | ToggleVisibilityLabel (TaggerLens TaggerModel Visibility) Text
@@ -81,18 +75,17 @@ instance Show TaggerAnonymousEvent where
 
 data FileSelectionEvent
   = AddFiles
-  | ClearSelection
   | CycleNextFile
+  | CycleOrderCriteria
+  | CycleOrderDirection
   | CyclePrevFile
   | DeleteFileFromFileSystem (RecordKey File)
   | DoFileSelectionWidgetEvent FileSelectionWidgetEvent
   | IncludeTagListInfraToPattern Text
   | MakeFileSelectionInfoMap (Seq File)
   | PutChunkSequence
-  | PutFiles (HashSet File)
   | PutFilesNoCombine (Seq File)
   | PutTagOccurrenceHashMap_ (HashMap Descriptor Int)
-  | Query
   | RefreshFileSelection
   | RefreshSpecificFile (RecordKey File)
   | RefreshSpecificFile_ File
@@ -107,6 +100,9 @@ data FileSelectionEvent
   | ShuffleSelection
   | ToggleSelectionView
   deriving (Show, Eq)
+
+data QueryEvent
+  = RunQuery
 
 data FileSelectionWidgetEvent
   = CycleNextChunk

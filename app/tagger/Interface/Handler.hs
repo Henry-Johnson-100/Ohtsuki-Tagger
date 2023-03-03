@@ -1,6 +1,9 @@
 {-# LANGUAGE BangPatterns #-}
 {-# HLINT ignore "Use list comprehension" #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# HLINT ignore "Redundant if" #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# HLINT ignore "Use const" #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -11,7 +14,7 @@ module Interface.Handler (
   taggerEventHandler,
 ) where
 
-import Control.Lens
+import Control.Lens ((%~), (&), (.~), (<|), (^.), (|>))
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
@@ -28,10 +31,8 @@ import Data.Model
 import Data.Model.Shared
 import Data.Sequence (Seq ((:<|), (:|>)))
 import qualified Data.Sequence as Seq
-import Data.Tagger
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.IO as T.IO
 import Data.Version (showVersion)
 import Database.Tagger
 import Interface.Handler.Internal
@@ -44,6 +45,8 @@ import System.FilePath
 import System.IO
 import Tagger.Info (taggerVersion)
 import Text.TaggerQL
+import Text.TaggerQL.Expression.Engine
+import Text.TaggerQL.Expression.Parser
 import Util
 
 taggerEventHandler ::
@@ -62,6 +65,7 @@ taggerEventHandler
       DoFileSelectionEvent e -> fileSelectionEventHandler wenv node model e
       DoDescriptorTreeEvent e -> descriptorTreeEventHandler wenv node model e
       DoTaggerInfoEvent e -> taggerInfoEventHandler wenv node model e
+      DoQueryEvent e -> queryEventHandler wenv node model e
       TaggerInit ->
         [ Event (DoDescriptorTreeEvent DescriptorTreeInit)
         , Task
@@ -97,8 +101,6 @@ taggerEventHandler
       Unit _ -> []
       AnonymousEvent (fmap (\(TaggerAnonymousEvent e) -> e) -> es) -> es
       Mempty (TaggerLens l) -> [Model $ model & l .~ mempty]
-      NextCyclicEnum (TaggerLens l) -> [Model $ model & l %~ next]
-      PrevCyclicEnum (TaggerLens l) -> [Model $ model & l %~ prev]
       NextHistory (TaggerLens l) ->
         [ Model $
             model
@@ -147,13 +149,6 @@ fileSelectionEventHandler
                   %~ putHist (T.strip currentAddFileText)
             , Event . Mempty $ TaggerLens (fileSelectionModel . addFileInput . text)
             ]
-      ClearSelection ->
-        [ Model $
-            model & fileSelectionModel . selection .~ Seq.empty
-              & fileSelectionTagListModel . occurrences .~ HM.empty
-              & fileSelectionModel . fileSelectionInfoMap .~ IntMap.empty
-              & fileSelectionModel . fileSelectionVis .~ VisibilityMain
-        ]
       CycleNextFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []
@@ -162,6 +157,10 @@ fileSelectionEventHandler
             [ Event . DoFocusedFileEvent . PutFile $ f
             , Model $ model & fileSelectionModel . selection .~ (f <| (fs |> f'))
             ]
+      CycleOrderCriteria ->
+        [Model $ model & fileSelectionTagListModel . ordering %~ cycleOrderCriteria]
+      CycleOrderDirection ->
+        [Model $ model & fileSelectionTagListModel . ordering %~ cycleOrderDir]
       CyclePrevFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []
@@ -200,22 +199,6 @@ fileSelectionEventHandler
                 .. selectionChunkLength model
                 ]
         ]
-      PutFiles fs ->
-        let currentSet =
-              HS.fromList
-                . F.toList
-                $ model ^. fileSelectionModel . selection
-            combFun =
-              case model ^. fileSelectionModel . setOp of
-                Union -> HS.union
-                Intersect -> HS.intersection
-                Difference -> HS.difference
-            newSeq =
-              Seq.fromList
-                . HS.toList
-                . combFun currentSet
-                $ fs
-         in [Event . DoFileSelectionEvent . PutFilesNoCombine $ newSeq]
       PutFilesNoCombine
         ( uncurry (Seq.><)
             . (\(x, y) -> (y, x))
@@ -245,34 +228,12 @@ fileSelectionEventHandler
                )
       PutTagOccurrenceHashMap_ ohm ->
         [Model $ model & fileSelectionTagListModel . occurrences .~ ohm]
-      Query ->
-        [ Task
-            ( do
-                r <-
-                  runExceptT $
-                    runQuery
-                      conn
-                      (T.strip $ model ^. fileSelectionModel . queryInput . text)
-                either
-                  (mapM_ T.IO.putStrLn >=> (pure . Unit))
-                  (return . DoFileSelectionEvent . PutFiles)
-                  r
-            )
-        , Model $
-            model & fileSelectionModel . queryInput . history
-              %~ putHist (T.strip $ model ^. fileSelectionModel . queryInput . text)
-        , Event . Mempty $ TaggerLens (fileSelectionModel . queryInput . text)
-        , Event . Mempty $
-            TaggerLens (fileSelectionModel . queryInput . history . historyIndex)
-        ]
       RefreshSpecificFile fk ->
         [ Task
-            ( do
-                f <- runMaybeT $ queryForSingleFileByFileId fk conn
-                maybe
-                  (return . Unit $ ())
-                  (return . DoFileSelectionEvent . RefreshSpecificFile_)
-                  f
+            ( maybe
+                (Unit ())
+                (DoFileSelectionEvent . RefreshSpecificFile_)
+                <$> queryForSingleFileByFileId fk conn
             )
         ]
       RefreshSpecificFile_ f@(File fk fp) ->
@@ -329,9 +290,9 @@ fileSelectionEventHandler
            in Task
                 ( do
                     -- refetch the fk from the db,
-                    -- to put the calculation in the MaybeT monad
-                    result <- runMaybeT $ do
-                      lift $ mvFile conn fk newRenameText
+                    -- to put the calculation in the Maybe monad
+                    result <- do
+                      mvFile conn fk newRenameText
                       queryForSingleFileByFileId fk conn
                     maybe
                       (return $ Unit ())
@@ -385,6 +346,29 @@ fileSelectionEventHandler
                 . fileSelectionVis
               %~ toggleAltVis
         ]
+
+queryEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  QueryEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+queryEventHandler _wenv _node model@((^. connection) -> conn) event =
+  case event of
+    RunQuery ->
+      [ either (const (Event (Unit ()))) runQueryExpressionTask
+          . parseQueryExpression
+          . T.strip
+          $ model ^. fileSelectionModel . queryModel . input . text
+      , Event . Mempty $
+          TaggerLens $
+            fileSelectionModel . queryModel . input . text
+      ]
+ where
+  runQueryExpressionTask =
+    Task
+      . fmap (DoFileSelectionEvent . PutFilesNoCombine . HS.foldl' (Seq.|>) Seq.empty)
+      . runFileQuery conn
 
 fileSelectionWidgetEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->

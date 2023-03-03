@@ -25,7 +25,6 @@ import Control.Monad.Trans.Except (
   throwE,
   withExceptT,
  )
-import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
 import qualified Data.Either as E
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -98,7 +97,7 @@ guardFileExists p =
 
 guardFileInDatabase :: TaggedConnection -> RecordKey File -> ExceptT String IO File
 guardFileInDatabase c fk = do
-  maybeDBFile <- lift . runMaybeT $ queryForSingleFileByFileId fk c
+  maybeDBFile <- lift $ queryForSingleFileByFileId fk c
   maybe
     (throwE ("File with id, " ++ show fk ++ " not found in database."))
     return

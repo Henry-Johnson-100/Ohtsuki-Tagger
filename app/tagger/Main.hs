@@ -92,7 +92,7 @@ import System.Directory (
 import System.FilePath (makeRelative, takeDirectory)
 import System.IO (hPutStrLn, stderr)
 import Tagger.Info (taggerVersion)
-import Text.TaggerQL (runQuery, tagFile)
+import Text.TaggerQL (fileQuery, tagFile)
 import Util (addFiles, compareConcreteTags)
 
 main :: IO ()
@@ -256,7 +256,7 @@ mainProgram (WithDB dbPath cm) = do
         Audit -> runReaderT mainReportAudit c
         Query (T.pack -> q) rel -> do
           let (T.unpack -> connPath) = c ^. connName
-          eQueryResults <- runExceptT $ runQuery c q
+          eQueryResults <- fileQuery c q
           either
             (mapM_ T.IO.putStrLn)
             ( \queryResults ->

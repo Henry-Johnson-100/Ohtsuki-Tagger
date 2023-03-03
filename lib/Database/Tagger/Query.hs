@@ -46,6 +46,9 @@ module Database.Tagger.Query (
   flatQueryForFileOnMetaRelation,
   flatQueryForFileOnMetaRelationPattern,
 
+  -- *** On 'Tag`
+  queryForFileByTagId,
+
   -- ** 'TaggedFile` and 'ConcreteTaggedFile` Queries
   derefTag,
   -- | Fairly costly compared to most other queries, so should be used sparingly.
@@ -80,6 +83,10 @@ module Database.Tagger.Query (
   queryForTagByFileAndDescriptorKeyAndNullSubTagOf,
   queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf,
   queryForTagBySubTagTriple,
+
+  -- *** On 'Descriptor`
+  queryForTagByDescriptorPattern,
+  queryForTagByMetaDescriptorPattern,
 
   -- *** On 'File`
   queryForFileTagsByFileId,
@@ -125,7 +132,7 @@ module Database.Tagger.Query (
 import Control.Monad (guard, join)
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT, throwE)
-import Control.Monad.Trans.Maybe (MaybeT)
+import Control.Monad.Trans.Maybe (MaybeT (MaybeT))
 import Data.Bifunctor (second)
 import qualified Data.HashSet as HashSet
 import Data.HierarchyMap (HierarchyMap)
@@ -180,10 +187,8 @@ queryForFileByPattern p tc = query tc q [p]
 {- |
  Query for a single 'File` with its id.
 -}
-queryForSingleFileByFileId :: RecordKey File -> TaggedConnection -> MaybeT IO File
-queryForSingleFileByFileId rk tc = do
-  result <- lift $ query tc q [rk] :: MaybeT IO [File]
-  hoistMaybe . head' $ result
+queryForSingleFileByFileId :: RecordKey File -> TaggedConnection -> IO (Maybe File)
+queryForSingleFileByFileId rk tc = head' <$> query tc q [rk]
  where
   q =
     [r|
@@ -273,6 +278,22 @@ flatQueryForFileOnMetaRelationPattern p tc = queryNamed tc q [":metaDesPattern" 
       ON r.infraDescriptorId = t.descriptorId
     JOIN File f
       ON t.fileId = f.id
+    |]
+
+{- |
+ Retrieve the 'File` that is tagged with the given 'Tag` if it exists.
+-}
+queryForFileByTagId :: RecordKey Tag -> TaggedConnection -> IO (Maybe File)
+queryForFileByTagId rt tc = head' <$> query tc q [rt]
+ where
+  q =
+    [r|
+      SELECT
+        f.id
+        ,f.filePath
+      FROM File f
+      JOIN Tag t ON f.id = t.fileId
+      WHERE t.id = ?
     |]
 
 {- |
@@ -374,7 +395,7 @@ queryForConcreteTaggedFileWithFileId ::
   MaybeT IO ConcreteTaggedFile
 queryForConcreteTaggedFileWithFileId rk tc =
   ConcreteTaggedFile
-    <$> queryForSingleFileByFileId rk tc
+    <$> MaybeT (queryForSingleFileByFileId rk tc)
     <*> lift (queryForFileTagHierarchyMapByFileId rk tc)
 
 {- |
@@ -879,6 +900,52 @@ queryForTagBySubTagTriple triple tc = query tc q triple
       AND descriptorId = ?
       AND subTagOfId = ?
     |]
+
+{- |
+ Retrieve all 'Tag`s corresponding to 'Descriptor`s that match
+ the given text pattern.
+-}
+queryForTagByDescriptorPattern :: Text -> TaggedConnection -> IO [Tag]
+queryForTagByDescriptorPattern t tc = query tc q [t]
+ where
+  q =
+    [r|
+      SELECT
+        t.id,
+        t.fileId,
+        t.descriptorId,
+        t.subTagOfId
+      FROM Tag t
+      JOIN Descriptor d ON t.descriptorId = d.id
+      WHERE d.descriptor LIKE ? ESCAPE '\'|]
+
+{- |
+ Retrieve all 'Tag`s corresponding to all 'Descriptor`s that are
+ infra to the 'Descriptor`s matching the given text pattern.
+-}
+queryForTagByMetaDescriptorPattern :: Text -> TaggedConnection -> IO [Tag]
+queryForTagByMetaDescriptorPattern t tc = query tc q [t]
+ where
+  q =
+    [r|
+        SELECT
+          t.id
+          ,t.fileId
+          ,t.descriptorId
+          ,t.subTagOfId
+        FROM Tag t
+        JOIN (
+          WITH RECURSIVE r(id) AS (
+            SELECT id
+            FROM Descriptor
+            WHERE descriptor LIKE ? ESCAPE '\'
+            UNION
+            SELECT infraDescriptorId
+            FROM MetaDescriptor md
+            JOIN r ON md.metaDescriptorId = r.id
+          )
+          SELECT id FROM r
+        ) AS d ON t.descriptorId = d.id|]
 
 {- |
  Returns all 'Tag`s for a given 'File`.

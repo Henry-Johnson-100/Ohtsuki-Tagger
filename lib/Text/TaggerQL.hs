@@ -1,6 +1,6 @@
 module Text.TaggerQL (
-  runQuery,
+  fileQuery,
   tagFile,
 ) where
 
-import Text.TaggerQL.Expression.Engine (runQuery, tagFile)
+import Text.TaggerQL.Expression.Engine (fileQuery, tagFile)

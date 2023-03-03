@@ -2,9 +2,14 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Redundant if" #-}
+{-# HLINT ignore "Redundant return" #-}
 
 module Data.Model.Lens (
   module Data.Model.Lens,
@@ -19,7 +24,20 @@ import Control.Lens (
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Maybe (fromMaybe)
-import Data.Model.Core
+import Data.Model.Core (
+  DescriptorInfo,
+  DescriptorTreeModel,
+  FileInfo,
+  FileSelectionModel,
+  FileSelectionTagListModel,
+  FocusedFileModel,
+  PositioningModel,
+  QueryModel,
+  TaggerInfoModel,
+  TaggerModel,
+  createDescriptorInfo,
+  createFileInfo,
+ )
 
 newtype TaggerLens a b = TaggerLens {taggerLens :: Lens' a b}
 
@@ -48,6 +66,8 @@ makeLensesWith abbreviatedFields ''FileInfo
 makeLensesWith abbreviatedFields ''TaggerInfoModel
 
 makeLensesWith abbreviatedFields ''PositioningModel
+
+makeLensesWith abbreviatedFields ''QueryModel
 
 {-# INLINE fileInfoAt #-}
 

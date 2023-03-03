@@ -12,7 +12,8 @@ import Control.Lens ((&), (.~), (^.))
 import Data.Event (
   FileSelectionEvent (
     AddFiles,
-    ClearSelection,
+    CycleOrderCriteria,
+    CycleOrderDirection,
     DeleteFileFromFileSystem,
     DoFileSelectionWidgetEvent,
     IncludeTagListInfraToPattern,
@@ -30,7 +31,6 @@ import Data.Event (
     DoFileSelectionEvent,
     DoFocusedFileEvent,
     Mempty,
-    NextCyclicEnum,
     NextHistory,
     PrevHistory,
     ToggleVisibilityLabel,
@@ -55,7 +55,6 @@ import Data.Model.Lens (
   HasOccurrences (occurrences),
   HasOrdering (ordering),
   HasSelection (selection),
-  HasSetOp (setOp),
   HasShellText (shellText),
   TaggerLens (TaggerLens),
   addFileInput,
@@ -73,14 +72,11 @@ import Data.Model.Shared.Core (
 import Data.Model.Shared.Lens (
   HasHistory (history),
   HasHistoryIndex (historyIndex),
-  HasOrderCriteria (orderCriteria),
-  HasOrderDirection (orderDirection),
   HasText (text),
  )
 import qualified Data.Ord as O
 import Data.Sequence ((|>))
 import qualified Data.Sequence as Seq
-import Data.Tagger (SetOp (Difference, Intersect, Union))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger (Descriptor (descriptor), File (File), descriptorId)
@@ -120,7 +116,6 @@ import Monomer (
   black,
   box_,
   draggable,
-  dropdown,
   hgrid_,
   hstack,
   hstack_,
@@ -163,28 +158,7 @@ widget m =
     hstack_
       []
       [ selectionSizeLabel m
-      , setOpDropdown
       ]
-
-setOpDropdown :: TaggerWidget
-setOpDropdown =
-  withStyleBasic [bgColor yuiLightPeach]
-    . tooltip_
-      "Choose how to combine the current selection with subsequent queries."
-      [tooltipDelay 1000]
-    . withStyleBasic [bgColor (yuiLightPeach & a .~ defaultElementOpacity)]
-    $ dropdown
-      (fileSelectionModel . setOp)
-      [Union, Intersect, Difference]
-      (flip label_ [resizeFactor (-1)] . T.pack . show)
-      (flip label_ [resizeFactor (-1)] . T.pack . show)
-
-clearSelectionButton :: TaggerWidget
-clearSelectionButton =
-  styledButton_
-    [resizeFactor (-1)]
-    "Clear"
-    (DoFileSelectionEvent ClearSelection)
 
 selectionSizeLabel :: TaggerModel -> TaggerWidget
 selectionSizeLabel ((^. fileSelectionModel . selection) -> selSeq) =
@@ -232,7 +206,6 @@ tagListWidget m =
     hstack_
       []
       [ toggleViewSelectionButton
-      , clearSelectionButton
       , tagListOrderCritCycleButton
       , tagListOrderDirCycleButton
       , tagListFilterTextField
@@ -254,17 +227,13 @@ tagListWidget m =
      in styledButton_
           [resizeFactor (-1)]
           btnText
-          ( NextCyclicEnum $
-              TaggerLens (fileSelectionTagListModel . ordering . orderCriteria)
-          )
+          (DoFileSelectionEvent CycleOrderCriteria)
   tagListOrderDirCycleButton =
     let (OrderBy _ ordDir) = m ^. fileSelectionTagListModel . ordering
      in styledButton_
           [resizeFactor (-1)]
           (T.pack . show $ ordDir)
-          ( NextCyclicEnum $
-              TaggerLens (fileSelectionTagListModel . ordering . orderDirection)
-          )
+          (DoFileSelectionEvent CycleOrderDirection)
   tagListLeaf (d, n) =
     hgrid_
       [childSpacing_ 0]
@@ -360,7 +329,6 @@ fileSelectionFileList m =
     hstack_
       []
       [ toggleViewSelectionButton
-      , clearSelectionButton
       , shuffleSelectionButton
       , refreshFileSelectionButton
       , fileSelectionChunkSizeNumField
