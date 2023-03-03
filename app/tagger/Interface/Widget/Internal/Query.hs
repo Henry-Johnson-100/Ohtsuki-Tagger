@@ -11,7 +11,7 @@ module Interface.Widget.Internal.Query (
 
 import Control.Lens ((&), (.~))
 import Data.Event (
-  QueryEvent (ParseQuery, RunQuery),
+  QueryEvent (RunQuery),
   TaggerEvent (
     AppendText,
     DoQueryEvent,
@@ -59,26 +59,19 @@ import Monomer (
   dropTargetStyle,
   dropTarget_,
   keystroke_,
-  resizeFactor,
   textField_,
-  toggleButton_,
-  vstack,
  )
 import Monomer.Graphics.Lens (HasA (a))
 
 widget :: TaggerModel -> TaggerWidget
 widget _ =
-  vstack
-    [ toggleButton_ "Editor" queryEditMode [resizeFactor (-1)]
-    , container
-        queryTextField
-    ]
+  container
+    queryTextField
 
 queryTextField :: TaggerWidget
 queryTextField =
   keystroke_
-    [ ("Enter", DoQueryEvent ParseQuery)
-    , ("Shift-Enter", DoQueryEvent RunQuery)
+    [ ("Enter", DoQueryEvent RunQuery)
     , ("Up", NextHistory $ TaggerLens (fileSelectionModel . queryModel . input))
     , ("Down", PrevHistory $ TaggerLens (fileSelectionModel . queryModel . input))
     ]

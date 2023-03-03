@@ -14,12 +14,11 @@ module Interface.Handler (
   taggerEventHandler,
 ) where
 
-import Control.Lens ((%~), (&), (.~), (<|), (?~), (^.), (|>))
+import Control.Lens ((%~), (&), (.~), (<|), (^.), (|>))
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
-import Data.Either (fromRight)
 import Data.Event
 import qualified Data.Foldable as F
 import qualified Data.HashMap.Strict as HM
@@ -46,8 +45,6 @@ import System.FilePath
 import System.IO
 import Tagger.Info (taggerVersion)
 import Text.TaggerQL
-import Text.TaggerQL.Expression.AST
-import Text.TaggerQL.Expression.AST.Editor
 import Text.TaggerQL.Expression.Engine
 import Text.TaggerQL.Expression.Parser
 import Util
@@ -100,7 +97,6 @@ taggerEventHandler
         [ Event . DoDescriptorTreeEvent $ RefreshBothDescriptorTrees
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
-      ToggleQueryEditMode -> [Model $ model & queryEditMode %~ not]
       CloseConnection -> [Task (Unit <$> close conn)]
       Unit _ -> []
       AnonymousEvent (fmap (\(TaggerAnonymousEvent e) -> e) -> es) -> es
@@ -153,8 +149,6 @@ fileSelectionEventHandler
                   %~ putHist (T.strip currentAddFileText)
             , Event . Mempty $ TaggerLens (fileSelectionModel . addFileInput . text)
             ]
-      ClearSelection ->
-        [Model $ model & fileSelectionModel . queryModel . expression .~ mid]
       CycleNextFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []
@@ -361,66 +355,14 @@ queryEventHandler ::
   [AppEventResponse TaggerModel TaggerEvent]
 queryEventHandler _wenv _node model@((^. connection) -> conn) event =
   case event of
-    ClearEditorFocus ->
-      [Model $ model & fileSelectionModel . queryModel . editorFocus .~ Nothing]
-    ParseQuery ->
-      let !rawQuery = T.strip $ model ^. fileSelectionModel . queryModel . input . text
-       in [ Model
-              $! model
-              & fileSelectionModel
-                . queryModel
-                . expression
-                %~ flip fromRight (parseQueryExpression rawQuery)
-          , Event . DoQueryEvent $ RunQuery
-          , Event . Mempty $
-              TaggerLens $
-                fileSelectionModel . queryModel . input . text
-          ]
-    ReplaceEditorFocus ->
-      let withEditorModel ret =
-            maybe [Event (Unit ())] ret $
-              model ^. fileSelectionModel . queryModel . editorFocus
-
-          withParsedExpr (editorModel :: QueryEditorModel) ret =
-            either (const [Event (Unit ())]) ret
-              . parseQueryExpression
-              . T.strip
-              $ editorModel ^. input . text
-       in withEditorModel $ \editorModel ->
-            withParsedExpr editorModel $ \parsedExpr ->
-              [ let replaceWithNewExpr =
-                      fileSelectionModel
-                        . queryModel
-                        . expression
-                        %~ flip
-                          (withQueryExpression (editorModel ^. expressionIndex))
-                          ( const parsedExpr
-                          )
-
-                    updateEditorFocusWithNewExpr =
-                      fileSelectionModel
-                        . queryModel
-                        . editorFocus
-                        ?~ createQueryEditorModel
-                          parsedExpr
-                          (editorModel ^. expressionIndex)
-                 in Model
-                      . updateEditorFocusWithNewExpr
-                      . replaceWithNewExpr
-                      $ model
-              ]
-    RunEditorFocus ->
-      [ maybe (Event (Unit ())) (runQueryExpressionTask . (^. expression)) $
-          model ^. fileSelectionModel . queryModel . editorFocus
-      ]
     RunQuery ->
-      [ runQueryExpressionTask $
-          model ^. fileSelectionModel . queryModel . expression
-      ]
-    SetEditorFocus qe n ->
-      [ Model $
-          model & fileSelectionModel . queryModel . editorFocus
-            ?~ createQueryEditorModel qe n
+      [ either (const (Event (Unit ()))) runQueryExpressionTask
+          . parseQueryExpression
+          . T.strip
+          $ model ^. fileSelectionModel . queryModel . input . text
+      , Event . Mempty $
+          TaggerLens $
+            fileSelectionModel . queryModel . input . text
       ]
  where
   runQueryExpressionTask =

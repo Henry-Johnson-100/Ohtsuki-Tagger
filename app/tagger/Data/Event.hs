@@ -35,7 +35,6 @@ import Database.Tagger.Type (
   Tag,
  )
 import Monomer (AppEventResponse)
-import Text.TaggerQL.Expression.AST
 
 data TaggerEvent
   = DoFocusedFileEvent FocusedFileEvent
@@ -44,7 +43,6 @@ data TaggerEvent
   | DoTaggerInfoEvent TaggerInfoEvent
   | DoQueryEvent QueryEvent
   | TaggerInit
-  | ToggleQueryEditMode
   | RefreshUI
   | CloseConnection
   | Unit ()
@@ -77,7 +75,6 @@ instance Show TaggerAnonymousEvent where
 
 data FileSelectionEvent
   = AddFiles
-  | ClearSelection
   | CycleNextFile
   | CycleOrderCriteria
   | CycleOrderDirection
@@ -105,12 +102,7 @@ data FileSelectionEvent
   deriving (Show, Eq)
 
 data QueryEvent
-  = ClearEditorFocus
-  | ParseQuery
-  | ReplaceEditorFocus
-  | RunEditorFocus
-  | RunQuery
-  | SetEditorFocus QueryExpression Int
+  = RunQuery
 
 data FileSelectionWidgetEvent
   = CycleNextChunk

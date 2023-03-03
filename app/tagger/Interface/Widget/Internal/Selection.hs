@@ -12,7 +12,6 @@ import Control.Lens ((&), (.~), (^.))
 import Data.Event (
   FileSelectionEvent (
     AddFiles,
-    ClearSelection,
     CycleOrderCriteria,
     CycleOrderDirection,
     DeleteFileFromFileSystem,
@@ -161,13 +160,6 @@ widget m =
       [ selectionSizeLabel m
       ]
 
-clearSelectionButton :: TaggerWidget
-clearSelectionButton =
-  styledButton_
-    [resizeFactor (-1)]
-    "Clear"
-    (DoFileSelectionEvent ClearSelection)
-
 selectionSizeLabel :: TaggerModel -> TaggerWidget
 selectionSizeLabel ((^. fileSelectionModel . selection) -> selSeq) =
   withStyleBasic [maxWidth 80]
@@ -214,7 +206,6 @@ tagListWidget m =
     hstack_
       []
       [ toggleViewSelectionButton
-      , clearSelectionButton
       , tagListOrderCritCycleButton
       , tagListOrderDirCycleButton
       , tagListFilterTextField
@@ -338,7 +329,6 @@ fileSelectionFileList m =
     hstack_
       []
       [ toggleViewSelectionButton
-      , clearSelectionButton
       , shuffleSelectionButton
       , refreshFileSelectionButton
       , fileSelectionChunkSizeNumField

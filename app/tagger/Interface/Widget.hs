@@ -17,7 +17,6 @@ import Data.Event (
   TaggerEvent (
     DoFileSelectionEvent,
     RefreshUI,
-    ToggleQueryEditMode,
     ToggleVisibilityLabel
   ),
   anonymousEvent,
@@ -197,7 +196,6 @@ globalKeystrokes m =
                   ]
                 else [setFocusEvent]
       )
-    , ("Ctrl-d", ToggleQueryEditMode)
     ,
       ( "Ctrl-h"
       , anonymousEvent

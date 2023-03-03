@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
@@ -13,8 +12,6 @@ module Data.Model.Core (
   createTaggerModel,
   FileSelectionModel (..),
   QueryModel (..),
-  QueryEditorModel (..),
-  createQueryEditorModel,
   getSelectionChunk,
   selectionChunkLength,
   FileSelectionTagListModel (..),
@@ -50,7 +47,6 @@ import qualified Data.Sequence as S
 import qualified Data.Sequence as Seq
 import Data.Text (Text)
 import Database.Tagger.Type
-import Text.TaggerQL.Expression.AST
 
 data TaggerModel = TaggerModel
   { _taggermodelDescriptorTreeModel :: DescriptorTreeModel
@@ -64,7 +60,6 @@ data TaggerModel = TaggerModel
     -- the FocusedFile and FileSelection models. I am not willing to combine those two
     -- so this will stay here for now.
     _taggerShellText :: Text
-  , _taggerQueryEditMode :: Bool
   }
   deriving (Show, Eq)
 
@@ -84,7 +79,6 @@ createTaggerModel tc d unRelatedD defaultFilePath =
     , _taggermodelVisibilityModel = VisibilityMain
     , _taggermodelConnection = tc
     , _taggerShellText = ""
-    , _taggerQueryEditMode = False
     }
 
 data FileSelectionModel = FileSelectionModel
@@ -118,8 +112,6 @@ createFileSelectionModel =
 
 data QueryModel = QueryModel
   { _queryInput :: TextInput
-  , _queryExpression :: QueryExpression
-  , _queryEditorFocus :: Maybe QueryEditorModel
   }
   deriving (Show, Eq)
 
@@ -127,23 +119,6 @@ createQueryModel :: QueryModel
 createQueryModel =
   QueryModel
     { _queryInput = createTextInput 10
-    , _queryExpression = mid
-    , _queryEditorFocus = Nothing
-    }
-
-data QueryEditorModel = QueryEditorModel
-  { _queryeditormodelExpression :: QueryExpression
-  , _queryeditormodelInput :: TextInput
-  , _queryeditormodelExpressionIndex :: Int
-  }
-  deriving (Show, Eq)
-
-createQueryEditorModel :: QueryExpression -> Int -> QueryEditorModel
-createQueryEditorModel qe location =
-  QueryEditorModel
-    { _queryeditormodelExpression = qe
-    , _queryeditormodelInput = createTextInput 10
-    , _queryeditormodelExpressionIndex = location
     }
 
 data FileSelectionTagListModel = FileSelectionTagListModel
