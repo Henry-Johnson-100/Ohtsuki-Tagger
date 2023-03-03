@@ -1,5 +1,4 @@
 {-# HLINT ignore "Use const" #-}
-{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
@@ -10,8 +9,8 @@ module Test.Text.TaggerQL.Expression.Engine (
   queryEngineASTTests,
 ) where
 
-import Control.Monad.Trans.Maybe (runMaybeT)
 import qualified Data.HashSet as HS
+import Data.List (sort)
 import qualified Data.Text as T
 import Database.Tagger
 import Test.Resources
@@ -660,20 +659,19 @@ taggingEngineTests c =
                   [ Tag 44 17 21 Nothing
                   , Tag 45 17 22 (Just 44)
                   , Tag 46 17 23 (Just 44)
-                  ]
+                  ] ::
+                    [Tag]
             c
               >>= insert
                 se
                 fk
-            f <-
-              fmap taggedFileTags
-                <$> (c >>= runMaybeT . queryForTaggedFileWithFileId fk)
+            f <- c >>= queryForFileTagsByFileId fk
             assertEqual
               ""
-              ( Just
+              ( sort
                   expectedResults
               )
-              f
+              (sort f)
         , after AllSucceed "Tagging Engine - 0" $
             testCase "Tagging Engine - 1" $ do
               let se =
@@ -715,15 +713,13 @@ taggingEngineTests c =
                 >>= insert
                   se
                   fk
-              f <-
-                fmap taggedFileTags
-                  <$> (c >>= runMaybeT . queryForTaggedFileWithFileId fk)
+              f <- c >>= queryForFileTagsByFileId fk
               assertEqual
                 ""
-                ( Just
+                ( sort
                     expectedResults
                 )
-                f
+                (sort f)
         , after AllSucceed "Tagging Engine - 1" $
             testCase "Tagging Engine - 2" $ do
               let se =
@@ -772,15 +768,13 @@ taggingEngineTests c =
                 >>= insert
                   se
                   fk
-              f <-
-                fmap taggedFileTags
-                  <$> (c >>= runMaybeT . queryForTaggedFileWithFileId fk)
+              f <- c >>= queryForFileTagsByFileId fk
               assertEqual
                 ""
-                ( Just
+                ( sort
                     expectedResults
                 )
-                f
+                (sort f)
         , after AllSucceed "Tagging Engine - 2" . testCase "Tagging Engine - 3" $ do
             let se =
                   ( (pure . des $ 32)
@@ -807,15 +801,13 @@ taggingEngineTests c =
               >>= insert
                 se
                 fk
-            f <-
-              fmap taggedFileTags
-                <$> (c >>= runMaybeT . queryForTaggedFileWithFileId fk)
+            f <- c >>= queryForFileTagsByFileId fk
             assertEqual
               ""
-              ( Just
+              ( sort
                   expectedResults
               )
-              f
+              (sort f)
         , after AllSucceed "Tagging Engine - 3" . testCase "Tagging Engine - 4" $ do
             let se =
                   (pure . des $ 33)
@@ -832,15 +824,13 @@ taggingEngineTests c =
               >>= insert
                 se
                 fk
-            f <-
-              fmap taggedFileTags
-                <$> (c >>= runMaybeT . queryForTaggedFileWithFileId fk)
+            f <- c >>= queryForFileTagsByFileId fk
             assertEqual
               ""
-              ( Just
+              ( sort
                   expectedResults
               )
-              f
+              (sort f)
         , after AllSucceed "Tagging Engine - 4" . testCase "Tagging Engine - 5" $ do
             let se =
                   ( (pure . des $ 35)
@@ -855,13 +845,11 @@ taggingEngineTests c =
                   , Tag 62 20 37 (Just 61)
                   ]
             c >>= insert se fk
-            f <-
-              fmap taggedFileTags
-                <$> (c >>= runMaybeT . queryForTaggedFileWithFileId fk)
+            f <- c >>= queryForFileTagsByFileId fk
             assertEqual
               "Tagging should work with a lift-distributive expression."
-              (Just expectedResults)
-              f
+              (sort expectedResults)
+              (sort f)
         , after AllSucceed "Tagging Engine - 5" . testCase "Tagging Engine - 6" $ do
             let se =
                   ( (pure . des $ 38)
@@ -879,13 +867,11 @@ taggingEngineTests c =
                   , Tag 67 21 41 (Just 66)
                   ]
             c >>= insert se fk
-            f <-
-              fmap taggedFileTags
-                <$> (c >>= runMaybeT . queryForTaggedFileWithFileId fk)
+            f <- c >>= queryForFileTagsByFileId fk
             assertEqual
               "Tagging should work with a lift-distributive expression."
-              (Just expectedResults)
-              f
+              (sort expectedResults)
+              (sort f)
         ]
 
 file :: RecordKey File -> File

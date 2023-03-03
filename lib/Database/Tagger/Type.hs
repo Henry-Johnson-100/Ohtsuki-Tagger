@@ -122,7 +122,7 @@ data Tag = Tag
   , -- | Linking key to another Tag record if this tag is a subtag.
     tagSubtagOfId :: Maybe (RecordKey Tag)
   }
-  deriving (Show, Eq, Generic, Hashable, RowId)
+  deriving (Show, Eq, Ord, Generic, Hashable, RowId)
 
 instance FromRow Tag where
   fromRow = Tag <$> field <*> field <*> field <*> field
