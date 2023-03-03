@@ -77,6 +77,9 @@ is complete, optionally how many files were added.
     - Its functionality has been merged with the normal executable, `tagger`
       - Added operations for adding files, tagging a file, removing files from the database, and deleting files from the database and file system.
 - Library Changes
+  - Types
+    - Removed the `TaggedFile` type.
+      - Consider using the `queryForFileTagsByFileId` query to achieve the same function.
   - Queries
     - Added
       - `queryForDescriptorByFileId`
