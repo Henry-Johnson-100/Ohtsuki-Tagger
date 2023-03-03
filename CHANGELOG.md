@@ -108,6 +108,8 @@ applied. Not how many times the descriptor is applied.
 - Added some tooltips to the tag list filter and the shell command text field and button.
 - Added some additional helper functions to `HierarchyMap` to make traversals
   a little bit less painful.
+- An issue where spawned shell commands via the UI would block it from updating
+or receiving any input.
 
 ------
 

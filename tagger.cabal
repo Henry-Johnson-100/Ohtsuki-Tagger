@@ -84,7 +84,7 @@ executable tagger
                      ,MultiWayIf
                      ,ExistentialQuantification
 
-  -- ghc-options:
+  ghc-options:        -threaded
 
   build-depends:      tagger-lib
                       ,lens == 5.1
