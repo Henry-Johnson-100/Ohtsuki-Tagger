@@ -51,8 +51,6 @@ module Database.Tagger.Query (
 
   -- ** 'TaggedFile` and 'ConcreteTaggedFile` Queries
   derefTag,
-  -- | Fairly costly compared to most other queries, so should be used sparingly.
-  queryForTaggedFileWithFileId,
   queryForFileTagHierarchyMapByFileId,
   queryForConcreteTaggedFileWithFileId,
 
@@ -129,7 +127,7 @@ module Database.Tagger.Query (
   unsafeInsertTag,
 ) where
 
-import Control.Monad (guard, join)
+import Control.Monad (join)
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT, throwE)
 import Control.Monad.Trans.Maybe (MaybeT (MaybeT))
@@ -160,7 +158,6 @@ import Database.Tagger.Type (
   RecordKey,
   Tag (Tag, tagSubtagOfId),
   TaggedConnection,
-  TaggedFile (TaggedFile),
  )
 import Tagger.Util (catMaybeTM, head', hoistMaybe)
 import Text.RawString.QQ (r)
@@ -348,15 +345,6 @@ derefTag tid tc = do
       ON t.descriptorId = d.id
     WHERE t.id = ?
     |]
-
-{- |
- Given a 'File` ID, return the corresponding 'TaggedFile` if it exists.
--}
-queryForTaggedFileWithFileId :: RecordKey File -> TaggedConnection -> MaybeT IO TaggedFile
-queryForTaggedFileWithFileId rk tc = do
-  guard =<< lift (doesFileExist rk tc)
-  fileTags <- fmap HashSet.fromList . lift $ queryForFileTagsByFileId rk tc
-  return $ TaggedFile rk fileTags
 
 {- |
  Given a 'File` ID, return a 'HierarchyMap` of its 'Tag`s.
@@ -1144,26 +1132,4 @@ unsafeInsertTag toInsert tc = do
     [r|
     INSERT INTO Tag (fileId, descriptorId, subTagOfId)
       VALUES (?,?,?)
-    |]
-
-{- |
- Given a 'File` ID, show if it exists in the database.
--}
-doesFileExist :: RecordKey File -> TaggedConnection -> IO Bool
-doesFileExist rk tc = do
-  result <- query tc q [rk] :: IO [Only Int]
-  return . any ((==) 1 . (\(Only n) -> n)) $ result
- where
-  q =
-    [r|
-    SELECT
-      EXISTS
-        (
-          SELECT
-            *
-          FROM
-            File
-          WHERE
-            id = ?
-        )
     |]

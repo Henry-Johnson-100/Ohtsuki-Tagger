@@ -27,14 +27,12 @@ module Database.Tagger.Type (
   MetaDescriptor (..),
   DescriptorTree,
   ConcreteTag (..),
-  TaggedFile (..),
   ConcreteTaggedFile (..),
 
   -- * Lenses
   module Database.Tagger.Type.Lens,
 ) where
 
-import qualified Data.HashSet as HashSet
 import Data.Hashable (Hashable)
 import Data.HierarchyMap (HierarchyMap)
 import Data.Int (Int64)
@@ -151,17 +149,6 @@ data MetaDescriptor = MetaDescriptor
     infraDescriptorId :: RecordKey Descriptor
   }
   deriving (Show, Eq)
-
-{- |
- Data type representing a single file and all of the tags it contains.
-
- Is an encoding of a recursive query on a joined table of Tag - File - Tag
--}
-data TaggedFile = TaggedFile
-  { taggedFileId :: RecordKey File
-  , taggedFileTags :: HashSet.HashSet Tag
-  }
-  deriving (Show, Eq, Generic, Hashable)
 
 {- |
  Data type corresponding to a \"dereferenced\" 'Tag`.
