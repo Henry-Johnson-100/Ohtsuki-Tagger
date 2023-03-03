@@ -105,10 +105,10 @@ programParser =
   info
     (helper <*> (versionParser <|> withDBParser))
     ( header
-        "TAGGER: A GUI image-tagging program with a unique sub-tagging \
-        \system and proprietary query language, TaggerQL."
+        "YUITAGGER: A GUI image-tagging program with a unique sub-tagging \
+        \system and proprietary query language, YuiQL."
         <> progDesc
-          "Tagger is, first and foremost, a GUI program.\
+          "YuiTagger is, first and foremost, a GUI program.\
           \ Run tagger with a path to a database and no other arguments to start the GUI.\
           \ Additionally, there are some limited CLI operations exposed for convenience."
     )
