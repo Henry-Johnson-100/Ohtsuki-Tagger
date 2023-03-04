@@ -464,9 +464,9 @@ focusedFileEventHandler
                 concreteTaggedFile $
                   model
                     ^. focusedFileModel . focusedFile
-           in anonymousTask $ do
-                moveTagTask fk
-                callback [Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection]
+           in [ Task $
+                  DoFocusedFileEvent RefreshFocusedFileAndSelection <$ moveTagTask fk
+              ]
          where
           moveTagTask :: RecordKey File -> IO ()
           moveTagTask fk = do
