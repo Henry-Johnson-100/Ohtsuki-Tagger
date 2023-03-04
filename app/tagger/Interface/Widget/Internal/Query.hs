@@ -20,7 +20,13 @@ import Data.Event (
     Unit
   ),
  )
-import Data.Model
+import Data.Model (
+  HasFileSelectionModel (fileSelectionModel),
+  HasInput (input),
+  HasQueryModel (queryModel),
+  TaggerLens (TaggerLens),
+  TaggerModel,
+ )
 import Data.Model.Shared.Lens (
   HasHistoryIndex (historyIndex),
   history,
@@ -63,10 +69,10 @@ import Monomer (
   onChange,
   paddingL,
   paddingT,
+  textArea_,
   tooltipDelay,
   tooltip_,
  )
-import Monomer.Widgets (textArea_)
 
 type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
@@ -141,11 +147,8 @@ container :: TaggerWidget -> TaggerWidget
 container w =
   withStyleBasic [paddingT 5, paddingL 10]
     . box_ [alignLeft, alignBottom, ignoreEmptyArea]
-    -- . withStyleBasic [borderT 1 black, borderB 1 black, borderR 1 black]
     $ w
 
 queryTextFieldKey :: Text
 queryTextFieldKey = "queryTextField"
 {-# INLINE queryTextFieldKey #-}
-
--- Query builder widget stuff
