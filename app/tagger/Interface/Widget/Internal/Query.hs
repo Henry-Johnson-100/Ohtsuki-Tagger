@@ -47,21 +47,23 @@ import Interface.Widget.Internal.Core (
  )
 import Interface.Widget.Internal.Type (TaggerWidget)
 import Monomer (
-  CmbAlignBottom (alignBottom),
-  CmbAlignLeft (alignLeft),
-  CmbBgColor (bgColor),
-  CmbBorder (border),
-  CmbIgnoreEmptyArea (ignoreEmptyArea),
-  CmbOnChange (onChange),
-  CmbPaddingL (paddingL),
-  CmbPaddingT (paddingT),
+  acceptTab,
+  alignBottom,
+  alignLeft,
+  bgColor,
+  border,
   box_,
   dropTargetStyle,
   dropTarget_,
+  ignoreChildrenEvts,
+  ignoreEmptyArea,
   keystroke_,
-  textField_,
+  onChange,
+  paddingL,
+  paddingT,
  )
 import Monomer.Graphics.Lens (HasA (a))
+import Monomer.Widgets (textArea_)
 
 widget :: TaggerModel -> TaggerWidget
 widget _ =
@@ -71,11 +73,11 @@ widget _ =
 queryTextField :: TaggerWidget
 queryTextField =
   keystroke_
-    [ ("Enter", DoQueryEvent RunQuery)
-    , ("Up", NextHistory $ TaggerLens (fileSelectionModel . queryModel . input))
-    , ("Down", PrevHistory $ TaggerLens (fileSelectionModel . queryModel . input))
+    [ ("Shift-Enter", DoQueryEvent RunQuery)
+    , ("Shift-Up", NextHistory $ TaggerLens (fileSelectionModel . queryModel . input))
+    , ("Shift-Down", PrevHistory $ TaggerLens (fileSelectionModel . queryModel . input))
     ]
-    []
+    [ignoreChildrenEvts]
     . dropTarget_
       ( AppendText (TaggerLens $ fileSelectionModel . queryModel . input . text)
           . descriptor
@@ -100,7 +102,7 @@ queryTextField =
       [dropTargetStyle [border 1 yuiBlue]]
     . withNodeKey queryTextFieldKey
     . withStyleBasic [bgColor (yuiLightPeach & a .~ defaultElementOpacity)]
-    $ textField_
+    $ textArea_
       (fileSelectionModel . queryModel . input . text)
       [ onChange
           ( \t ->
@@ -116,6 +118,7 @@ queryTextField =
                       )
                 else Unit ()
           )
+      , acceptTab
       ]
 
 container :: TaggerWidget -> TaggerWidget

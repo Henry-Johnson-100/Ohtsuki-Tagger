@@ -356,14 +356,13 @@ queryEventHandler ::
 queryEventHandler _wenv _node model@((^. connection) -> conn) event =
   case event of
     RunQuery ->
-      [ either (const (Event (Unit ()))) runQueryExpressionTask
-          . parseQueryExpression
-          . T.strip
-          $ model ^. fileSelectionModel . queryModel . input . text
-      , Event . Mempty $
-          TaggerLens $
-            fileSelectionModel . queryModel . input . text
-      ]
+      let !parsedQuery =
+            parseQueryExpression
+              . T.strip
+              $ model ^. fileSelectionModel . queryModel . input . text
+       in [ either (const (Event . Unit $ ())) runQueryExpressionTask parsedQuery
+          , Model $ model & fileSelectionModel . queryModel . input . text .~ ""
+          ]
  where
   runQueryExpressionTask =
     Task
