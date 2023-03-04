@@ -365,11 +365,6 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
                 & fileSelectionModel
                   . queryModel
                   . input
-                  . text
-                  .~ ""
-                & fileSelectionModel
-                  . queryModel
-                  . input
                   . history
                   %~ putHist rawQuery
           ]
