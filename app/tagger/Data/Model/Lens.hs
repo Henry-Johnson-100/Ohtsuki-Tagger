@@ -33,7 +33,6 @@ import Data.Model.Core (
   FocusedFileModel,
   PositioningModel,
   QueryModel,
-  TaggerInfoModel,
   TaggerModel,
   createDescriptorInfo,
   createFileInfo,
@@ -62,8 +61,6 @@ makeLensesWith abbreviatedFields ''FileSelectionModel
 makeLensesWith abbreviatedFields ''FileSelectionTagListModel
 
 makeLensesWith abbreviatedFields ''FileInfo
-
-makeLensesWith abbreviatedFields ''TaggerInfoModel
 
 makeLensesWith abbreviatedFields ''PositioningModel
 
