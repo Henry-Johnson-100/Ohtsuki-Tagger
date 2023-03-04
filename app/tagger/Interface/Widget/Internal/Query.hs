@@ -9,7 +9,6 @@ module Interface.Widget.Internal.Query (
   widget,
 ) where
 
-import Control.Lens ((&), (.~))
 import Data.Event (
   QueryEvent (RunQuery),
   TaggerEvent (
@@ -42,6 +41,8 @@ import Interface.Theme (
  )
 import Interface.Widget.Internal.Core (
   defaultElementOpacity,
+  defaultOpacityModulator,
+  modulateOpacity,
   withNodeKey,
   withStyleBasic,
  )
@@ -55,6 +56,7 @@ import Monomer (
   box_,
   dropTargetStyle,
   dropTarget_,
+  height,
   ignoreChildrenEvts,
   ignoreEmptyArea,
   keystroke_,
@@ -62,7 +64,6 @@ import Monomer (
   paddingL,
   paddingT,
  )
-import Monomer.Graphics.Lens (HasA (a))
 import Monomer.Widgets (textArea_)
 
 widget :: TaggerModel -> TaggerWidget
@@ -101,7 +102,12 @@ queryTextField =
       )
       [dropTargetStyle [border 1 yuiBlue]]
     . withNodeKey queryTextFieldKey
-    . withStyleBasic [bgColor (yuiLightPeach & a .~ defaultElementOpacity)]
+    . withStyleBasic
+      [ bgColor
+          . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+          $ yuiLightPeach
+      , height 250
+      ]
     $ textArea_
       (fileSelectionModel . queryModel . input . text)
       [ onChange
