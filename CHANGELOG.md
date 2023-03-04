@@ -110,6 +110,7 @@ applied. Not how many times the descriptor is applied.
   a little bit less painful.
 - An issue where spawned shell commands via the UI would block it from updating
 or receiving any input.
+- Changed the query input into a larger area, much like the tagging text field.
 
 ------
 

@@ -356,14 +356,18 @@ queryEventHandler ::
 queryEventHandler _wenv _node model@((^. connection) -> conn) event =
   case event of
     RunQuery ->
-      [ either (const (Event (Unit ()))) runQueryExpressionTask
-          . parseQueryExpression
-          . T.strip
-          $ model ^. fileSelectionModel . queryModel . input . text
-      , Event . Mempty $
-          TaggerLens $
-            fileSelectionModel . queryModel . input . text
-      ]
+      let !rawQuery = T.strip $ model ^. fileSelectionModel . queryModel . input . text
+       in [ either (const (Event . Unit $ ())) runQueryExpressionTask
+              . parseQueryExpression
+              $ rawQuery
+          , Model $
+              model
+                & fileSelectionModel
+                  . queryModel
+                  . input
+                  . history
+                  %~ putHist rawQuery
+          ]
  where
   runQueryExpressionTask =
     Task
@@ -425,18 +429,16 @@ focusedFileEventHandler
   event =
     case event of
       CommitTagText ->
-        anonymousTask $ do
-          _ <-
-            tagFile
-              ( fileId . concreteTaggedFile $
-                  model ^. focusedFileModel . focusedFile
-              )
-              conn
-              ( T.strip $
-                  model ^. focusedFileModel . tagInput . text
-              )
-          callback
-            [ Model $
+        let !tagText = T.strip $ model ^. focusedFileModel . tagInput . text
+         in [ Task $
+                DoFocusedFileEvent RefreshFocusedFileAndSelection
+                  <$ tagFile
+                    ( fileId . concreteTaggedFile $
+                        model ^. focusedFileModel . focusedFile
+                    )
+                    conn
+                    tagText
+            , Model $
                 model
                   & focusedFileModel . tagInput . history
                     %~ putHist
@@ -457,9 +459,9 @@ focusedFileEventHandler
                 concreteTaggedFile $
                   model
                     ^. focusedFileModel . focusedFile
-           in anonymousTask $ do
-                moveTagTask fk
-                callback [Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection]
+           in [ Task $
+                  DoFocusedFileEvent RefreshFocusedFileAndSelection <$ moveTagTask fk
+              ]
          where
           moveTagTask :: RecordKey File -> IO ()
           moveTagTask fk = do

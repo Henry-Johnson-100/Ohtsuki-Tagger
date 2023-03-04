@@ -1,15 +1,14 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Eta reduce" #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Interface.Widget.Internal.Query (
   queryTextFieldKey,
   widget,
 ) where
 
-import Control.Lens ((&), (.~))
 import Data.Event (
   QueryEvent (RunQuery),
   TaggerEvent (
@@ -21,7 +20,13 @@ import Data.Event (
     Unit
   ),
  )
-import Data.Model
+import Data.Model (
+  HasFileSelectionModel (fileSelectionModel),
+  HasInput (input),
+  HasQueryModel (queryModel),
+  TaggerLens (TaggerLens),
+  TaggerModel,
+ )
 import Data.Model.Shared.Lens (
   HasHistoryIndex (historyIndex),
   history,
@@ -42,26 +47,34 @@ import Interface.Theme (
  )
 import Interface.Widget.Internal.Core (
   defaultElementOpacity,
+  defaultOpacityModulator,
+  modulateOpacity,
   withNodeKey,
   withStyleBasic,
  )
-import Interface.Widget.Internal.Type (TaggerWidget)
 import Monomer (
-  CmbAlignBottom (alignBottom),
-  CmbAlignLeft (alignLeft),
-  CmbBgColor (bgColor),
-  CmbBorder (border),
-  CmbIgnoreEmptyArea (ignoreEmptyArea),
-  CmbOnChange (onChange),
-  CmbPaddingL (paddingL),
-  CmbPaddingT (paddingT),
+  WidgetNode,
+  acceptTab,
+  alignBottom,
+  alignLeft,
+  bgColor,
+  border,
   box_,
   dropTargetStyle,
   dropTarget_,
+  height,
+  ignoreChildrenEvts,
+  ignoreEmptyArea,
   keystroke_,
-  textField_,
+  onChange,
+  paddingL,
+  paddingT,
+  textArea_,
+  tooltipDelay,
+  tooltip_,
  )
-import Monomer.Graphics.Lens (HasA (a))
+
+type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
 widget :: TaggerModel -> TaggerWidget
 widget _ =
@@ -70,12 +83,18 @@ widget _ =
 
 queryTextField :: TaggerWidget
 queryTextField =
-  keystroke_
-    [ ("Enter", DoQueryEvent RunQuery)
-    , ("Up", NextHistory $ TaggerLens (fileSelectionModel . queryModel . input))
-    , ("Down", PrevHistory $ TaggerLens (fileSelectionModel . queryModel . input))
+  withStyleBasic
+    [ bgColor
+        . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+        $ yuiLightPeach
     ]
-    []
+    . tooltip_ "Shift-Enter to run query." [tooltipDelay 1500]
+    . keystroke_
+      [ ("Shift-Enter", DoQueryEvent RunQuery)
+      , ("Shift-Up", NextHistory $ TaggerLens (fileSelectionModel . queryModel . input))
+      , ("Shift-Down", PrevHistory $ TaggerLens (fileSelectionModel . queryModel . input))
+      ]
+      [ignoreChildrenEvts]
     . dropTarget_
       ( AppendText (TaggerLens $ fileSelectionModel . queryModel . input . text)
           . descriptor
@@ -99,8 +118,13 @@ queryTextField =
       )
       [dropTargetStyle [border 1 yuiBlue]]
     . withNodeKey queryTextFieldKey
-    . withStyleBasic [bgColor (yuiLightPeach & a .~ defaultElementOpacity)]
-    $ textField_
+    . withStyleBasic
+      [ bgColor
+          . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+          $ yuiLightPeach
+      , height 250
+      ]
+    $ textArea_
       (fileSelectionModel . queryModel . input . text)
       [ onChange
           ( \t ->
@@ -116,17 +140,15 @@ queryTextField =
                       )
                 else Unit ()
           )
+      , acceptTab
       ]
 
 container :: TaggerWidget -> TaggerWidget
 container w =
   withStyleBasic [paddingT 5, paddingL 10]
     . box_ [alignLeft, alignBottom, ignoreEmptyArea]
-    -- . withStyleBasic [borderT 1 black, borderB 1 black, borderR 1 black]
     $ w
 
 queryTextFieldKey :: Text
 queryTextFieldKey = "queryTextField"
 {-# INLINE queryTextFieldKey #-}
-
--- Query builder widget stuff

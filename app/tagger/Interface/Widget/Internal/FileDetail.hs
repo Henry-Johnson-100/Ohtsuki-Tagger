@@ -106,7 +106,7 @@ import Monomer (
   vscroll_,
   vstack,
   vstack_,
-  zstack_,
+  zstack_, CmbIgnoreChildrenEvts (ignoreChildrenEvts)
  )
 import Util (compareConcreteTags)
 
@@ -284,7 +284,7 @@ tagTextField =
     , ("Shift-Up", NextHistory $ TaggerLens (focusedFileModel . tagInput))
     , ("Shift-Down", PrevHistory $ TaggerLens (focusedFileModel . tagInput))
     ]
-    []
+    [ignoreChildrenEvts]
     . dropTarget_
       ( AppendText (TaggerLens $ focusedFileModel . tagInput . text)
           . descriptor
