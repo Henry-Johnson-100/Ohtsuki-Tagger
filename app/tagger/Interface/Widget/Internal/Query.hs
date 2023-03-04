@@ -1,8 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Eta reduce" #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Interface.Widget.Internal.Query (
   queryTextFieldKey,
@@ -46,8 +46,8 @@ import Interface.Widget.Internal.Core (
   withNodeKey,
   withStyleBasic,
  )
-import Interface.Widget.Internal.Type (TaggerWidget)
 import Monomer (
+  WidgetNode,
   acceptTab,
   alignBottom,
   alignLeft,
@@ -63,8 +63,12 @@ import Monomer (
   onChange,
   paddingL,
   paddingT,
+  tooltipDelay,
+  tooltip_,
  )
 import Monomer.Widgets (textArea_)
+
+type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
 widget :: TaggerModel -> TaggerWidget
 widget _ =
@@ -73,12 +77,18 @@ widget _ =
 
 queryTextField :: TaggerWidget
 queryTextField =
-  keystroke_
-    [ ("Shift-Enter", DoQueryEvent RunQuery)
-    , ("Shift-Up", NextHistory $ TaggerLens (fileSelectionModel . queryModel . input))
-    , ("Shift-Down", PrevHistory $ TaggerLens (fileSelectionModel . queryModel . input))
+  withStyleBasic
+    [ bgColor
+        . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+        $ yuiLightPeach
     ]
-    [ignoreChildrenEvts]
+    . tooltip_ "Shift-Enter to run query." [tooltipDelay 1500]
+    . keystroke_
+      [ ("Shift-Enter", DoQueryEvent RunQuery)
+      , ("Shift-Up", NextHistory $ TaggerLens (fileSelectionModel . queryModel . input))
+      , ("Shift-Down", PrevHistory $ TaggerLens (fileSelectionModel . queryModel . input))
+      ]
+      [ignoreChildrenEvts]
     . dropTarget_
       ( AppendText (TaggerLens $ fileSelectionModel . queryModel . input . text)
           . descriptor
