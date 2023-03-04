@@ -111,6 +111,11 @@ applied. Not how many times the descriptor is applied.
 - An issue where spawned shell commands via the UI would block it from updating
 or receiving any input.
 - Changed the query input into a larger area, much like the tagging text field.
+- Stopped updating a last_accessed field in the db on connection.
+  - Consequently, write locks no longer happen when piping YuiTagger output back into
+  a database a la 
+  '`yuitagger data.db -q "p.%" --relative | xargs yuitagger data.db --describe`'
+  making CLI operations more convenient.
 
 ------
 
