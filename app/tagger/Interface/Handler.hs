@@ -434,18 +434,16 @@ focusedFileEventHandler
   event =
     case event of
       CommitTagText ->
-        anonymousTask $ do
-          _ <-
-            tagFile
-              ( fileId . concreteTaggedFile $
-                  model ^. focusedFileModel . focusedFile
-              )
-              conn
-              ( T.strip $
-                  model ^. focusedFileModel . tagInput . text
-              )
-          callback
-            [ Model $
+        let !tagText = T.strip $ model ^. focusedFileModel . tagInput . text
+         in [ Task $
+                DoFocusedFileEvent RefreshFocusedFileAndSelection
+                  <$ tagFile
+                    ( fileId . concreteTaggedFile $
+                        model ^. focusedFileModel . focusedFile
+                    )
+                    conn
+                    tagText
+            , Model $
                 model
                   & focusedFileModel . tagInput . history
                     %~ putHist
