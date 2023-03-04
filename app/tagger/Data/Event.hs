@@ -14,7 +14,6 @@ module Data.Event (
   FileSelectionWidgetEvent (..),
   DescriptorTreeEvent (..),
   FocusedFileEvent (..),
-  TaggerInfoEvent (..),
 ) where
 
 import Data.HashMap.Strict (HashMap)
@@ -40,7 +39,6 @@ data TaggerEvent
   = DoFocusedFileEvent FocusedFileEvent
   | DoFileSelectionEvent FileSelectionEvent
   | DoDescriptorTreeEvent DescriptorTreeEvent
-  | DoTaggerInfoEvent TaggerInfoEvent
   | DoQueryEvent QueryEvent
   | TaggerInit
   | RefreshUI
@@ -137,10 +135,4 @@ data DescriptorTreeEvent
   | RequestFocusedNode Text
   | RequestFocusedNodeParent
   | UpdateDescriptor (RecordKey Descriptor)
-  deriving (Show, Eq)
-
-data TaggerInfoEvent
-  = PutLastAccessed Text
-  | PutLastSaved Text
-  | PutWorkingDirectory Text
   deriving (Show, Eq)

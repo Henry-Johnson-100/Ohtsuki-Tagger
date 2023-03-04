@@ -33,17 +33,14 @@ import Data.Sequence (Seq ((:<|), (:|>)))
 import qualified Data.Sequence as Seq
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Version (showVersion)
 import Database.Tagger
 import Interface.Handler.Internal
 import Interface.Widget.Internal.Query (queryTextFieldKey)
 import Interface.Widget.Internal.Selection (fileSelectionScrollWidgetNodeKey)
 import Monomer
 import Paths_tagger
-import System.Directory (getCurrentDirectory)
 import System.FilePath
 import System.IO
-import Tagger.Info (taggerVersion)
 import Text.TaggerQL
 import Text.TaggerQL.Expression.Engine
 import Text.TaggerQL.Expression.Parser
@@ -64,33 +61,9 @@ taggerEventHandler
       DoFocusedFileEvent e -> focusedFileEventHandler wenv node model e
       DoFileSelectionEvent e -> fileSelectionEventHandler wenv node model e
       DoDescriptorTreeEvent e -> descriptorTreeEventHandler wenv node model e
-      DoTaggerInfoEvent e -> taggerInfoEventHandler wenv node model e
       DoQueryEvent e -> queryEventHandler wenv node model e
       TaggerInit ->
         [ Event (DoDescriptorTreeEvent DescriptorTreeInit)
-        , Task
-            ( DoTaggerInfoEvent . PutWorkingDirectory
-                <$> (T.pack <$> getCurrentDirectory)
-            )
-        , Task
-            ( DoTaggerInfoEvent . PutLastAccessed <$> do
-                la <- runMaybeT $ getLastAccessed conn
-                maybe (return "never") return la
-            )
-        , Task
-            ( DoTaggerInfoEvent . PutLastSaved <$> do
-                la <- runMaybeT $ getLastSaved conn
-                maybe (return "never") return la
-            )
-        , Model $
-            model & taggerInfoModel . Data.Model.version
-              .~ ( T.pack . showVersion $
-                    taggerVersion
-                 )
-              & taggerInfoModel . message
-              .~ "Thank you for using tagger!"
-              & taggerInfoModel . versionMessage
-              .~ mempty
         , SetFocusOnKey . WidgetKey $ queryTextFieldKey
         ]
       RefreshUI ->
@@ -738,18 +711,6 @@ descriptorTreeEventHandler
                     )
                 , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
                 ]
-
-taggerInfoEventHandler ::
-  WidgetEnv TaggerModel TaggerEvent ->
-  WidgetNode TaggerModel TaggerEvent ->
-  TaggerModel ->
-  TaggerInfoEvent ->
-  [AppEventResponse TaggerModel TaggerEvent]
-taggerInfoEventHandler _ _ model e =
-  case e of
-    PutLastAccessed t -> [Model $ model & taggerInfoModel . lastAccessed .~ t]
-    PutLastSaved t -> [Model $ model & taggerInfoModel . lastSaved .~ t]
-    PutWorkingDirectory t -> [Model $ model & taggerInfoModel . workingDirectory .~ t]
 
 toDescriptorInfo :: TaggedConnection -> Descriptor -> IO (IntMap.IntMap DescriptorInfo)
 toDescriptorInfo tc (Descriptor dk p) = do

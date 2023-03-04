@@ -55,7 +55,6 @@ import Control.Monad.Trans.State.Strict (
 import Data.Maybe (isNothing, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Time (getCurrentTime)
 import Data.Version (
   Version,
   makeVersion,
@@ -96,7 +95,7 @@ newtype DatabaseInfoUpdate a = DatabaseInfoUpdate {runDatabaseInfoUpdate :: IO a
 {- |
  Open a new 'TaggedConnection` with the database at the given path.
 
- The connection's label is set to the path and the lastAccessed time and database version
+ The connection's label is set to the path and the database version
  is updated.
 
  If the db info table is not found then the database is initialized, if this is undesired,
@@ -117,15 +116,13 @@ openOrCreate p = do
   unless dbInfoTableExists . runDatabaseInfoUpdate . initializeDatabase $ conn
   runDatabaseInfoUpdate $ do
     patchDatabaseIfRequired bc
-    updateTaggerDBInfoLastAccessed bc
   return conn
 
 {- |
  Like 'openOrCreate` but
   does NOT initialize the database if there is no TaggerDBInfo table.
 
-  WILL attempt to patch the table if there is,
-    as well as update the TaggerDBInfo.lastAccessed column.
+  WILL attempt to patch the table if there is.
 
   Returns a Left value if the specified file does not exist or the table TaggerDBInfo
     cannot be found in it.
@@ -151,7 +148,6 @@ open p = do
     (guard dbInfoTableExists :: ExceptT () IO ())
   liftIO . runDatabaseInfoUpdate $ do
     patchDatabaseIfRequired bc
-    updateTaggerDBInfoLastAccessed bc
   return $ TaggedConnection tagName bc
 
 {- |
@@ -319,18 +315,6 @@ taggerDBInfoTableExists c = do
       \WHERE type = 'table' AND name = 'TaggerDBInfo'" ::
       IO [Simple.Only Int]
   return . all ((> 0) . (\(Simple.Only n) -> n)) $ r
-
-updateTaggerDBInfoLastAccessed :: BareConnection -> DatabaseInfoUpdate ()
-updateTaggerDBInfoLastAccessed bc = DatabaseInfoUpdate $ do
-  currentTime <- getCurrentTime
-  withConnection
-    ( \c ->
-        Simple.execute
-          c
-          "UPDATE TaggerDBInfo SET lastAccessed = ?"
-          [currentTime]
-    )
-    bc
 
 {- |
  Attempts to read the version number from the TaggerDBInfo table.
