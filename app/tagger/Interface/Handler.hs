@@ -338,6 +338,10 @@ addFileEventHandler _wenv _wnode model@((^. connection) -> conn) e =
           ]
     AddFileDone ->
       [Model $ model & fileSelectionModel . addFileModel . inProgress .~ False]
+    AddFilePath fp ->
+      [ Model $ model & fileSelectionModel . addFileModel . inProgress .~ True
+      , Task $ DoAddFileEvent AddFileDone <$ addFiles conn (T.pack fp)
+      ]
     PutDirectoryList fs ->
       [Model $ model & fileSelectionModel . addFileModel . directoryList .~ fs]
     ScanDirectories ->

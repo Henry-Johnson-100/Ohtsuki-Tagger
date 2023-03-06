@@ -11,7 +11,7 @@ module Interface.Widget.Internal.Selection (
 
 import Control.Lens ((&), (.~), (^.))
 import Data.Event (
-  AddFileEvent (AddFiles, ToggleAddFileVisibility),
+  AddFileEvent (AddFilePath, AddFiles, ToggleAddFileVisibility),
   FileSelectionEvent (
     CycleOrderCriteria,
     CycleOrderDirection,
@@ -60,6 +60,7 @@ import Data.Model.Lens (
   HasShellText (shellText),
   TaggerLens (TaggerLens),
   addFileModel,
+  directoryList,
   fileInfoAt,
   fileSelectionTagListModel,
   inProgress,
@@ -571,12 +572,32 @@ addFilesWidget m =
         (DoAddFileEvent ToggleAddFileVisibility)
 
   addFileAltVisWidget =
-    vstack_
-      []
-      [ label_ "WIP" [resizeFactor (-1)]
-      , closeScanDirectoriesButton
+    zstack_
+      [onlyTopActive]
+      [ withNodeVisible
+          (not $ m ^. fileSelectionModel . addFileModel . inProgress)
+          $ vstack_ [] [directoryListWidget, closeScanDirectoriesButton]
+      , withNodeVisible (m ^. fileSelectionModel . addFileModel . inProgress) $
+          label_ "Adding Files..." [resizeFactor (-1)]
       ]
    where
+    directoryListWidget =
+      withStyleBasic
+        [ bgColor
+            . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+            $ yuiLightPeach
+        ]
+        . tooltip_ "Click a path to add its contents" [tooltipDelay 1500]
+        . vscroll_ [wheelRate 50]
+        . vstack_ []
+        . map
+          ( \dirPath ->
+              styledButton_
+                [resizeFactor (-1)]
+                (T.pack dirPath)
+                (DoAddFileEvent . AddFilePath $ dirPath)
+          )
+        $ m ^. fileSelectionModel . addFileModel . directoryList
     closeScanDirectoriesButton =
       styledButton_
         [resizeFactor (-1)]

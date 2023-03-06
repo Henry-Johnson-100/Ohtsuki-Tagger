@@ -103,6 +103,7 @@ data FileSelectionEvent
 data AddFileEvent
   = AddFiles
   | AddFileDone
+  | AddFilePath FilePath
   | PutDirectoryList [FilePath]
   | ScanDirectories
   | ToggleAddFileVisibility
