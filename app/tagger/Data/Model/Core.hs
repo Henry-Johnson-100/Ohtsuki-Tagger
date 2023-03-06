@@ -22,6 +22,7 @@ module Data.Model.Core (
   FocusedFileModel (..),
   focusedFileDefaultDataFile,
   focusedFileDefaultRecordKey,
+  TagInputModel (..),
   DescriptorTreeModel (..),
   DescriptorInfo (..),
   createDescriptorInfo,
@@ -212,6 +213,22 @@ createFocusedFileModel fp =
     , _focusedfilemodelRenderability = RenderingNotSupported
     , _focusedfilemodelFocusedFileVis = VisibilityMain
     , _focusedfilemodelTagInput = createTextInput 10
+    }
+
+data TagInputModel = TagInputModel
+  { _taginputInput :: TextInput
+  , _taginputVisibility :: Visibility
+  , _taginputIsTagSelection :: Bool
+  , _taginputIsDeleteTag :: Bool
+  }
+
+createTagInputModel :: TagInputModel
+createTagInputModel =
+  TagInputModel
+    { _taginputInput = createTextInput 10
+    , _taginputVisibility = VisibilityMain
+    , _taginputIsTagSelection = False
+    , _taginputIsDeleteTag = False
     }
 
 focusedFileDefaultDataFile :: FilePath

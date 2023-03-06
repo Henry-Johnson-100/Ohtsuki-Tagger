@@ -34,6 +34,7 @@ import Data.Model.Core (
   FocusedFileModel,
   PositioningModel,
   QueryModel,
+  TagInputModel,
   TaggerModel,
   createDescriptorInfo,
   createFileInfo,
@@ -54,6 +55,8 @@ makeLensesWith abbreviatedFields ''TaggerModel
 makeLensesWith abbreviatedFields ''DescriptorTreeModel
 
 makeLensesWith abbreviatedFields ''FocusedFileModel
+
+makeLensesWith abbreviatedFields ''TagInputModel
 
 makeLensesWith abbreviatedFields ''DescriptorInfo
 
