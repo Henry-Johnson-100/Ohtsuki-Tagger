@@ -116,6 +116,7 @@ or receiving any input.
   a database a la 
   '`yuitagger data.db -q "p.%" --relative | xargs yuitagger data.db --describe`'
   making CLI operations more convenient.
+- Added some visual feedback when files are being added to the database via the textfield.
 
 ------
 
