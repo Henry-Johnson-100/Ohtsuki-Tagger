@@ -63,6 +63,7 @@ taggerEventHandler
       DoFileSelectionEvent e -> fileSelectionEventHandler wenv node model e
       DoDescriptorTreeEvent e -> descriptorTreeEventHandler wenv node model e
       DoQueryEvent e -> queryEventHandler wenv node model e
+      DoTagInputEvent e -> tagInputEventHandler wenv node model e
       TaggerInit ->
         [ Event (DoDescriptorTreeEvent DescriptorTreeInit)
         , SetFocusOnKey . WidgetKey $ queryTextFieldKey
@@ -593,6 +594,16 @@ focusedFileEventHandler
         [ Task (Unit <$> unSubTags [tk] conn)
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
+
+tagInputEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  TagInputEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+tagInputEventHandler _wenv _wnode model@((^. connection) -> conn) e =
+  case e of
+    TagInputEvent -> []
 
 {- |
  Performs some IO then executes the returned 'AppEventResponse`s

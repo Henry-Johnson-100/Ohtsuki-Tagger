@@ -15,6 +15,7 @@ module Data.Event (
   FileSelectionWidgetEvent (..),
   DescriptorTreeEvent (..),
   FocusedFileEvent (..),
+  TagInputEvent (..),
 ) where
 
 import Data.HashMap.Strict (HashMap)
@@ -42,6 +43,7 @@ data TaggerEvent
   | DoFileSelectionEvent FileSelectionEvent
   | DoDescriptorTreeEvent DescriptorTreeEvent
   | DoQueryEvent QueryEvent
+  | DoTagInputEvent TagInputEvent
   | TaggerInit
   | RefreshUI
   | CloseConnection
@@ -129,6 +131,9 @@ data FocusedFileEvent
   | TagFile (RecordKey Descriptor) (Maybe (RecordKey Tag))
   | UnSubTag (RecordKey Tag)
   deriving (Show, Eq)
+
+data TagInputEvent
+  = TagInputEvent
 
 data DescriptorTreeEvent
   = CreateRelation Descriptor Descriptor
