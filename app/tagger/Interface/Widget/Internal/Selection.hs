@@ -87,6 +87,8 @@ import Database.Tagger (Descriptor (descriptor), File (File), descriptorId)
 import Interface.Theme (yuiLightPeach, yuiRed)
 import Interface.Widget.Internal.Core (
   defaultElementOpacity,
+  defaultOpacityModulator,
+  modulateOpacity,
   styledButton_,
   withNodeKey,
   withNodeVisible,
@@ -153,7 +155,10 @@ widget m =
     , zstack_
         []
         [ withNodeVisible (not selectionIsVisible) $ tagListWidget m
-        , withNodeVisible selectionIsVisible $ fileSelectionFileList m
+        , withNodeVisible selectionIsVisible . vstack_ [] $
+            [ fileSelectionFileList m
+            , addFilesWidget m
+            ]
         ]
     ]
  where
@@ -276,7 +281,7 @@ fileSelectionFileList m =
         [ wheelRate 50
         ]
       . vstack_ []
-      . flip (|>) (hstack [toggleFileEditMode, addFilesWidget m])
+      . flip (|>) toggleFileEditMode
       $ ( fmap fileSelectionLeaf renderedChunks
             Seq.>< Seq.fromList fileListPaginationWidgets
         )
@@ -324,8 +329,6 @@ fileSelectionFileList m =
                   , neq chunkSequence
                   , neq chunkSize
                   , neq fileSelectionVis
-                  , neq (addFileModel . input . text)
-                  , neq (addFileModel . inProgress)
                   ]
         )
   renderedChunks =
@@ -495,11 +498,16 @@ shuffleSelectionButton =
 
 addFilesWidget :: TaggerModel -> TaggerWidget
 addFilesWidget m =
-  keystroke
-    [ ("Enter", DoAddFileEvent AddFiles)
-    , ("Up", NextHistory $ TaggerLens (fileSelectionModel . addFileModel . input))
-    , ("Down", PrevHistory $ TaggerLens (fileSelectionModel . addFileModel . input))
+  box_
+    [ mergeRequired $ \_wenv x y ->
+        (x ^. fileSelectionModel . addFileModel)
+          /= (y ^. fileSelectionModel . addFileModel)
     ]
+    . keystroke
+      [ ("Enter", DoAddFileEvent AddFiles)
+      , ("Up", NextHistory $ TaggerLens (fileSelectionModel . addFileModel . input))
+      , ("Down", PrevHistory $ TaggerLens (fileSelectionModel . addFileModel . input))
+      ]
     $ zstack_
       [onlyTopActive]
       [ withNodeVisible (m ^. fileSelectionModel . addFileModel . inProgress) $
@@ -513,23 +521,28 @@ addFilesWidget m =
           hstack_
             []
             [ styledButton_ [resizeFactor (-1)] "Add" (DoAddFileEvent AddFiles)
-            , textField_
-                (fileSelectionModel . addFileModel . input . text)
-                [ onChange
-                    ( \t ->
-                        if T.null t
-                          then
-                            Mempty $
-                              TaggerLens
-                                ( fileSelectionModel
-                                    . addFileModel
-                                    . input
-                                    . history
-                                    . historyIndex
-                                )
-                          else Unit ()
-                    )
+            , withStyleBasic
+                [ bgColor
+                    . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+                    $ yuiLightPeach
                 ]
+                $ textField_
+                  (fileSelectionModel . addFileModel . input . text)
+                  [ onChange
+                      ( \t ->
+                          if T.null t
+                            then
+                              Mempty $
+                                TaggerLens
+                                  ( fileSelectionModel
+                                      . addFileModel
+                                      . input
+                                      . history
+                                      . historyIndex
+                                  )
+                            else Unit ()
+                      )
+                  ]
             ]
       ]
 
