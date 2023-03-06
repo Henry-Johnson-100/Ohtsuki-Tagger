@@ -342,6 +342,14 @@ addFileEventHandler _wenv _wnode model@((^. connection) -> conn) e =
       [Model $ model & fileSelectionModel . addFileModel . directoryList .~ fs]
     ScanDirectories ->
       [Task $ DoAddFileEvent . PutDirectoryList <$> getDirectories conn]
+    ToggleAddFileVisibility ->
+      let !currentVis = model ^. fileSelectionModel . addFileModel . visibility
+       in [ -- Scan directories if the new visibility is showing the directory list
+            if hasVis VisibilityMain currentVis
+              then Event . DoAddFileEvent $ ScanDirectories
+              else Event (Unit ())
+          , Model $ model & fileSelectionModel . addFileModel . visibility %~ toggleAltVis
+          ]
 
 queryEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->

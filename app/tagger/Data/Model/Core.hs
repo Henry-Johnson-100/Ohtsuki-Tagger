@@ -110,6 +110,10 @@ createFileSelectionModel =
 
 data AddFileModel = AddFileModel
   { _addfileDirectoryList :: [FilePath]
+  , -- | 'VisibilityMain` is a textfield
+    --
+    -- 'VisibilityAlt` is a list of directories to scan
+    _addfileVisibility :: Visibility
   , _addfileInput :: TextInput
   , _addfileInProgress :: Bool
   }
@@ -119,6 +123,7 @@ createAddFileModel :: AddFileModel
 createAddFileModel =
   AddFileModel
     { _addfileDirectoryList = []
+    , _addfileVisibility = VisibilityMain
     , _addfileInput = createTextInput 10
     , _addfileInProgress = False
     }

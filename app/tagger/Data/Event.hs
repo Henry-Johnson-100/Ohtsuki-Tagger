@@ -105,6 +105,7 @@ data AddFileEvent
   | AddFileDone
   | PutDirectoryList [FilePath]
   | ScanDirectories
+  | ToggleAddFileVisibility
 
 data QueryEvent
   = RunQuery
