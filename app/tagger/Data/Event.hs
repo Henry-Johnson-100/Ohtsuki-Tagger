@@ -74,9 +74,7 @@ instance Show TaggerAnonymousEvent where
   show _ = "TaggerAnonymousEvent"
 
 data FileSelectionEvent
-  = AddFiles
-  | AddFileDone
-  | CycleNextFile
+  = CycleNextFile
   | CycleOrderCriteria
   | CycleOrderDirection
   | CyclePrevFile
@@ -103,7 +101,9 @@ data FileSelectionEvent
   deriving (Show, Eq)
 
 data AddFileEvent
-  = PutDirectoryList [FilePath]
+  = AddFiles
+  | AddFileDone
+  | PutDirectoryList [FilePath]
   | ScanDirectories
 
 data QueryEvent
