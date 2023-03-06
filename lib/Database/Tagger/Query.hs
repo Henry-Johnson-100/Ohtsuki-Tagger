@@ -762,7 +762,7 @@ getLastSaved tc = do
 getDirectories :: TaggedConnection -> IO [FilePath]
 getDirectories =
   fmap
-    (L.sort . L.nub . map (FilePath.takeDirectory . T.unpack . filePath))
+    (L.sort . L.nub . map (FilePath.dropFileName . T.unpack . filePath))
     . allFiles
 
 {- |
