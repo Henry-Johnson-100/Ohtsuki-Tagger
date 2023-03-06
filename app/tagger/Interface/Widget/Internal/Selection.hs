@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# HLINT ignore "Use ||" #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Interface.Widget.Internal.Selection (
@@ -57,6 +58,7 @@ import Data.Model.Lens (
   HasSelection (selection),
   HasShellText (shellText),
   TaggerLens (TaggerLens),
+  addFileInProgress,
   addFileInput,
   fileInfoAt,
   fileSelectionTagListModel,
@@ -124,6 +126,7 @@ import Monomer (
   label,
   label_,
   numericField_,
+  onlyTopActive,
   separatorLine,
   textFieldV,
   textField_,
@@ -271,7 +274,7 @@ fileSelectionFileList m =
         [ wheelRate 50
         ]
       . vstack_ []
-      . flip (|>) (hstack [toggleFileEditMode, addFilesWidget])
+      . flip (|>) (hstack [toggleFileEditMode, addFilesWidget m])
       $ ( fmap fileSelectionLeaf renderedChunks
             Seq.>< Seq.fromList fileListPaginationWidgets
         )
@@ -320,6 +323,7 @@ fileSelectionFileList m =
                   , neq chunkSize
                   , neq fileSelectionVis
                   , neq (addFileInput . text)
+                  , neq addFileInProgress
                   ]
         )
   renderedChunks =
@@ -487,32 +491,43 @@ shuffleSelectionButton =
     "Shuffle"
     (DoFileSelectionEvent ShuffleSelection)
 
-addFilesWidget :: TaggerWidget
-addFilesWidget =
+addFilesWidget :: TaggerModel -> TaggerWidget
+addFilesWidget m =
   keystroke
     [ ("Enter", DoFileSelectionEvent AddFiles)
     , ("Up", NextHistory $ TaggerLens (fileSelectionModel . addFileInput))
     , ("Down", PrevHistory $ TaggerLens (fileSelectionModel . addFileInput))
     ]
-    $ hstack_
-      []
-      [ styledButton_ [resizeFactor (-1)] "Add" (DoFileSelectionEvent AddFiles)
-      , textField_
-          (fileSelectionModel . addFileInput . text)
-          [ onChange
-              ( \t ->
-                  if T.null t
-                    then
-                      Mempty $
-                        TaggerLens
-                          ( fileSelectionModel
-                              . addFileInput
-                              . history
-                              . historyIndex
-                          )
-                    else Unit ()
-              )
-          ]
+    $ zstack_
+      [onlyTopActive]
+      [ withNodeVisible (m ^. fileSelectionModel . addFileInProgress) $
+          label_
+            ( "Adding files from '"
+                <> m ^. fileSelectionModel . addFileInput . text
+                <> "'"
+            )
+            [resizeFactor (-1)]
+      , withNodeVisible (not $ m ^. fileSelectionModel . addFileInProgress) $
+          hstack_
+            []
+            [ styledButton_ [resizeFactor (-1)] "Add" (DoFileSelectionEvent AddFiles)
+            , textField_
+                (fileSelectionModel . addFileInput . text)
+                [ onChange
+                    ( \t ->
+                        if T.null t
+                          then
+                            Mempty $
+                              TaggerLens
+                                ( fileSelectionModel
+                                    . addFileInput
+                                    . history
+                                    . historyIndex
+                                )
+                          else Unit ()
+                    )
+                ]
+            ]
       ]
 
 toggleFileEditMode :: TaggerWidget

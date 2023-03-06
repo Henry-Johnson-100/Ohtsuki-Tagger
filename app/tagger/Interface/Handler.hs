@@ -116,12 +116,16 @@ fileSelectionEventHandler
     case event of
       AddFiles ->
         let !currentAddFileText = model ^. fileSelectionModel . addFileInput . text
-         in [ Task (Unit <$> addFiles conn currentAddFileText)
-            , Model $
-                model & fileSelectionModel . addFileInput . history
-                  %~ putHist (T.strip currentAddFileText)
-            , Event . Mempty $ TaggerLens (fileSelectionModel . addFileInput . text)
+         in [ Model $
+                model & fileSelectionModel . addFileInProgress .~ True
+                  & fileSelectionModel . addFileInput . history
+                    %~ putHist (T.strip currentAddFileText)
+            , Task $
+                DoFileSelectionEvent AddFileDone
+                  <$ addFiles conn currentAddFileText
             ]
+      AddFileDone ->
+        [Model $ model & fileSelectionModel . addFileInProgress .~ False]
       CycleNextFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []

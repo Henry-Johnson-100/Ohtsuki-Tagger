@@ -88,6 +88,7 @@ data FileSelectionModel = FileSelectionModel
   , _fileselectionFileSelectionInfoMap :: IntMap FileInfo
   , _fileselectionFileSelectionVis :: Visibility
   , _fileselectionAddFileInput :: TextInput
+  , _fileselectionAddFileInProgress :: Bool
   , _fileselectionIsMassOpMode :: Bool
   }
   deriving (Show, Eq)
@@ -104,6 +105,7 @@ createFileSelectionModel =
     , _fileselectionFileSelectionInfoMap = IntMap.empty
     , _fileselectionFileSelectionVis = VisibilityMain
     , _fileselectionAddFileInput = createTextInput 10
+    , _fileselectionAddFileInProgress = False
     , _fileselectionIsMassOpMode = False
     }
 
