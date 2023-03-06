@@ -58,6 +58,7 @@ taggerEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
+      DoAddFileEvent e -> addFileEventHandler wenv node model e
       DoFocusedFileEvent e -> focusedFileEventHandler wenv node model e
       DoFileSelectionEvent e -> fileSelectionEventHandler wenv node model e
       DoDescriptorTreeEvent e -> descriptorTreeEventHandler wenv node model e
@@ -323,6 +324,19 @@ fileSelectionEventHandler
                 . fileSelectionVis
               %~ toggleAltVis
         ]
+
+addFileEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  AddFileEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+addFileEventHandler _wenv _wnode model@(_taggerModelConnection -> conn) e =
+  case e of
+    PutDirectoryList fs ->
+      [Model $ model & fileSelectionModel . addFileModel . directoryList .~ fs]
+    ScanDirectories ->
+      [Task $ DoAddFileEvent . PutDirectoryList <$> getDirectories conn]
 
 queryEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->

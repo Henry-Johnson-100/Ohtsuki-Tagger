@@ -11,6 +11,7 @@ module Data.Model.Core (
   TaggerModel (..),
   createTaggerModel,
   FileSelectionModel (..),
+  AddFileModel (..),
   QueryModel (..),
   getSelectionChunk,
   selectionChunkLength,
@@ -81,6 +82,7 @@ createTaggerModel tc d unRelatedD defaultFilePath =
 data FileSelectionModel = FileSelectionModel
   { _fileselectionTagList :: FileSelectionTagListModel
   , _fileselectionQueryModel :: QueryModel
+  , _fileselectionAddFileModel :: AddFileModel
   , _fileselectionSelection :: Seq File
   , _fileselectionCurrentChunk :: Int
   , _fileselectionChunkSize :: Int
@@ -98,6 +100,7 @@ createFileSelectionModel =
   FileSelectionModel
     { _fileselectionTagList = createFileSelectionTagListModel
     , _fileselectionQueryModel = createQueryModel
+    , _fileselectionAddFileModel = createAddFileModel
     , _fileselectionSelection = S.empty
     , _fileselectionCurrentChunk = 0
     , _fileselectionChunkSize = 50
@@ -107,6 +110,17 @@ createFileSelectionModel =
     , _fileselectionAddFileInput = createTextInput 10
     , _fileselectionAddFileInProgress = False
     , _fileselectionIsMassOpMode = False
+    }
+
+data AddFileModel = AddFileModel
+  { _addfileDirectoryList :: [FilePath]
+  }
+  deriving (Show, Eq)
+
+createAddFileModel :: AddFileModel
+createAddFileModel =
+  AddFileModel
+    { _addfileDirectoryList = []
     }
 
 data QueryModel = QueryModel
