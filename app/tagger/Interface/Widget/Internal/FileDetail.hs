@@ -12,16 +12,13 @@ module Interface.Widget.Internal.FileDetail (
 import Control.Lens ((^.))
 import Data.Event (
   FileSelectionEvent (RenameFile),
-  FocusedFileEvent (
-    CommitTagText,
-    DeleteTag,
-    MoveTag,
-    TagFile
-  ),
+  FocusedFileEvent (DeleteTag, MoveTag, TagFile),
+  TagInputEvent (RunTagExpression),
   TaggerEvent (
     AppendText,
     DoFileSelectionEvent,
     DoFocusedFileEvent,
+    DoTagInputEvent,
     Mempty,
     NextHistory,
     PrevHistory,
@@ -40,9 +37,10 @@ import Data.Model.Lens (
   HasFocusedFile (focusedFile),
   HasFocusedFileModel (focusedFileModel),
   HasFocusedFileVis (focusedFileVis),
+  HasInput (input),
+  HasTagInputModel (tagInputModel),
   TaggerLens (TaggerLens),
   fileInfoAt,
-  tagInput,
  )
 import Data.Model.Shared.Core (
   Visibility (VisibilityLabel),
@@ -80,6 +78,7 @@ import Monomer (
   CmbAlignTop (alignTop),
   CmbBgColor (bgColor),
   CmbBorder (border),
+  CmbIgnoreChildrenEvts (ignoreChildrenEvts),
   CmbMaxHeight (maxHeight),
   CmbOnChange (onChange),
   CmbPaddingR (paddingR),
@@ -106,7 +105,7 @@ import Monomer (
   vscroll_,
   vstack,
   vstack_,
-  zstack_, CmbIgnoreChildrenEvts (ignoreChildrenEvts)
+  zstack_,
  )
 import Util (compareConcreteTags)
 
@@ -280,19 +279,19 @@ tagTextNodeKey = "tag-text-field"
 tagTextField :: TaggerWidget
 tagTextField =
   keystroke_
-    [ ("Shift-Enter", DoFocusedFileEvent CommitTagText)
-    , ("Shift-Up", NextHistory $ TaggerLens (focusedFileModel . tagInput))
-    , ("Shift-Down", PrevHistory $ TaggerLens (focusedFileModel . tagInput))
+    [ ("Shift-Enter", DoTagInputEvent RunTagExpression)
+    , ("Shift-Up", NextHistory $ TaggerLens (tagInputModel . input))
+    , ("Shift-Down", PrevHistory $ TaggerLens (tagInputModel . input))
     ]
     [ignoreChildrenEvts]
     . dropTarget_
-      ( AppendText (TaggerLens $ focusedFileModel . tagInput . text)
+      ( AppendText (TaggerLens $ tagInputModel . input . text)
           . descriptor
           . concreteTagDescriptor
       )
       [dropTargetStyle [border 1 yuiRed]]
     . dropTarget_
-      (AppendText (TaggerLens $ focusedFileModel . tagInput . text) . descriptor)
+      (AppendText (TaggerLens $ tagInputModel . input . text) . descriptor)
       [dropTargetStyle [border 1 yuiBlue]]
     . withNodeKey tagTextNodeKey
     . withStyleBasic
@@ -303,15 +302,15 @@ tagTextField =
       , maxHeight 250
       ]
     $ textArea_
-      (focusedFileModel . tagInput . text)
+      (tagInputModel . input . text)
       [ onChange
           ( \t ->
               if T.null . T.strip $ t
                 then
                   Mempty $
                     TaggerLens
-                      ( focusedFileModel
-                          . tagInput
+                      ( tagInputModel
+                          . input
                           . history
                           . historyIndex
                       )

@@ -445,26 +445,6 @@ focusedFileEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
-      CommitTagText ->
-        let !tagText = T.strip $ model ^. focusedFileModel . tagInput . text
-         in [ Task $
-                DoFocusedFileEvent RefreshFocusedFileAndSelection
-                  <$ tagFile
-                    ( fileId . concreteTaggedFile $
-                        model ^. focusedFileModel . focusedFile
-                    )
-                    conn
-                    tagText
-            , Model $
-                model
-                  & focusedFileModel . tagInput . history
-                    %~ putHist
-                      (T.strip $ model ^. focusedFileModel . tagInput . text)
-            , Event
-                . Mempty
-                $ TaggerLens (focusedFileModel . tagInput . text)
-            , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
-            ]
       DeleteTag t ->
         [ Task (Unit <$> deleteTags [t] conn)
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection

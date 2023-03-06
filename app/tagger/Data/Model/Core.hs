@@ -204,7 +204,6 @@ data FocusedFileModel = FocusedFileModel
   { _focusedfilemodelFocusedFile :: ConcreteTaggedFile
   , _focusedfilemodelRenderability :: Renderability
   , _focusedfilemodelFocusedFileVis :: Visibility
-  , _focusedfilemodelTagInput :: TextInput
   }
   deriving (Show, Eq)
 
@@ -215,7 +214,6 @@ createFocusedFileModel fp =
         ConcreteTaggedFile (File focusedFileDefaultRecordKey fp) empty
     , _focusedfilemodelRenderability = RenderingNotSupported
     , _focusedfilemodelFocusedFileVis = VisibilityMain
-    , _focusedfilemodelTagInput = createTextInput 10
     }
 
 data TagInputModel = TagInputModel

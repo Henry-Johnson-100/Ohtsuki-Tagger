@@ -121,8 +121,7 @@ data FileSelectionWidgetEvent
   deriving (Show, Eq)
 
 data FocusedFileEvent
-  = CommitTagText
-  | DeleteTag (RecordKey Tag)
+  = DeleteTag (RecordKey Tag)
   | MoveTag ConcreteTag (Maybe (RecordKey Tag))
   | PutConcreteFile ConcreteTaggedFile
   | PutFile File
