@@ -65,12 +65,13 @@ import Data.Model.Lens (
   inProgress,
   include,
   input,
+  visibility,
  )
 import Data.Model.Shared.Core (
   OrderBy (OrderBy),
   OrderCriteria (Alphabetic, Numeric),
   OrderDirection (Asc, Desc),
-  Visibility (VisibilityAlt, VisibilityLabel),
+  Visibility (VisibilityAlt, VisibilityLabel, VisibilityMain),
   hasVis,
  )
 import Data.Model.Shared.Lens (
@@ -505,6 +506,14 @@ addFilesWidget m =
     ]
     $ zstack_
       [onlyTopActive]
+      [ withNodeVisible
+          (hasVis VisibilityMain $ m ^. fileSelectionModel . addFileModel . visibility)
+          addFileMainVisWidget
+      ]
+ where
+  addFileMainVisWidget =
+    zstack_
+      [onlyTopActive]
       [ withNodeVisible (m ^. fileSelectionModel . addFileModel . inProgress) $
           label_
             ( "Adding files from '"
@@ -516,41 +525,41 @@ addFilesWidget m =
           (not $ m ^. fileSelectionModel . addFileModel . inProgress)
           addFileTextField
       ]
- where
-  addFileTextField =
-    keystroke
-      [ ("Enter", DoAddFileEvent AddFiles)
-      , ("Up", NextHistory $ TaggerLens (fileSelectionModel . addFileModel . input))
-      , ("Down", PrevHistory $ TaggerLens (fileSelectionModel . addFileModel . input))
-      ]
-      . withStyleBasic
-        [ bgColor
-            . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
-            $ yuiLightPeach
+   where
+    addFileTextField =
+      keystroke
+        [ ("Enter", DoAddFileEvent AddFiles)
+        , ("Up", NextHistory $ TaggerLens (fileSelectionModel . addFileModel . input))
+        , ("Down", PrevHistory $ TaggerLens (fileSelectionModel . addFileModel . input))
         ]
-      . tooltip_ "Enter to add file path" [tooltipDelay 1500]
-      . withStyleBasic
-        [ bgColor
-            . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
-            $ yuiLightPeach
-        ]
-      $ textField_
-        (fileSelectionModel . addFileModel . input . text)
-        [ onChange
-            ( \t ->
-                if T.null t
-                  then
-                    Mempty $
-                      TaggerLens
-                        ( fileSelectionModel
-                            . addFileModel
-                            . input
-                            . history
-                            . historyIndex
-                        )
-                  else Unit ()
-            )
-        ]
+        . withStyleBasic
+          [ bgColor
+              . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+              $ yuiLightPeach
+          ]
+        . tooltip_ "Enter to add file path" [tooltipDelay 1500]
+        . withStyleBasic
+          [ bgColor
+              . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+              $ yuiLightPeach
+          ]
+        $ textField_
+          (fileSelectionModel . addFileModel . input . text)
+          [ onChange
+              ( \t ->
+                  if T.null t
+                    then
+                      Mempty $
+                        TaggerLens
+                          ( fileSelectionModel
+                              . addFileModel
+                              . input
+                              . history
+                              . historyIndex
+                          )
+                    else Unit ()
+              )
+          ]
 
 toggleFileEditMode :: TaggerWidget
 toggleFileEditMode =
