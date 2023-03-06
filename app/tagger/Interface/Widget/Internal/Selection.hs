@@ -11,7 +11,7 @@ module Interface.Widget.Internal.Selection (
 
 import Control.Lens ((&), (.~), (^.))
 import Data.Event (
-  AddFileEvent (AddFiles),
+  AddFileEvent (AddFiles, ToggleAddFileVisibility),
   FileSelectionEvent (
     CycleOrderCriteria,
     CycleOrderDirection,
@@ -509,6 +509,9 @@ addFilesWidget m =
       [ withNodeVisible
           (hasVis VisibilityMain $ m ^. fileSelectionModel . addFileModel . visibility)
           addFileMainVisWidget
+      , withNodeVisible
+          (hasVis VisibilityAlt $ m ^. fileSelectionModel . addFileModel . visibility)
+          addFileAltVisWidget
       ]
  where
   addFileMainVisWidget =
@@ -523,7 +526,7 @@ addFilesWidget m =
             [resizeFactor (-1)]
       , withNodeVisible
           (not $ m ^. fileSelectionModel . addFileModel . inProgress)
-          addFileTextField
+          $ hstack_ [] [addFileTextField, scanDirectoriesButton]
       ]
    where
     addFileTextField =
@@ -560,6 +563,25 @@ addFilesWidget m =
                     else Unit ()
               )
           ]
+
+    scanDirectoriesButton =
+      styledButton_
+        [resizeFactor (-1)]
+        "Directories"
+        (DoAddFileEvent ToggleAddFileVisibility)
+
+  addFileAltVisWidget =
+    vstack_
+      []
+      [ label_ "WIP" [resizeFactor (-1)]
+      , closeScanDirectoriesButton
+      ]
+   where
+    closeScanDirectoriesButton =
+      styledButton_
+        [resizeFactor (-1)]
+        "Close"
+        (DoAddFileEvent ToggleAddFileVisibility)
 
 toggleFileEditMode :: TaggerWidget
 toggleFileEditMode =
