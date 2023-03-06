@@ -133,7 +133,7 @@ data FocusedFileEvent
   deriving (Show, Eq)
 
 data TagInputEvent
-  = TagInputEvent
+  = ToggleTagInputOptionPane
 
 data DescriptorTreeEvent
   = CreateRelation Descriptor Descriptor

@@ -23,6 +23,7 @@ module Data.Model.Core (
   focusedFileDefaultDataFile,
   focusedFileDefaultRecordKey,
   TagInputModel (..),
+  tagInputOptionPaneLabel,
   DescriptorTreeModel (..),
   DescriptorInfo (..),
   createDescriptorInfo,
@@ -53,6 +54,7 @@ data TaggerModel = TaggerModel
   { _taggermodelDescriptorTreeModel :: DescriptorTreeModel
   , _taggermodelFocusedFileModel :: FocusedFileModel
   , _taggermodelFileSelectionModel :: FileSelectionModel
+  , _taggermodelTagInputModel :: TagInputModel
   , _taggermodelPositioningModel :: PositioningModel
   , _taggermodelVisibilityModel :: Visibility
   , _taggermodelConnection :: TaggedConnection
@@ -75,6 +77,7 @@ createTaggerModel tc d unRelatedD defaultFilePath =
     , _taggermodelFocusedFileModel = createFocusedFileModel defaultFilePath
     , _taggermodelFileSelectionModel = createFileSelectionModel
     , _taggermodelPositioningModel = createPositioningModel
+    , _taggermodelTagInputModel = createTagInputModel
     , _taggermodelVisibilityModel = VisibilityMain
     , _taggermodelConnection = tc
     , _taggerShellText = ""
@@ -220,7 +223,7 @@ data TagInputModel = TagInputModel
   , _taginputVisibility :: Visibility
   , _taginputIsTagSelection :: Bool
   , _taginputIsDeleteTag :: Bool
-  }
+  } deriving (Show, Eq)
 
 createTagInputModel :: TagInputModel
 createTagInputModel =
@@ -230,6 +233,9 @@ createTagInputModel =
     , _taginputIsTagSelection = False
     , _taginputIsDeleteTag = False
     }
+
+tagInputOptionPaneLabel :: Text
+tagInputOptionPaneLabel = "tagInputOptionPaneLabel"
 
 focusedFileDefaultDataFile :: FilePath
 focusedFileDefaultDataFile = "resources/Yui_signature_SS.png"

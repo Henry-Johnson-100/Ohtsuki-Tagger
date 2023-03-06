@@ -603,7 +603,11 @@ tagInputEventHandler ::
   [AppEventResponse TaggerModel TaggerEvent]
 tagInputEventHandler _wenv _wnode model@((^. connection) -> conn) e =
   case e of
-    TagInputEvent -> []
+    ToggleTagInputOptionPane ->
+      [ Model $
+          model & tagInputModel . visibility
+            %~ togglePaneVis (VisibilityLabel tagInputOptionPaneLabel)
+      ]
 
 {- |
  Performs some IO then executes the returned 'AppEventResponse`s
