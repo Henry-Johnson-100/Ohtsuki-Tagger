@@ -146,7 +146,8 @@ library tagger-lib
                       ,raw-strings-qq
                       ,time == 1.9.3
                       ,parsec
-                      ,directory
+                      ,directory == 1.3.6.0
+                      ,filepath == 1.4.2.1
 
   default-language:    Haskell2010
 

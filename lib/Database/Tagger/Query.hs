@@ -99,6 +99,7 @@ module Database.Tagger.Query (
   getTagOccurrencesByDescriptorKeys,
   getLastAccessed,
   getLastSaved,
+  getDirectories,
 
   -- * Operations
   -- $Operations
@@ -135,6 +136,7 @@ import Data.Bifunctor (second)
 import qualified Data.HashSet as HashSet
 import Data.HierarchyMap (HierarchyMap)
 import qualified Data.HierarchyMap as HAM
+import qualified Data.List as L
 import Data.Maybe (catMaybes, fromMaybe, isNothing)
 import qualified Data.OccurrenceMap.Internal as OM
 import Data.Text (Text)
@@ -158,7 +160,9 @@ import Database.Tagger.Type (
   RecordKey,
   Tag (Tag, tagSubtagOfId),
   TaggedConnection,
+  filePath,
  )
+import qualified System.FilePath as FilePath
 import Tagger.Util (catMaybeTM, head', hoistMaybe)
 import Text.RawString.QQ (r)
 
@@ -751,6 +755,15 @@ getLastSaved tc = do
     SELECT lastBackup
     FROM TaggerDBInfo
     |]
+
+{- |
+ Returns a sorted list of all directories of files stored in the database.
+-}
+getDirectories :: TaggedConnection -> IO [FilePath]
+getDirectories =
+  fmap
+    (L.sort . L.nub . map (FilePath.takeDirectory . T.unpack . filePath))
+    . allFiles
 
 {- |
  For the given Tag Triple, return 'True` if it will violate the UNIQUE constraint in
