@@ -379,7 +379,12 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
  where
   runQueryExpressionTask =
     Task
-      . fmap (DoFileSelectionEvent . PutFilesNoCombine . HS.foldl' (Seq.|>) Seq.empty)
+      . fmap
+        ( DoFileSelectionEvent
+            . PutFilesNoCombine
+            . Seq.sortBy (\x y -> filePath x `compare` filePath y)
+            . HS.foldl' (Seq.|>) Seq.empty
+        )
       . runFileQuery conn
 
 fileSelectionWidgetEventHandler ::
