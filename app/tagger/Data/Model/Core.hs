@@ -222,7 +222,8 @@ data TagInputModel = TagInputModel
   { _taginputInput :: TextInput
   , _taginputVisibility :: Visibility
   , _taginputIsTagSelection :: Bool
-  , _taginputIsDeleteTag :: Bool
+  , _taginputTaggingSelection :: HashSet (RecordKey File)
+  , _taginputIsTagDelete :: Bool
   } deriving (Show, Eq)
 
 createTagInputModel :: TagInputModel
@@ -231,7 +232,8 @@ createTagInputModel =
     { _taginputInput = createTextInput 10
     , _taginputVisibility = VisibilityMain
     , _taginputIsTagSelection = False
-    , _taginputIsDeleteTag = False
+    , _taginputTaggingSelection = mempty
+    , _taginputIsTagDelete = False
     }
 
 tagInputOptionPaneLabel :: Text

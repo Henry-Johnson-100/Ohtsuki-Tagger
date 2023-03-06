@@ -133,7 +133,12 @@ data FocusedFileEvent
   deriving (Show, Eq)
 
 data TagInputEvent
-  = ToggleTagInputOptionPane
+  = ClearTagSelection
+  | RunTagExpression
+  | TagSelect (RecordKey File)
+  | ToggleTagDelete
+  | ToggleTagInputOptionPane
+  | ToggleTagSelection
 
 data DescriptorTreeEvent
   = CreateRelation Descriptor Descriptor
