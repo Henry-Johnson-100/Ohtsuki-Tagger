@@ -73,6 +73,7 @@ instance Show TaggerAnonymousEvent where
 
 data FileSelectionEvent
   = AddFiles
+  | AddFileDone
   | CycleNextFile
   | CycleOrderCriteria
   | CycleOrderDirection
