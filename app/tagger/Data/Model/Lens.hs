@@ -25,6 +25,7 @@ import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Maybe (fromMaybe)
 import Data.Model.Core (
+  AddFileModel,
   DescriptorInfo,
   DescriptorTreeModel,
   FileInfo,
@@ -57,6 +58,8 @@ makeLensesWith abbreviatedFields ''FocusedFileModel
 makeLensesWith abbreviatedFields ''DescriptorInfo
 
 makeLensesWith abbreviatedFields ''FileSelectionModel
+
+makeLensesWith abbreviatedFields ''AddFileModel
 
 makeLensesWith abbreviatedFields ''FileSelectionTagListModel
 

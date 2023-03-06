@@ -11,8 +11,8 @@ module Interface.Widget.Internal.Selection (
 
 import Control.Lens ((&), (.~), (^.))
 import Data.Event (
+  AddFileEvent (AddFilePath, AddFiles, ToggleAddFileVisibility),
   FileSelectionEvent (
-    AddFiles,
     CycleOrderCriteria,
     CycleOrderDirection,
     DeleteFileFromFileSystem,
@@ -29,6 +29,7 @@ import Data.Event (
   FileSelectionWidgetEvent (CycleNextChunk, CyclePrevChunk),
   FocusedFileEvent (RunFocusedFileShellCommand),
   TaggerEvent (
+    DoAddFileEvent,
     DoFileSelectionEvent,
     DoFocusedFileEvent,
     Mempty,
@@ -58,17 +59,20 @@ import Data.Model.Lens (
   HasSelection (selection),
   HasShellText (shellText),
   TaggerLens (TaggerLens),
-  addFileInProgress,
-  addFileInput,
+  addFileModel,
+  directoryList,
   fileInfoAt,
   fileSelectionTagListModel,
+  inProgress,
   include,
+  input,
+  visibility,
  )
 import Data.Model.Shared.Core (
   OrderBy (OrderBy),
   OrderCriteria (Alphabetic, Numeric),
   OrderDirection (Asc, Desc),
-  Visibility (VisibilityAlt, VisibilityLabel),
+  Visibility (VisibilityAlt, VisibilityLabel, VisibilityMain),
   hasVis,
  )
 import Data.Model.Shared.Lens (
@@ -85,6 +89,8 @@ import Database.Tagger (Descriptor (descriptor), File (File), descriptorId)
 import Interface.Theme (yuiLightPeach, yuiRed)
 import Interface.Widget.Internal.Core (
   defaultElementOpacity,
+  defaultOpacityModulator,
+  modulateOpacity,
   styledButton_,
   withNodeKey,
   withNodeVisible,
@@ -151,7 +157,10 @@ widget m =
     , zstack_
         []
         [ withNodeVisible (not selectionIsVisible) $ tagListWidget m
-        , withNodeVisible selectionIsVisible $ fileSelectionFileList m
+        , withNodeVisible selectionIsVisible . vstack_ [] $
+            [ fileSelectionFileList m
+            , addFilesWidget m
+            ]
         ]
     ]
  where
@@ -274,7 +283,7 @@ fileSelectionFileList m =
         [ wheelRate 50
         ]
       . vstack_ []
-      . flip (|>) (hstack [toggleFileEditMode, addFilesWidget m])
+      . flip (|>) toggleFileEditMode
       $ ( fmap fileSelectionLeaf renderedChunks
             Seq.>< Seq.fromList fileListPaginationWidgets
         )
@@ -322,8 +331,6 @@ fileSelectionFileList m =
                   , neq chunkSequence
                   , neq chunkSize
                   , neq fileSelectionVis
-                  , neq (addFileInput . text)
-                  , neq addFileInProgress
                   ]
         )
   renderedChunks =
@@ -493,42 +500,109 @@ shuffleSelectionButton =
 
 addFilesWidget :: TaggerModel -> TaggerWidget
 addFilesWidget m =
-  keystroke
-    [ ("Enter", DoFileSelectionEvent AddFiles)
-    , ("Up", NextHistory $ TaggerLens (fileSelectionModel . addFileInput))
-    , ("Down", PrevHistory $ TaggerLens (fileSelectionModel . addFileInput))
+  box_
+    [ mergeRequired $ \_wenv x y ->
+        (x ^. fileSelectionModel . addFileModel)
+          /= (y ^. fileSelectionModel . addFileModel)
     ]
     $ zstack_
       [onlyTopActive]
-      [ withNodeVisible (m ^. fileSelectionModel . addFileInProgress) $
+      [ withNodeVisible
+          (hasVis VisibilityMain $ m ^. fileSelectionModel . addFileModel . visibility)
+          addFileMainVisWidget
+      , withNodeVisible
+          (hasVis VisibilityAlt $ m ^. fileSelectionModel . addFileModel . visibility)
+          addFileAltVisWidget
+      ]
+ where
+  addFileMainVisWidget =
+    zstack_
+      [onlyTopActive]
+      [ withNodeVisible (m ^. fileSelectionModel . addFileModel . inProgress) $
           label_
             ( "Adding files from '"
-                <> m ^. fileSelectionModel . addFileInput . text
+                <> m ^. fileSelectionModel . addFileModel . input . text
                 <> "'"
             )
             [resizeFactor (-1)]
-      , withNodeVisible (not $ m ^. fileSelectionModel . addFileInProgress) $
-          hstack_
-            []
-            [ styledButton_ [resizeFactor (-1)] "Add" (DoFileSelectionEvent AddFiles)
-            , textField_
-                (fileSelectionModel . addFileInput . text)
-                [ onChange
-                    ( \t ->
-                        if T.null t
-                          then
-                            Mempty $
-                              TaggerLens
-                                ( fileSelectionModel
-                                    . addFileInput
-                                    . history
-                                    . historyIndex
-                                )
-                          else Unit ()
-                    )
-                ]
-            ]
+      , withNodeVisible
+          (not $ m ^. fileSelectionModel . addFileModel . inProgress)
+          $ hstack_ [] [addFileTextField, scanDirectoriesButton]
       ]
+   where
+    addFileTextField =
+      keystroke
+        [ ("Enter", DoAddFileEvent AddFiles)
+        , ("Up", NextHistory $ TaggerLens (fileSelectionModel . addFileModel . input))
+        , ("Down", PrevHistory $ TaggerLens (fileSelectionModel . addFileModel . input))
+        ]
+        . withStyleBasic
+          [ bgColor
+              . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+              $ yuiLightPeach
+          ]
+        . tooltip_ "Enter to add file path" [tooltipDelay 1500]
+        . withStyleBasic
+          [ bgColor
+              . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+              $ yuiLightPeach
+          ]
+        $ textField_
+          (fileSelectionModel . addFileModel . input . text)
+          [ onChange
+              ( \t ->
+                  if T.null t
+                    then
+                      Mempty $
+                        TaggerLens
+                          ( fileSelectionModel
+                              . addFileModel
+                              . input
+                              . history
+                              . historyIndex
+                          )
+                    else Unit ()
+              )
+          ]
+
+    scanDirectoriesButton =
+      styledButton_
+        [resizeFactor (-1)]
+        "Directories"
+        (DoAddFileEvent ToggleAddFileVisibility)
+
+  addFileAltVisWidget =
+    zstack_
+      [onlyTopActive]
+      [ withNodeVisible
+          (not $ m ^. fileSelectionModel . addFileModel . inProgress)
+          $ vstack_ [] [directoryListWidget, closeScanDirectoriesButton]
+      , withNodeVisible (m ^. fileSelectionModel . addFileModel . inProgress) $
+          label_ "Adding Files..." [resizeFactor (-1)]
+      ]
+   where
+    directoryListWidget =
+      withStyleBasic
+        [ bgColor
+            . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+            $ yuiLightPeach
+        ]
+        . tooltip_ "Click a path to add its contents" [tooltipDelay 1500]
+        . vscroll_ [wheelRate 50]
+        . vstack_ []
+        . map
+          ( \dirPath ->
+              styledButton_
+                [resizeFactor (-1)]
+                (T.pack dirPath)
+                (DoAddFileEvent . AddFilePath $ dirPath)
+          )
+        $ m ^. fileSelectionModel . addFileModel . directoryList
+    closeScanDirectoriesButton =
+      styledButton_
+        [resizeFactor (-1)]
+        "Close"
+        (DoAddFileEvent ToggleAddFileVisibility)
 
 toggleFileEditMode :: TaggerWidget
 toggleFileEditMode =

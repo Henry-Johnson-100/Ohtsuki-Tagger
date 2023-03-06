@@ -58,6 +58,7 @@ taggerEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
+      DoAddFileEvent e -> addFileEventHandler wenv node model e
       DoFocusedFileEvent e -> focusedFileEventHandler wenv node model e
       DoFileSelectionEvent e -> fileSelectionEventHandler wenv node model e
       DoDescriptorTreeEvent e -> descriptorTreeEventHandler wenv node model e
@@ -114,18 +115,6 @@ fileSelectionEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
-      AddFiles ->
-        let !currentAddFileText = model ^. fileSelectionModel . addFileInput . text
-         in [ Model $
-                model & fileSelectionModel . addFileInProgress .~ True
-                  & fileSelectionModel . addFileInput . history
-                    %~ putHist (T.strip currentAddFileText)
-            , Task $
-                DoFileSelectionEvent AddFileDone
-                  <$ addFiles conn currentAddFileText
-            ]
-      AddFileDone ->
-        [Model $ model & fileSelectionModel . addFileInProgress .~ False]
       CycleNextFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []
@@ -323,6 +312,48 @@ fileSelectionEventHandler
                 . fileSelectionVis
               %~ toggleAltVis
         ]
+
+addFileEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  AddFileEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+addFileEventHandler _wenv _wnode model@((^. connection) -> conn) e =
+  case e of
+    AddFiles ->
+      let !currentAddFileText =
+            model
+              ^. fileSelectionModel
+                . addFileModel
+                . input
+                . text
+       in [ Model $
+              model & fileSelectionModel . addFileModel . inProgress .~ True
+                & fileSelectionModel . addFileModel . input . history
+                  %~ putHist (T.strip currentAddFileText)
+          , Task $
+              DoAddFileEvent AddFileDone
+                <$ addFiles conn currentAddFileText
+          ]
+    AddFileDone ->
+      [Model $ model & fileSelectionModel . addFileModel . inProgress .~ False]
+    AddFilePath fp ->
+      [ Model $ model & fileSelectionModel . addFileModel . inProgress .~ True
+      , Task $ DoAddFileEvent AddFileDone <$ addFiles conn (T.pack fp)
+      ]
+    PutDirectoryList fs ->
+      [Model $ model & fileSelectionModel . addFileModel . directoryList .~ fs]
+    ScanDirectories ->
+      [Task $ DoAddFileEvent . PutDirectoryList <$> getDirectories conn]
+    ToggleAddFileVisibility ->
+      let !currentVis = model ^. fileSelectionModel . addFileModel . visibility
+       in [ -- Scan directories if the new visibility is showing the directory list
+            if hasVis VisibilityMain currentVis
+              then Event . DoAddFileEvent $ ScanDirectories
+              else Event (Unit ())
+          , Model $ model & fileSelectionModel . addFileModel . visibility %~ toggleAltVis
+          ]
 
 queryEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->

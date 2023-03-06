@@ -11,6 +11,7 @@ module Data.Model.Core (
   TaggerModel (..),
   createTaggerModel,
   FileSelectionModel (..),
+  AddFileModel (..),
   QueryModel (..),
   getSelectionChunk,
   selectionChunkLength,
@@ -81,14 +82,13 @@ createTaggerModel tc d unRelatedD defaultFilePath =
 data FileSelectionModel = FileSelectionModel
   { _fileselectionTagList :: FileSelectionTagListModel
   , _fileselectionQueryModel :: QueryModel
+  , _fileselectionAddFileModel :: AddFileModel
   , _fileselectionSelection :: Seq File
   , _fileselectionCurrentChunk :: Int
   , _fileselectionChunkSize :: Int
   , _fileselectionChunkSequence :: Seq Int
   , _fileselectionFileSelectionInfoMap :: IntMap FileInfo
   , _fileselectionFileSelectionVis :: Visibility
-  , _fileselectionAddFileInput :: TextInput
-  , _fileselectionAddFileInProgress :: Bool
   , _fileselectionIsMassOpMode :: Bool
   }
   deriving (Show, Eq)
@@ -98,15 +98,34 @@ createFileSelectionModel =
   FileSelectionModel
     { _fileselectionTagList = createFileSelectionTagListModel
     , _fileselectionQueryModel = createQueryModel
+    , _fileselectionAddFileModel = createAddFileModel
     , _fileselectionSelection = S.empty
     , _fileselectionCurrentChunk = 0
     , _fileselectionChunkSize = 50
     , _fileselectionChunkSequence = S.singleton 0
     , _fileselectionFileSelectionInfoMap = IntMap.empty
     , _fileselectionFileSelectionVis = VisibilityMain
-    , _fileselectionAddFileInput = createTextInput 10
-    , _fileselectionAddFileInProgress = False
     , _fileselectionIsMassOpMode = False
+    }
+
+data AddFileModel = AddFileModel
+  { _addfileDirectoryList :: [FilePath]
+  , -- | 'VisibilityMain` is a textfield
+    --
+    -- 'VisibilityAlt` is a list of directories to scan
+    _addfileVisibility :: Visibility
+  , _addfileInput :: TextInput
+  , _addfileInProgress :: Bool
+  }
+  deriving (Show, Eq)
+
+createAddFileModel :: AddFileModel
+createAddFileModel =
+  AddFileModel
+    { _addfileDirectoryList = []
+    , _addfileVisibility = VisibilityMain
+    , _addfileInput = createTextInput 10
+    , _addfileInProgress = False
     }
 
 data QueryModel = QueryModel

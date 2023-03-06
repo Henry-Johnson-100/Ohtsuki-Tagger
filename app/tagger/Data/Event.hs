@@ -10,6 +10,7 @@ module Data.Event (
   TaggerAnonymousEvent (..),
   anonymousEvent,
   FileSelectionEvent (..),
+  AddFileEvent (..),
   QueryEvent (..),
   FileSelectionWidgetEvent (..),
   DescriptorTreeEvent (..),
@@ -36,7 +37,8 @@ import Database.Tagger.Type (
 import Monomer (AppEventResponse)
 
 data TaggerEvent
-  = DoFocusedFileEvent FocusedFileEvent
+  = DoAddFileEvent AddFileEvent
+  | DoFocusedFileEvent FocusedFileEvent
   | DoFileSelectionEvent FileSelectionEvent
   | DoDescriptorTreeEvent DescriptorTreeEvent
   | DoQueryEvent QueryEvent
@@ -72,9 +74,7 @@ instance Show TaggerAnonymousEvent where
   show _ = "TaggerAnonymousEvent"
 
 data FileSelectionEvent
-  = AddFiles
-  | AddFileDone
-  | CycleNextFile
+  = CycleNextFile
   | CycleOrderCriteria
   | CycleOrderDirection
   | CyclePrevFile
@@ -99,6 +99,14 @@ data FileSelectionEvent
   | ShuffleSelection
   | ToggleSelectionView
   deriving (Show, Eq)
+
+data AddFileEvent
+  = AddFiles
+  | AddFileDone
+  | AddFilePath FilePath
+  | PutDirectoryList [FilePath]
+  | ScanDirectories
+  | ToggleAddFileVisibility
 
 data QueryEvent
   = RunQuery

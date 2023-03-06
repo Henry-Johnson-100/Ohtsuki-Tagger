@@ -117,6 +117,8 @@ or receiving any input.
   '`yuitagger data.db -q "p.%" --relative | xargs yuitagger data.db --describe`'
   making CLI operations more convenient.
 - Added some visual feedback when files are being added to the database via the textfield.
+- Add a new widget for selecting directories scan for new files.
+  - Accessed via the "Directories" button next to the addFiles text field.
 
 ------
 
