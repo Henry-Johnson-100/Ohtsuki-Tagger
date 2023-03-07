@@ -401,7 +401,7 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
             . Seq.sortBy (\x y -> filePath x `compare` filePath y)
             . HS.foldl' (Seq.|>) Seq.empty
         )
-      . runFileQuery conn
+      . yuiQLFileQueryExpression conn
 
 fileSelectionWidgetEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -611,11 +611,15 @@ tagInputEventHandler _wenv _wnode model@((^. connection) -> conn) e =
                 HS.toList (model ^. fileSelectionModel . taggingSelection)
               else [focusedFileFK]
        in ( if model ^. tagInputModel . isTagDelete
-              then []
+              then
+                [ Task $
+                    DoFocusedFileEvent RefreshFocusedFileAndSelection
+                      <$ yuiQLDeleteTags conn fks rawTagText
+                ]
               else
                 [ Task $
                     DoFocusedFileEvent RefreshFocusedFileAndSelection
-                      <$ mapM (\fk -> tagFile fk conn rawTagText) fks
+                      <$ mapM (\fk -> yuiQLTagFile fk conn rawTagText) fks
                 ]
           )
             ++ [ Model $
