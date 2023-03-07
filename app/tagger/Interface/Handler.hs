@@ -457,10 +457,6 @@ focusedFileEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
-      DeleteTag t ->
-        [ Task (Unit <$> deleteTags [t] conn)
-        , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
-        ]
       MoveTag
         (ConcreteTag oldTagKey (Descriptor dk dp) oldSubTagKey)
         newMaybeSubTagKey ->
