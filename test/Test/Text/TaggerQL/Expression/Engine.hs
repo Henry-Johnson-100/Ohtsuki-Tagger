@@ -640,7 +640,7 @@ taggingEngineTests c =
   let insert se fk c' = yuiQLTagFileExpression c' fk se
    in testGroup
         "Tagging_Engine_Tests"
-        [ testCase "0" $ do
+        [ testCase "Tagging_Engine_Tests_0" $ do
             let se =
                   (pure . des $ 21)
                     ∙ ( (pure . des $ 22)
@@ -673,8 +673,8 @@ taggingEngineTests c =
                   expectedResults
               )
               (sort f)
-        , after AllSucceed "$0 == \"Tagging_Engine_Tests.0\"" $
-            testCase "1" $ do
+        , after AllSucceed "Tagging_Engine_Tests_0" $
+            testCase "Tagging_Engine_Tests_1" $ do
               let se =
                     (pure . des $ 21)
                       ∙ ( ( (pure . des $ 22)
@@ -721,8 +721,8 @@ taggingEngineTests c =
                     expectedResults
                 )
                 (sort f)
-        , after AllSucceed "$0 == \"Tagging_Engine_Tests.1\"" $
-            testCase "2" $ do
+        , after AllSucceed "Tagging_Engine_Tests_1" $
+            testCase "Tagging_Engine_Tests_2" $ do
               let se =
                     (pure . des $ 26)
                       ∙ ( ( (pure . des $ 27)
@@ -776,8 +776,8 @@ taggingEngineTests c =
                     expectedResults
                 )
                 (sort f)
-        , after AllSucceed "$0 == \"Tagging_Engine_Tests.2\""
-            . testCase "3"
+        , after AllSucceed "Tagging_Engine_Tests_2"
+            . testCase "Tagging_Engine_Tests_3"
             $ do
               let se =
                     ( (pure . des $ 32)
@@ -811,8 +811,8 @@ taggingEngineTests c =
                     expectedResults
                 )
                 (sort f)
-        , after AllSucceed "$0 == \"Tagging_Engine_Tests.3\""
-            . testCase "4"
+        , after AllSucceed "Tagging_Engine_Tests_3"
+            . testCase "Tagging_Engine_Tests_4"
             $ do
               let se =
                     (pure . des $ 33)
@@ -836,8 +836,8 @@ taggingEngineTests c =
                     expectedResults
                 )
                 (sort f)
-        , after AllSucceed "$0 == \"Tagging_Engine_Tests.4\""
-            . testCase "5"
+        , after AllSucceed "Tagging_Engine_Tests_4"
+            . testCase "Tagging_Engine_Tests_5"
             $ do
               let se =
                     ( (pure . des $ 35)
@@ -857,8 +857,8 @@ taggingEngineTests c =
                 "Tagging should work with a lift-distributive expression."
                 (sort expectedResults)
                 (sort f)
-        , after AllSucceed "$0 == \"Tagging_Engine_Tests.5\""
-            . testCase "6"
+        , after AllSucceed "Tagging_Engine_Tests_5"
+            . testCase "Tagging_Engine_Tests_6"
             $ do
               let se =
                     ( (pure . des $ 38)
@@ -888,7 +888,13 @@ tagDeleteEngineTests ioc =
   after AllSucceed "Tagging_Engine_Tests" $
     testGroup
       "Tagging_Delete_Tests"
-      [ testCase "Setup" (assertFailure "Not Implemented")
+      [ testGroup
+          "Tagging_Delete_Tests_Setup"
+          [testCase "in setup" (assertFailure "Not Implemented")]
+      , after AllSucceed "Tagging_Delete_Tests_Setup" $
+          testGroup
+            "Tagging_Delete_Tests_Tests"
+            [testCase "in tests" (assertFailure "Not Implemented")]
       ]
 
 file :: RecordKey File -> File
