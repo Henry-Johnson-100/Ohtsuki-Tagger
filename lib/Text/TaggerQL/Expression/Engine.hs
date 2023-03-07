@@ -3,7 +3,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# HLINT ignore "Use lambda-case" #-}
 {-# HLINT ignore "Use <=<" #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_HADDOCK prune #-}
@@ -23,13 +22,16 @@ Contains functions that interprets the TaggerQL query language to either run que
 module Text.TaggerQL.Expression.Engine (
   fileQuery,
   tagFile,
+  deleteTagExpression,
 
   -- * New
   runFileQuery,
   runTagFile,
+  runDeleteTagExpression,
 ) where
 
 import Control.Monad (void, (<=<), (>=>))
+import Data.Bifunctor (first)
 import Data.Bitraversable (bitraverse)
 import qualified Data.Foldable as F
 import Data.HashSet (HashSet)
@@ -42,6 +44,7 @@ import Database.Tagger (
   RecordKey,
   allFiles,
   allTags,
+  deleteTags,
   insertTags,
   queryForDescriptorByPattern,
   queryForSingleFileByFileId,
@@ -68,6 +71,7 @@ import Text.TaggerQL.Expression.AST (
   Pattern (PatternText, WildCard),
   QueryExpression,
   RingExpression,
+  TagQueryExpression,
   distributeK,
   evaluateRingExpression,
   runDTerm,
@@ -104,29 +108,15 @@ runFileQuery c =
     . traverse (either pure toFileSet)
     <=< fmap
       ( fmap
-          ( fmap
-              ( evaluateRingExpression
-                  . fmap (F.foldr1 tagMagma)
-                  . distributeK
-              )
-          )
+          (fmap joinTagQueryResultSets)
           . simplifyQueryExpression
       )
-      . bitraverse queryFilePattern (traverse queryDTerm)
+      . bitraverse queryFilePattern (traverse (queryDTerm c))
  where
   queryFilePattern pat =
     case pat of
       WildCard -> HS.fromList <$> allFiles c
       PatternText t -> HS.fromList <$> queryForFileByPattern t c
-
-  queryDTerm dt = case dt of
-    DTerm (PatternText t) ->
-      HS.fromList
-        <$> queryForTagByDescriptorPattern t c
-    DMetaTerm (PatternText t) ->
-      HS.fromList
-        <$> queryForTagByMetaDescriptorPattern t c
-    _wildcard -> HS.fromList <$> allTags c
 
   toFileSet =
     HS.foldl'
@@ -138,6 +128,21 @@ runFileQuery c =
       (pure HS.empty)
       . HS.map tagFileId
 
+queryDTerm :: TaggedConnection -> DTerm Pattern -> IO (HashSet Tag)
+queryDTerm c dt = case dt of
+  DTerm (PatternText t) ->
+    HS.fromList
+      <$> queryForTagByDescriptorPattern t c
+  DMetaTerm (PatternText t) ->
+    HS.fromList
+      <$> queryForTagByMetaDescriptorPattern t c
+  _wildcard -> HS.fromList <$> allTags c
+
+joinTagQueryResultSets ::
+  FreeDisjunctMonad RingExpression MagmaExpression (HashSet Tag) ->
+  HashSet Tag
+joinTagQueryResultSets = evaluateRingExpression . fmap (F.foldr1 tagMagma) . distributeK
+ where
   tagMagma superTagSet subTagSet =
     let subtagIds = HS.map tagSubtagOfId subTagSet
      in HS.filter (flip HS.member subtagIds . Just . tagId) superTagSet
@@ -208,3 +213,21 @@ runTagFile c fk =
               <$> mapM
                 (`queryForTagBySubTagTriple` c)
                 (third fromJust <$> tagTriples)
+
+deleteTagExpression :: TaggedConnection -> RecordKey File -> Text -> IO (Either Text ())
+deleteTagExpression c fk t =
+  let parsedTagExpression = parseTagExpression t
+   in traverse (runDeleteTagExpression c fk) . first (T.pack . show) $
+        parsedTagExpression
+
+-- Kind of the dual to `runTagFile` but can also operate with `DTerm`s.
+runDeleteTagExpression ::
+  TaggedConnection ->
+  RecordKey File ->
+  TagQueryExpression ->
+  IO ()
+runDeleteTagExpression c fk tqe = do
+  queryTagResults <-
+    joinTagQueryResultSets
+      <$> traverse (queryDTerm c) tqe
+  deleteTags [tagId t | t <- HS.toList queryTagResults, tagFileId t == fk] c
