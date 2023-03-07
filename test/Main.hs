@@ -30,8 +30,10 @@ main =
                     testGroup
                         "Database Tests"
                         [ setup_0_InitializeDatabase conn
-                        , after AllSucceed "Setup 0" $ setup_1_TestInitialization conn
-                        , after AllSucceed "Setup" $ queryEngineASTTests conn
+                        , after AllSucceed "$0 == \"Initialize_Database\"" $
+                            setup_1_TestInitialization conn
+                        , after AllSucceed "$0 == \"Test_Initialization\"" $
+                            queryEngineASTTests conn
                         ]
             , astTests
             ]

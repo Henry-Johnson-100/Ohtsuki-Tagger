@@ -330,7 +330,7 @@ newRelations =
 
 setup_0_InitializeDatabase :: IO TaggedConnection -> TestTree
 setup_0_InitializeDatabase conn =
-  testCaseSteps "Setup 0 - Initialize Database" $ \step -> do
+  testCaseSteps "Initialize_Database" $ \step -> do
     step "Inserting test files"
     conn >>= insertFiles (T.unpack . filePath <$> testFiles)
 
@@ -355,7 +355,7 @@ setup_0_InitializeDatabase conn =
 setup_1_TestInitialization :: IO TaggedConnection -> TestTree
 setup_1_TestInitialization conn =
   testGroup
-    "Setup 1 - Test Initialization"
+    "Test_Initialization"
     [ testCase
         "All Test Files Inserted"
         ( do
