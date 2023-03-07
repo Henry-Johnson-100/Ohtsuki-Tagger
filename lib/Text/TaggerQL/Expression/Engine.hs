@@ -214,20 +214,24 @@ runTagFile c fk =
                 (`queryForTagBySubTagTriple` c)
                 (third fromJust <$> tagTriples)
 
-deleteTagExpression :: TaggedConnection -> RecordKey File -> Text -> IO (Either Text ())
-deleteTagExpression c fk t =
+deleteTagExpression ::
+  TaggedConnection ->
+  [RecordKey File] ->
+  Text ->
+  IO (Either Text ())
+deleteTagExpression c fks t =
   let parsedTagExpression = parseTagExpression t
-   in traverse (runDeleteTagExpression c fk . fmap runDTerm) . first (T.pack . show) $
+   in traverse (runDeleteTagExpression c fks . fmap runDTerm) . first (T.pack . show) $
         parsedTagExpression
 
 runDeleteTagExpression ::
   TaggedConnection ->
-  RecordKey File ->
+  [RecordKey File] ->
   FreeDisjunctMonad RingExpression MagmaExpression Pattern ->
   IO ()
-runDeleteTagExpression c fk tqe = do
+runDeleteTagExpression c fks tqe = do
   traversedTQE <-
-    fmap (HS.filter ((==) fk . tagFileId))
+    fmap (HS.filter ((`elem` fks) . tagFileId))
       <$> traverse
         ( \p ->
             HS.fromList

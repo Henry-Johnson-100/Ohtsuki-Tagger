@@ -614,7 +614,7 @@ tagInputEventHandler _wenv _wnode model@((^. connection) -> conn) e =
               then
                 [ Task $
                     DoFocusedFileEvent RefreshFocusedFileAndSelection
-                      <$ mapM (\fk -> deleteTagExpression conn fk rawTagText) fks
+                      <$ deleteTagExpression conn fks rawTagText
                 ]
               else
                 [ Task $
