@@ -72,6 +72,7 @@ import Text.TaggerQL.Expression.AST (
   Pattern (PatternText, WildCard),
   QueryExpression,
   RingExpression,
+  TagDeleteExpression,
   distributeK,
   evaluateRingExpression,
   runDTerm,
@@ -227,10 +228,23 @@ deleteTagExpression c fks t =
 runDeleteTagExpression ::
   TaggedConnection ->
   [RecordKey File] ->
-  FreeDisjunctMonad RingExpression MagmaExpression Pattern ->
+  TagDeleteExpression ->
   IO ()
 runDeleteTagExpression _ [] _ = pure ()
 runDeleteTagExpression c fks tqe = do
+  tagsToDelete <- queryTagDeleteExpression c fks tqe
+  deleteTags (map tagId . HS.toList $ tagsToDelete) c
+
+{- |
+ Performs a query for tags that will be deleted by the given expression.
+-}
+queryTagDeleteExpression ::
+  TaggedConnection ->
+  [RecordKey File] ->
+  TagDeleteExpression ->
+  IO (HashSet Tag)
+queryTagDeleteExpression _ [] _ = pure HS.empty
+queryTagDeleteExpression c fks tqe = do
   traversedTQE <-
     fmap (HS.filter ((`elem` fks) . tagFileId))
       <$> traverse
@@ -255,6 +269,6 @@ runDeleteTagExpression c fks tqe = do
               )
           )
           distributedTQE
-      ignoredRing = F.foldl1 HS.union foldedMagmas
+      result = F.foldl1 HS.union foldedMagmas
 
-  deleteTags (map tagId . HS.toList $ ignoredRing) c
+  pure result
