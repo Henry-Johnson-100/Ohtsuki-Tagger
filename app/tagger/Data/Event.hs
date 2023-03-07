@@ -76,7 +76,8 @@ instance Show TaggerAnonymousEvent where
   show _ = "TaggerAnonymousEvent"
 
 data FileSelectionEvent
-  = CycleNextFile
+  = ClearTaggingSelection
+  | CycleNextFile
   | CycleOrderCriteria
   | CycleOrderDirection
   | CyclePrevFile
@@ -99,6 +100,7 @@ data FileSelectionEvent
   | RenameFile (RecordKey File)
   | RunSelectionShellCommand
   | ShuffleSelection
+  | TagSelect (RecordKey File)
   | ToggleSelectionView
   deriving (Show, Eq)
 
@@ -132,12 +134,9 @@ data FocusedFileEvent
   deriving (Show, Eq)
 
 data TagInputEvent
-  = ClearTagSelection
-  | RunTagExpression
-  | TagSelect (RecordKey File)
-  | ToggleTagDelete
-  | ToggleTagInputOptionPane
-  | ToggleTagSelection
+  = RunTagExpression
+  | -- | Also causes a @FileSelectionEvent ClearTaggingSelection@
+    ToggleTagInputOptionPane
 
 data DescriptorTreeEvent
   = CreateRelation Descriptor Descriptor

@@ -94,6 +94,7 @@ data FileSelectionModel = FileSelectionModel
   , _fileselectionFileSelectionInfoMap :: IntMap FileInfo
   , _fileselectionFileSelectionVis :: Visibility
   , _fileselectionIsMassOpMode :: Bool
+  , _fileselectionTaggingSelection :: HashSet (RecordKey File)
   }
   deriving (Show, Eq)
 
@@ -110,6 +111,7 @@ createFileSelectionModel =
     , _fileselectionFileSelectionInfoMap = IntMap.empty
     , _fileselectionFileSelectionVis = VisibilityMain
     , _fileselectionIsMassOpMode = False
+    , _fileselectionTaggingSelection = mempty
     }
 
 data AddFileModel = AddFileModel
@@ -220,9 +222,9 @@ data TagInputModel = TagInputModel
   { _taginputInput :: TextInput
   , _taginputVisibility :: Visibility
   , _taginputIsTagSelection :: Bool
-  , _taginputTaggingSelection :: HashSet (RecordKey File)
   , _taginputIsTagDelete :: Bool
-  } deriving (Show, Eq)
+  }
+  deriving (Show, Eq)
 
 createTagInputModel :: TagInputModel
 createTagInputModel =
@@ -230,7 +232,6 @@ createTagInputModel =
     { _taginputInput = createTextInput 10
     , _taginputVisibility = VisibilityMain
     , _taginputIsTagSelection = False
-    , _taginputTaggingSelection = mempty
     , _taginputIsTagDelete = False
     }
 

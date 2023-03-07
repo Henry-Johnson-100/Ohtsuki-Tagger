@@ -119,6 +119,8 @@ fileSelectionEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
+      ClearTaggingSelection ->
+        [Model $ model & fileSelectionModel . taggingSelection .~ mempty]
       CycleNextFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []
@@ -308,6 +310,11 @@ fileSelectionEventHandler
             ( DoFileSelectionEvent . PutFilesNoCombine
                 <$> shuffleSequence (model ^. fileSelectionModel . selection)
             )
+        ]
+      TagSelect fk ->
+        [ Model $
+            model & fileSelectionModel . taggingSelection
+              %~ \hs -> if HS.member fk hs then HS.delete fk hs else HS.insert fk hs
         ]
       ToggleSelectionView ->
         [ Model $
@@ -586,7 +593,6 @@ tagInputEventHandler ::
   [AppEventResponse TaggerModel TaggerEvent]
 tagInputEventHandler _wenv _wnode model@((^. connection) -> conn) e =
   case e of
-    ClearTagSelection -> [Model $ model & tagInputModel . taggingSelection .~ mempty]
     RunTagExpression ->
       let !rawTagText = T.strip $ model ^. tagInputModel . input . text
           focusedFileFK =
@@ -611,20 +617,12 @@ tagInputEventHandler _wenv _wnode model@((^. connection) -> conn) e =
                   model & tagInputModel . input . history %~ putHist rawTagText
                     & tagInputModel . input . text .~ mempty
                ]
-    TagSelect fk ->
-      [ Model $
-          model & tagInputModel . taggingSelection
-            %~ \hs -> if HS.member fk hs then HS.delete fk hs else HS.insert fk hs
-      ]
-    ToggleTagDelete ->
-      [Model $ model & tagInputModel . isTagDelete %~ not]
     ToggleTagInputOptionPane ->
       [ Model $
           model & tagInputModel . visibility
             %~ flip togglePaneVis (VisibilityLabel tagInputOptionPaneLabel)
+      , Event . DoFileSelectionEvent $ ClearTaggingSelection
       ]
-    ToggleTagSelection ->
-      [Model $ model & tagInputModel . isTagSelection %~ not]
 
 {- |
  Performs some IO then executes the returned 'AppEventResponse`s
