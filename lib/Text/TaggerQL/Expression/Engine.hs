@@ -72,7 +72,6 @@ import Text.TaggerQL.Expression.AST (
   Pattern (PatternText, WildCard),
   QueryExpression,
   RingExpression,
-  TagQueryExpression,
   distributeK,
   evaluateRingExpression,
   runDTerm,
@@ -218,17 +217,25 @@ runTagFile c fk =
 deleteTagExpression :: TaggedConnection -> RecordKey File -> Text -> IO (Either Text ())
 deleteTagExpression c fk t =
   let parsedTagExpression = parseTagExpression t
-   in traverse (runDeleteTagExpression c fk) . first (T.pack . show) $
+   in traverse (runDeleteTagExpression c fk . fmap runDTerm) . first (T.pack . show) $
         parsedTagExpression
 
--- Kind of the dual to `runTagFile` but can also operate with `DTerm`s.
 runDeleteTagExpression ::
   TaggedConnection ->
   RecordKey File ->
-  TagQueryExpression ->
+  FreeDisjunctMonad RingExpression MagmaExpression Pattern ->
   IO ()
 runDeleteTagExpression c fk tqe = do
-  traversedTQE <- fmap (HS.filter ((==) fk . tagFileId)) <$> traverse (queryDTerm c) tqe
+  traversedTQE <-
+    fmap (HS.filter ((==) fk . tagFileId))
+      <$> traverse
+        ( \p ->
+            HS.fromList
+              <$> case p of
+                WildCard -> allTags c
+                PatternText txt -> queryForTagByDescriptorPattern txt c
+        )
+        tqe
 
   let distributedTQE = distributeK traversedTQE
       foldedMagmas =
