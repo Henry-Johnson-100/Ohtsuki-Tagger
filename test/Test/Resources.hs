@@ -269,7 +269,7 @@ testTags =
     since the tagging engine works left-to-right on binary expressions.
 
     Any new, destructive tests written on the database must happen after the pattern:
-      "Tagging Engine Tests"!
+      "Tagging_Engine_Tests"!
 
     -- tag file_17 "21{22 23}" to yield new tags:
     Tag 46 17 23 (Just 44)
