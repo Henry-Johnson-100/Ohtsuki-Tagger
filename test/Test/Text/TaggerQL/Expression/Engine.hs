@@ -9,6 +9,7 @@ module Test.Text.TaggerQL.Expression.Engine (
   queryEngineASTTests,
 ) where
 
+import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.List (sort)
 import qualified Data.Text as T
@@ -18,6 +19,7 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Text.TaggerQL.Expression.AST
 import Text.TaggerQL.Expression.Engine
+import Text.TaggerQL.Expression.Parser (parseTagExpression)
 
 queryEngineASTTests :: IO TaggedConnection -> TestTree
 queryEngineASTTests c =
@@ -890,11 +892,34 @@ tagDeleteEngineTests ioc =
       "Tagging_Delete_Tests"
       [ testGroup
           "Tagging_Delete_Tests_Setup"
-          [testCase "in setup" (assertFailure "Not Implemented")]
+          []
       , after AllSucceed "Tagging_Delete_Tests_Setup" $
-          testGroup
-            "Tagging_Delete_Tests_Tests"
-            [testCase "in tests" (assertFailure "Not Implemented")]
+          let tagDeleteTestCase name fks tqe expected =
+                testCase name $ do
+                  tagsToDelete <- fmap (fmap (HS.map tagId)) . sequenceA $ do
+                    deleteExpression <- fmap runDTerm <$> parseTagExpression tqe
+                    pure $
+                      ioc >>= \c ->
+                        yuiQLQueryTagDeleteExpression c fks deleteExpression
+
+                  assertEqual "" (Right expected) tagsToDelete
+           in testGroup
+                "Tagging_Delete_Tests_Tests"
+                [ testCase "Single Term Delete" $ do
+                    let fks = [17] :: [RecordKey File]
+
+                    tagsToDelete <- fmap (fmap (HS.map tagId)) . sequenceA $ do
+                      deleteExpression <- fmap runDTerm <$> parseTagExpression "%25"
+                      pure $
+                        ioc >>= \c ->
+                          yuiQLQueryTagDeleteExpression c fks deleteExpression
+
+                    let expected = [48] :: HashSet (RecordKey Tag)
+
+                    assertEqual "" (Right expected) tagsToDelete
+                , tagDeleteTestCase "Single Term Delete Alt" [17] "%25" [48]
+                , testCase "in tests" (assertFailure "Not Implemented")
+                ]
       ]
 
 file :: RecordKey File -> File
