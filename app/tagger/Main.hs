@@ -92,7 +92,7 @@ import System.Directory (
 import System.FilePath (makeRelative, takeDirectory)
 import System.IO (hPutStrLn, stderr)
 import Tagger.Info (taggerVersion)
-import Text.TaggerQL (fileQuery, tagFile)
+import Text.TaggerQL (yuiQLFileQuery, yuiQLTagFile)
 import Util (addFiles, compareConcreteTags)
 
 main :: IO ()
@@ -256,7 +256,7 @@ mainProgram (WithDB dbPath cm) = do
         Audit -> runReaderT mainReportAudit c
         Query (T.pack -> q) rel -> do
           let (T.unpack -> connPath) = c ^. connName
-          eQueryResults <- fileQuery c q
+          eQueryResults <- yuiQLFileQuery c q
           either
             (mapM_ T.IO.putStrLn)
             ( \queryResults ->
@@ -280,7 +280,7 @@ mainProgram (WithDB dbPath cm) = do
             eQueryResults
         Main.Tag s (T.pack -> tExpr) -> do
           fs <- queryForFileByPattern (T.pack s) c
-          mapM_ ((\fk -> tagFile fk c tExpr) . fileId) fs
+          mapM_ ((\fk -> yuiQLTagFile fk c tExpr) . fileId) fs
         Describe ss ->
           case ss of
             [] -> describeDatabaseDescriptors c
