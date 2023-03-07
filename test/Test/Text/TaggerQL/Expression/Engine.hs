@@ -12,6 +12,7 @@ module Test.Text.TaggerQL.Expression.Engine (
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.List (sort)
+import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger
 import Test.Resources
@@ -894,33 +895,41 @@ tagDeleteEngineTests ioc =
           "Tagging_Delete_Tests_Setup"
           []
       , after AllSucceed "Tagging_Delete_Tests_Setup" $
-          let tagDeleteTestCase name fks tqe expected =
-                testCase name $ do
-                  tagsToDelete <- fmap (fmap (HS.map tagId)) . sequenceA $ do
-                    deleteExpression <- fmap runDTerm <$> parseTagExpression tqe
-                    pure $
-                      ioc >>= \c ->
-                        yuiQLQueryTagDeleteExpression c fks deleteExpression
+          testGroup
+            "Tagging_Delete_Tests_Tests"
+            [ testCase "Single Term Delete" $ do
+                let fks = [17] :: [RecordKey File]
 
-                  assertEqual "" (Right expected) tagsToDelete
-           in testGroup
-                "Tagging_Delete_Tests_Tests"
-                [ testCase "Single Term Delete" $ do
-                    let fks = [17] :: [RecordKey File]
+                tagsToDelete <- fmap (fmap (HS.map tagId)) . sequenceA $ do
+                  deleteExpression <- fmap runDTerm <$> parseTagExpression "%25"
+                  pure $
+                    ioc >>= \c ->
+                      yuiQLQueryTagDeleteExpression c fks deleteExpression
 
-                    tagsToDelete <- fmap (fmap (HS.map tagId)) . sequenceA $ do
-                      deleteExpression <- fmap runDTerm <$> parseTagExpression "%25"
-                      pure $
-                        ioc >>= \c ->
-                          yuiQLQueryTagDeleteExpression c fks deleteExpression
+                let expected = [48] :: HashSet (RecordKey Tag)
 
-                    let expected = [48] :: HashSet (RecordKey Tag)
-
-                    assertEqual "" (Right expected) tagsToDelete
-                , tagDeleteTestCase "Single Term Delete Alt" [17] "%25" [48]
-                , testCase "in tests" (assertFailure "Not Implemented")
-                ]
+                assertEqual "" (Right expected) tagsToDelete
+            , tagDeleteTestCase "Single Term Delete Alt" [17] "%25" [48]
+            , testCase "in tests" (assertFailure "Not Implemented")
+            ]
       ]
+ where
+  tagDeleteTestCase ::
+    HasCallStack =>
+    String ->
+    [RecordKey File] ->
+    Text ->
+    HashSet (RecordKey Tag) ->
+    TestTree
+  tagDeleteTestCase name fks tqe expected =
+    testCase name $ do
+      tagsToDelete <- fmap (fmap (HS.map tagId)) . sequenceA $ do
+        deleteExpression <- fmap runDTerm <$> parseTagExpression tqe
+        pure $
+          ioc >>= \c ->
+            yuiQLQueryTagDeleteExpression c fks deleteExpression
+
+      assertEqual "" (Right expected) tagsToDelete
 
 file :: RecordKey File -> File
 file n = File n ("file_" <> (T.pack . show $ n))
