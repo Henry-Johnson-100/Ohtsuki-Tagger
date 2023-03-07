@@ -12,7 +12,7 @@ module Interface.Widget.Internal.FileDetail (
 import Control.Lens ((&), (^.))
 import Data.Event (
   FileSelectionEvent (ClearTaggingSelection, RenameFile),
-  FocusedFileEvent (DeleteTag, MoveTag, TagFile),
+  FocusedFileEvent (MoveTag, TagFile),
   TagInputEvent (RunTagExpression, ToggleTagInputOptionPane),
   TaggerEvent (
     AppendText,
@@ -57,14 +57,14 @@ import Data.Model.Shared.Lens (
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger (
-  ConcreteTag (ConcreteTag, concreteTagDescriptor, concreteTagId),
+  ConcreteTag (ConcreteTag, concreteTagDescriptor),
   ConcreteTaggedFile (ConcreteTaggedFile, concreteTaggedFile),
   Descriptor (Descriptor, descriptor),
   File (fileId, filePath),
   RecordKey,
   Tag,
  )
-import Interface.Theme (yuiBlue, yuiLightPeach, yuiPeach, yuiRed)
+import Interface.Theme (yuiBlue, yuiLightPeach, yuiRed)
 import Interface.Widget.Internal.Core (
   defaultElementOpacity,
   defaultOpacityModulator,
@@ -86,13 +86,11 @@ import Monomer (
   CmbOnChange (onChange),
   CmbPaddingR (paddingR),
   CmbResizeFactor (resizeFactor),
-  CmbStyleHover (styleHoverSet),
   CmbTextColor (textColor),
   CmbWheelRate (wheelRate),
   CmbWidth (width),
   black,
   box_,
-  buttonD_,
   draggable,
   dropTargetStyle,
   dropTarget_,
@@ -143,7 +141,6 @@ detailPaneTagsWidget
         , vstack
             [ imageTagsWidget hm
             , taggingWidget m
-            , deleteTagZone
             ]
         ]
 
@@ -263,24 +260,6 @@ subTagDropTarget tk =
             (MoveTag ct (Just tk))
       )
       [dropTargetStyle [border 1 yuiRed]]
-
-deleteTagZone :: TaggerWidget
-deleteTagZone =
-  dropTarget_
-    (DoFocusedFileEvent . DeleteTag . concreteTagId)
-    [dropTargetStyle [border 1 yuiRed]]
-    . flip styleHoverSet []
-    . withStyleBasic
-      [ bgColor
-          . modulateOpacity
-            (defaultElementOpacity - defaultOpacityModulator)
-          $ yuiLightPeach
-      , border 1
-          . modulateOpacity
-            (defaultElementOpacity - defaultOpacityModulator)
-          $ yuiPeach
-      ]
-    $ buttonD_ "Delete" [resizeFactor (-1)]
 
 tagTextNodeKey :: Text
 tagTextNodeKey = "tag-text-field"
