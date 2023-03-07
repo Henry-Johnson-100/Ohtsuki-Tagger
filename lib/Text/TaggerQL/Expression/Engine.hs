@@ -46,6 +46,7 @@ import Database.Tagger (
   allTags,
   deleteTags,
   insertTags,
+  isSubTagOf,
   queryForDescriptorByPattern,
   queryForSingleFileByFileId,
   queryForTagByDescriptorPattern,
@@ -227,7 +228,21 @@ runDeleteTagExpression ::
   TagQueryExpression ->
   IO ()
 runDeleteTagExpression c fk tqe = do
-  queryTagResults <-
-    joinTagQueryResultSets
-      <$> traverse (queryDTerm c) tqe
-  deleteTags [tagId t | t <- HS.toList queryTagResults, tagFileId t == fk] c
+  traversedTQE <- fmap (HS.filter ((==) fk . tagFileId)) <$> traverse (queryDTerm c) tqe
+
+  let distributedTQE = distributeK traversedTQE
+      foldedMagmas =
+        fmap
+          ( F.foldl1
+              ( \l r ->
+                  HS.filter
+                    ( \rt ->
+                        HS.foldl' (\b lt -> b || rt `isSubTagOf` lt) False l
+                    )
+                    r
+              )
+          )
+          distributedTQE
+      ignoredRing = F.foldl1 HS.union foldedMagmas
+
+  deleteTags (map tagId . HS.toList $ ignoredRing) c

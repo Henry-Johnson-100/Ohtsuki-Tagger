@@ -611,7 +611,11 @@ tagInputEventHandler _wenv _wnode model@((^. connection) -> conn) e =
                 HS.toList (model ^. fileSelectionModel . taggingSelection)
               else [focusedFileFK]
        in ( if model ^. tagInputModel . isTagDelete
-              then []
+              then
+                [ Task $
+                    DoFocusedFileEvent RefreshFocusedFileAndSelection
+                      <$ mapM (\fk -> deleteTagExpression conn fk rawTagText) fks
+                ]
               else
                 [ Task $
                     DoFocusedFileEvent RefreshFocusedFileAndSelection
