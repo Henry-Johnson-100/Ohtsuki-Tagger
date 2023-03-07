@@ -621,7 +621,7 @@ tagInputEventHandler _wenv _wnode model@((^. connection) -> conn) e =
     ToggleTagInputOptionPane ->
       [ Model $
           model & tagInputModel . visibility
-            %~ togglePaneVis (VisibilityLabel tagInputOptionPaneLabel)
+            %~ flip togglePaneVis (VisibilityLabel tagInputOptionPaneLabel)
       ]
     ToggleTagSelection ->
       [Model $ model & tagInputModel . isTagSelection %~ not]
