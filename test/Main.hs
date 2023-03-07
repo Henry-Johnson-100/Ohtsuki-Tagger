@@ -28,10 +28,12 @@ main =
             , withResource secureResource removeResource $
                 \conn ->
                     testGroup
-                        "Database Tests"
+                        "Database_Tests"
                         [ setup_0_InitializeDatabase conn
-                        , after AllSucceed "Setup 0" $ setup_1_TestInitialization conn
-                        , after AllSucceed "Setup" $ queryEngineASTTests conn
+                        , after AllSucceed "Initialize_Database" $
+                            setup_1_TestInitialization conn
+                        , after AllSucceed "Test_Initialization" $
+                            queryEngineASTTests conn
                         ]
             , astTests
             ]

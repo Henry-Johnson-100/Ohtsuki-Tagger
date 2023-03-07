@@ -28,6 +28,7 @@ module Text.TaggerQL.Expression.Engine (
   yuiQLFileQueryExpression,
   yuiQLTagFileExpression,
   yuiQLDeleteTagExpression,
+  yuiQLQueryTagDeleteExpression,
 ) where
 
 import Control.Monad (void, (<=<), (>=>))
