@@ -897,20 +897,46 @@ tagDeleteEngineTests ioc =
       , after AllSucceed "Tagging_Delete_Tests_Setup" $
           testGroup
             "Tagging_Delete_Tests_Tests"
-            [ testCase "Single Term Delete" $ do
-                let fks = [17] :: [RecordKey File]
-
-                tagsToDelete <- fmap (fmap (HS.map tagId)) . sequenceA $ do
-                  deleteExpression <- fmap runDTerm <$> parseTagExpression "%25"
-                  pure $
-                    ioc >>= \c ->
-                      yuiQLQueryTagDeleteExpression c fks deleteExpression
-
-                let expected = [48] :: HashSet (RecordKey Tag)
-
-                assertEqual "" (Right expected) tagsToDelete
-            , tagDeleteTestCase "Single Term Delete Alt" [17] "%25" [48]
-            , testCase "in tests" (assertFailure "Not Implemented")
+            [ tagDeleteTestCase
+                "Single Term Delete"
+                [17]
+                "%25"
+                [48]
+            , tagDeleteTestCase
+                "Specific Term Delete"
+                [17]
+                "%21{%22{%25}}"
+                [48]
+            , tagDeleteTestCase
+                "Delete Two Terms"
+                [17]
+                "%21{%23} %21{%22{%25}}"
+                [46, 48]
+            , tagDeleteTestCase
+                "Distribute Tag Deletion"
+                [17]
+                "%21{%23 %22{%25}}"
+                [46, 48]
+            , tagDeleteTestCase
+                "Higher Level Tag"
+                [17]
+                "%21"
+                [44]
+            , tagDeleteTestCase
+                "Multiple Files With Disjoint Tags"
+                [17, 18]
+                "%21 %26"
+                [44, 49]
+            , tagDeleteTestCase
+                "Multiple Files With Similar Tags"
+                [11, 12, 13, 14, 15, 16]
+                "%17{%18}"
+                [29, 33, 39, 42]
+            , tagDeleteTestCase
+                "Multiple Files With Similar Tags - 1"
+                [11, 12, 13, 14, 15, 16, 17]
+                "%18"
+                [29, 33, 35, 39, 42]
             ]
       ]
  where

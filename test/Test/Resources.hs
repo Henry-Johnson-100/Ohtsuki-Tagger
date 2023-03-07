@@ -307,19 +307,6 @@ testTags =
     Tag 66 21 40 (Just 65)
     Tag 67 21 41 (Just 66)
   -}
-  {- Below are expressions used for testing tag deletion expressions.
-  These are created after the above tags are made.
-
-  These tests are non-destructive since they are only querying tags that would be
-  deleted, not actually deleting them.
-
-  Keep in mind that tag deletions are cascaded through their subtags.
-
-  -- delete from file_17 "25"
-    - corresponds to tag ids:
-    48
-
-  -}
   ]
 
 toTagTriple ::
