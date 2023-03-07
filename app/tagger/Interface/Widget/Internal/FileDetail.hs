@@ -64,7 +64,7 @@ import Database.Tagger (
   RecordKey,
   Tag,
  )
-import Interface.Theme (yuiBlue, yuiLightPeach, yuiRed)
+import Interface.Theme (yuiBlue, yuiLightPeach, yuiOrange, yuiRed, yuiYellow)
 import Interface.Widget.Internal.Core (
   defaultElementOpacity,
   defaultOpacityModulator,
@@ -82,29 +82,30 @@ import Monomer (
   CmbBgColor (bgColor),
   CmbBorder (border),
   CmbIgnoreChildrenEvts (ignoreChildrenEvts),
-  CmbMaxHeight (maxHeight),
   CmbOnChange (onChange),
   CmbPaddingR (paddingR),
   CmbResizeFactor (resizeFactor),
   CmbTextColor (textColor),
   CmbWheelRate (wheelRate),
   CmbWidth (width),
+  alignBottom,
+  alignMiddle,
   black,
   box_,
   draggable,
   dropTargetStyle,
   dropTarget_,
+  height,
   hstack,
   hstack_,
   keystroke_,
   label,
   label_,
-  paddingB,
-  paddingT,
   separatorLine,
   spacer,
   spacer_,
   styleBasic,
+  styleHover,
   textArea_,
   textField_,
   toggleButtonOffStyle,
@@ -266,11 +267,12 @@ tagTextNodeKey = "tag-text-field"
 
 taggingWidget :: TaggerModel -> TaggerWidget
 taggingWidget m =
-  vstack
-    [ taggingOptionsToggle
-    , taggingOptionsWidget
-    , tagTextField
-    ]
+  box_ [alignBottom] $
+    vstack
+      [ taggingOptionsToggle
+      , taggingOptionsWidget
+      , tagTextField
+      ]
  where
   taggingOptionsToggle =
     styledButton_
@@ -283,14 +285,16 @@ taggingWidget m =
       ( (m ^. tagInputModel . visibility)
           `hasVis` VisibilityLabel tagInputOptionPaneLabel
       )
-      . withStyleBasic [paddingT 5, paddingB 5]
       $ vstack_
         []
-        [ styledToggleButton "Tag Selection" (tagInputModel . isTagSelection)
-        , styledButton_
-            [resizeFactor (-1)]
-            "Clear Tag Selection"
-            (DoFileSelectionEvent ClearTaggingSelection)
+        [ box_ [alignMiddle] $
+            hstack
+              [ styledToggleButton "Tag Selection" (tagInputModel . isTagSelection)
+              , styledButton_
+                  [resizeFactor (-1)]
+                  "Clear Tag Selection"
+                  (DoFileSelectionEvent ClearTaggingSelection)
+              ]
         , styledToggleButton "Delete Mode" (tagInputModel . isTagDelete)
         ]
    where
@@ -308,6 +312,11 @@ taggingWidget m =
           , toggleButtonOffStyle $
               mempty
                 & flip styleBasic [bgColor . modOpac $ yuiLightPeach, textColor black]
+                & flip
+                  styleHover
+                  [ bgColor . modulateOpacity defaultElementOpacity $ yuiYellow
+                  , border 1 yuiOrange
+                  ]
           ]
      where
       modOpac = modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
@@ -335,7 +344,7 @@ taggingWidget m =
             . modulateOpacity
               (defaultElementOpacity - defaultOpacityModulator)
             $ yuiLightPeach
-        , maxHeight 250
+        , height 250
         ]
       $ textArea_
         (tagInputModel . input . text)
