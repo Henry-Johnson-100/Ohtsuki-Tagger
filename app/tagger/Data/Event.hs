@@ -101,6 +101,7 @@ data FileSelectionEvent
   | RunSelectionShellCommand
   | ShuffleSelection
   | TagSelect (RecordKey File)
+  | TagSelectWholeChunk
   | ToggleSelectionView
   deriving (Show, Eq)
 

@@ -11,7 +11,7 @@ module Interface.Widget.Internal.FileDetail (
 
 import Control.Lens ((&), (^.))
 import Data.Event (
-  FileSelectionEvent (RenameFile),
+  FileSelectionEvent (ClearTaggingSelection, RenameFile),
   FocusedFileEvent (DeleteTag, MoveTag, TagFile),
   TagInputEvent (RunTagExpression, ToggleTagInputOptionPane),
   TaggerEvent (
@@ -308,7 +308,11 @@ taggingWidget m =
       $ vstack_
         []
         [ styledToggleButton "Tag Selection" (tagInputModel . isTagSelection)
-        , styledToggleButton "Delete Tags" (tagInputModel . isTagDelete)
+        , styledButton_
+            [resizeFactor (-1)]
+            "Clear Tag Selection"
+            (DoFileSelectionEvent ClearTaggingSelection)
+        , styledToggleButton "Delete Mode" (tagInputModel . isTagDelete)
         ]
    where
     styledToggleButton t l =

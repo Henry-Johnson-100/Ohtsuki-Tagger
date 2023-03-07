@@ -24,6 +24,8 @@ import Data.Event (
     RenameFile,
     RunSelectionShellCommand,
     ShuffleSelection,
+    TagSelect,
+    TagSelectWholeChunk,
     ToggleSelectionView
   ),
   FileSelectionWidgetEvent (CycleNextChunk, CyclePrevChunk),
@@ -66,6 +68,9 @@ import Data.Model.Lens (
   inProgress,
   include,
   input,
+  isTagSelection,
+  tagInputModel,
+  taggingSelection,
   visibility,
  )
 import Data.Model.Shared.Core (
@@ -86,7 +91,7 @@ import qualified Data.Sequence as Seq
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger (Descriptor (descriptor), File (File), descriptorId)
-import Interface.Theme (yuiLightPeach, yuiRed)
+import Interface.Theme (yuiLightPeach, yuiOrange, yuiRed)
 import Interface.Widget.Internal.Core (
   defaultElementOpacity,
   defaultOpacityModulator,
@@ -134,8 +139,10 @@ import Monomer (
   numericField_,
   onlyTopActive,
   separatorLine,
+  styleIf,
   textFieldV,
   textField_,
+  textSize,
   toggleButton_,
   tooltipDelay,
   tooltip_,
@@ -318,6 +325,11 @@ fileSelectionFileList m =
                     . DoFileSelectionWidgetEvent
                     $ CycleNextChunk
                 )
+            , withNodeVisible (m ^. tagInputModel . isTagSelection) $
+                styledButton_
+                  [resizeFactor (-1)]
+                  "Select"
+                  (DoFileSelectionEvent TagSelectWholeChunk)
             ]
       ]
     fileListMergeRequirement =
@@ -331,7 +343,11 @@ fileSelectionFileList m =
                   , neq chunkSequence
                   , neq chunkSize
                   , neq fileSelectionVis
+                  , neq taggingSelection
                   ]
+                  || ( (m1 ^. tagInputModel . isTagSelection)
+                        /= (m2 ^. tagInputModel . isTagSelection)
+                     )
         )
   renderedChunks =
     getSelectionChunk m
@@ -354,8 +370,26 @@ fileSelectionFileList m =
           ( not isEditMode
           )
           . draggable f
-          . withStyleBasic [textLeft]
-          $ label_ fp [resizeFactor (-1)]
+          . withStyleBasic
+            [ textLeft
+            , styleIf
+                ( (m ^. tagInputModel . isTagSelection)
+                    && HS.member fk (m ^. fileSelectionModel . taggingSelection)
+                )
+                ( bgColor
+                    . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+                    $ yuiOrange
+                )
+            ]
+          $ hstack
+            [ withNodeVisible (m ^. tagInputModel . isTagSelection)
+                . withStyleBasic [border 1 black, textSize 10]
+                $ styledButton_
+                  [resizeFactor (-1)]
+                  " "
+                  (DoFileSelectionEvent $ TagSelect fk)
+            , label_ fp [resizeFactor (-1)]
+            ]
       , withNodeVisible isEditMode editModeWidget
       ]
    where

@@ -316,6 +316,11 @@ fileSelectionEventHandler
             model & fileSelectionModel . taggingSelection
               %~ \hs -> if HS.member fk hs then HS.delete fk hs else HS.insert fk hs
         ]
+      TagSelectWholeChunk ->
+        [ Model $
+            model & fileSelectionModel . taggingSelection %~ \hs ->
+              F.foldl (\hs' f -> HS.insert (fileId f) hs') hs (getSelectionChunk model)
+        ]
       ToggleSelectionView ->
         [ Model $
             model
@@ -621,7 +626,6 @@ tagInputEventHandler _wenv _wnode model@((^. connection) -> conn) e =
       [ Model $
           model & tagInputModel . visibility
             %~ flip togglePaneVis (VisibilityLabel tagInputOptionPaneLabel)
-      , Event . DoFileSelectionEvent $ ClearTaggingSelection
       ]
 
 {- |
