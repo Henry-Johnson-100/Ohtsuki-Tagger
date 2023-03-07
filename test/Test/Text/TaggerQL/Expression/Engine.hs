@@ -27,6 +27,7 @@ queryEngineASTTests c =
     , queryExpressionEdgeCases c
     , taggingEngineTests c
     , enginePropertyTests
+    , tagDeleteEngineTests c
     ]
 
 des :: Int -> Pattern
@@ -638,8 +639,8 @@ taggingEngineTests :: IO TaggedConnection -> TestTree
 taggingEngineTests c =
   let insert se fk c' = yuiQLTagFileExpression c' fk se
    in testGroup
-        "Tagging Engine Tests"
-        [ testCase "Tagging Engine - 0" $ do
+        "Tagging_Engine_Tests"
+        [ testCase "0" $ do
             let se =
                   (pure . des $ 21)
                     ∙ ( (pure . des $ 22)
@@ -672,8 +673,8 @@ taggingEngineTests c =
                   expectedResults
               )
               (sort f)
-        , after AllSucceed "Tagging Engine - 0" $
-            testCase "Tagging Engine - 1" $ do
+        , after AllSucceed "$0 == \"Tagging_Engine_Tests.0\"" $
+            testCase "1" $ do
               let se =
                     (pure . des $ 21)
                       ∙ ( ( (pure . des $ 22)
@@ -720,8 +721,8 @@ taggingEngineTests c =
                     expectedResults
                 )
                 (sort f)
-        , after AllSucceed "Tagging Engine - 1" $
-            testCase "Tagging Engine - 2" $ do
+        , after AllSucceed "$0 == \"Tagging_Engine_Tests.1\"" $
+            testCase "2" $ do
               let se =
                     (pure . des $ 26)
                       ∙ ( ( (pure . des $ 27)
@@ -775,104 +776,120 @@ taggingEngineTests c =
                     expectedResults
                 )
                 (sort f)
-        , after AllSucceed "Tagging Engine - 2" . testCase "Tagging Engine - 3" $ do
-            let se =
-                  ( (pure . des $ 32)
-                      *. (pure . des $ 33)
-                  )
-                    *. (pure . des $ 34)
-                -- BinarySubExpression $
-                --   BinaryOperation
-                --     ( BinarySubExpression $
-                --         BinaryOperation
-                --           (SubTag (td 32))
-                --           Multiplication
-                --           (SubTag (td 33))
-                --     )
-                --     Multiplication
-                --     (SubTag (td 34))
-                fk = 19
-                expectedResults =
-                  [ Tag 55 19 32 Nothing
-                  , Tag 56 19 33 Nothing
-                  , Tag 57 19 34 Nothing
-                  ]
-            c
-              >>= insert
-                se
-                fk
-            f <- c >>= queryForFileTagsByFileId fk
-            assertEqual
-              ""
-              ( sort
-                  expectedResults
-              )
-              (sort f)
-        , after AllSucceed "Tagging Engine - 3" . testCase "Tagging Engine - 4" $ do
-            let se =
-                  (pure . des $ 33)
-                    ∙ (pure . des $ 32)
-                -- SubExpression $ TagTermExtension (td 33) (SubTag (td 32))
-                fk = 19
-                expectedResults =
-                  [ Tag 55 19 32 Nothing
-                  , Tag 56 19 33 Nothing
-                  , Tag 57 19 34 Nothing
-                  , Tag 58 19 32 (Just 56)
-                  ]
-            c
-              >>= insert
-                se
-                fk
-            f <- c >>= queryForFileTagsByFileId fk
-            assertEqual
-              ""
-              ( sort
-                  expectedResults
-              )
-              (sort f)
-        , after AllSucceed "Tagging Engine - 4" . testCase "Tagging Engine - 5" $ do
-            let se =
-                  ( (pure . des $ 35)
-                      *. (pure . des $ 36)
-                  )
-                    ∙ (pure . des $ 37)
-                fk = 20
-                expectedResults =
-                  [ Tag 59 20 35 Nothing
-                  , Tag 60 20 37 (Just 59)
-                  , Tag 61 20 36 Nothing
-                  , Tag 62 20 37 (Just 61)
-                  ]
-            c >>= insert se fk
-            f <- c >>= queryForFileTagsByFileId fk
-            assertEqual
-              "Tagging should work with a lift-distributive expression."
-              (sort expectedResults)
-              (sort f)
-        , after AllSucceed "Tagging Engine - 5" . testCase "Tagging Engine - 6" $ do
-            let se =
-                  ( (pure . des $ 38)
-                      *. ( (pure . des $ 39)
-                            ∙ (pure . des $ 40)
-                         )
-                  )
-                    ∙ (pure . des $ 41)
-                fk = 21
-                expectedResults =
-                  [ Tag 63 21 38 Nothing
-                  , Tag 64 21 41 (Just 63)
-                  , Tag 65 21 39 Nothing
-                  , Tag 66 21 40 (Just 65)
-                  , Tag 67 21 41 (Just 66)
-                  ]
-            c >>= insert se fk
-            f <- c >>= queryForFileTagsByFileId fk
-            assertEqual
-              "Tagging should work with a lift-distributive expression."
-              (sort expectedResults)
-              (sort f)
+        , after AllSucceed "$0 == \"Tagging_Engine_Tests.2\""
+            . testCase "3"
+            $ do
+              let se =
+                    ( (pure . des $ 32)
+                        *. (pure . des $ 33)
+                    )
+                      *. (pure . des $ 34)
+                  -- BinarySubExpression $
+                  --   BinaryOperation
+                  --     ( BinarySubExpression $
+                  --         BinaryOperation
+                  --           (SubTag (td 32))
+                  --           Multiplication
+                  --           (SubTag (td 33))
+                  --     )
+                  --     Multiplication
+                  --     (SubTag (td 34))
+                  fk = 19
+                  expectedResults =
+                    [ Tag 55 19 32 Nothing
+                    , Tag 56 19 33 Nothing
+                    , Tag 57 19 34 Nothing
+                    ]
+              c
+                >>= insert
+                  se
+                  fk
+              f <- c >>= queryForFileTagsByFileId fk
+              assertEqual
+                ""
+                ( sort
+                    expectedResults
+                )
+                (sort f)
+        , after AllSucceed "$0 == \"Tagging_Engine_Tests.3\""
+            . testCase "4"
+            $ do
+              let se =
+                    (pure . des $ 33)
+                      ∙ (pure . des $ 32)
+                  -- SubExpression $ TagTermExtension (td 33) (SubTag (td 32))
+                  fk = 19
+                  expectedResults =
+                    [ Tag 55 19 32 Nothing
+                    , Tag 56 19 33 Nothing
+                    , Tag 57 19 34 Nothing
+                    , Tag 58 19 32 (Just 56)
+                    ]
+              c
+                >>= insert
+                  se
+                  fk
+              f <- c >>= queryForFileTagsByFileId fk
+              assertEqual
+                ""
+                ( sort
+                    expectedResults
+                )
+                (sort f)
+        , after AllSucceed "$0 == \"Tagging_Engine_Tests.4\""
+            . testCase "5"
+            $ do
+              let se =
+                    ( (pure . des $ 35)
+                        *. (pure . des $ 36)
+                    )
+                      ∙ (pure . des $ 37)
+                  fk = 20
+                  expectedResults =
+                    [ Tag 59 20 35 Nothing
+                    , Tag 60 20 37 (Just 59)
+                    , Tag 61 20 36 Nothing
+                    , Tag 62 20 37 (Just 61)
+                    ]
+              c >>= insert se fk
+              f <- c >>= queryForFileTagsByFileId fk
+              assertEqual
+                "Tagging should work with a lift-distributive expression."
+                (sort expectedResults)
+                (sort f)
+        , after AllSucceed "$0 == \"Tagging_Engine_Tests.5\""
+            . testCase "6"
+            $ do
+              let se =
+                    ( (pure . des $ 38)
+                        *. ( (pure . des $ 39)
+                              ∙ (pure . des $ 40)
+                           )
+                    )
+                      ∙ (pure . des $ 41)
+                  fk = 21
+                  expectedResults =
+                    [ Tag 63 21 38 Nothing
+                    , Tag 64 21 41 (Just 63)
+                    , Tag 65 21 39 Nothing
+                    , Tag 66 21 40 (Just 65)
+                    , Tag 67 21 41 (Just 66)
+                    ]
+              c >>= insert se fk
+              f <- c >>= queryForFileTagsByFileId fk
+              assertEqual
+                "Tagging should work with a lift-distributive expression."
+                (sort expectedResults)
+                (sort f)
         ]
+
+tagDeleteEngineTests :: HasCallStack => IO TaggedConnection -> TestTree
+tagDeleteEngineTests ioc =
+  after AllSucceed "Tagging_Engine_Tests" $
+    testGroup
+      "Tagging_Delete_Tests"
+      [ testCase "Setup" (assertFailure "Not Implemented")
+      ]
 
 file :: RecordKey File -> File
 file n = File n ("file_" <> (T.pack . show $ n))
