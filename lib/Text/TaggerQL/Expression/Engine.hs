@@ -229,6 +229,7 @@ runDeleteTagExpression ::
   [RecordKey File] ->
   FreeDisjunctMonad RingExpression MagmaExpression Pattern ->
   IO ()
+runDeleteTagExpression _ [] _ = pure ()
 runDeleteTagExpression c fks tqe = do
   traversedTQE <-
     fmap (HS.filter ((`elem` fks) . tagFileId))
