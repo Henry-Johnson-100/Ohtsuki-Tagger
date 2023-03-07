@@ -12,7 +12,7 @@ module Interface.Widget.Internal.FileDetail (
 import Control.Lens ((&), (^.))
 import Data.Event (
   FileSelectionEvent (ClearTaggingSelection, RenameFile),
-  FocusedFileEvent (MoveTag, TagFile),
+  FocusedFileEvent (DeleteTag, MoveTag, TagFile),
   TagInputEvent (RunTagExpression, ToggleTagInputOptionPane),
   TaggerEvent (
     AppendText,
@@ -63,6 +63,7 @@ import Database.Tagger (
   File (fileId, filePath),
   RecordKey,
   Tag,
+  concreteTagId,
  )
 import Interface.Theme (yuiBlue, yuiLightPeach, yuiOrange, yuiRed, yuiYellow)
 import Interface.Widget.Internal.Core (
@@ -295,7 +296,10 @@ taggingWidget m =
                   "Clear Tag Selection"
                   (DoFileSelectionEvent ClearTaggingSelection)
               ]
-        , styledToggleButton "Delete Mode" (tagInputModel . isTagDelete)
+        , dropTarget_
+            (DoFocusedFileEvent . DeleteTag . concreteTagId)
+            [dropTargetStyle [border 1 yuiRed]]
+            $ styledToggleButton "Delete Mode" (tagInputModel . isTagDelete)
         ]
    where
     styledToggleButton t l =
