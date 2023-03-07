@@ -607,9 +607,9 @@ tagInputEventHandler _wenv _wnode model@((^. connection) -> conn) e =
           !fks =
             if model ^. tagInputModel . isTagSelection
               then
-                focusedFileFK
-                  Seq.<| fmap fileId (model ^. fileSelectionModel . selection)
-              else Seq.singleton focusedFileFK
+                focusedFileFK :
+                HS.toList (model ^. fileSelectionModel . taggingSelection)
+              else [focusedFileFK]
        in ( if model ^. tagInputModel . isTagDelete
               then []
               else
