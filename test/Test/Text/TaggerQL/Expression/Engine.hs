@@ -1117,6 +1117,29 @@ descriptorTreeCreateEngineTests ioc =
                 "\"script_9\" should be infra to \"script_7\""
                 ["script_9"]
                 (descriptor <$> s7Infra)
+      , {-
+        script_10{script_11{script_10}}
+          -> #UNRELATED# {script_10 script_11}
+        -}
+        after AllSucceed "Create_Infra_Relations_Without_Regard_To_Existing_Meta" $
+          testCaseSteps "Cannot_Create_Recursive_Relations" $ \step -> do
+            c <- ioc
+
+            step "Insert {script_10{script_11{script_10}}}"
+            r <- yuiQLCreateDescriptors c "script_10{script_11{script_10}}"
+            assertBool "Parse failure" (isRight r)
+
+            step "Query #UNRELATED# Infra"
+            u <- head <$> queryForDescriptorByPattern "#UNRELATED#" c
+            uinfra <- fmap descriptor <$> getInfraChildren (descriptorId u) c
+
+            assertBool
+              "\"script_10\" is infra to #UNRELATED#"
+              ("script_10" `elem` uinfra)
+
+            assertBool
+              "\"script_11\" is infra to #UNRELATED#"
+              ("script_11" `elem` uinfra)
       ]
 
 file :: RecordKey File -> File
