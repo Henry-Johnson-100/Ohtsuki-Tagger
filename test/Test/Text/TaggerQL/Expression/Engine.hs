@@ -31,6 +31,7 @@ queryEngineASTTests c =
     , taggingEngineTests c
     , enginePropertyTests
     , tagDeleteEngineTests c
+    , descriptorTreeCreateEngineTests c
     ]
 
 des :: Int -> Pattern
@@ -956,6 +957,14 @@ tagDeleteEngineTests ioc =
             yuiQLQueryTagDeleteExpression c fks deleteExpression
 
       assertEqual "" (Right expected) tagsToDelete
+
+descriptorTreeCreateEngineTests :: IO TaggedConnection -> TestTree
+descriptorTreeCreateEngineTests ioc =
+  after AllSucceed "Tagging_Delete_Tests" $
+    testGroup
+      "Descriptor_Tree_Create_Tests"
+      [ testCase "NI" (assertFailure "Not Implemented")
+      ]
 
 file :: RecordKey File -> File
 file n = File n ("file_" <> (T.pack . show $ n))
