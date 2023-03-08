@@ -89,6 +89,8 @@ is complete, optionally how many files were added.
         - It was only used in one place and I found I didn't care for it.
   - Removed the `OccurrenceHashMap` data type.
     - It can be easily replaced with a plain old `HashMap a Int`.
+  - Renamed
+    - Functions in the Text.TaggerQL.Engine module to be prefixed by yuiQL-
 
 ## Non-Breaking Changes
 - Changed how tags ordered when using the --describe CLI command
@@ -120,6 +122,13 @@ or receiving any input.
 - Add a new widget for selecting directories scan for new files.
   - Accessed via the "Directories" button next to the addFiles text field.
 - When a query is run, the results are sorted alphabetically.
+- Added a function yuiQLDeleteTagExpression which
+  takes a tag expression and deletes the corresponding tags for a given list of files.
+- Added a 'Options' pane below the tagging text field:
+  - There is a toggle option to select many files to tag at a time.
+  - There is an option to enter "Delete Mode" which allows a user to enter
+  a tag expression into the textfield to delete tags from the current file, or selection
+  of files.
 
 ------
 
