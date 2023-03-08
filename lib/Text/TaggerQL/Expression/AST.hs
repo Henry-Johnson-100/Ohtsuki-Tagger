@@ -27,6 +27,7 @@ module Text.TaggerQL.Expression.AST (
   TagQueryExpression,
   TagDeleteExpression,
   TagFileExpression,
+  DescriptorExpression,
   unwrapIdentities,
   normalize,
 
@@ -115,6 +116,12 @@ type TagDeleteExpression =
  > FreeDisjunctMonad RingExpression MagmaExpression Pattern
 -}
 type TagFileExpression =
+  FreeDisjunctMonad RingExpression MagmaExpression Pattern
+
+{- |
+ > FreeDisjunctMonad RingExpression MagmaExpression Pattern
+-}
+type DescriptorExpression =
   FreeDisjunctMonad RingExpression MagmaExpression Pattern
 
 {- |

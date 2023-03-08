@@ -23,12 +23,14 @@ module Text.TaggerQL.Expression.Engine (
   yuiQLFileQuery,
   yuiQLTagFile,
   yuiQLDeleteTags,
+  yuiQLCreateDescriptors,
 
-  -- * New
+  -- * On Expressions
   yuiQLFileQueryExpression,
   yuiQLTagFileExpression,
   yuiQLDeleteTagExpression,
   yuiQLQueryTagDeleteExpression,
+  yuiQLCreateDescriptorExpression,
 ) where
 
 import Control.Monad (void, (<=<), (>=>))
@@ -68,6 +70,7 @@ import Database.Tagger.Type (
 import Text.Parsec.Error (errorMessages, messageString)
 import Text.TaggerQL.Expression.AST (
   DTerm (DMetaTerm, DTerm),
+  DescriptorExpression,
   Pattern (PatternText, WildCard),
   QueryExpression,
   TagDeleteExpression,
@@ -268,3 +271,14 @@ yuiQLQueryTagDeleteExpression c fks tqe = do
       result = F.foldl1 HS.union foldedMagmas
 
   pure result
+
+yuiQLCreateDescriptors :: TaggedConnection -> Text -> IO (Either Text ())
+yuiQLCreateDescriptors c =
+  traverse (yuiQLCreateDescriptorExpression c)
+    . first (T.pack . show)
+    . fmap (fmap runDTerm)
+    . parseTagExpression
+
+yuiQLCreateDescriptorExpression :: TaggedConnection -> DescriptorExpression -> IO ()
+yuiQLCreateDescriptorExpression c tqe = do
+  undefined
