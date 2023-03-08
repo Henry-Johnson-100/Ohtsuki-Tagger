@@ -9,6 +9,7 @@ module Test.Text.TaggerQL.Expression.Engine (
   queryEngineASTTests,
 ) where
 
+import Data.Either (isRight)
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HS
 import Data.List (sort)
@@ -963,7 +964,58 @@ descriptorTreeCreateEngineTests ioc =
   after AllSucceed "Tagging_Delete_Tests" $
     testGroup
       "Descriptor_Tree_Create_Tests"
-      [ testCase "NI" (assertFailure "Not Implemented")
+      [ testCaseSteps "Create_One_Descriptor" $ \step -> do
+          c <- ioc
+
+          step "Insert Descriptors"
+          r <- yuiQLCreateDescriptors c "script_1"
+          assertBool "Parse failure" (isRight r)
+
+          step "Query Descriptor"
+          ds <- queryForDescriptorByPattern "script_1" c
+          assertEqual "Could not find \"script_1\"" ["script_1"] (descriptor <$> ds)
+      , after AllSucceed "Create_One_Descriptor" $
+          testCaseSteps "Create_Simple_Descriptor_Tree" $ \step -> do
+            c <- ioc
+
+            step "Insert Descriptors"
+            r <- yuiQLCreateDescriptors c "script_2 {script_3}"
+            assertBool "Parse failure" (isRight r)
+
+            step "Query Head Descriptor"
+            s2 <- queryForDescriptorByPattern "script_2" c
+            assertEqual "Insert \"script_2\"" ["script_2"] (descriptor <$> s2)
+
+            step "Query Head Infra Descriptors"
+            infraS3 <- getInfraChildren (descriptorId . head $ s2) c
+            assertEqual
+              "\"script_3\" is infra to \"script_2\""
+              ["script_3"]
+              (descriptor <$> infraS3)
+      , after AllSucceed "Create_Simple_Descriptor_Tree" $
+          testCaseSteps "Update_Descriptor_Tree_With_Existing_Descriptor" $ \step -> do
+            c <- ioc
+
+            step "Insert Descriptors"
+            r <- yuiQLCreateDescriptors c "script_1 {script_3}"
+            assertBool "Parse failure" (isRight r)
+
+            step "Query Head Descriptor"
+            s1 <- queryForDescriptorByPattern "script_1" c
+            assertEqual "find \"script_1\"" ["script_1"] (descriptor <$> s1)
+
+            step "Query Head Infra Descriptors"
+            infraS3 <- getInfraChildren (descriptorId . head $ s1) c
+            assertEqual
+              "\"script_3\" is infra to \"script_2\""
+              ["script_3"]
+              (descriptor <$> infraS3)
+
+            step "Query Previous Head Infra Descriptors"
+            s2 <- queryForDescriptorByPattern "script_2" c
+            assertEqual "Could not find \"script_2\"" ["script_2"] (descriptor <$> s2)
+            s2Children <- getInfraChildren (descriptorId . head $ s2) c
+            assertEqual "\"script_2\" has infra children when it shouldn't" [] s2Children
       ]
 
 file :: RecordKey File -> File
