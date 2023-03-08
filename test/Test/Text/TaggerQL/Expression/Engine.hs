@@ -964,58 +964,159 @@ descriptorTreeCreateEngineTests ioc =
   after AllSucceed "Tagging_Delete_Tests" $
     testGroup
       "Descriptor_Tree_Create_Tests"
-      [ testCaseSteps "Create_One_Descriptor" $ \step -> do
+      [ {-
+        script_1
+        -}
+        testCaseSteps "Create_One_Descriptor" $ \step -> do
           c <- ioc
 
-          step "Insert Descriptors"
+          step "Insert script_1"
           r <- yuiQLCreateDescriptors c "script_1"
           assertBool "Parse failure" (isRight r)
 
-          step "Query Descriptor"
+          step "Query script_1"
           ds <- queryForDescriptorByPattern "script_1" c
           assertEqual "Could not find \"script_1\"" ["script_1"] (descriptor <$> ds)
-      , after AllSucceed "Create_One_Descriptor" $
+      , {-
+        script_2{script_3}
+        -}
+        after AllSucceed "Create_One_Descriptor" $
           testCaseSteps "Create_Simple_Descriptor_Tree" $ \step -> do
             c <- ioc
 
-            step "Insert Descriptors"
+            step "Insert script_2{script_3}"
             r <- yuiQLCreateDescriptors c "script_2 {script_3}"
             assertBool "Parse failure" (isRight r)
 
-            step "Query Head Descriptor"
+            step "Query script_2"
             s2 <- queryForDescriptorByPattern "script_2" c
             assertEqual "Insert \"script_2\"" ["script_2"] (descriptor <$> s2)
 
-            step "Query Head Infra Descriptors"
+            step "Query script_2 Infra"
             infraS3 <- getInfraChildren (descriptorId . head $ s2) c
             assertEqual
               "\"script_3\" is infra to \"script_2\""
               ["script_3"]
               (descriptor <$> infraS3)
-      , after AllSucceed "Create_Simple_Descriptor_Tree" $
+      , {-
+        script_1{script_3}
+        -}
+        after AllSucceed "Create_Simple_Descriptor_Tree" $
           testCaseSteps "Update_Descriptor_Tree_With_Existing_Descriptor" $ \step -> do
             c <- ioc
 
-            step "Insert Descriptors"
+            step "Insert script_1{script_3}"
             r <- yuiQLCreateDescriptors c "script_1 {script_3}"
             assertBool "Parse failure" (isRight r)
 
-            step "Query Head Descriptor"
+            step "Query script_1"
             s1 <- queryForDescriptorByPattern "script_1" c
             assertEqual "find \"script_1\"" ["script_1"] (descriptor <$> s1)
 
-            step "Query Head Infra Descriptors"
+            step "Query script_1 Infra"
             infraS3 <- getInfraChildren (descriptorId . head $ s1) c
             assertEqual
               "\"script_3\" is infra to \"script_2\""
               ["script_3"]
               (descriptor <$> infraS3)
 
-            step "Query Previous Head Infra Descriptors"
+            step "Query script_2 and script_2 Infra"
             s2 <- queryForDescriptorByPattern "script_2" c
             assertEqual "Could not find \"script_2\"" ["script_2"] (descriptor <$> s2)
             s2Children <- getInfraChildren (descriptorId . head $ s2) c
             assertEqual "\"script_2\" has infra children when it shouldn't" [] s2Children
+      , {-
+        script_5 script_5
+        -}
+        after AllSucceed "Update_Descriptor_Tree_With_Existing_Descriptor" $
+          testCaseSteps "Insert_Multiple_New_Descriptors_Simple" $
+            \step -> do
+              c <- ioc
+
+              step "Insert {script_4 script_5}"
+              r <- yuiQLCreateDescriptors c "script_4 script_5"
+              assertBool "Parse failure" (isRight r)
+
+              step "Query script_4 and script_5"
+              s4 <- queryForDescriptorByPattern "script_4" c
+              s5 <- queryForDescriptorByPattern "script_5" c
+              assertEqual
+                "Could not find \"script_4\" and \"script_5\""
+                ["script_4", "script_5"]
+                (descriptor <$> s4 ++ s5)
+      , {-
+        script_6{script_7} script_8{script_7}
+           -> script_6 script_8{script_7}
+        -}
+        after AllSucceed "Insert_Multiple_New_Descriptors_Simple" $
+          testCaseSteps "Duplicate_Infra_Descriptors_Reside_In_Last_Defined_Meta" $
+            \step -> do
+              c <- ioc
+
+              step "Insert {script_6{script_7} script_8{script_7}}"
+              r <- yuiQLCreateDescriptors c "script_6{script_7} script_8{script_7}"
+              assertBool "Parse failure" (isRight r)
+
+              step "Query script_6"
+              s6 <- queryForDescriptorByPattern "script_6" c
+              assertEqual
+                "Could not find \"script_6\""
+                ["script_6"]
+                (descriptor <$> s6)
+
+              step "Query script_6 Infra"
+              s6Infra <- getInfraChildren (descriptorId . head $ s6) c
+              assertEqual
+                "\"script_6\" should have no infra children"
+                []
+                s6Infra
+
+              step "Query script_8"
+              s8 <- queryForDescriptorByPattern "script_8" c
+              assertEqual
+                "Could not find \"script_8\""
+                ["script_8"]
+                (descriptor <$> s8)
+
+              step "Query script_8 Infra"
+              s8Infra <- getInfraChildren (descriptorId . head $ s8) c
+              assertEqual
+                "\"script_8\" is not meta to \"script_7\""
+                ["script_7"]
+                (descriptor <$> s8Infra)
+      , {-
+        script_7 {script_9}
+          -> script_8{script_7{script_9}}
+        -}
+        after AllSucceed "Duplicate_Infra_Descriptors_Reside_In_Last_Defined_Meta" $
+          testCaseSteps "Create_Infra_Relations_Without_Regard_To_Existing_Meta" $
+            \step -> do
+              c <- ioc
+
+              step "Insert {script_7{script_9}}"
+              r <- yuiQLCreateDescriptors c "script_7{script_9}"
+              assertBool "Parse failure" (isRight r)
+
+              step "Query script_8"
+              s8 <- queryForDescriptorByPattern "script_8" c
+              assertEqual
+                "Could not find \"script_8\""
+                ["script_8"]
+                (descriptor <$> s8)
+
+              step "Query script_8 Infra"
+              s8Infra <- getInfraChildren (descriptorId . head $ s8) c
+              assertEqual
+                "\"script_7\" should be infra to \"script_8\""
+                ["script_7"]
+                (descriptor <$> s8Infra)
+
+              step "Query script_7 Infra"
+              s7Infra <- getInfraChildren (descriptorId . head $ s8Infra) c
+              assertEqual
+                "\"script_9\" should be infra to \"script_7\""
+                ["script_9"]
+                (descriptor <$> s7Infra)
       ]
 
 file :: RecordKey File -> File
