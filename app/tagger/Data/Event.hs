@@ -15,6 +15,7 @@ module Data.Event (
   FileSelectionWidgetEvent (..),
   DescriptorTreeEvent (..),
   FocusedFileEvent (..),
+  TagInputEvent (..),
 ) where
 
 import Data.HashMap.Strict (HashMap)
@@ -42,6 +43,7 @@ data TaggerEvent
   | DoFileSelectionEvent FileSelectionEvent
   | DoDescriptorTreeEvent DescriptorTreeEvent
   | DoQueryEvent QueryEvent
+  | DoTagInputEvent TagInputEvent
   | TaggerInit
   | RefreshUI
   | CloseConnection
@@ -74,7 +76,8 @@ instance Show TaggerAnonymousEvent where
   show _ = "TaggerAnonymousEvent"
 
 data FileSelectionEvent
-  = CycleNextFile
+  = ClearTaggingSelection
+  | CycleNextFile
   | CycleOrderCriteria
   | CycleOrderDirection
   | CyclePrevFile
@@ -97,6 +100,8 @@ data FileSelectionEvent
   | RenameFile (RecordKey File)
   | RunSelectionShellCommand
   | ShuffleSelection
+  | TagSelect (RecordKey File)
+  | TagSelectWholeChunk
   | ToggleSelectionView
   deriving (Show, Eq)
 
@@ -119,8 +124,7 @@ data FileSelectionWidgetEvent
   deriving (Show, Eq)
 
 data FocusedFileEvent
-  = CommitTagText
-  | DeleteTag (RecordKey Tag)
+  = DeleteTag (RecordKey Tag)
   | MoveTag ConcreteTag (Maybe (RecordKey Tag))
   | PutConcreteFile ConcreteTaggedFile
   | PutFile File
@@ -129,6 +133,11 @@ data FocusedFileEvent
   | TagFile (RecordKey Descriptor) (Maybe (RecordKey Tag))
   | UnSubTag (RecordKey Tag)
   deriving (Show, Eq)
+
+data TagInputEvent
+  = RunTagExpression
+  | -- | Also causes a @FileSelectionEvent ClearTaggingSelection@
+    ToggleTagInputOptionPane
 
 data DescriptorTreeEvent
   = CreateRelation Descriptor Descriptor

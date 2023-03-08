@@ -9,19 +9,16 @@ module Interface.Widget.Internal.FileDetail (
   tagTextNodeKey,
 ) where
 
-import Control.Lens ((^.))
+import Control.Lens ((&), (^.))
 import Data.Event (
-  FileSelectionEvent (RenameFile),
-  FocusedFileEvent (
-    CommitTagText,
-    DeleteTag,
-    MoveTag,
-    TagFile
-  ),
+  FileSelectionEvent (ClearTaggingSelection, RenameFile),
+  FocusedFileEvent (DeleteTag, MoveTag, TagFile),
+  TagInputEvent (RunTagExpression, ToggleTagInputOptionPane),
   TaggerEvent (
     AppendText,
     DoFileSelectionEvent,
     DoFocusedFileEvent,
+    DoTagInputEvent,
     Mempty,
     NextHistory,
     PrevHistory,
@@ -32,7 +29,7 @@ import Data.Event (
 import Data.HierarchyMap (HierarchyMap)
 import qualified Data.HierarchyMap as HM
 import qualified Data.List as L
-import Data.Model.Core (TaggerModel, focusedFileDefaultRecordKey)
+import Data.Model.Core (TaggerModel, focusedFileDefaultRecordKey, tagInputOptionPaneLabel)
 import Data.Model.Lens (
   HasFileInfoRenameText (fileInfoRenameText),
   HasFileSelectionInfoMap (fileSelectionInfoMap),
@@ -40,9 +37,13 @@ import Data.Model.Lens (
   HasFocusedFile (focusedFile),
   HasFocusedFileModel (focusedFileModel),
   HasFocusedFileVis (focusedFileVis),
+  HasInput (input),
+  HasTagInputModel (tagInputModel),
   TaggerLens (TaggerLens),
   fileInfoAt,
-  tagInput,
+  isTagDelete,
+  isTagSelection,
+  visibility,
  )
 import Data.Model.Shared.Core (
   Visibility (VisibilityLabel),
@@ -56,14 +57,15 @@ import Data.Model.Shared.Lens (
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger (
-  ConcreteTag (ConcreteTag, concreteTagDescriptor, concreteTagId),
+  ConcreteTag (ConcreteTag, concreteTagDescriptor),
   ConcreteTaggedFile (ConcreteTaggedFile, concreteTaggedFile),
   Descriptor (Descriptor, descriptor),
   File (fileId, filePath),
   RecordKey,
   Tag,
+  concreteTagId,
  )
-import Interface.Theme (yuiBlue, yuiLightPeach, yuiPeach, yuiRed)
+import Interface.Theme (yuiBlue, yuiLightPeach, yuiOrange, yuiRed, yuiYellow)
 import Interface.Widget.Internal.Core (
   defaultElementOpacity,
   defaultOpacityModulator,
@@ -80,19 +82,21 @@ import Monomer (
   CmbAlignTop (alignTop),
   CmbBgColor (bgColor),
   CmbBorder (border),
-  CmbMaxHeight (maxHeight),
+  CmbIgnoreChildrenEvts (ignoreChildrenEvts),
   CmbOnChange (onChange),
   CmbPaddingR (paddingR),
   CmbResizeFactor (resizeFactor),
-  CmbStyleHover (styleHoverSet),
   CmbTextColor (textColor),
   CmbWheelRate (wheelRate),
   CmbWidth (width),
+  alignBottom,
+  alignMiddle,
+  black,
   box_,
-  buttonD_,
   draggable,
   dropTargetStyle,
   dropTarget_,
+  height,
   hstack,
   hstack_,
   keystroke_,
@@ -101,12 +105,16 @@ import Monomer (
   separatorLine,
   spacer,
   spacer_,
+  styleBasic,
+  styleHover,
   textArea_,
   textField_,
+  toggleButtonOffStyle,
+  toggleButton_,
   vscroll_,
   vstack,
   vstack_,
-  zstack_, CmbIgnoreChildrenEvts (ignoreChildrenEvts)
+  zstack_,
  )
 import Util (compareConcreteTags)
 
@@ -134,8 +142,7 @@ detailPaneTagsWidget
         , separatorLine
         , vstack
             [ imageTagsWidget hm
-            , tagTextField
-            , deleteTagZone
+            , taggingWidget m
             ]
         ]
 
@@ -143,8 +150,9 @@ imageTagsWidget ::
   HierarchyMap ConcreteTag ->
   TaggerWidget
 imageTagsWidget hm =
-  vscroll_ [wheelRate 50]
-    . vstack
+  box_ []
+    . vscroll_ [wheelRate 50]
+    . (\xs -> case xs of [] -> spacer; _notNull -> vstack xs)
     . HM.traverseHierarchyMap
       ()
       id
@@ -256,66 +264,107 @@ subTagDropTarget tk =
       )
       [dropTargetStyle [border 1 yuiRed]]
 
-deleteTagZone :: TaggerWidget
-deleteTagZone =
-  dropTarget_
-    (DoFocusedFileEvent . DeleteTag . concreteTagId)
-    [dropTargetStyle [border 1 yuiRed]]
-    . flip styleHoverSet []
-    . withStyleBasic
-      [ bgColor
-          . modulateOpacity
-            (defaultElementOpacity - defaultOpacityModulator)
-          $ yuiLightPeach
-      , border 1
-          . modulateOpacity
-            (defaultElementOpacity - defaultOpacityModulator)
-          $ yuiPeach
-      ]
-    $ buttonD_ "Delete" [resizeFactor (-1)]
-
 tagTextNodeKey :: Text
 tagTextNodeKey = "tag-text-field"
 
-tagTextField :: TaggerWidget
-tagTextField =
-  keystroke_
-    [ ("Shift-Enter", DoFocusedFileEvent CommitTagText)
-    , ("Shift-Up", NextHistory $ TaggerLens (focusedFileModel . tagInput))
-    , ("Shift-Down", PrevHistory $ TaggerLens (focusedFileModel . tagInput))
-    ]
-    [ignoreChildrenEvts]
-    . dropTarget_
-      ( AppendText (TaggerLens $ focusedFileModel . tagInput . text)
-          . descriptor
-          . concreteTagDescriptor
+taggingWidget :: TaggerModel -> TaggerWidget
+taggingWidget m =
+  box_ [alignBottom] $
+    vstack
+      [ tagTextField
+      , taggingOptionsToggle
+      , taggingOptionsWidget
+      ]
+ where
+  taggingOptionsToggle =
+    styledButton_
+      [resizeFactor (-1)]
+      "Options"
+      (DoTagInputEvent ToggleTagInputOptionPane)
+
+  taggingOptionsWidget =
+    withNodeVisible
+      ( (m ^. tagInputModel . visibility)
+          `hasVis` VisibilityLabel tagInputOptionPaneLabel
       )
-      [dropTargetStyle [border 1 yuiRed]]
-    . dropTarget_
-      (AppendText (TaggerLens $ focusedFileModel . tagInput . text) . descriptor)
-      [dropTargetStyle [border 1 yuiBlue]]
-    . withNodeKey tagTextNodeKey
-    . withStyleBasic
-      [ bgColor
-          . modulateOpacity
-            (defaultElementOpacity - defaultOpacityModulator)
-          $ yuiLightPeach
-      , maxHeight 250
+      $ vstack_
+        []
+        [ box_ [alignMiddle] $
+            hstack
+              [ styledToggleButton "Tag Selection" (tagInputModel . isTagSelection)
+              , styledButton_
+                  [resizeFactor (-1)]
+                  "Clear Tag Selection"
+                  (DoFileSelectionEvent ClearTaggingSelection)
+              ]
+        , dropTarget_
+            (DoFocusedFileEvent . DeleteTag . concreteTagId)
+            [dropTargetStyle [border 1 yuiRed]]
+            $ styledToggleButton "Delete Mode" (tagInputModel . isTagDelete)
+        ]
+   where
+    styledToggleButton t l =
+      withStyleBasic
+        [ bgColor
+            . modOpac
+            $ yuiBlue
+        , textColor black
+        ]
+        $ toggleButton_
+          t
+          l
+          [ resizeFactor (-1)
+          , toggleButtonOffStyle $
+              mempty
+                & flip styleBasic [bgColor . modOpac $ yuiLightPeach, textColor black]
+                & flip
+                  styleHover
+                  [ bgColor . modulateOpacity defaultElementOpacity $ yuiYellow
+                  , border 1 yuiOrange
+                  ]
+          ]
+     where
+      modOpac = modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+
+  tagTextField :: TaggerWidget
+  tagTextField =
+    keystroke_
+      [ ("Shift-Enter", DoTagInputEvent RunTagExpression)
+      , ("Shift-Up", NextHistory $ TaggerLens (tagInputModel . input))
+      , ("Shift-Down", PrevHistory $ TaggerLens (tagInputModel . input))
       ]
-    $ textArea_
-      (focusedFileModel . tagInput . text)
-      [ onChange
-          ( \t ->
-              if T.null . T.strip $ t
-                then
-                  Mempty $
-                    TaggerLens
-                      ( focusedFileModel
-                          . tagInput
-                          . history
-                          . historyIndex
-                      )
-                else Unit ()
-          )
-      , acceptTab
-      ]
+      [ignoreChildrenEvts]
+      . dropTarget_
+        ( AppendText (TaggerLens $ tagInputModel . input . text)
+            . descriptor
+            . concreteTagDescriptor
+        )
+        [dropTargetStyle [border 1 yuiRed]]
+      . dropTarget_
+        (AppendText (TaggerLens $ tagInputModel . input . text) . descriptor)
+        [dropTargetStyle [border 1 yuiBlue]]
+      . withNodeKey tagTextNodeKey
+      . withStyleBasic
+        [ bgColor
+            . modulateOpacity
+              (defaultElementOpacity - defaultOpacityModulator)
+            $ yuiLightPeach
+        , height 250
+        ]
+      $ textArea_
+        (tagInputModel . input . text)
+        [ onChange
+            ( \t ->
+                if T.null . T.strip $ t
+                  then
+                    Mempty $
+                      TaggerLens
+                        ( tagInputModel
+                            . input
+                            . history
+                            . historyIndex
+                        )
+                  else Unit ()
+            )
+        , acceptTab
+        ]

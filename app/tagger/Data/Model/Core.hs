@@ -22,6 +22,8 @@ module Data.Model.Core (
   FocusedFileModel (..),
   focusedFileDefaultDataFile,
   focusedFileDefaultRecordKey,
+  TagInputModel (..),
+  tagInputOptionPaneLabel,
   DescriptorTreeModel (..),
   DescriptorInfo (..),
   createDescriptorInfo,
@@ -52,6 +54,7 @@ data TaggerModel = TaggerModel
   { _taggermodelDescriptorTreeModel :: DescriptorTreeModel
   , _taggermodelFocusedFileModel :: FocusedFileModel
   , _taggermodelFileSelectionModel :: FileSelectionModel
+  , _taggermodelTagInputModel :: TagInputModel
   , _taggermodelPositioningModel :: PositioningModel
   , _taggermodelVisibilityModel :: Visibility
   , _taggermodelConnection :: TaggedConnection
@@ -74,6 +77,7 @@ createTaggerModel tc d unRelatedD defaultFilePath =
     , _taggermodelFocusedFileModel = createFocusedFileModel defaultFilePath
     , _taggermodelFileSelectionModel = createFileSelectionModel
     , _taggermodelPositioningModel = createPositioningModel
+    , _taggermodelTagInputModel = createTagInputModel
     , _taggermodelVisibilityModel = VisibilityMain
     , _taggermodelConnection = tc
     , _taggerShellText = ""
@@ -90,6 +94,7 @@ data FileSelectionModel = FileSelectionModel
   , _fileselectionFileSelectionInfoMap :: IntMap FileInfo
   , _fileselectionFileSelectionVis :: Visibility
   , _fileselectionIsMassOpMode :: Bool
+  , _fileselectionTaggingSelection :: HashSet (RecordKey File)
   }
   deriving (Show, Eq)
 
@@ -106,6 +111,7 @@ createFileSelectionModel =
     , _fileselectionFileSelectionInfoMap = IntMap.empty
     , _fileselectionFileSelectionVis = VisibilityMain
     , _fileselectionIsMassOpMode = False
+    , _fileselectionTaggingSelection = mempty
     }
 
 data AddFileModel = AddFileModel
@@ -200,7 +206,6 @@ data FocusedFileModel = FocusedFileModel
   { _focusedfilemodelFocusedFile :: ConcreteTaggedFile
   , _focusedfilemodelRenderability :: Renderability
   , _focusedfilemodelFocusedFileVis :: Visibility
-  , _focusedfilemodelTagInput :: TextInput
   }
   deriving (Show, Eq)
 
@@ -211,8 +216,27 @@ createFocusedFileModel fp =
         ConcreteTaggedFile (File focusedFileDefaultRecordKey fp) empty
     , _focusedfilemodelRenderability = RenderingNotSupported
     , _focusedfilemodelFocusedFileVis = VisibilityMain
-    , _focusedfilemodelTagInput = createTextInput 10
     }
+
+data TagInputModel = TagInputModel
+  { _taginputInput :: TextInput
+  , _taginputVisibility :: Visibility
+  , _taginputIsTagSelection :: Bool
+  , _taginputIsTagDelete :: Bool
+  }
+  deriving (Show, Eq)
+
+createTagInputModel :: TagInputModel
+createTagInputModel =
+  TagInputModel
+    { _taginputInput = createTextInput 10
+    , _taginputVisibility = VisibilityMain
+    , _taginputIsTagSelection = False
+    , _taginputIsTagDelete = False
+    }
+
+tagInputOptionPaneLabel :: Text
+tagInputOptionPaneLabel = "tagInputOptionPaneLabel"
 
 focusedFileDefaultDataFile :: FilePath
 focusedFileDefaultDataFile = "resources/Yui_signature_SS.png"
@@ -288,7 +312,7 @@ createPositioningModel =
   PositioningModel
     0.5
     0.2
-    0.5
+    1.0
     0.8
 
 defaultSelectionAndQueryPositioningModel :: PositioningModel -> PositioningModel

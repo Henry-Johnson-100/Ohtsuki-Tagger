@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# HLINT ignore "Use list comprehension" #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# HLINT ignore "Redundant if" #-}
@@ -9,6 +10,8 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Redundant multi-way if" #-}
 
 module Interface.Handler (
   taggerEventHandler,
@@ -63,6 +66,7 @@ taggerEventHandler
       DoFileSelectionEvent e -> fileSelectionEventHandler wenv node model e
       DoDescriptorTreeEvent e -> descriptorTreeEventHandler wenv node model e
       DoQueryEvent e -> queryEventHandler wenv node model e
+      DoTagInputEvent e -> tagInputEventHandler wenv node model e
       TaggerInit ->
         [ Event (DoDescriptorTreeEvent DescriptorTreeInit)
         , SetFocusOnKey . WidgetKey $ queryTextFieldKey
@@ -115,6 +119,8 @@ fileSelectionEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
+      ClearTaggingSelection ->
+        [Model $ model & fileSelectionModel . taggingSelection .~ mempty]
       CycleNextFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []
@@ -305,6 +311,16 @@ fileSelectionEventHandler
                 <$> shuffleSequence (model ^. fileSelectionModel . selection)
             )
         ]
+      TagSelect fk ->
+        [ Model $
+            model & fileSelectionModel . taggingSelection
+              %~ \hs -> if HS.member fk hs then HS.delete fk hs else HS.insert fk hs
+        ]
+      TagSelectWholeChunk ->
+        [ Model $
+            model & fileSelectionModel . taggingSelection %~ \hs ->
+              F.foldl (\hs' f -> HS.insert (fileId f) hs') hs (getSelectionChunk model)
+        ]
       ToggleSelectionView ->
         [ Model $
             model
@@ -385,7 +401,7 @@ queryEventHandler _wenv _node model@((^. connection) -> conn) event =
             . Seq.sortBy (\x y -> filePath x `compare` filePath y)
             . HS.foldl' (Seq.|>) Seq.empty
         )
-      . runFileQuery conn
+      . yuiQLFileQueryExpression conn
 
 fileSelectionWidgetEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -441,26 +457,6 @@ focusedFileEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
-      CommitTagText ->
-        let !tagText = T.strip $ model ^. focusedFileModel . tagInput . text
-         in [ Task $
-                DoFocusedFileEvent RefreshFocusedFileAndSelection
-                  <$ tagFile
-                    ( fileId . concreteTaggedFile $
-                        model ^. focusedFileModel . focusedFile
-                    )
-                    conn
-                    tagText
-            , Model $
-                model
-                  & focusedFileModel . tagInput . history
-                    %~ putHist
-                      (T.strip $ model ^. focusedFileModel . tagInput . text)
-            , Event
-                . Mempty
-                $ TaggerLens (focusedFileModel . tagInput . text)
-            , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
-            ]
       DeleteTag t ->
         [ Task (Unit <$> deleteTags [t] conn)
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
@@ -593,6 +589,48 @@ focusedFileEventHandler
         [ Task (Unit <$> unSubTags [tk] conn)
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
+
+tagInputEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  TagInputEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+tagInputEventHandler _wenv _wnode model@((^. connection) -> conn) e =
+  case e of
+    RunTagExpression ->
+      let !rawTagText = T.strip $ model ^. tagInputModel . input . text
+          focusedFileFK =
+            fileId
+              . concreteTaggedFile
+              $ model ^. focusedFileModel . focusedFile
+          !fks =
+            if model ^. tagInputModel . isTagSelection
+              then
+                focusedFileFK :
+                HS.toList (model ^. fileSelectionModel . taggingSelection)
+              else [focusedFileFK]
+       in ( if model ^. tagInputModel . isTagDelete
+              then
+                [ Task $
+                    DoFocusedFileEvent RefreshFocusedFileAndSelection
+                      <$ yuiQLDeleteTags conn fks rawTagText
+                ]
+              else
+                [ Task $
+                    DoFocusedFileEvent RefreshFocusedFileAndSelection
+                      <$ mapM (\fk -> yuiQLTagFile fk conn rawTagText) fks
+                ]
+          )
+            ++ [ Model $
+                  model & tagInputModel . input . history %~ putHist rawTagText
+                    & tagInputModel . input . text .~ mempty
+               ]
+    ToggleTagInputOptionPane ->
+      [ Model $
+          model & tagInputModel . visibility
+            %~ flip togglePaneVis (VisibilityLabel tagInputOptionPaneLabel)
+      ]
 
 {- |
  Performs some IO then executes the returned 'AppEventResponse`s

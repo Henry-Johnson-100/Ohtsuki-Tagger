@@ -3,7 +3,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# HLINT ignore "Use lambda-case" #-}
 {-# HLINT ignore "Use <=<" #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_HADDOCK prune #-}
@@ -21,15 +20,19 @@ Contains functions that interprets the TaggerQL query language to either run que
   or tag a file with a certain expression.
 -}
 module Text.TaggerQL.Expression.Engine (
-  fileQuery,
-  tagFile,
+  yuiQLFileQuery,
+  yuiQLTagFile,
+  yuiQLDeleteTags,
 
   -- * New
-  runFileQuery,
-  runTagFile,
+  yuiQLFileQueryExpression,
+  yuiQLTagFileExpression,
+  yuiQLDeleteTagExpression,
+  yuiQLQueryTagDeleteExpression,
 ) where
 
 import Control.Monad (void, (<=<), (>=>))
+import Data.Bifunctor (first)
 import Data.Bitraversable (bitraverse)
 import qualified Data.Foldable as F
 import Data.HashSet (HashSet)
@@ -42,7 +45,9 @@ import Database.Tagger (
   RecordKey,
   allFiles,
   allTags,
+  deleteTags,
   insertTags,
+  isSubTagOf,
   queryForDescriptorByPattern,
   queryForSingleFileByFileId,
   queryForTagByDescriptorPattern,
@@ -63,11 +68,10 @@ import Database.Tagger.Type (
 import Text.Parsec.Error (errorMessages, messageString)
 import Text.TaggerQL.Expression.AST (
   DTerm (DMetaTerm, DTerm),
-  FreeDisjunctMonad,
-  MagmaExpression,
   Pattern (PatternText, WildCard),
   QueryExpression,
-  RingExpression,
+  TagDeleteExpression,
+  TagFileExpression,
   distributeK,
   evaluateRingExpression,
   runDTerm,
@@ -76,57 +80,43 @@ import Text.TaggerQL.Expression.AST (
 import Text.TaggerQL.Expression.Parser (parseQueryExpression, parseTagExpression)
 
 {- |
- Run a TaggerQL query on the given database.
+ Run a YuiQL query on the given database.
 -}
-fileQuery :: TaggedConnection -> Text -> IO (Either [Text] (HashSet File))
-fileQuery c =
+yuiQLFileQuery :: TaggedConnection -> Text -> IO (Either [Text] (HashSet File))
+yuiQLFileQuery c =
   either
     (pure . Left . map (T.pack . messageString) . errorMessages)
-    (fmap pure . runFileQuery c)
+    (fmap pure . yuiQLFileQueryExpression c)
     . parseQueryExpression
 
 {- |
  Tag a file with the given 'TagExpression`
 -}
-tagFile :: RecordKey File -> TaggedConnection -> Text -> IO (Maybe Text)
-tagFile fk c =
+yuiQLTagFile :: RecordKey File -> TaggedConnection -> Text -> IO (Maybe Text)
+yuiQLTagFile fk c =
   either
     (pure . Just . T.pack . show)
-    (fmap (const Nothing) . runTagFile c fk . fmap runDTerm)
+    (fmap (const Nothing) . yuiQLTagFileExpression c fk . fmap runDTerm)
     . parseTagExpression
 
-runFileQuery ::
+yuiQLFileQueryExpression ::
   TaggedConnection ->
   QueryExpression ->
   IO (HashSet File)
-runFileQuery c =
+yuiQLFileQueryExpression c =
   fmap evaluateRingExpression
     . traverse (either pure toFileSet)
     <=< fmap
       ( fmap
-          ( fmap
-              ( evaluateRingExpression
-                  . fmap (F.foldr1 tagMagma)
-                  . distributeK
-              )
-          )
+          (fmap joinTagQueryResultSets)
           . simplifyQueryExpression
       )
-      . bitraverse queryFilePattern (traverse queryDTerm)
+      . bitraverse queryFilePattern (traverse (queryDTerm c))
  where
   queryFilePattern pat =
     case pat of
       WildCard -> HS.fromList <$> allFiles c
       PatternText t -> HS.fromList <$> queryForFileByPattern t c
-
-  queryDTerm dt = case dt of
-    DTerm (PatternText t) ->
-      HS.fromList
-        <$> queryForTagByDescriptorPattern t c
-    DMetaTerm (PatternText t) ->
-      HS.fromList
-        <$> queryForTagByMetaDescriptorPattern t c
-    _wildcard -> HS.fromList <$> allTags c
 
   toFileSet =
     HS.foldl'
@@ -138,21 +128,33 @@ runFileQuery c =
       (pure HS.empty)
       . HS.map tagFileId
 
-  tagMagma superTagSet subTagSet =
-    let subtagIds = HS.map tagSubtagOfId subTagSet
-     in HS.filter (flip HS.member subtagIds . Just . tagId) superTagSet
+  joinTagQueryResultSets = evaluateRingExpression . fmap (F.foldr1 tagMagma) . distributeK
+   where
+    tagMagma superTagSet subTagSet =
+      let subtagIds = HS.map tagSubtagOfId subTagSet
+       in HS.filter (flip HS.member subtagIds . Just . tagId) superTagSet
+
+queryDTerm :: TaggedConnection -> DTerm Pattern -> IO (HashSet Tag)
+queryDTerm c dt = case dt of
+  DTerm (PatternText t) ->
+    HS.fromList
+      <$> queryForTagByDescriptorPattern t c
+  DMetaTerm (PatternText t) ->
+    HS.fromList
+      <$> queryForTagByMetaDescriptorPattern t c
+  _wildcard -> HS.fromList <$> allTags c
 
 -- Tagging Engine
 
 newtype TagInserter = TagInserter
   {runTagInserter :: Maybe [RecordKey Tag] -> IO [RecordKey Tag]}
 
-runTagFile ::
+yuiQLTagFileExpression ::
   TaggedConnection ->
   RecordKey File ->
-  FreeDisjunctMonad RingExpression MagmaExpression Pattern ->
+  TagFileExpression ->
   IO ()
-runTagFile c fk =
+yuiQLTagFileExpression c fk =
   void
     . flip runTagInserter Nothing
     . F.foldl1 sequenceTagInserters
@@ -208,3 +210,61 @@ runTagFile c fk =
               <$> mapM
                 (`queryForTagBySubTagTriple` c)
                 (third fromJust <$> tagTriples)
+
+yuiQLDeleteTags ::
+  TaggedConnection ->
+  [RecordKey File] ->
+  Text ->
+  IO (Either Text ())
+yuiQLDeleteTags c fks t =
+  let parsedTagExpression = parseTagExpression t
+   in traverse (yuiQLDeleteTagExpression c fks . fmap runDTerm) . first (T.pack . show) $
+        parsedTagExpression
+
+yuiQLDeleteTagExpression ::
+  TaggedConnection ->
+  [RecordKey File] ->
+  TagDeleteExpression ->
+  IO ()
+yuiQLDeleteTagExpression _ [] _ = pure ()
+yuiQLDeleteTagExpression c fks tqe = do
+  tagsToDelete <- yuiQLQueryTagDeleteExpression c fks tqe
+  deleteTags (map tagId . HS.toList $ tagsToDelete) c
+
+{- |
+ Performs a query for tags that will be deleted by the given expression.
+-}
+yuiQLQueryTagDeleteExpression ::
+  TaggedConnection ->
+  [RecordKey File] ->
+  TagDeleteExpression ->
+  IO (HashSet Tag)
+yuiQLQueryTagDeleteExpression _ [] _ = pure HS.empty
+yuiQLQueryTagDeleteExpression c fks tqe = do
+  traversedTQE <-
+    fmap (HS.filter ((`elem` fks) . tagFileId))
+      <$> traverse
+        ( \p ->
+            HS.fromList
+              <$> case p of
+                WildCard -> allTags c
+                PatternText txt -> queryForTagByDescriptorPattern txt c
+        )
+        tqe
+
+  let distributedTQE = distributeK traversedTQE
+      foldedMagmas =
+        fmap
+          ( F.foldl1
+              ( \l r ->
+                  HS.filter
+                    ( \rt ->
+                        HS.foldl' (\b lt -> b || rt `isSubTagOf` lt) False l
+                    )
+                    r
+              )
+          )
+          distributedTQE
+      result = F.foldl1 HS.union foldedMagmas
+
+  pure result

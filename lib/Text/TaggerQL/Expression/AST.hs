@@ -23,8 +23,10 @@ Maintainer  : monawasensei@gmail.com
 module Text.TaggerQL.Expression.AST (
   -- * Language Expressions
 
-  -- ** TagQueryExpression
+  -- ** TagExpressions
   TagQueryExpression,
+  TagDeleteExpression,
+  TagFileExpression,
   unwrapIdentities,
   normalize,
 
@@ -102,6 +104,18 @@ instance Hashable RingOperation
 -}
 type TagQueryExpression =
   FreeDisjunctMonad RingExpression MagmaExpression (DTerm Pattern)
+
+{- |
+ > FreeDisjunctMonad RingExpression MagmaExpression Pattern
+-}
+type TagDeleteExpression =
+  FreeDisjunctMonad RingExpression MagmaExpression Pattern
+
+{- |
+ > FreeDisjunctMonad RingExpression MagmaExpression Pattern
+-}
+type TagFileExpression =
+  FreeDisjunctMonad RingExpression MagmaExpression Pattern
 
 {- |
  Attempts to remove some redundant monadic identities.

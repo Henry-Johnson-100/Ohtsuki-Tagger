@@ -1,6 +1,6 @@
 module Text.TaggerQL (
-  fileQuery,
-  tagFile,
+  yuiQLFileQuery,
+  yuiQLTagFile,
 ) where
 
-import Text.TaggerQL.Expression.Engine (fileQuery, tagFile)
+import Text.TaggerQL.Expression.Engine (yuiQLFileQuery, yuiQLTagFile)

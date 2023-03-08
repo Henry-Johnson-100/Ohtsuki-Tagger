@@ -269,7 +269,7 @@ testTags =
     since the tagging engine works left-to-right on binary expressions.
 
     Any new, destructive tests written on the database must happen after the pattern:
-      "Tagging Engine Tests"!
+      "Tagging_Engine_Tests"!
 
     -- tag file_17 "21{22 23}" to yield new tags:
     Tag 46 17 23 (Just 44)
@@ -330,7 +330,7 @@ newRelations =
 
 setup_0_InitializeDatabase :: IO TaggedConnection -> TestTree
 setup_0_InitializeDatabase conn =
-  testCaseSteps "Setup 0 - Initialize Database" $ \step -> do
+  testCaseSteps "Initialize_Database" $ \step -> do
     step "Inserting test files"
     conn >>= insertFiles (T.unpack . filePath <$> testFiles)
 
@@ -355,7 +355,7 @@ setup_0_InitializeDatabase conn =
 setup_1_TestInitialization :: IO TaggedConnection -> TestTree
 setup_1_TestInitialization conn =
   testGroup
-    "Setup 1 - Test Initialization"
+    "Test_Initialization"
     [ testCase
         "All Test Files Inserted"
         ( do
