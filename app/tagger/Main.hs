@@ -329,12 +329,17 @@ describeFile tc fk = do
 describeDatabaseDescriptors :: TaggedConnection -> IO ()
 describeDatabaseDescriptors tc = do
   allD <- queryForDescriptorByPattern "#ALL#" tc
-  mapM_ (describe' (0 :: Int)) allD
+  mapM_ describe' allD
  where
-  describe' depth (Descriptor dk dp) = do
-    T.IO.putStrLn $ T.replicate (depth * 4) " " <> dp
+  describe' (Descriptor dk dp) = do
+    T.IO.putStr $ " " <> dp <> " "
     infra <- getInfraChildren dk tc
-    mapM_ (describe' (depth + 1)) infra
+    if null infra
+      then pure ()
+      else do
+        T.IO.putStr $ " " <> "{ "
+        mapM_ describe' infra
+        T.IO.putStr $ " " <> "} "
 
 showStats :: ReaderT TaggedConnection IO ()
 showStats = do
