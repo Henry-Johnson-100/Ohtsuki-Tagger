@@ -142,7 +142,6 @@ import Monomer (
   styleIf,
   textFieldV,
   textField_,
-  textSize,
   toggleButton_,
   tooltipDelay,
   tooltip_,
@@ -377,7 +376,7 @@ fileSelectionFileList m =
                     && HS.member fk (m ^. fileSelectionModel . taggingSelection)
                 )
                 ( bgColor
-                    . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+                    . modulateOpacity defaultElementOpacity
                     $ yuiOrange
                 )
             ]
