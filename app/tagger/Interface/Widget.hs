@@ -120,7 +120,7 @@ fileDetailAndDescriptorTreeLayer m =
           $ spacer_ [resizeFactor (-1)]
       , withStyleBasic [bgColor $ yuiLightPeach & a .~ defaultElementOpacity]
           . vsplit_
-            [ splitIgnoreChildResize True
+            [ splitIgnoreChildResize False
             , splitHandlePos (positioningModel . fileDetailAndDescriptorTreePosV)
             ]
           . bimap

@@ -312,7 +312,7 @@ createPositioningModel =
   PositioningModel
     0.5
     0.2
-    0.5
+    1.0
     0.8
 
 defaultSelectionAndQueryPositioningModel :: PositioningModel -> PositioningModel

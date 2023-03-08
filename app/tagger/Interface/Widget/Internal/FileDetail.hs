@@ -150,8 +150,9 @@ imageTagsWidget ::
   HierarchyMap ConcreteTag ->
   TaggerWidget
 imageTagsWidget hm =
-  vscroll_ [wheelRate 50]
-    . vstack
+  box_ []
+    . vscroll_ [wheelRate 50]
+    . (\xs -> case xs of [] -> spacer; _notNull -> vstack xs)
     . HM.traverseHierarchyMap
       ()
       id
@@ -270,9 +271,9 @@ taggingWidget :: TaggerModel -> TaggerWidget
 taggingWidget m =
   box_ [alignBottom] $
     vstack
-      [ taggingOptionsToggle
+      [ tagTextField
+      , taggingOptionsToggle
       , taggingOptionsWidget
-      , tagTextField
       ]
  where
   taggingOptionsToggle =
