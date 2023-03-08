@@ -34,6 +34,7 @@ module Text.TaggerQL.Expression.Engine (
 ) where
 
 import Control.Monad (void, (<=<), (>=>))
+import Control.Monad.IO.Class (liftIO)
 import Data.Bifunctor (first)
 import Data.Bitraversable (bitraverse)
 import qualified Data.Foldable as F
@@ -44,10 +45,14 @@ import Data.Maybe (fromJust)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger (
+  Descriptor,
   RecordKey,
   allFiles,
   allTags,
   deleteTags,
+  descriptor,
+  insertDescriptorRelation,
+  insertDescriptors,
   insertTags,
   isSubTagOf,
   queryForDescriptorByPattern,
@@ -67,16 +72,19 @@ import Database.Tagger.Type (
   TaggedConnection,
   descriptorId,
  )
+import Tagger.Util (head')
 import Text.Parsec.Error (errorMessages, messageString)
 import Text.TaggerQL.Expression.AST (
   DTerm (DMetaTerm, DTerm),
   DescriptorExpression,
+  MagmaExpression,
   Pattern (PatternText, WildCard),
   QueryExpression,
   TagDeleteExpression,
   TagFileExpression,
   distributeK,
   evaluateRingExpression,
+  fold1WithEdge,
   runDTerm,
   simplifyQueryExpression,
  )
@@ -281,4 +289,29 @@ yuiQLCreateDescriptors c =
 
 yuiQLCreateDescriptorExpression :: TaggedConnection -> DescriptorExpression -> IO ()
 yuiQLCreateDescriptorExpression c tqe = do
-  undefined
+  let insertedTerms = fmap insertPatternDescriptor tqe
+  let distributedTerms = distributeK insertedTerms
+  F.foldl' (\x me -> x >> foldNewDescriptorMagma me) (pure ()) distributedTerms
+ where
+  insertPatternDescriptor :: Pattern -> IO (Maybe (RecordKey Descriptor))
+  insertPatternDescriptor WildCard = do
+    unrelatedD <- queryForDescriptorByPattern "#UNRELATED#" c
+    pure . fmap descriptorId . head' $ unrelatedD
+  insertPatternDescriptor (PatternText p) = do
+    liftIO $ insertDescriptors [p] c
+    corrD <- liftIO $ queryForDescriptorByPattern p c
+    pure . fmap descriptorId . head' . filter ((==) p . descriptor) $ corrD
+  foldNewDescriptorMagma :: MagmaExpression (IO (Maybe (RecordKey Descriptor))) -> IO ()
+  foldNewDescriptorMagma me =
+    ()
+      <$ fold1WithEdge
+        ( \_edge l r -> do
+            ml <- l
+            mr <- r
+            ml ?>>= \l' ->
+              mr ?>>= \r' -> ml <$ insertDescriptorRelation l' r' c
+        )
+        me
+
+(?>>=) :: Monad m => Maybe a -> (a -> m (Maybe b)) -> m (Maybe b)
+x ?>>= f = maybe (pure Nothing) f x
