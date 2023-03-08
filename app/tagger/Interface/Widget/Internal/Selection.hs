@@ -383,10 +383,13 @@ fileSelectionFileList m =
             ]
           $ hstack
             [ withNodeVisible (m ^. tagInputModel . isTagSelection)
-                . withStyleBasic [border 1 black, textSize 10]
+                . withStyleBasic [border 1 black]
                 $ styledButton_
                   [resizeFactor (-1)]
-                  " "
+                  ( if HS.member fk (m ^. fileSelectionModel . taggingSelection)
+                      then "X"
+                      else " "
+                  )
                   (DoFileSelectionEvent $ TagSelect fk)
             , label_ fp [resizeFactor (-1)]
             ]
