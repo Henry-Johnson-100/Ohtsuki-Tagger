@@ -93,6 +93,7 @@ import System.FilePath (makeRelative, takeDirectory)
 import System.IO (hPutStrLn, stderr)
 import Tagger.Info (taggerVersion)
 import Text.TaggerQL (yuiQLFileQuery, yuiQLTagFile)
+import Text.TaggerQL.Expression.Engine (yuiQLCreateDescriptors)
 import Util (addFiles, compareConcreteTags)
 
 main :: IO ()
@@ -154,6 +155,13 @@ programParser =
                       <*> some (argument str (metavar "PATHS"))
                   )
               <|> ( flag'
+                      Descriptors
+                      ( long "descriptors"
+                          <> help "Insert a yuiQL expression as new descriptors."
+                      )
+                      <*> argument str (metavar "EXPR")
+                  )
+              <|> ( flag'
                       Main.Tag
                       ( long "tag"
                           <> help
@@ -204,6 +212,7 @@ data Command
   = Default
   | Create
   | Add ![FilePath]
+  | Descriptors !String
   | Move !FilePath !FilePath
   | Remove ![String]
   | Delete ![String]
@@ -235,6 +244,9 @@ mainProgram (WithDB dbPath cm) = do
                 defaultFile
             )
         Add ss -> mapM_ (addFiles c . T.pack) ss
+        Descriptors ss -> do
+          r <- yuiQLCreateDescriptors c . T.pack $ ss
+          either (T.IO.hPutStrLn stderr) pure r
         Move s toN -> do
           fs <- queryForFileByPattern (T.pack s) c
           case fs of
