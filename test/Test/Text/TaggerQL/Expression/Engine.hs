@@ -1129,17 +1129,29 @@ descriptorTreeCreateEngineTests ioc =
             r <- yuiQLCreateDescriptors c "script_10{script_11{script_10}}"
             assertBool "Parse failure" (isRight r)
 
+            step "Query script_11 Infra"
+            s11 <- queryForDescriptorByPattern "script_11" c
+            assertEqual
+              "Could not find \"script_11\""
+              ["script_11"]
+              (descriptor <$> s11)
+            s11Infra <- getInfraChildren (descriptorId . head $ s11) c
+            assertEqual
+              "\"script_10\" is not infra to \"script_11\""
+              ["script_10"]
+              (descriptor <$> s11Infra)
+
             step "Query #UNRELATED# Infra"
             u <- head <$> queryForDescriptorByPattern "#UNRELATED#" c
             uinfra <- fmap descriptor <$> getInfraChildren (descriptorId u) c
 
             assertBool
-              "\"script_10\" is infra to #UNRELATED#"
-              ("script_10" `elem` uinfra)
+              "\"script_11\" should be infra to #UNRELATED#"
+              ("script_11" `elem` uinfra)
 
             assertBool
-              "\"script_11\" is infra to #UNRELATED#"
-              ("script_11" `elem` uinfra)
+              "\"script_10\" should not be infra to #UNRELATED#"
+              ("script_10" `notElem` uinfra)
       ]
 
 file :: RecordKey File -> File
