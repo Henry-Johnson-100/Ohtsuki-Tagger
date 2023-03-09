@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -149,11 +150,16 @@ programParser =
       info
         ( helper
             <*> ( Query
-                    <$> argument
-                      str
-                      ( metavar "YuiQL"
-                          <> help "A YuiQL query for files."
-                      )
+                    <$> ( UserSupplied
+                            <$> argument
+                              str
+                              ( metavar "YuiQL"
+                                  <> help
+                                    "A YuiQL query for files. \
+                                    \Reads from stdin if no query is given."
+                              )
+                            <|> pure GetFromStdIn
+                        )
                     <*> switch
                       ( long "relative"
                           <> short 'r'
@@ -199,14 +205,19 @@ programParser =
         info
           ( helper
               <*> ( Descriptors
-                      <$> argument
-                        str
-                        ( metavar "YUIQL"
-                            <> help
-                              "An expression like \"a{b{c}}\" \
-                              \can define a new set of descriptors \
-                              \and their relations to one another."
-                        )
+                      <$> ( ( UserSupplied
+                                <$> argument
+                                  str
+                                  ( metavar "YUIQL"
+                                      <> help
+                                        "An expression like \"a{b{c}}\" \
+                                        \can define a new set of descriptors \
+                                        \and their relations to one another. \
+                                        \Reads from stdin if no expression is given."
+                                  )
+                            )
+                              <|> pure GetFromStdIn
+                          )
                   )
           )
           (progDesc "Add a YuiQL expression as descriptors to the database.")
@@ -273,16 +284,18 @@ data Command
   = Default
   | Create
   | Add ![FilePath]
-  | Descriptors !String
+  | Descriptors !(StdInOptional String)
   | Move !FilePath !FilePath
   | Remove ![String]
   | Delete ![String]
   | Stats
   | Audit
-  | Query !String !Bool
+  | Query !(StdInOptional String) !Bool
   | Tag !String !String
   | Describe ![String]
   deriving (Show, Eq)
+
+data StdInOptional a = GetFromStdIn | UserSupplied a deriving (Show, Eq, Functor)
 
 mainProgram :: Program -> IO ()
 mainProgram Version = putStrLn . showVersion $ taggerVersion
@@ -306,7 +319,10 @@ mainProgram (WithDB dbPath cm) = do
             )
         Add ss -> mapM_ (addFiles c . T.pack) ss
         Descriptors ss -> do
-          r <- yuiQLCreateDescriptors c . T.pack $ ss
+          ss' <- case ss of
+            GetFromStdIn -> T.IO.getContents
+            UserSupplied s -> pure . T.pack $ s
+          r <- yuiQLCreateDescriptors c ss'
           either (T.IO.hPutStrLn stderr) pure r
         Move s toN -> do
           fs <- queryForFileByPattern (T.pack s) c
@@ -327,7 +343,10 @@ mainProgram (WithDB dbPath cm) = do
           mapM_ (rmFile c . fileId) fs
         Stats -> runReaderT showStats c
         Audit -> runReaderT mainReportAudit c
-        Query (T.pack -> q) rel -> do
+        Query inpStr rel -> do
+          q <- case inpStr of
+            GetFromStdIn -> T.IO.getContents
+            UserSupplied s -> pure $ T.pack s
           let (T.unpack -> connPath) = c ^. connName
           eQueryResults <- yuiQLFileQuery c q
           either
@@ -390,17 +409,17 @@ describeFile tc fk = do
 describeDatabaseDescriptors :: TaggedConnection -> IO ()
 describeDatabaseDescriptors tc = do
   allD <- queryForDescriptorByPattern "#ALL#" tc
-  mapM_ describe' allD
+  mapM_ (describe' (0 :: Int)) allD
  where
-  describe' (Descriptor dk dp) = do
-    T.IO.putStr $ " " <> dp <> " "
+  describe' depth (Descriptor dk dp) = do
+    T.IO.putStr $ T.replicate (depth * 2) " " <> dp
     infra <- getInfraChildren dk tc
     if null infra
-      then pure ()
+      then putStrLn ""
       else do
-        T.IO.putStr $ " " <> "{ "
-        mapM_ describe' infra
-        T.IO.putStr $ " " <> "} "
+        T.IO.putStrLn $ " " <> "{"
+        mapM_ (describe' (depth + 1)) infra
+        T.IO.putStrLn $ T.replicate (depth * 2) " " <> "}"
 
 showStats :: ReaderT TaggedConnection IO ()
 showStats = do
