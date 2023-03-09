@@ -1,8 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 {-# HLINT ignore "Redundant if" #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 import CLI.Data
 import Control.Lens ((&), (.~), (^.))
@@ -69,8 +69,8 @@ import Options.Applicative (
   Alternative (some, (<|>)),
   ParserInfo,
   argument,
+  command,
   execParser,
-  flag',
   header,
   help,
   helper,
@@ -81,6 +81,7 @@ import Options.Applicative (
   progDesc,
   short,
   str,
+  subparser,
   switch,
  )
 import Paths_tagger (getDataFileName)
@@ -122,85 +123,139 @@ programParser =
       <$> argument
         str
         (metavar "DATABASE" <> help "Path to the tagger database file.")
-      <*> ( flag' Create (short 'c' <> long "create" <> help "Create database")
-              <|> ( flag'
-                      Query
-                      ( short 'q' <> long "query"
-                          <> help "Run the given TaggerQL on the database."
+      <*> ( subparser
+              ( command "create" createParser
+                  <> command "query" queryParser
+                  <> command "stats" statisticsParser
+                  <> command "audit" auditParser
+                  <> command "describe" describeParser
+                  <> command "add" addParser
+                  <> command "system" systemParser
+              )
+              <|> pure Default
+          )
+   where
+    createParser =
+      info
+        (pure Create)
+        (progDesc "Create the database at the specified file path.")
+    queryParser =
+      info
+        ( helper
+            <*> ( Query
+                    <$> argument
+                      str
+                      ( metavar "YuiQL"
+                          <> help "A YuiQL query for files."
                       )
-                      <*> argument str (metavar "QUERY")
-                      <*> switch
-                        ( long "relative"
-                            <> help "Output query results with relative paths."
+                    <*> switch
+                      ( long "relative"
+                          <> short 'r'
+                          <> help "Output filepaths as they appear in the database."
+                      )
+                )
+        )
+        ( progDesc
+            "Run a YuiQL query over the database. \
+            \Filepaths are resolved to their absolute forms by default."
+        )
+    statisticsParser =
+      info
+        (pure Stats)
+        (progDesc "Output statistics about the database.")
+    auditParser =
+      info
+        (pure Audit)
+        (progDesc "Audit the database. Read-only operation.")
+    describeParser =
+      info
+        (Describe <$> many (argument str (metavar "FILE")))
+        ( progDesc
+            "Output the tags of a specified file or the database's descriptor tree\
+            \ if none are specified."
+        )
+    addParser =
+      info
+        ( helper
+            <*> subparser
+              ( command "file" addFileParser
+                  <> command "descriptor" addDescriptorParser
+                  <> command "tag" addTagParser
+              )
+        )
+        (progDesc "Add items to the database, use with -h for more info.")
+     where
+      addFileParser =
+        info
+          (Add <$> some (argument str (metavar "PATH")))
+          (progDesc "Add all files found at the given paths to the database.")
+      addDescriptorParser =
+        info
+          ( helper
+              <*> ( Descriptors
+                      <$> argument
+                        str
+                        ( metavar "YUIQL"
+                            <> help
+                              "An expression like \"a{b{c}}\" \
+                              \can define a new set of descriptors \
+                              \and their relations to one another."
                         )
                   )
-              <|> flag' Stats (long "stats" <> help "Show stats for the given database.")
-              <|> flag' Audit (long "audit" <> help "Run audit on the given database.")
-              <|> ( flag'
-                      Describe
-                      ( long "describe"
-                          <> help
-                            "Show the tags applied to an image, \
-                            \or display all of the Descriptors in the database \
-                            \if no patterns are specified."
-                      )
-                      <*> many (argument str (metavar "PATTERNS"))
+          )
+          (progDesc "Add a YuiQL expression as descriptors to the database.")
+      addTagParser =
+        info
+          ( helper
+              <*> ( Tag
+                      <$> argument
+                        str
+                        ( metavar "FILE_PATTERN"
+                            <> help
+                              "A pattern to match a file in the database with."
+                        )
+                        <*> argument str (metavar "YUIQL" <> help "A tag expression.")
                   )
-              <|> ( flag'
-                      Add
-                      ( short 'a'
-                          <> long "add"
-                          <> help "Add file(s) at the given path to the database."
-                      )
-                      <*> some (argument str (metavar "PATHS"))
+          )
+          ( progDesc
+              "Tag a file or files matching the given pattern from the command line."
+          )
+    systemParser =
+      info
+        ( helper
+            <*> subparser
+              ( command "remove" systemRemoveParser
+                  <> command "rename" systemRenameParser
+                  <> command "DELETE" systemDeleteParser
+              )
+        )
+        ( progDesc
+            "Edit the files in a database, rename them in the filesystem, or delete them."
+        )
+     where
+      systemRemoveParser =
+        info
+          (Remove <$> some (argument str (metavar "FILE_PATTERN")))
+          (progDesc "Remove files matching the given patterns from just the database.")
+      systemRenameParser =
+        info
+          ( helper
+              <*> ( Move <$> argument str (metavar "FROM_PATH")
+                      <*> argument str (metavar "TO_PATH")
                   )
-              <|> ( flag'
-                      Descriptors
-                      ( long "descriptors"
-                          <> help "Insert a yuiQL expression as new descriptors."
-                      )
-                      <*> argument str (metavar "EXPR")
-                  )
-              <|> ( flag'
-                      Main.Tag
-                      ( long "tag"
-                          <> help
-                            "Run a tagging expression on the file \
-                            \matching the given pattern."
-                      )
-                      <*> argument str (metavar "PATTERN")
-                      <*> argument str (metavar "EXPR")
-                  )
-              <|> ( flag'
-                      Move
-                      ( long "move"
-                          <> help
-                            "Rename or move a file that matches the given pattern, \
-                            \both in the database and in the filesystem.\
-                            \ Does nothing if the pattern matches 0 or many files."
-                      )
-                      <*> argument str (metavar "FROM")
-                      <*> argument str (metavar "TO")
-                  )
-              <|> ( flag'
-                      Remove
-                      ( long "REMOVE"
-                          <> help
-                            "Remove file(s) matching the given pattern\
-                            \ from the database."
-                      )
-                      <*> some (argument str (metavar "PATTERN"))
-                  )
-              <|> ( flag'
-                      Delete
-                      ( long "DELETE"
-                          <> help
-                            "Deletes file(s) matching the given pattern\
-                            \ from the database AND filesystem!"
-                      )
-                      <*> some (argument str (metavar "PATTERN"))
-                  )
-              <|> pure Default
+          )
+          ( progDesc
+              "Rename a single file matching the given path \
+              \to the new path in both the database and file system."
+          )
+      systemDeleteParser =
+        info
+          (helper <*> (Delete <$> some (argument str (metavar "FILE_PATTERN"))))
+          ( progDesc
+              "Delete files matching the given patterns \
+              \from the database AND the file system. \
+              \Always removes them from the database regardless of whether deletion \
+              \was successful."
           )
 
 data Program
