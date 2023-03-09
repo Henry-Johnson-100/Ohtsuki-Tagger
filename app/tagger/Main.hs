@@ -1,10 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# HLINT ignore "Redundant if" #-}
-{-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-import CLI.Data
+import CLI.Data (
+  HasMissingFiles (missingFiles),
+  HasUnusedDescriptorTrees (unusedDescriptorTrees),
+  TaggerDBAudit,
+  TaggerDBStats (TaggerDBStats),
+ )
 import Control.Lens ((&), (.~), (^.))
 import Control.Monad (filterM, void, when, (<=<))
 import Control.Monad.IO.Class (liftIO)
@@ -93,8 +96,11 @@ import System.Directory (
 import System.FilePath (makeRelative, takeDirectory)
 import System.IO (hPutStrLn, stderr)
 import Tagger.Info (taggerVersion)
-import Text.TaggerQL (yuiQLFileQuery, yuiQLTagFile)
-import Text.TaggerQL.Expression.Engine (yuiQLCreateDescriptors)
+import Text.TaggerQL.Expression.Engine (
+  yuiQLCreateDescriptors,
+  yuiQLFileQuery,
+  yuiQLTagFile,
+ )
 import Util (addFiles, compareConcreteTags)
 
 main :: IO ()
