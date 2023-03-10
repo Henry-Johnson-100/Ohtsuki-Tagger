@@ -181,11 +181,29 @@ programParser =
         (progDesc "Audit the database. Read-only operation.")
     describeParser =
       info
-        (Describe <$> many (argument str (metavar "FILE")))
-        ( progDesc
-            "Output the tags of a specified file or the database's descriptor tree\
-            \ if none are specified."
+        ( helper
+            <*> subparser
+              ( command "database" describeDatabaseParser
+                  <> command "file" describeFilesParser
+              )
         )
+        ( progDesc
+            "Describe the Descriptors in a database or \
+            \show the tags on given files."
+        )
+     where
+      describeDatabaseParser =
+        info
+          (pure (Describe DescribeDatabase))
+          (progDesc "Show the structure of the database's Descriptor hierarchy.")
+      describeFilesParser =
+        info
+          ( Describe . DescribeFiles
+              <$> ( (UserSupplied <$> some (argument str (metavar "FILE_PATTERN")))
+                      <|> pure GetFromStdIn
+                  )
+          )
+          (progDesc "Show the tags attached to the files matching the given patterns.")
     addParser =
       info
         ( helper
@@ -292,7 +310,12 @@ data Command
   | Audit
   | Query !(StdInOptional String) !Bool
   | Tag !String !String
-  | Describe ![String]
+  | Describe !DescribeCommand
+  deriving (Show, Eq)
+
+data DescribeCommand
+  = DescribeDatabase
+  | DescribeFiles !(StdInOptional [String])
   deriving (Show, Eq)
 
 data StdInOptional a = GetFromStdIn | UserSupplied a deriving (Show, Eq, Functor)
@@ -373,12 +396,14 @@ mainProgram (WithDB dbPath cm) = do
         Main.Tag s (T.pack -> tExpr) -> do
           fs <- queryForFileByPattern (T.pack s) c
           mapM_ ((\fk -> yuiQLTagFile fk c tExpr) . fileId) fs
-        Describe ss ->
-          case ss of
-            [] -> describeDatabaseDescriptors c
-            _notNull -> do
-              fs <- concat <$> mapM ((`queryForFileByPattern` c) . T.pack) ss
-              mapM_ (describeFile c) (fileId <$> fs)
+        Describe dc -> case dc of
+          DescribeDatabase -> describeDatabaseDescriptors c
+          DescribeFiles sio -> do
+            s <- case sio of
+              GetFromStdIn -> T.words <$> T.IO.getContents
+              UserSupplied ss -> pure $ T.pack <$> ss
+            fs <- concat <$> mapM (`queryForFileByPattern` c) s
+            mapM_ (describeFile c) (fileId <$> fs)
         _alreadHandled -> pure ()
 
 describeFile :: TaggedConnection -> RecordKey File -> IO ()
