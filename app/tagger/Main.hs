@@ -80,7 +80,6 @@ import Options.Applicative (
   helper,
   info,
   long,
-  many,
   metavar,
   progDesc,
   short,
