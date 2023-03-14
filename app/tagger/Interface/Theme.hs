@@ -24,8 +24,10 @@ import Monomer (
   appWindowIcon,
   appWindowState,
   appWindowTitle,
+  black,
   lightThemeColors,
   rgbHex,
+  white,
  )
 import Monomer.Core.Themes.BaseTheme (
   BaseThemeColors (
@@ -126,7 +128,7 @@ yuiBlue :: Color
 yuiBlue = rgbHex "#3554A0"
 
 yuiBlack :: Color
-yuiBlack = rgbHex "#000000"
+yuiBlack = black
 
 yuiWhite :: Color
-yuiWhite = rgbHex "#FFFFFF"
+yuiWhite = white
