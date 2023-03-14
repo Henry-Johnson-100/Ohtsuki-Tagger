@@ -91,7 +91,7 @@ import qualified Data.Sequence as Seq
 import Data.Text (Text)
 import qualified Data.Text as T
 import Database.Tagger (Descriptor (descriptor), File (File), descriptorId)
-import Interface.Theme (yuiBlack, yuiLightPeach, yuiOrange, yuiRed, yuiWhite)
+import Interface.Theme (yuiBorderColor, yuiLightPeach, yuiOrange, yuiRed, yuiWhite)
 import Interface.Widget.Internal.Core (
   defaultElementOpacity,
   defaultOpacityModulator,
@@ -257,7 +257,7 @@ tagListWidget m =
           . flip label_ []
           . descriptor
           $ d
-      , withStyleBasic [paddingL 1.5, borderL 1 yuiBlack] . label . T.pack . show $ n
+      , withStyleBasic [paddingL 1.5, borderL 1 yuiBorderColor] . label . T.pack . show $ n
       ]
 
 toggleViewSelectionButton :: TaggerWidget
@@ -380,7 +380,7 @@ fileSelectionFileList m =
             ]
           $ hstack
             [ withNodeVisible (m ^. tagInputModel . isTagSelection)
-                . withStyleBasic [border 1 yuiBlack]
+                . withStyleBasic [border 1 yuiBorderColor]
                 $ styledButton_
                   [resizeFactor (-1)]
                   ( if HS.member fk (m ^. fileSelectionModel . taggingSelection)
@@ -409,8 +409,8 @@ fileSelectionFileList m =
               . tooltip_
                 "Deletes the file from the database and file system."
                 [tooltipDelay 500]
-              . withStyleHover [textColor yuiWhite, bgColor yuiRed, border 1 yuiBlack]
-              . withStyleBasic [textColor yuiRed, bgColor yuiLightPeach, border 1 yuiBlack]
+              . withStyleHover [textColor yuiWhite, bgColor yuiRed, border 1 yuiBorderColor]
+              . withStyleBasic [textColor yuiRed, bgColor yuiLightPeach, border 1 yuiBorderColor]
               $ styledButton_
                 [resizeFactor (-1)]
                 "Confirm"
@@ -420,8 +420,8 @@ fileSelectionFileList m =
               . tooltip_
                 "Deletes the file from the database and file system."
                 [tooltipDelay 500]
-              . withStyleHover [textColor yuiWhite, bgColor yuiRed, border 1 yuiBlack]
-              . withStyleBasic [textColor yuiRed, bgColor yuiLightPeach, border 1 yuiBlack]
+              . withStyleHover [textColor yuiWhite, bgColor yuiRed, border 1 yuiBorderColor]
+              . withStyleBasic [textColor yuiRed, bgColor yuiLightPeach, border 1 yuiBorderColor]
               $ toggleButton_
                 "Delete"
                 ( fileSelectionModel

@@ -41,7 +41,7 @@ import Data.Model.Shared.Core (
   hasVis,
  )
 import Data.Text (Text)
-import Interface.Theme (yuiLightPeach, yuiBlack)
+import Interface.Theme (yuiLightPeach, yuiBorderColor)
 import Interface.Widget.Internal.Core (
   defaultElementOpacity,
   withNodeHidden,
@@ -113,7 +113,7 @@ fileDetailAndDescriptorTreeLayer m =
       , splitHandlePos
           (positioningModel . fileDetailAndDescriptorTreePosH)
       ]
-      ( withStyleBasic [maxWidth 10000, borderR 1 $ yuiBlack & a .~ 0.10]
+      ( withStyleBasic [maxWidth 10000, borderR 1 $ yuiBorderColor & a .~ 0.10]
           . box_ [ignoreEmptyArea]
           . withStyleBasic [maxWidth 0]
           $ spacer_ [resizeFactor (-1)]
@@ -123,8 +123,8 @@ fileDetailAndDescriptorTreeLayer m =
             , splitHandlePos (positioningModel . fileDetailAndDescriptorTreePosV)
             ]
           . bimap
-            (withStyleBasic [borderB 1 yuiBlack, paddingB 10])
-            (withStyleBasic [borderT 1 yuiBlack, paddingT 3])
+            (withStyleBasic [borderB 1 yuiBorderColor, paddingB 10])
+            (withStyleBasic [borderT 1 yuiBorderColor, paddingT 3])
           $ (FileDetail.widget m, DescriptorTree.widget m)
       )
 
@@ -152,10 +152,10 @@ selectionQueryLayer m =
                 (positioningModel . selectionAndQueryPosV)
             ]
           . bimap
-            (withStyleBasic [borderB 1 yuiBlack, paddingB 10])
-            (withStyleBasic [borderT 1 yuiBlack, paddingT 3])
+            (withStyleBasic [borderB 1 yuiBorderColor, paddingB 10])
+            (withStyleBasic [borderT 1 yuiBorderColor, paddingT 3])
           $ (Query.widget m, Selection.widget m)
-      , withStyleBasic [maxWidth 10000, borderL 1 $ yuiBlack & a .~ 0.10]
+      , withStyleBasic [maxWidth 10000, borderL 1 $ yuiBorderColor & a .~ 0.10]
           . box_ [ignoreEmptyArea]
           . withStyleBasic [maxWidth 0]
           $ spacer_ [resizeFactor (-1)]

@@ -65,7 +65,14 @@ import Database.Tagger (
   Tag,
   concreteTagId,
  )
-import Interface.Theme (yuiBlack, yuiBlue, yuiLightPeach, yuiOrange, yuiRed, yuiYellow)
+import Interface.Theme (
+  yuiBlue,
+  yuiLightPeach,
+  yuiOrange,
+  yuiRed,
+  yuiTextColor,
+  yuiYellow,
+ )
 import Interface.Widget.Internal.Core (
   defaultElementOpacity,
   defaultOpacityModulator,
@@ -307,7 +314,7 @@ taggingWidget m =
         [ bgColor
             . modOpac
             $ yuiBlue
-        , textColor yuiBlack
+        , textColor yuiTextColor
         ]
         $ toggleButton_
           t
@@ -315,7 +322,9 @@ taggingWidget m =
           [ resizeFactor (-1)
           , toggleButtonOffStyle $
               mempty
-                & flip styleBasic [bgColor . modOpac $ yuiLightPeach, textColor yuiBlack]
+                & flip
+                  styleBasic
+                  [bgColor . modOpac $ yuiLightPeach, textColor yuiTextColor]
                 & flip
                   styleHover
                   [ bgColor . modulateOpacity defaultElementOpacity $ yuiYellow

@@ -132,8 +132,11 @@ yuiOrange = rgbHex "#FF8A44"
 yuiBlue :: Color
 yuiBlue = rgbHex "#3554A0"
 
-yuiBlack :: Color
-yuiBlack = black
+yuiBorderColor :: Color
+yuiBorderColor = black
+
+yuiTextColor :: Color
+yuiTextColor = black
 
 yuiWhite :: Color
 yuiWhite = white

@@ -40,13 +40,13 @@ import Data.Model.Shared (Visibility (VisibilityLabel), hasVis)
 import Data.Text (Text)
 import Database.Tagger (Descriptor (Descriptor, descriptor))
 import Interface.Theme (
-  yuiBlack,
+  yuiBorderColor,
   yuiBlue,
   yuiLightPeach,
   yuiOrange,
   yuiRed,
   yuiWhite,
-  yuiYellow,
+  yuiYellow, yuiTextColor,
  )
 import Interface.Widget.Internal.Core (
   defaultElementOpacity,
@@ -144,7 +144,7 @@ descriptorTreeFocusedNodeWidget m =
             dm1 /= dm2
         )
     ]
-    . withStyleBasic [borderR 1 yuiBlack]
+    . withStyleBasic [borderR 1 yuiBorderColor]
     . createRelationDropTarget
     $ descriptorTreeFocusedNodeWidgetBody
  where
@@ -195,7 +195,7 @@ descriptorTreeUnrelatedWidget m =
             dm1 /= dm2
         )
     ]
-    . withStyleBasic [borderL 1 yuiBlack]
+    . withStyleBasic [borderL 1 yuiBorderColor]
     . createUnrelationDropTargetWidget
       $descriptorTreeUnrelatedWidgetBody
  where
@@ -274,7 +274,7 @@ descriptorTreeLeaf
                   $ yuiOrange
               ]
             . withStyleBasic
-              [ textColor (if di ^. descriptorIsMeta then yuiBlue else yuiBlack)
+              [ textColor (if di ^. descriptorIsMeta then yuiBlue else yuiTextColor)
               , textLeft
               , bgColor
                   . modulateOpacity
