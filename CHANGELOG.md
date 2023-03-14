@@ -129,7 +129,11 @@ or receiving any input.
   - There is an option to enter "Delete Mode" which allows a user to enter
   a tag expression into the textfield to delete tags from the current file, or selection
   of files.
-
+- The text field for inserting descriptors can now accept a YuiQL expression which
+  is used to define a descriptor tree. For example, `#ALL#{#META#{foo{bar}}}` will
+  place the descriptor `bar` under `foo` which is placed under the `#META#` descriptor.
+  - It is not necessary to qualify the absolute path to a descriptor, so the `#ALL#{#META#}`
+  can be left out.
 ------
 
 ### 1.0.2.1 -- 2021-10-04
