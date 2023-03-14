@@ -216,39 +216,53 @@ programParser =
      where
       addFileParser =
         info
-          (Add <$> some (argument str (metavar "PATH")))
+          ( Add . AddCommandFiles
+              <$> ( stdInOptionalParser
+                      . some
+                      $ argument str (metavar "PATH")
+                  )
+          )
           (progDesc "Add all files found at the given paths to the database.")
       addDescriptorParser =
         info
           ( helper
-              <*> ( Descriptors
-                      <$> ( ( UserSupplied
-                                <$> argument
-                                  str
-                                  ( metavar "YUIQL"
-                                      <> help
-                                        "An expression like \"a{b{c}}\" \
-                                        \can define a new set of descriptors \
-                                        \and their relations to one another. \
-                                        \Reads from stdin if no expression is given."
-                                  )
+              <*> ( Add . AddCommandDescriptors
+                      <$> stdInOptionalParser
+                        ( argument
+                            str
+                            ( metavar "YUIQL"
+                                <> help
+                                  "An expression like \"a{b{c}}\" \
+                                  \can define a new set of descriptors \
+                                  \and their relations to one another. \
+                                  \Reads from stdin if no expression is given."
                             )
-                              <|> pure GetFromStdIn
-                          )
+                        )
                   )
           )
           (progDesc "Add a YuiQL expression as descriptors to the database.")
       addTagParser =
         info
           ( helper
-              <*> ( Tag
-                      <$> argument
-                        str
-                        ( metavar "FILE_PATTERN"
-                            <> help
-                              "A pattern to match a file in the database with."
-                        )
-                        <*> argument str (metavar "YUIQL" <> help "A tag expression.")
+              <*> ( Add
+                      <$> ( AddCommandTags
+                              <$> argument
+                                str
+                                ( metavar "YUIQL"
+                                    <> help
+                                      "A tag expression."
+                                )
+                                <*> ( stdInOptionalParser . some $
+                                        argument
+                                          str
+                                          ( metavar "FILE_PATTERN"
+                                              <> help
+                                                "Patterns to match files with. \
+                                                \Reads from stdin if no \
+                                                \expression is given."
+                                          )
+                                    )
+                          )
                   )
           )
           ( progDesc
@@ -300,15 +314,13 @@ data Program
 data Command
   = Default
   | Create
-  | Add ![FilePath]
-  | Descriptors !(StdInOptional String)
+  | Add !AddCommand
   | Move !FilePath !FilePath
   | Remove ![String]
   | Delete ![String]
   | Stats
   | Audit
   | Query !(StdInOptional String) !Bool
-  | Tag !String !String
   | Describe !DescribeCommand
   deriving (Show, Eq)
 
@@ -317,7 +329,16 @@ data DescribeCommand
   | DescribeFiles !(StdInOptional [String])
   deriving (Show, Eq)
 
+data AddCommand
+  = AddCommandDescriptors !(StdInOptional String)
+  | AddCommandFiles !(StdInOptional [FilePath])
+  | AddCommandTags !String !(StdInOptional [String])
+  deriving (Show, Eq)
+
 data StdInOptional a = GetFromStdIn | UserSupplied a deriving (Show, Eq, Functor)
+
+stdInOptionalParser :: Alternative f => f a -> f (StdInOptional a)
+stdInOptionalParser p = (UserSupplied <$> p) <|> pure GetFromStdIn
 
 mainProgram :: Program -> IO ()
 mainProgram Version = putStrLn . showVersion $ taggerVersion
@@ -339,13 +360,24 @@ mainProgram (WithDB dbPath cm) = do
                 (Descriptor (-2) "fake #UNRELATED#")
                 defaultFile
             )
-        Add ss -> mapM_ (addFiles c . T.pack) ss
-        Descriptors ss -> do
-          ss' <- case ss of
-            GetFromStdIn -> T.IO.getContents
-            UserSupplied s -> pure . T.pack $ s
-          r <- yuiQLCreateDescriptors c ss'
-          either (T.IO.hPutStrLn stderr) pure r
+        Add ac -> case ac of
+          AddCommandDescriptors sio -> do
+            s <- case sio of
+              GetFromStdIn -> T.IO.getContents
+              UserSupplied s -> pure . T.pack $ s
+            r <- yuiQLCreateDescriptors c s
+            either (T.IO.hPutStrLn stderr) pure r
+          AddCommandFiles sio -> do
+            s <- case sio of
+              GetFromStdIn -> T.words <$> T.IO.getContents
+              UserSupplied ss -> pure $ T.pack <$> ss
+            mapM_ (addFiles c) s
+          AddCommandTags (T.pack -> tagExpr) sio -> do
+            fps <- case sio of
+              GetFromStdIn -> T.words <$> T.IO.getContents
+              UserSupplied ss -> pure $ T.pack <$> ss
+            fs <- concat <$> mapM (`queryForFileByPattern` c) fps
+            mapM_ (\f -> yuiQLTagFile (fileId f) c tagExpr) fs
         Move s toN -> do
           fs <- queryForFileByPattern (T.pack s) c
           case fs of
@@ -392,9 +424,6 @@ mainProgram (WithDB dbPath cm) = do
                       $ queryResults
             )
             eQueryResults
-        Main.Tag s (T.pack -> tExpr) -> do
-          fs <- queryForFileByPattern (T.pack s) c
-          mapM_ ((\fk -> yuiQLTagFile fk c tExpr) . fileId) fs
         Describe dc -> case dc of
           DescribeDatabase -> describeDatabaseDescriptors c
           DescribeFiles sio -> do
