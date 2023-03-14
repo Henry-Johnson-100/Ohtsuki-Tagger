@@ -1,10 +1,14 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Redundant if" #-}
-
-import CLI.Data
+import CLI.Data (
+  HasMissingFiles (missingFiles),
+  HasUnusedDescriptorTrees (unusedDescriptorTrees),
+  TaggerDBAudit,
+  TaggerDBStats (TaggerDBStats),
+ )
 import Control.Lens ((&), (.~), (^.))
 import Control.Monad (filterM, void, when, (<=<))
 import Control.Monad.IO.Class (liftIO)
@@ -69,18 +73,19 @@ import Options.Applicative (
   Alternative (some, (<|>)),
   ParserInfo,
   argument,
+  command,
   execParser,
-  flag',
   header,
   help,
   helper,
   info,
   long,
-  many,
   metavar,
+  optional,
   progDesc,
   short,
   str,
+  subparser,
   switch,
  )
 import Paths_tagger (getDataFileName)
@@ -92,7 +97,11 @@ import System.Directory (
 import System.FilePath (makeRelative, takeDirectory)
 import System.IO (hPutStrLn, stderr)
 import Tagger.Info (taggerVersion)
-import Text.TaggerQL (yuiQLFileQuery, yuiQLTagFile)
+import Text.TaggerQL.Expression.Engine (
+  yuiQLCreateDescriptors,
+  yuiQLFileQuery,
+  yuiQLTagFile,
+ )
 import Util (addFiles, compareConcreteTags)
 
 main :: IO ()
@@ -121,78 +130,178 @@ programParser =
       <$> argument
         str
         (metavar "DATABASE" <> help "Path to the tagger database file.")
-      <*> ( flag' Create (short 'c' <> long "create" <> help "Create database")
-              <|> ( flag'
-                      Query
-                      ( short 'q' <> long "query"
-                          <> help "Run the given TaggerQL on the database."
+      <*> ( subparser
+              ( command "create" createParser
+                  <> command "query" queryParser
+                  <> command "stats" statisticsParser
+                  <> command "audit" auditParser
+                  <> command "describe" describeParser
+                  <> command "add" addParser
+                  <> command "system" systemParser
+              )
+              <|> pure Default
+          )
+   where
+    createParser =
+      info
+        (pure Create)
+        (progDesc "Create the database at the specified file path.")
+    queryParser =
+      info
+        ( helper
+            <*> ( Query
+                    <$> optional
+                      ( argument
+                          str
+                          ( metavar "YuiQL"
+                              <> help
+                                "A YuiQL query for files. \
+                                \Reads from stdin if no query is given."
+                          )
                       )
-                      <*> argument str (metavar "QUERY")
-                      <*> switch
-                        ( long "relative"
-                            <> help "Output query results with relative paths."
+                    <*> switch
+                      ( long "relative"
+                          <> short 'r'
+                          <> help "Output filepaths as they appear in the database."
+                      )
+                )
+        )
+        ( progDesc
+            "Run a YuiQL query over the database. \
+            \Filepaths are resolved to their absolute forms by default."
+        )
+    statisticsParser =
+      info
+        (pure Stats)
+        (progDesc "Output statistics about the database.")
+    auditParser =
+      info
+        (pure Audit)
+        (progDesc "Audit the database. Read-only operation.")
+    describeParser =
+      info
+        ( helper
+            <*> subparser
+              ( command "database" describeDatabaseParser
+                  <> command "file" describeFilesParser
+              )
+        )
+        ( progDesc
+            "Describe the Descriptors in a database or \
+            \show the tags on given files."
+        )
+     where
+      describeDatabaseParser =
+        info
+          (pure (Describe DescribeDatabase))
+          (progDesc "Show the structure of the database's Descriptor hierarchy.")
+      describeFilesParser =
+        info
+          ( Describe . DescribeFiles
+              <$> optional (some (argument str (metavar "FILE_PATTERN")))
+          )
+          (progDesc "Show the tags attached to the files matching the given patterns.")
+    addParser =
+      info
+        ( helper
+            <*> subparser
+              ( command "file" addFileParser
+                  <> command "descriptor" addDescriptorParser
+                  <> command "tag" addTagParser
+              )
+        )
+        (progDesc "Add items to the database, use with -h for more info.")
+     where
+      addFileParser =
+        info
+          ( Add . AddCommandFiles
+              <$> ( optional
+                      . some
+                      $ argument str (metavar "PATH")
+                  )
+          )
+          (progDesc "Add all files found at the given paths to the database.")
+      addDescriptorParser =
+        info
+          ( helper
+              <*> ( Add . AddCommandDescriptors
+                      <$> optional
+                        ( argument
+                            str
+                            ( metavar "YUIQL"
+                                <> help
+                                  "An expression like \"a{b{c}}\" \
+                                  \can define a new set of descriptors \
+                                  \and their relations to one another. \
+                                  \Reads from stdin if no expression is given."
+                            )
                         )
                   )
-              <|> flag' Stats (long "stats" <> help "Show stats for the given database.")
-              <|> flag' Audit (long "audit" <> help "Run audit on the given database.")
-              <|> ( flag'
-                      Describe
-                      ( long "describe"
-                          <> help
-                            "Show the tags applied to an image, \
-                            \or display all of the Descriptors in the database \
-                            \if no patterns are specified."
-                      )
-                      <*> many (argument str (metavar "PATTERNS"))
+          )
+          (progDesc "Add a YuiQL expression as descriptors to the database.")
+      addTagParser =
+        info
+          ( helper
+              <*> ( Add
+                      <$> ( AddCommandTags
+                              <$> argument
+                                str
+                                ( metavar "YUIQL"
+                                    <> help
+                                      "A tag expression."
+                                )
+                                <*> ( optional . some $
+                                        argument
+                                          str
+                                          ( metavar "FILE_PATTERN"
+                                              <> help
+                                                "Patterns to match files with. \
+                                                \Reads from stdin if no \
+                                                \expression is given."
+                                          )
+                                    )
+                          )
                   )
-              <|> ( flag'
-                      Add
-                      ( short 'a'
-                          <> long "add"
-                          <> help "Add file(s) at the given path to the database."
-                      )
-                      <*> some (argument str (metavar "PATHS"))
+          )
+          ( progDesc
+              "Tag a file or files matching the given pattern from the command line."
+          )
+    systemParser =
+      info
+        ( helper
+            <*> subparser
+              ( command "remove" systemRemoveParser
+                  <> command "rename" systemRenameParser
+                  <> command "DELETE" systemDeleteParser
+              )
+        )
+        ( progDesc
+            "Edit the files in a database, rename them in the filesystem, or delete them."
+        )
+     where
+      systemRemoveParser =
+        info
+          (Remove <$> some (argument str (metavar "FILE_PATTERN")))
+          (progDesc "Remove files matching the given patterns from just the database.")
+      systemRenameParser =
+        info
+          ( helper
+              <*> ( Move <$> argument str (metavar "FROM_PATH")
+                      <*> argument str (metavar "TO_PATH")
                   )
-              <|> ( flag'
-                      Main.Tag
-                      ( long "tag"
-                          <> help
-                            "Run a tagging expression on the file \
-                            \matching the given pattern."
-                      )
-                      <*> argument str (metavar "PATTERN")
-                      <*> argument str (metavar "EXPR")
-                  )
-              <|> ( flag'
-                      Move
-                      ( long "move"
-                          <> help
-                            "Rename or move a file that matches the given pattern, \
-                            \both in the database and in the filesystem.\
-                            \ Does nothing if the pattern matches 0 or many files."
-                      )
-                      <*> argument str (metavar "FROM")
-                      <*> argument str (metavar "TO")
-                  )
-              <|> ( flag'
-                      Remove
-                      ( long "REMOVE"
-                          <> help
-                            "Remove file(s) matching the given pattern\
-                            \ from the database."
-                      )
-                      <*> some (argument str (metavar "PATTERN"))
-                  )
-              <|> ( flag'
-                      Delete
-                      ( long "DELETE"
-                          <> help
-                            "Deletes file(s) matching the given pattern\
-                            \ from the database AND filesystem!"
-                      )
-                      <*> some (argument str (metavar "PATTERN"))
-                  )
-              <|> pure Default
+          )
+          ( progDesc
+              "Rename a single file matching the given path \
+              \to the new path in both the database and file system."
+          )
+      systemDeleteParser =
+        info
+          (helper <*> (Delete <$> some (argument str (metavar "FILE_PATTERN"))))
+          ( progDesc
+              "Delete files matching the given patterns \
+              \from the database AND the file system. \
+              \Always removes them from the database regardless of whether deletion \
+              \was successful."
           )
 
 data Program
@@ -203,15 +312,25 @@ data Program
 data Command
   = Default
   | Create
-  | Add ![FilePath]
+  | Add !AddCommand
   | Move !FilePath !FilePath
   | Remove ![String]
   | Delete ![String]
   | Stats
   | Audit
-  | Query !String !Bool
-  | Tag !String !String
-  | Describe ![String]
+  | Query !(Maybe String) !Bool
+  | Describe !DescribeCommand
+  deriving (Show, Eq)
+
+data DescribeCommand
+  = DescribeDatabase
+  | DescribeFiles !(Maybe [String])
+  deriving (Show, Eq)
+
+data AddCommand
+  = AddCommandDescriptors !(Maybe String)
+  | AddCommandFiles !(Maybe [FilePath])
+  | AddCommandTags !String !(Maybe [String])
   deriving (Show, Eq)
 
 mainProgram :: Program -> IO ()
@@ -234,7 +353,24 @@ mainProgram (WithDB dbPath cm) = do
                 (Descriptor (-2) "fake #UNRELATED#")
                 defaultFile
             )
-        Add ss -> mapM_ (addFiles c . T.pack) ss
+        Add ac -> case ac of
+          AddCommandDescriptors sio -> do
+            s <- case sio of
+              Nothing -> T.IO.getContents
+              Just s -> pure . T.pack $ s
+            r <- yuiQLCreateDescriptors c s
+            either (T.IO.hPutStrLn stderr) pure r
+          AddCommandFiles sio -> do
+            s <- case sio of
+              Nothing -> T.words <$> T.IO.getContents
+              Just ss -> pure $ T.pack <$> ss
+            mapM_ (addFiles c) s
+          AddCommandTags (T.pack -> tagExpr) sio -> do
+            fps <- case sio of
+              Nothing -> T.words <$> T.IO.getContents
+              Just ss -> pure $ T.pack <$> ss
+            fs <- concat <$> mapM (`queryForFileByPattern` c) fps
+            mapM_ (\f -> yuiQLTagFile (fileId f) c tagExpr) fs
         Move s toN -> do
           fs <- queryForFileByPattern (T.pack s) c
           case fs of
@@ -254,7 +390,10 @@ mainProgram (WithDB dbPath cm) = do
           mapM_ (rmFile c . fileId) fs
         Stats -> runReaderT showStats c
         Audit -> runReaderT mainReportAudit c
-        Query (T.pack -> q) rel -> do
+        Query inpStr rel -> do
+          q <- case inpStr of
+            Nothing -> T.IO.getContents
+            Just s -> pure $ T.pack s
           let (T.unpack -> connPath) = c ^. connName
           eQueryResults <- yuiQLFileQuery c q
           either
@@ -278,15 +417,14 @@ mainProgram (WithDB dbPath cm) = do
                       $ queryResults
             )
             eQueryResults
-        Main.Tag s (T.pack -> tExpr) -> do
-          fs <- queryForFileByPattern (T.pack s) c
-          mapM_ ((\fk -> yuiQLTagFile fk c tExpr) . fileId) fs
-        Describe ss ->
-          case ss of
-            [] -> describeDatabaseDescriptors c
-            _notNull -> do
-              fs <- concat <$> mapM ((`queryForFileByPattern` c) . T.pack) ss
-              mapM_ (describeFile c) (fileId <$> fs)
+        Describe dc -> case dc of
+          DescribeDatabase -> describeDatabaseDescriptors c
+          DescribeFiles sio -> do
+            s <- case sio of
+              Nothing -> T.words <$> T.IO.getContents
+              Just ss -> pure $ T.pack <$> ss
+            fs <- concat <$> mapM (`queryForFileByPattern` c) s
+            mapM_ (describeFile c) (fileId <$> fs)
         _alreadHandled -> pure ()
 
 describeFile :: TaggedConnection -> RecordKey File -> IO ()
@@ -320,9 +458,14 @@ describeDatabaseDescriptors tc = do
   mapM_ (describe' (0 :: Int)) allD
  where
   describe' depth (Descriptor dk dp) = do
-    T.IO.putStrLn $ T.replicate (depth * 4) " " <> dp
+    T.IO.putStr $ T.replicate (depth * 2) " " <> dp
     infra <- getInfraChildren dk tc
-    mapM_ (describe' (depth + 1)) infra
+    if null infra
+      then putStrLn ""
+      else do
+        T.IO.putStrLn $ " " <> "{"
+        mapM_ (describe' (depth + 1)) infra
+        T.IO.putStrLn $ T.replicate (depth * 2) " " <> "}"
 
 showStats :: ReaderT TaggedConnection IO ()
 showStats = do

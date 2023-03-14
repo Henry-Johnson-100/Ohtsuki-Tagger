@@ -187,6 +187,11 @@ newDescriptors =
 testDescriptors :: [Descriptor]
 testDescriptors = newDescriptors <> defaultDescriptors
 
+{-
+A new set of descriptors with prefix "script_" are created by the test
+  "descriptorTreeCreateEngineTests" which has a pattern "Descriptor_Tree_Create_Tests"
+-}
+
 testTags :: [Tag]
 testTags =
   [ -- File_1: Descriptors_ 4

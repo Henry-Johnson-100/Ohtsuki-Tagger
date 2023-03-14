@@ -693,17 +693,15 @@ descriptorTreeEventHandler
             )
         ]
       InsertDescriptor ->
-        [ Task
-            ( Unit <$> do
-                let newDesText =
-                      T.words
-                        . T.strip
-                        $ model ^. descriptorTreeModel . newDescriptorText
-                unless (null newDesText) (insertDescriptors newDesText conn)
-            )
-        , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
-        , Event . Mempty $ TaggerLens (descriptorTreeModel . newDescriptorText)
-        ]
+        let !newDesText =
+              T.strip $
+                model ^. descriptorTreeModel . newDescriptorText
+         in [ Task
+                ( DoDescriptorTreeEvent RefreshBothDescriptorTrees
+                    <$ yuiQLCreateDescriptors conn newDesText
+                )
+            , Model $ model & descriptorTreeModel . newDescriptorText .~ mempty
+            ]
       PutFocusedTree_ nodeName ds desInfoMap ->
         [ Model $
             model
