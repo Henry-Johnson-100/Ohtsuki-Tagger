@@ -81,6 +81,7 @@ import Options.Applicative (
   info,
   long,
   metavar,
+  optional,
   progDesc,
   short,
   str,
@@ -149,7 +150,7 @@ programParser =
       info
         ( helper
             <*> ( Query
-                    <$> ( UserSupplied
+                    <$> ( Just
                             <$> argument
                               str
                               ( metavar "YuiQL"
@@ -157,7 +158,7 @@ programParser =
                                     "A YuiQL query for files. \
                                     \Reads from stdin if no query is given."
                               )
-                            <|> pure GetFromStdIn
+                            <|> pure Nothing
                         )
                     <*> switch
                       ( long "relative"
@@ -198,8 +199,8 @@ programParser =
       describeFilesParser =
         info
           ( Describe . DescribeFiles
-              <$> ( (UserSupplied <$> some (argument str (metavar "FILE_PATTERN")))
-                      <|> pure GetFromStdIn
+              <$> ( (Just <$> some (argument str (metavar "FILE_PATTERN")))
+                      <|> pure Nothing
                   )
           )
           (progDesc "Show the tags attached to the files matching the given patterns.")
@@ -217,7 +218,7 @@ programParser =
       addFileParser =
         info
           ( Add . AddCommandFiles
-              <$> ( stdInOptionalParser
+              <$> ( optional
                       . some
                       $ argument str (metavar "PATH")
                   )
@@ -227,7 +228,7 @@ programParser =
         info
           ( helper
               <*> ( Add . AddCommandDescriptors
-                      <$> stdInOptionalParser
+                      <$> optional
                         ( argument
                             str
                             ( metavar "YUIQL"
@@ -252,7 +253,7 @@ programParser =
                                     <> help
                                       "A tag expression."
                                 )
-                                <*> ( stdInOptionalParser . some $
+                                <*> ( optional . some $
                                         argument
                                           str
                                           ( metavar "FILE_PATTERN"
@@ -320,25 +321,20 @@ data Command
   | Delete ![String]
   | Stats
   | Audit
-  | Query !(StdInOptional String) !Bool
+  | Query !(Maybe String) !Bool
   | Describe !DescribeCommand
   deriving (Show, Eq)
 
 data DescribeCommand
   = DescribeDatabase
-  | DescribeFiles !(StdInOptional [String])
+  | DescribeFiles !(Maybe [String])
   deriving (Show, Eq)
 
 data AddCommand
-  = AddCommandDescriptors !(StdInOptional String)
-  | AddCommandFiles !(StdInOptional [FilePath])
-  | AddCommandTags !String !(StdInOptional [String])
+  = AddCommandDescriptors !(Maybe String)
+  | AddCommandFiles !(Maybe [FilePath])
+  | AddCommandTags !String !(Maybe [String])
   deriving (Show, Eq)
-
-data StdInOptional a = GetFromStdIn | UserSupplied a deriving (Show, Eq, Functor)
-
-stdInOptionalParser :: Alternative f => f a -> f (StdInOptional a)
-stdInOptionalParser p = (UserSupplied <$> p) <|> pure GetFromStdIn
 
 mainProgram :: Program -> IO ()
 mainProgram Version = putStrLn . showVersion $ taggerVersion
@@ -363,19 +359,19 @@ mainProgram (WithDB dbPath cm) = do
         Add ac -> case ac of
           AddCommandDescriptors sio -> do
             s <- case sio of
-              GetFromStdIn -> T.IO.getContents
-              UserSupplied s -> pure . T.pack $ s
+              Nothing -> T.IO.getContents
+              Just s -> pure . T.pack $ s
             r <- yuiQLCreateDescriptors c s
             either (T.IO.hPutStrLn stderr) pure r
           AddCommandFiles sio -> do
             s <- case sio of
-              GetFromStdIn -> T.words <$> T.IO.getContents
-              UserSupplied ss -> pure $ T.pack <$> ss
+              Nothing -> T.words <$> T.IO.getContents
+              Just ss -> pure $ T.pack <$> ss
             mapM_ (addFiles c) s
           AddCommandTags (T.pack -> tagExpr) sio -> do
             fps <- case sio of
-              GetFromStdIn -> T.words <$> T.IO.getContents
-              UserSupplied ss -> pure $ T.pack <$> ss
+              Nothing -> T.words <$> T.IO.getContents
+              Just ss -> pure $ T.pack <$> ss
             fs <- concat <$> mapM (`queryForFileByPattern` c) fps
             mapM_ (\f -> yuiQLTagFile (fileId f) c tagExpr) fs
         Move s toN -> do
@@ -399,8 +395,8 @@ mainProgram (WithDB dbPath cm) = do
         Audit -> runReaderT mainReportAudit c
         Query inpStr rel -> do
           q <- case inpStr of
-            GetFromStdIn -> T.IO.getContents
-            UserSupplied s -> pure $ T.pack s
+            Nothing -> T.IO.getContents
+            Just s -> pure $ T.pack s
           let (T.unpack -> connPath) = c ^. connName
           eQueryResults <- yuiQLFileQuery c q
           either
@@ -428,8 +424,8 @@ mainProgram (WithDB dbPath cm) = do
           DescribeDatabase -> describeDatabaseDescriptors c
           DescribeFiles sio -> do
             s <- case sio of
-              GetFromStdIn -> T.words <$> T.IO.getContents
-              UserSupplied ss -> pure $ T.pack <$> ss
+              Nothing -> T.words <$> T.IO.getContents
+              Just ss -> pure $ T.pack <$> ss
             fs <- concat <$> mapM (`queryForFileByPattern` c) s
             mapM_ (describeFile c) (fileId <$> fs)
         _alreadHandled -> pure ()
