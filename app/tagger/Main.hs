@@ -150,16 +150,15 @@ programParser =
       info
         ( helper
             <*> ( Query
-                    <$> ( Just
-                            <$> argument
-                              str
-                              ( metavar "YuiQL"
-                                  <> help
-                                    "A YuiQL query for files. \
-                                    \Reads from stdin if no query is given."
-                              )
-                            <|> pure Nothing
-                        )
+                    <$> optional
+                      ( argument
+                          str
+                          ( metavar "YuiQL"
+                              <> help
+                                "A YuiQL query for files. \
+                                \Reads from stdin if no query is given."
+                          )
+                      )
                     <*> switch
                       ( long "relative"
                           <> short 'r'
@@ -199,9 +198,7 @@ programParser =
       describeFilesParser =
         info
           ( Describe . DescribeFiles
-              <$> ( (Just <$> some (argument str (metavar "FILE_PATTERN")))
-                      <|> pure Nothing
-                  )
+              <$> optional (some (argument str (metavar "FILE_PATTERN")))
           )
           (progDesc "Show the tags attached to the files matching the given patterns.")
     addParser =
