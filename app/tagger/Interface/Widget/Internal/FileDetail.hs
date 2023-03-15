@@ -22,14 +22,13 @@ import Data.Event (
     Mempty,
     NextHistory,
     PrevHistory,
-    ToggleVisibilityLabel,
     Unit
   ),
  )
 import Data.HierarchyMap (HierarchyMap)
 import qualified Data.HierarchyMap as HM
 import qualified Data.List as L
-import Data.Model.Core (TaggerModel, focusedFileDefaultRecordKey, tagInputOptionPaneLabel)
+import Data.Model.Core (TaggerModel, tagInputOptionPaneLabel)
 import Data.Model.Lens (
   HasFileInfoRenameText (fileInfoRenameText),
   HasFileSelectionInfoMap (fileSelectionInfoMap),
@@ -101,7 +100,9 @@ import Monomer (
   keystroke_,
   label,
   label_,
+  resizeFactorW,
   separatorLine,
+  separatorLine_,
   spacer,
   spacer_,
   styleBasic,
@@ -110,6 +111,8 @@ import Monomer (
   textField_,
   toggleButtonOffStyle,
   toggleButton_,
+  tooltipDelay,
+  tooltip_,
   vscroll_,
   vstack,
   vstack_,
@@ -140,8 +143,9 @@ detailPaneTagsWidget
         [ filePathWidget m
         , separatorLine
         , vstack
-            [ imageTagsWidget hm
-            , taggingWidget m
+            [ taggingWidget m
+            , separatorLine_ [resizeFactor (-1)]
+            , imageTagsWidget hm
             ]
         ]
 
@@ -185,18 +189,7 @@ filePathWidget :: TaggerModel -> TaggerWidget
 filePathWidget m =
   hstack_
     []
-    [ withNodeVisible
-        ( focusedFileDefaultRecordKey
-            /= (fileId . concreteTaggedFile $ m ^. focusedFileModel . focusedFile)
-        )
-        $ styledButton_
-          [resizeFactor (-1)]
-          "Rename"
-          ( ToggleVisibilityLabel
-              (TaggerLens $ focusedFileModel . focusedFileVis)
-              fileRenameModeVis
-          )
-    , zstack_
+    [ zstack_
         []
         [ withNodeVisible (not $ isFileRenameMode m) $
             label_
@@ -277,7 +270,7 @@ taggingWidget m =
  where
   taggingOptionsToggle =
     styledButton_
-      [resizeFactor (-1)]
+      [resizeFactorW (-1)]
       "Options"
       (DoTagInputEvent ToggleTagInputOptionPane)
 
@@ -292,7 +285,7 @@ taggingWidget m =
             hstack
               [ styledToggleButton "Tag Selection" (tagInputModel . isTagSelection)
               , styledButton_
-                  [resizeFactor (-1)]
+                  [resizeFactorW (-1)]
                   "Clear Tag Selection"
                   (DoFileSelectionEvent ClearTaggingSelection)
               ]
@@ -312,7 +305,7 @@ taggingWidget m =
         $ toggleButton_
           t
           l
-          [ resizeFactor (-1)
+          [ resizeFactorW (-1)
           , toggleButtonOffStyle $
               mempty
                 & flip styleBasic [bgColor . modOpac $ yuiLightPeach, textColor yuiBlack]
@@ -327,12 +320,18 @@ taggingWidget m =
 
   tagTextField :: TaggerWidget
   tagTextField =
-    keystroke_
-      [ ("Shift-Enter", DoTagInputEvent RunTagExpression)
-      , ("Shift-Up", NextHistory $ TaggerLens (tagInputModel . input))
-      , ("Shift-Down", PrevHistory $ TaggerLens (tagInputModel . input))
+    withStyleBasic
+      [ bgColor
+          . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+          $ yuiLightPeach
       ]
-      [ignoreChildrenEvts]
+      . tooltip_ "Shift-Enter to tag the current file." [tooltipDelay 1500]
+      . keystroke_
+        [ ("Shift-Enter", DoTagInputEvent RunTagExpression)
+        , ("Shift-Up", NextHistory $ TaggerLens (tagInputModel . input))
+        , ("Shift-Down", PrevHistory $ TaggerLens (tagInputModel . input))
+        ]
+        [ignoreChildrenEvts]
       . dropTarget_
         ( AppendText (TaggerLens $ tagInputModel . input . text)
             . descriptor
