@@ -10,8 +10,8 @@ module Tagger.Info (
 ) where
 
 import qualified Data.Version as Version
-import qualified Paths_tagger
+import qualified Paths_yuitagger
 
 {-# INLINE taggerVersion #-}
 taggerVersion :: Version.Version
-taggerVersion = Paths_tagger.version
+taggerVersion = Paths_yuitagger.version

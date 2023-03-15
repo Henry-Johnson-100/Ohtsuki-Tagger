@@ -1,6 +1,6 @@
 cabal-version:       2.4
 
-name:                tagger
+name:                yuitagger
 version:             2.0.0.0
 synopsis:            A file/image tagger that connects to or initializes sqlite databases.
 -- description:
@@ -20,7 +20,7 @@ data-files:          resources/Yui_signature_SS.bmp
                     ,resources/TaggerSchemaDefinition.sql
                     ,resources/TaggerSchemaTeardown.sql
                     ,resources/Patch/patch_2_0.sql
-                     
+
 common haskell-common
   default-language:    Haskell2010
 
@@ -40,9 +40,9 @@ common yuitagger-common
                       ,InstanceSigs
                       ,RankNTypes
 
-  other-modules:       Paths_tagger
+  other-modules:       Paths_yuitagger
 
-  autogen-modules:     Paths_tagger
+  autogen-modules:     Paths_yuitagger
 
   build-depends:       text == 1.2.4.0
                       ,transformers == 0.5.6.2

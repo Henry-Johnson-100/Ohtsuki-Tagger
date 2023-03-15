@@ -41,7 +41,7 @@ import Interface.Handler.Internal
 import Interface.Widget.Internal.Query (queryTextFieldKey)
 import Interface.Widget.Internal.Selection (fileSelectionScrollWidgetNodeKey)
 import Monomer
-import Paths_tagger
+import Paths_yuitagger
 import System.FilePath
 import System.IO
 import Text.TaggerQL.Expression.Engine

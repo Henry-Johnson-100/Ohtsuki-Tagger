@@ -91,7 +91,7 @@ import Options.Applicative (
   subparser,
   switch,
  )
-import Paths_tagger (getDataFileName)
+import Paths_yuitagger (getDataFileName)
 import System.Directory (
   doesFileExist,
   makeAbsolute,

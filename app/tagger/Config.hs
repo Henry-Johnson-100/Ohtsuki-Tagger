@@ -12,7 +12,7 @@ import Control.Monad (guard, (<=<))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Maybe (MaybeT (MaybeT))
 import qualified Data.Text as T
-import Paths_tagger
+import Paths_yuitagger
 import System.Directory (doesFileExist)
 import System.FilePath
 import System.IO (hPutStrLn, stderr)

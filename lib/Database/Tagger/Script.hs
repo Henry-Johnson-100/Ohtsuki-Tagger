@@ -19,7 +19,7 @@ module Database.Tagger.Script (
 import Control.Monad ((<=<))
 import Data.String (IsString (..))
 import Data.Text (Text)
-import Paths_tagger (getDataFileName)
+import Paths_yuitagger (getDataFileName)
 import Text.RawString.QQ (r)
 
 newtype SQLiteScript = SQLiteScript Text deriving (Show, Eq)

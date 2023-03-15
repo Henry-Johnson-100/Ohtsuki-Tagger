@@ -52,7 +52,7 @@ import Monomer.Core.Themes.BaseTheme (
   ),
   baseTheme,
  )
-import qualified Paths_tagger as PT
+import qualified Paths_yuitagger as PT
 import System.Directory (makeAbsolute)
 
 themeConfig :: IO [AppConfig TaggerEvent]
