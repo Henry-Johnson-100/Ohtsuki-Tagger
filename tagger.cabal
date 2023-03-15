@@ -149,7 +149,7 @@ library yuitagger-lib
 
   default-language:    Haskell2010
 
-test-suite tagger-test
+test-suite yuitagger-test
   import:              yuitagger-common 
                       ,haskell-common
   
