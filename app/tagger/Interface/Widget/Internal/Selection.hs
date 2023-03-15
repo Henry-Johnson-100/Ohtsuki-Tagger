@@ -100,7 +100,7 @@ import Interface.Widget.Internal.Core (
   withNodeKey,
   withNodeVisible,
   withStyleBasic,
-  withStyleHover,
+  withStyleHover, styledToggleButton_,
  )
 import Monomer (
   CmbAlignBottom (alignBottom),
@@ -479,7 +479,7 @@ shellCommandWidget ((^. fileSelectionModel . isMassOpMode) -> isMassOpModeIsTrue
             "If toggled, \
             \uses the entire selection as arguments to the given shell command."
             [tooltipDelay 1000]
-          $ toggleButton_ "MassOp" (fileSelectionModel . isMassOpMode) []
+          $ styledToggleButton_ [] "MassOp" (fileSelectionModel . isMassOpMode)
       , keystroke_
           [
             ( "Enter"
