@@ -222,6 +222,9 @@ yuiQLTagFileExpression c fk =
                 (`queryForTagBySubTagTriple` c)
                 (third fromJust <$> tagTriples)
 
+{- |
+  Delete tags corresponding to the given tag expression from the files.
+-}
 yuiQLDeleteTags ::
   TaggedConnection ->
   [RecordKey File] ->
@@ -280,6 +283,18 @@ yuiQLQueryTagDeleteExpression c fks tqe = do
 
   pure result
 
+{- |
+ Insert descriptors into the database whose relations correspond
+ to the given expression.
+
+  For example:
+
+ @
+ \#ALL\#{\#META\#{Foo Bar {Baz}}}
+ @
+ Inserts the descriptors "Foo" and "Bar" as infra to the #META# descriptor
+ and "Baz" as infra to "Bar"
+-}
 yuiQLCreateDescriptors :: TaggedConnection -> Text -> IO (Either Text ())
 yuiQLCreateDescriptors c =
   traverse (yuiQLCreateDescriptorExpression c)
