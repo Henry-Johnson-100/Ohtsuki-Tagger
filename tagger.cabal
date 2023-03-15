@@ -50,7 +50,7 @@ common tagger-common
                       ,containers == 0.6.2.1
                       ,unordered-containers == 0.2.18.0
 
-executable tagger
+executable yuitagger
   import:              haskell-common
                       ,tagger-common
 
