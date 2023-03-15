@@ -97,6 +97,7 @@ import Interface.Widget.Internal.Core (
   defaultOpacityModulator,
   modulateOpacity,
   styledButton_,
+  styledToggleButton_,
   withNodeKey,
   withNodeVisible,
   withStyleBasic,
@@ -150,7 +151,6 @@ import Monomer (
   zstack_,
  )
 import Monomer.Core.Lens (fixed)
-import Monomer.Graphics.Lens (a)
 import Util (both)
 
 type TaggerWidget = WidgetNode TaggerModel TaggerEvent
@@ -479,7 +479,7 @@ shellCommandWidget ((^. fileSelectionModel . isMassOpMode) -> isMassOpModeIsTrue
             "If toggled, \
             \uses the entire selection as arguments to the given shell command."
             [tooltipDelay 1000]
-          $ toggleButton_ "MassOp" (fileSelectionModel . isMassOpMode) []
+          $ styledToggleButton_ [] "MassOp" (fileSelectionModel . isMassOpMode)
       , keystroke_
           [
             ( "Enter"
@@ -495,7 +495,9 @@ shellCommandWidget ((^. fileSelectionModel . isMassOpMode) -> isMassOpModeIsTrue
             [tooltipDelay 1000]
           . withStyleBasic
             [ minWidth 80
-            , bgColor (yuiLightPeach & a .~ defaultElementOpacity)
+            , bgColor
+                . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+                $ yuiLightPeach
             ]
           $ textField_ shellText []
       ]
@@ -507,7 +509,11 @@ tagListFilterTextField =
     . tooltip_
       "Filter the list of tag occurrences by a MetaDescriptor pattern"
       [tooltipDelay 1000]
-    . withStyleBasic [bgColor (yuiLightPeach & a .~ defaultElementOpacity)]
+    . withStyleBasic
+      [ bgColor
+          . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+          $ yuiLightPeach
+      ]
     $ textFieldV
       mempty
       ( \t ->
@@ -517,8 +523,13 @@ tagListFilterTextField =
 
 fileSelectionChunkSizeNumField :: TaggerWidget
 fileSelectionChunkSizeNumField =
-  withStyleBasic [maxWidth 80] $
-    numericField_ (fileSelectionModel . chunkSize) [minValue 0]
+  withStyleBasic
+    [ maxWidth 80
+    , bgColor
+        . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+        $ yuiLightPeach
+    ]
+    $ numericField_ (fileSelectionModel . chunkSize) [minValue 0]
 
 refreshFileSelectionButton :: TaggerWidget
 refreshFileSelectionButton =
