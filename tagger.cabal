@@ -108,7 +108,6 @@ library tagger-lib
                       ,Tagger.Info
                       ,Text.TaggerQL
                       ,Text.TaggerQL.Expression.AST
-                      ,Text.TaggerQL.Expression.AST.Editor
                       ,Text.TaggerQL.Expression.Engine
                       ,Text.TaggerQL.Expression.Parser
 
@@ -121,6 +120,7 @@ library tagger-lib
                       ,Data.Hierarchy.Internal
                       ,Data.OccurrenceMap.Internal
                       ,Tagger.Util
+                      ,Text.TaggerQL.Expression.AST.Editor
 
   other-extensions:    DeriveGeneric
                       ,DeriveAnyClass

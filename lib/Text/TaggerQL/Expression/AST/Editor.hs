@@ -19,8 +19,6 @@ module Text.TaggerQL.Expression.AST.Editor (
   dropRightTree,
   duplicateRing,
   onTagLeaf,
-  distributeTagExpression,
-  (<-#),
 
   -- * Counter
   CounterT,
@@ -35,30 +33,6 @@ import Control.Monad.Trans.State.Strict (StateT (..), get, modify)
 import Data.Bifunctor
 import Data.Functor.Identity (runIdentity)
 import Text.TaggerQL.Expression.AST
-
-{- |
- A function handling left-distribution of a 'TagExpression` into a 'QueryExpression`.
-
- Where a 'FileLeaf` becomes an intersection and a 'TagLeaf` is subject to normal
- distribution.
-
- Meant to operate over queries of the form:
-
- > (a){b}
--}
-distributeTagExpression ::
-  QueryExpression ->
-  TagQueryExpression ->
-  QueryExpression
-distributeTagExpression fqe tqe = TraversableQueryExpression . Node . Left $ (fqe, tqe)
-
-infixl 6 <-#
-
-{- |
- Infix synonym for 'distributeTagExpression`.
--}
-(<-#) :: QueryExpression -> TagQueryExpression -> QueryExpression
-(<-#) = distributeTagExpression
 
 {- |
  Modifies the TagExpression in a TagLeaf of a QueryExpression if it is a ring value

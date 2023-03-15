@@ -49,8 +49,24 @@ import Text.Parsec (
   try,
   (<|>),
  )
-import Text.TaggerQL.Expression.AST
-import Text.TaggerQL.Expression.AST.Editor ((<-#))
+import Text.TaggerQL.Expression.AST (
+  DTerm (..),
+  FreeDisjunctMonad (T),
+  LabeledFreeTree (Node),
+  Magma (..),
+  Pattern (Pattern),
+  QueryExpression,
+  RingExpression,
+  RingOperation (..),
+  Rng (..),
+  TagQueryExpression,
+  TraversableQueryExpression (
+    TraversableQueryExpression,
+    runTraversableQueryExpression
+  ),
+  liftSimpleQueryRing,
+  (<-#),
+ )
 
 type Parser a = Parsec Text () a
 

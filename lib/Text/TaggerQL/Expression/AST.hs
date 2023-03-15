@@ -37,6 +37,8 @@ module Text.TaggerQL.Expression.AST (
   simplifyLeftProduct,
   liftSimpleQueryRing,
   simplifyQueryExpression,
+  distributeTagExpression,
+  (<-#),
 
   -- ** Primitive Expressions
   RingExpression,
@@ -333,6 +335,30 @@ simplifyQueryExpression tqe =
           (Node . Right . (∙ x))
           <=< id
     )
+
+{- |
+ A function handling left-distribution of a 'TagExpression` into a 'QueryExpression`.
+
+ Where a 'FileLeaf` becomes an intersection and a 'TagLeaf` is subject to normal
+ distribution.
+
+ Meant to operate over queries of the form:
+
+ > (a){b}
+-}
+distributeTagExpression ::
+  QueryExpression ->
+  TagQueryExpression ->
+  QueryExpression
+distributeTagExpression fqe tqe = TraversableQueryExpression . Node . Left $ (fqe, tqe)
+
+infixl 6 <-#
+
+{- |
+ Infix synonym for 'distributeTagExpression`.
+-}
+(<-#) :: QueryExpression -> TagQueryExpression -> QueryExpression
+(<-#) = distributeTagExpression
 
 {- |
  > LabeledFreeTree RingOperation
