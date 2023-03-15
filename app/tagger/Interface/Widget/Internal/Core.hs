@@ -20,7 +20,6 @@ import Interface.Theme (
   yuiPeach,
   yuiYellow,
  )
-import Interface.Widget.Internal.Type (TaggerWidget)
 import Monomer (
   ButtonCfg,
   CmbBgColor (bgColor),
@@ -35,6 +34,8 @@ import Monomer (
  )
 import Monomer.Graphics (Color)
 import Monomer.Lens (HasA (a))
+
+type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
 styledButton_ ::
   [ButtonCfg TaggerModel TaggerEvent] ->

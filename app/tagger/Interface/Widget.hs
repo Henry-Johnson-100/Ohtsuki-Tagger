@@ -41,7 +41,7 @@ import Data.Model.Shared.Core (
   hasVis,
  )
 import Data.Text (Text)
-import Interface.Theme (yuiLightPeach, yuiBlack)
+import Interface.Theme (yuiBlack, yuiLightPeach)
 import Interface.Widget.Internal.Core (
   defaultElementOpacity,
   withNodeHidden,
@@ -52,7 +52,6 @@ import qualified Interface.Widget.Internal.FileDetail as FileDetail
 import qualified Interface.Widget.Internal.FilePreview as FilePreview
 import qualified Interface.Widget.Internal.Query as Query
 import qualified Interface.Widget.Internal.Selection as Selection
-import Interface.Widget.Internal.Type (TaggerWidget)
 import Monomer (
   CmbBgColor (bgColor),
   CmbBorderB (borderB),
@@ -67,6 +66,7 @@ import Monomer (
   EventResponse (Event, Model, SetFocusOnKey),
   WidgetEnv,
   WidgetKey (WidgetKey),
+  WidgetNode,
   box_,
   hsplit_,
   keystroke_,
@@ -78,6 +78,8 @@ import Monomer (
   zstack_,
  )
 import Monomer.Graphics.Lens (HasA (a))
+
+type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
 taggerApplicationUI ::
   WidgetEnv TaggerModel TaggerEvent ->

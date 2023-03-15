@@ -76,7 +76,6 @@ executable tagger
                       ,Interface.Widget.Internal.FilePreview
                       ,Interface.Widget.Internal.Query
                       ,Interface.Widget.Internal.Selection
-                      ,Interface.Widget.Internal.Type
                       ,Util
 
   other-extensions:   RankNTypes

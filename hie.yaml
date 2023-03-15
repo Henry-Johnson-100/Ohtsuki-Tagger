@@ -69,9 +69,6 @@ cradle:
     - path: "app/tagger/Interface/Widget/Internal/Selection.hs"
       component: "tagger:exe:tagger"
 
-    - path: "app/tagger/Interface/Widget/Internal/Type.hs"
-      component: "tagger:exe:tagger"
-
     - path: "app/tagger/Util.hs"
       component: "tagger:exe:tagger"
 

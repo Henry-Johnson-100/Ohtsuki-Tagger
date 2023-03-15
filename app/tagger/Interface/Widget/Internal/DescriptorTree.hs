@@ -58,7 +58,6 @@ import Interface.Widget.Internal.Core (
   withStyleBasic,
   withStyleHover,
  )
-import Interface.Widget.Internal.Type (TaggerWidget)
 import Monomer (
   CmbAlignBottom (alignBottom),
   CmbAlignLeft (alignLeft),
@@ -73,6 +72,7 @@ import Monomer (
   CmbTextColor (textColor),
   CmbTextLeft (textLeft),
   CmbWheelRate (wheelRate),
+  WidgetNode,
   box_,
   button,
   button_,
@@ -94,6 +94,8 @@ import Monomer (
  )
 import Monomer.Core.Lens (fixed)
 import Util (both)
+
+type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
 widget :: TaggerModel -> TaggerWidget
 widget m = descriptorTreeWidget m

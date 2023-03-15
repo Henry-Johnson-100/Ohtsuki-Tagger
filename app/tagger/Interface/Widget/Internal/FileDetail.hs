@@ -74,7 +74,6 @@ import Interface.Widget.Internal.Core (
   withNodeVisible,
   withStyleBasic,
  )
-import Interface.Widget.Internal.Type (TaggerWidget)
 import Monomer (
   CmbAcceptTab (acceptTab),
   CmbAlignLeft (alignLeft),
@@ -88,6 +87,7 @@ import Monomer (
   CmbTextColor (textColor),
   CmbWheelRate (wheelRate),
   CmbWidth (width),
+  WidgetNode,
   alignBottom,
   alignMiddle,
   box_,
@@ -119,6 +119,8 @@ import Monomer (
   zstack_,
  )
 import Util (compareConcreteTags)
+
+type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
 widget :: TaggerModel -> TaggerWidget
 widget m = detailPane m
