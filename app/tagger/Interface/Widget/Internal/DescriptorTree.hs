@@ -40,10 +40,12 @@ import Data.Model.Shared (Visibility (VisibilityLabel), hasVis)
 import Data.Text (Text)
 import Database.Tagger (Descriptor (Descriptor, descriptor))
 import Interface.Theme (
+  yuiBlack,
   yuiBlue,
   yuiLightPeach,
   yuiOrange,
   yuiRed,
+  yuiWhite,
   yuiYellow,
  )
 import Interface.Widget.Internal.Core (
@@ -71,7 +73,6 @@ import Monomer (
   CmbTextColor (textColor),
   CmbTextLeft (textLeft),
   CmbWheelRate (wheelRate),
-  black,
   box_,
   button,
   button_,
@@ -89,7 +90,6 @@ import Monomer (
   textField_,
   vscroll_,
   vstack_,
-  white,
   zstack_,
  )
 import Monomer.Core.Lens (fixed)
@@ -144,7 +144,7 @@ descriptorTreeFocusedNodeWidget m =
             dm1 /= dm2
         )
     ]
-    . withStyleBasic [borderR 1 black]
+    . withStyleBasic [borderR 1 yuiBlack]
     . createRelationDropTarget
     $ descriptorTreeFocusedNodeWidgetBody
  where
@@ -195,7 +195,7 @@ descriptorTreeUnrelatedWidget m =
             dm1 /= dm2
         )
     ]
-    . withStyleBasic [borderL 1 black]
+    . withStyleBasic [borderL 1 yuiBlack]
     . createUnrelationDropTargetWidget
       $descriptorTreeUnrelatedWidgetBody
  where
@@ -274,7 +274,7 @@ descriptorTreeLeaf
                   $ yuiOrange
               ]
             . withStyleBasic
-              [ textColor (if di ^. descriptorIsMeta then yuiBlue else black)
+              [ textColor (if di ^. descriptorIsMeta then yuiBlue else yuiBlack)
               , textLeft
               , bgColor
                   . modulateOpacity
@@ -308,7 +308,7 @@ descriptorTreeLeaf
             . withStyleHover
               [ bgColor
                   . modulateOpacity defaultElementOpacity $yuiRed
-              , textColor white
+              , textColor yuiWhite
               ]
             . withStyleBasic
               [ textColor yuiRed
