@@ -45,7 +45,7 @@ import Paths_yuitagger
 import System.FilePath
 import System.IO
 import Text.TaggerQL.Expression.Engine
-import Text.TaggerQL.Expression.Parser
+import Text.YuiQL.Parser
 import Util
 
 taggerEventHandler ::

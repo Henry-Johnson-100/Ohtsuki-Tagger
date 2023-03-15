@@ -21,7 +21,7 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Text.TaggerQL.Expression.AST
 import Text.TaggerQL.Expression.Engine
-import Text.TaggerQL.Expression.Parser (parseTagExpression)
+import Text.YuiQL.Parser (parseTagExpression)
 
 queryEngineASTTests :: IO TaggedConnection -> TestTree
 queryEngineASTTests c =

@@ -88,7 +88,7 @@ import Text.TaggerQL.Expression.AST (
   runDTerm,
   simplifyQueryExpression,
  )
-import Text.TaggerQL.Expression.Parser (parseQueryExpression, parseTagExpression)
+import Text.YuiQL.Parser (parseQueryExpression, parseTagExpression)
 
 {- |
  Run a YuiQL query on the given database.

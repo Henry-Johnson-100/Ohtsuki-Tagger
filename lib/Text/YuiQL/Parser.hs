@@ -6,13 +6,13 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {- |
-Module      : Text.TaggerQL.Expression.Parser
+Module      : Text.YuiQL.Parser
 Description : Parsers for the expression-based TaggerQL query language.
 
 License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
-module Text.TaggerQL.Expression.Parser (
+module Text.YuiQL.Parser (
   parseQueryExpression,
   parseTagExpression,
   ParseError,

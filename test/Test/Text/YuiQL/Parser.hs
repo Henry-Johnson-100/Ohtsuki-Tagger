@@ -5,7 +5,7 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Test.Text.TaggerQL.Expression.Parser (
+module Test.Text.YuiQL.Parser (
     parserTests,
 ) where
 
@@ -15,7 +15,7 @@ import Test.Resources (rt, tedp)
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.TaggerQL.Expression.AST
-import Text.TaggerQL.Expression.Parser
+import Text.YuiQL.Parser
 
 {- |
  Run a series of equality assertions on varying inputs that all produce the same
