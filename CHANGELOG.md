@@ -27,11 +27,10 @@ is complete, optionally how many files were added.
 
 ------
 
-# 2.0.0.0 -- ????-??-??
+# 2.0.0.0 -- 2023-03-18
 
 ## Breaking Changes:
 - TaggerQL Syntax and Interpreter Implementation
-  - Specifics of these changes can be seen here: ????.md
   - TaggerQL was rebuilt from the ground-up as an expression-based query language.
     Its syntax is very similar in structure but there are some key differences:
     - Set Operations have been changed from "`U|, I|, and D|`" 
@@ -43,20 +42,17 @@ is complete, optionally how many files were added.
     - Previously corresponded to a query that finds all untagged files in the database.
       This is a redundant token because that same set can be found trivially with a
       difference: "`p.% ! d.%`".
-  - Text.TaggerQL exports two functions, where the text parameter is a 
-    TaggerQL Query.
-    - `runQuery :: TaggedConnection -> Text -> ExceptT [Text] IO (HashSet File)`
-    - `tagFile :: RecordKey File -> TaggedConnection -> Text -> IO (Maybe Text)`
   - Deleted modules
+    - Text.TaggerQL
     - Text.TaggerQL.Parser.Internal
     - Text.TaggerQL.AST
     - All members of the module hierarchy Text.TaggerQL.Engine
-  - Replaced with, respectively,
+  - Replaced with,
     - Text.TaggerQL.Expression.Parser
     - Text.TaggerQL.Expression.AST
     - Text.TaggerQL.Expression.Engine
-  - Removed the sum type `QueryCriteria` from the `Data.Tagger` module.
-    - These criteria are now encoded in the AST of TaggerQL, found in `Text.TaggerQL.Expression.AST`
+  - Renamed the sum type `QueryCriteria` from the `Data.Tagger` module 
+  to `RingOperation` and moved it to Text.TaggerQL.Expression.AST.
 - Database Changes
   - The database will be automatically patched and upgraded from version `1.0.2.1` to `2.0.0.0` when it is opened by Tagger.
   - Added new constraint conflict handlers to `Tag` and `MetaDescriptor` table.
@@ -106,7 +102,7 @@ to querying.
 - Changed the tag list to report only the number of files that have a given descriptor
 applied. Not how many times the descriptor is applied.
   - I think both cases are valid but the intention behind the latter was less helpful
-  and less than intuitive than the former.
+  and less intuitive than the former.
 - Added some tooltips to the tag list filter and the shell command text field and button.
 - Added some additional helper functions to `HierarchyMap` to make traversals
   a little bit less painful.
