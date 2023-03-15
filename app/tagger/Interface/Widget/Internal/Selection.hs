@@ -151,7 +151,6 @@ import Monomer (
   zstack_,
  )
 import Monomer.Core.Lens (fixed)
-import Monomer.Graphics.Lens (a)
 import Util (both)
 
 type TaggerWidget = WidgetNode TaggerModel TaggerEvent
