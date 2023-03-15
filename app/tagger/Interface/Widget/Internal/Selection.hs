@@ -97,10 +97,11 @@ import Interface.Widget.Internal.Core (
   defaultOpacityModulator,
   modulateOpacity,
   styledButton_,
+  styledToggleButton_,
   withNodeKey,
   withNodeVisible,
   withStyleBasic,
-  withStyleHover, styledToggleButton_,
+  withStyleHover,
  )
 import Monomer (
   CmbAlignBottom (alignBottom),
@@ -495,7 +496,9 @@ shellCommandWidget ((^. fileSelectionModel . isMassOpMode) -> isMassOpModeIsTrue
             [tooltipDelay 1000]
           . withStyleBasic
             [ minWidth 80
-            , bgColor (yuiLightPeach & a .~ defaultElementOpacity)
+            , bgColor
+                . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+                $ yuiLightPeach
             ]
           $ textField_ shellText []
       ]
