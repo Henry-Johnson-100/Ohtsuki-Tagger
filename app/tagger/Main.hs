@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 import CLI.Data (
@@ -27,6 +28,7 @@ import Control.Monad.Trans.State.Strict (
   execStateT,
   modify,
  )
+import Data.Either (lefts)
 import qualified Data.Foldable as F
 import Data.Functor (($>))
 import Data.HashSet (HashSet)
@@ -56,6 +58,7 @@ import Database.Tagger (
   allTags,
   close,
   concreteTagDescriptor,
+  deleteDescriptors,
   deleteFiles,
   getAllInfra,
   getInfraChildren,
@@ -99,6 +102,7 @@ import System.IO (hPutStrLn, stderr)
 import Tagger.Info (taggerVersion)
 import Text.TaggerQL.Expression.Engine (
   yuiQLCreateDescriptors,
+  yuiQLDeleteTags,
   yuiQLFileQuery,
   yuiQLTagFile,
  )
@@ -137,6 +141,7 @@ programParser =
                   <> command "audit" auditParser
                   <> command "describe" describeParser
                   <> command "add" addParser
+                  <> command "remove" removeParser
                   <> command "system" systemParser
               )
               <|> pure Default
@@ -226,15 +231,16 @@ programParser =
           ( helper
               <*> ( Add . AddCommandDescriptors
                       <$> optional
-                        ( argument
-                            str
-                            ( metavar "YUIQL"
-                                <> help
-                                  "An expression like \"a{b{c}}\" \
-                                  \can define a new set of descriptors \
-                                  \and their relations to one another. \
-                                  \Reads from stdin if no expression is given."
-                            )
+                        ( some $
+                            argument
+                              str
+                              ( metavar "YUIQL"
+                                  <> help
+                                    "An expression like \"a{b{c}}\" \
+                                    \can define a new set of descriptors \
+                                    \and their relations to one another. \
+                                    \Reads from stdin if no expression is given."
+                              )
                         )
                   )
           )
@@ -266,12 +272,88 @@ programParser =
           ( progDesc
               "Tag a file or files matching the given pattern from the command line."
           )
+    removeParser =
+      info
+        ( helper
+            <*> subparser
+              ( command "file" removeFileParser
+                  <> command "descriptor" removeDescriptorParser
+                  <> command "tag" removeTagParser
+              )
+        )
+        (progDesc "Remove items from the database, use with -h for more info.")
+     where
+      removeFileParser =
+        info
+          ( helper
+              <*> ( Remove . RemoveCommandFiles
+                      <$> optional
+                        ( some $
+                            argument
+                              str
+                              ( metavar "FILE_PATTERN"
+                                  <> help
+                                    "Any files matching any of the given \
+                                    \patterns will be removed from the database. \
+                                    \Reads from stdin if there is no input."
+                              )
+                        )
+                  )
+          )
+          (progDesc "Remove files matching the given patterns from the database.")
+      removeDescriptorParser =
+        info
+          ( helper
+              <*> ( Remove . RemoveCommandDescriptors
+                      <$> optional
+                        ( some $
+                            argument
+                              str
+                              ( metavar "DESCRIPTOR_PATTERN"
+                                  <> help
+                                    "Any Descriptors matching any of the given \
+                                    \patterns will be removed from the database. \
+                                    \Reads from stdin if there is no input."
+                              )
+                        )
+                  )
+          )
+          (progDesc "Remove Descriptors from the database.")
+      removeTagParser =
+        info
+          ( helper
+              <*> ( Remove
+                      <$> ( RemoveCommandTags
+                              <$> argument
+                                str
+                                ( metavar "YUIQL"
+                                    <> help
+                                      "A YuiQL Tag Expression to specify which \
+                                      \tags to remove."
+                                )
+                              <*> optional
+                                ( some $
+                                    argument
+                                      str
+                                      ( metavar "FILE_PATTERN"
+                                          <> help
+                                            "Any files matching any of the given \
+                                            \patterns are subject to tag removal. \
+                                            \Reads from stdin if no input is given."
+                                      )
+                                )
+                          )
+                  )
+          )
+          ( progDesc
+              "From the given file, \
+              \remove tags matching the given YuiQL tag expression."
+          )
     systemParser =
       info
         ( helper
             <*> subparser
-              ( command "remove" systemRemoveParser
-                  <> command "rename" systemRenameParser
+              ( command "rename" systemRenameParser
                   <> command "DELETE" systemDeleteParser
               )
         )
@@ -279,10 +361,6 @@ programParser =
             "Edit the files in a database, rename them in the filesystem, or delete them."
         )
      where
-      systemRemoveParser =
-        info
-          (Remove <$> some (argument str (metavar "FILE_PATTERN")))
-          (progDesc "Remove files matching the given patterns from just the database.")
       systemRenameParser =
         info
           ( helper
@@ -314,7 +392,7 @@ data Command
   | Create
   | Add !AddCommand
   | Move !FilePath !FilePath
-  | Remove ![String]
+  | Remove !RemoveCommand
   | Delete ![String]
   | Stats
   | Audit
@@ -328,9 +406,15 @@ data DescribeCommand
   deriving (Show, Eq)
 
 data AddCommand
-  = AddCommandDescriptors !(Maybe String)
+  = AddCommandDescriptors !(Maybe [String])
   | AddCommandFiles !(Maybe [FilePath])
   | AddCommandTags !String !(Maybe [String])
+  deriving (Show, Eq)
+
+data RemoveCommand
+  = RemoveCommandDescriptors !(Maybe [String])
+  | RemoveCommandFiles !(Maybe [FilePath])
+  | RemoveCommandTags !String !(Maybe [String])
   deriving (Show, Eq)
 
 mainProgram :: Program -> IO ()
@@ -356,10 +440,10 @@ mainProgram (WithDB dbPath cm) = do
         Add ac -> case ac of
           AddCommandDescriptors sio -> do
             s <- case sio of
-              Nothing -> T.IO.getContents
-              Just s -> pure . T.pack $ s
-            r <- yuiQLCreateDescriptors c s
-            either (T.IO.hPutStrLn stderr) pure r
+              Nothing -> fmap (: []) T.IO.getContents
+              Just s -> pure . map T.pack $ s
+            r <- mapM (yuiQLCreateDescriptors c) s
+            mapM_ (T.IO.hPutStrLn stderr) . lefts $ r
           AddCommandFiles sio -> do
             s <- case sio of
               Nothing -> T.words <$> T.IO.getContents
@@ -382,9 +466,24 @@ mainProgram (WithDB dbPath cm) = do
                 "Too many files matching '"
                   <> s
                   <> "' only one file rename is permitted at a time."
-        Remove ss -> do
-          fs <- concat <$> mapM ((`queryForFileByPattern` c) . T.pack) ss
-          deleteFiles (fileId <$> fs) c
+        Remove ss -> case ss of
+          RemoveCommandDescriptors m_ss -> do
+            desPatterns <- maybe ((: []) <$> T.IO.getContents) (pure . map T.pack) m_ss
+            ds <- concat <$> mapM (`queryForDescriptorByPattern` c) desPatterns
+            deleteDescriptors (descriptorId <$> ds) c
+          RemoveCommandFiles m_ss -> do
+            removePaths <- maybe ((: []) <$> T.IO.getContents) (pure . map T.pack) m_ss
+            fs <- concat <$> mapM (`queryForFileByPattern` c) removePaths
+            deleteFiles (fileId <$> fs) c
+          RemoveCommandTags s m_ss -> do
+            filePathsToRemoveFrom <-
+              maybe
+                ((: []) <$> T.IO.getContents)
+                (pure . map T.pack)
+                m_ss
+            fs <- concat <$> mapM (`queryForFileByPattern` c) filePathsToRemoveFrom
+            r <- yuiQLDeleteTags c (fileId <$> fs) (T.pack s)
+            either (T.IO.hPutStrLn stderr) pure r
         Delete ss -> do
           fs <- concat <$> mapM ((`queryForFileByPattern` c) . T.pack) ss
           mapM_ (rmFile c . fileId) fs
