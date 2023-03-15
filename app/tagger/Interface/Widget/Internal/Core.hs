@@ -1,5 +1,8 @@
+{-# OPTIONS_GHC -Wno-typed-holes #-}
+
 module Interface.Widget.Internal.Core (
   styledButton_,
+  styledToggleButton_,
   withStyleBasic,
   withStyleHover,
   withNodeKey,
@@ -10,11 +13,13 @@ module Interface.Widget.Internal.Core (
   modulateOpacity,
 ) where
 
-import Control.Lens ((&), (.~))
+import Control.Lens (ALens', (&), (.~))
 import Data.Event (TaggerEvent)
 import Data.Model.Core (TaggerModel)
 import Data.Text (Text)
 import Interface.Theme (
+  yuiBlack,
+  yuiBlue,
   yuiLightPeach,
   yuiOrange,
   yuiPeach,
@@ -27,10 +32,14 @@ import Monomer (
   CmbStyleBasic (styleBasic),
   CmbStyleHover (styleHover),
   StyleState,
+  ToggleButtonCfg,
   WidgetNode,
   button_,
   nodeKey,
   nodeVisible,
+  textColor,
+  toggleButtonOffStyle,
+  toggleButton_,
  )
 import Monomer.Graphics (Color)
 import Monomer.Lens (HasA (a))
@@ -64,6 +73,44 @@ styledButton_ opts t e =
           $ yuiPeach
       ]
     $ button_ t e opts
+
+styledToggleButton_ ::
+  [ ToggleButtonCfg
+      TaggerModel
+      TaggerEvent
+  ] ->
+  Text ->
+  ALens' TaggerModel Bool ->
+  TaggerWidget
+styledToggleButton_ c t l =
+  withStyleBasic
+    [ bgColor
+        . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+        $ yuiBlue
+    , textColor yuiBlack
+    ]
+    $ toggleButton_
+      t
+      l
+      ( toggleButtonOffStyle
+          ( mempty
+              & flip
+                styleBasic
+                [ bgColor
+                    . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+                    $ yuiLightPeach
+                , textColor yuiBlack
+                ]
+              & flip
+                styleHover
+                [ bgColor
+                    . modulateOpacity defaultElementOpacity
+                    $ yuiYellow
+                , border 1 yuiOrange
+                ]
+          ) :
+        c
+      )
 
 withStyleBasic ::
   [StyleState] ->

@@ -9,7 +9,7 @@ module Interface.Widget.Internal.FileDetail (
   tagTextNodeKey,
 ) where
 
-import Control.Lens ((&), (^.))
+import Control.Lens ((^.))
 import Data.Event (
   FileSelectionEvent (ClearTaggingSelection, RenameFile),
   FocusedFileEvent (DeleteTag, MoveTag, TagFile),
@@ -64,12 +64,17 @@ import Database.Tagger (
   Tag,
   concreteTagId,
  )
-import Interface.Theme (yuiBlack, yuiBlue, yuiLightPeach, yuiOrange, yuiRed, yuiYellow)
+import Interface.Theme (
+  yuiBlue,
+  yuiLightPeach,
+  yuiRed,
+ )
 import Interface.Widget.Internal.Core (
   defaultElementOpacity,
   defaultOpacityModulator,
   modulateOpacity,
   styledButton_,
+  styledToggleButton_,
   withNodeKey,
   withNodeVisible,
   withStyleBasic,
@@ -105,12 +110,8 @@ import Monomer (
   separatorLine_,
   spacer,
   spacer_,
-  styleBasic,
-  styleHover,
   textArea_,
   textField_,
-  toggleButtonOffStyle,
-  toggleButton_,
   tooltipDelay,
   tooltip_,
   vscroll_,
@@ -285,7 +286,10 @@ taggingWidget m =
         []
         [ box_ [alignMiddle] $
             hstack
-              [ styledToggleButton "Tag Selection" (tagInputModel . isTagSelection)
+              [ styledToggleButton_
+                  [resizeFactorW (-1)]
+                  "Tag Selection"
+                  (tagInputModel . isTagSelection)
               , styledButton_
                   [resizeFactorW (-1)]
                   "Clear Tag Selection"
@@ -294,31 +298,34 @@ taggingWidget m =
         , dropTarget_
             (DoFocusedFileEvent . DeleteTag . concreteTagId)
             [dropTargetStyle [border 1 yuiRed]]
-            $ styledToggleButton "Delete Mode" (tagInputModel . isTagDelete)
+            $ styledToggleButton_
+              [resizeFactorW (-1)]
+              "Delete Mode"
+              (tagInputModel . isTagDelete)
         ]
-   where
-    styledToggleButton t l =
-      withStyleBasic
-        [ bgColor
-            . modOpac
-            $ yuiBlue
-        , textColor yuiBlack
-        ]
-        $ toggleButton_
-          t
-          l
-          [ resizeFactorW (-1)
-          , toggleButtonOffStyle $
-              mempty
-                & flip styleBasic [bgColor . modOpac $ yuiLightPeach, textColor yuiBlack]
-                & flip
-                  styleHover
-                  [ bgColor . modulateOpacity defaultElementOpacity $ yuiYellow
-                  , border 1 yuiOrange
-                  ]
-          ]
-     where
-      modOpac = modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+  --  where
+  --   styledToggleButton t l =
+  --     withStyleBasic
+  --       [ bgColor
+  --           . modOpac
+  --           $ yuiBlue
+  --       , textColor yuiBlack
+  --       ]
+  --       $ toggleButton_
+  --         t
+  --         l
+  --         [ resizeFactorW (-1)
+  --         , toggleButtonOffStyle $
+  --             mempty
+  --               & flip styleBasic [bgColor . modOpac $ yuiLightPeach, textColor yuiBlack]
+  --               & flip
+  --                 styleHover
+  --                 [ bgColor . modulateOpacity defaultElementOpacity $ yuiYellow
+  --                 , border 1 yuiOrange
+  --                 ]
+  --         ]
+  --    where
+  --     modOpac = modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
 
   tagTextField :: TaggerWidget
   tagTextField =
