@@ -29,7 +29,7 @@ common haskell-common
   build-depends:       base ^>= 4.13.0.0
                       ,Cabal
 
-common tagger-common
+common yuitagger-common
   other-extensions:    OverloadedStrings
                       ,TemplateHaskell
                       ,FlexibleContexts
@@ -52,7 +52,7 @@ common tagger-common
 
 executable yuitagger
   import:              haskell-common
-                      ,tagger-common
+                      ,yuitagger-common
 
   main-is:             Main.hs
 
@@ -99,7 +99,7 @@ executable yuitagger
 
 library tagger-lib
   import:              haskell-common
-                      ,tagger-common
+                      ,yuitagger-common
 
   exposed-modules:     Database.Tagger
                       ,Database.Tagger.Type
@@ -150,7 +150,7 @@ library tagger-lib
   default-language:    Haskell2010
 
 test-suite tagger-test
-  import:              tagger-common 
+  import:              yuitagger-common 
                       ,haskell-common
   
   type:                exitcode-stdio-1.0
