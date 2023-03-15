@@ -510,7 +510,11 @@ tagListFilterTextField =
     . tooltip_
       "Filter the list of tag occurrences by a MetaDescriptor pattern"
       [tooltipDelay 1000]
-    . withStyleBasic [bgColor (yuiLightPeach & a .~ defaultElementOpacity)]
+    . withStyleBasic
+      [ bgColor
+          . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+          $ yuiLightPeach
+      ]
     $ textFieldV
       mempty
       ( \t ->
