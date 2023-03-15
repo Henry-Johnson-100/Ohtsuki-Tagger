@@ -524,8 +524,13 @@ tagListFilterTextField =
 
 fileSelectionChunkSizeNumField :: TaggerWidget
 fileSelectionChunkSizeNumField =
-  withStyleBasic [maxWidth 80] $
-    numericField_ (fileSelectionModel . chunkSize) [minValue 0]
+  withStyleBasic
+    [ maxWidth 80
+    , bgColor
+        . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+        $ yuiLightPeach
+    ]
+    $ numericField_ (fileSelectionModel . chunkSize) [minValue 0]
 
 refreshFileSelectionButton :: TaggerWidget
 refreshFileSelectionButton =
