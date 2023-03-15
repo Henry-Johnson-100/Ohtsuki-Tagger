@@ -44,7 +44,6 @@ import Monomer
 import Paths_tagger
 import System.FilePath
 import System.IO
-import Text.TaggerQL
 import Text.TaggerQL.Expression.Engine
 import Text.TaggerQL.Expression.Parser
 import Util

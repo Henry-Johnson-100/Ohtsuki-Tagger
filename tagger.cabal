@@ -106,7 +106,6 @@ library tagger-lib
                       ,Data.HierarchyMap
                       ,Data.OccurrenceMap
                       ,Tagger.Info
-                      ,Text.TaggerQL
                       ,Text.TaggerQL.Expression.AST
                       ,Text.TaggerQL.Expression.Engine
                       ,Text.TaggerQL.Expression.Parser
