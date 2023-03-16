@@ -243,7 +243,7 @@ focusedFileDefaultDataFile = "resources/Yui_signature_SS.png"
 
 {- |
  placeholder file id for a default file.
- events for this id should be filtered. (if negative file ids are common in the tagger db
+ events for this id should be filtered. (if negative file ids are common in the yuitagger db
   for some reason though they shouldn't be.)
 
  \-1

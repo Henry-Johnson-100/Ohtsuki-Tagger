@@ -37,7 +37,7 @@ taggerConfigCodec =
 getOptConf :: MaybeT IO TaggerConfig
 getOptConf = do
   bd <- lift getBinDir
-  let f = bd </> "tagger.toml"
+  let f = bd </> "yuitagger.toml"
   optConfigExists <- lift $ doesFileExist f
   guard optConfigExists
   c <- lift $ decodeFileEither taggerConfigCodec f

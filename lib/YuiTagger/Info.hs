@@ -1,6 +1,6 @@
 {- |
 Module      : YuiTagger.Info
-Description : Basic information detailing runtime information of tagger-lib
+Description : Basic information detailing runtime information of yuitagger-lib
 
 License     : GPL-3
 Maintainer  : monawasensei@gmail.com

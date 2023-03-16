@@ -157,7 +157,7 @@ programParser =
         \system and proprietary query language, YuiQL."
         <> progDesc
           "YuiTagger is, first and foremost, a GUI program.\
-          \ Run tagger with a path to a database and no other arguments to start the GUI.\
+          \ Run yuitagger with a path to a database and no other arguments to start the GUI.\
           \ Additionally, there are some limited CLI operations exposed for convenience."
     )
  where
@@ -168,7 +168,7 @@ programParser =
     WithDB
       <$> argument
         str
-        (metavar "DATABASE" <> help "Path to the tagger database file.")
+        (metavar "DATABASE" <> help "Path to the yuitagger database file.")
       <*> ( subparser
               ( command "create" createParser
                   <> command "query" queryParser
