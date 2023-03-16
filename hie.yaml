@@ -6,70 +6,70 @@ cradle:
     - path: "./nanovg-hs/test"
       component: "nanovg:test:nanovg-test"
 
-    - path: "app/tagger/Main.hs"
+    - path: "app/yuitagger/Main.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/Config.hs"
+    - path: "app/yuitagger/Config.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/CLI/Data.hs"
+    - path: "app/yuitagger/CLI/Data.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/Data/Event.hs"
+    - path: "app/yuitagger/Data/Event.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/Data/Model.hs"
+    - path: "app/yuitagger/Data/Model.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/Data/Model/Core.hs"
+    - path: "app/yuitagger/Data/Model/Core.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/Data/Model/Lens.hs"
+    - path: "app/yuitagger/Data/Model/Lens.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/Data/Model/Shared.hs"
+    - path: "app/yuitagger/Data/Model/Shared.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/Data/Model/Shared/Core.hs"
+    - path: "app/yuitagger/Data/Model/Shared/Core.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/Data/Model/Shared/Lens.hs"
+    - path: "app/yuitagger/Data/Model/Shared/Lens.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/Interface.hs"
+    - path: "app/yuitagger/Interface.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/Interface/Handler.hs"
+    - path: "app/yuitagger/Interface/Handler.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/Interface/Handler/Internal.hs"
+    - path: "app/yuitagger/Interface/Handler/Internal.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/Interface/Theme.hs"
+    - path: "app/yuitagger/Interface/Theme.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/Interface/Widget.hs"
+    - path: "app/yuitagger/Interface/Widget.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/Interface/Widget/Internal/Core.hs"
+    - path: "app/yuitagger/Interface/Widget/Internal/Core.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/Interface/Widget/Internal/DescriptorTree.hs"
+    - path: "app/yuitagger/Interface/Widget/Internal/DescriptorTree.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/Interface/Widget/Internal/FileDetail.hs"
+    - path: "app/yuitagger/Interface/Widget/Internal/FileDetail.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/Interface/Widget/Internal/FilePreview.hs"
+    - path: "app/yuitagger/Interface/Widget/Internal/FilePreview.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/Interface/Widget/Internal/Query.hs"
+    - path: "app/yuitagger/Interface/Widget/Internal/Query.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/Interface/Widget/Internal/Selection.hs"
+    - path: "app/yuitagger/Interface/Widget/Internal/Selection.hs"
       component: "yuitagger:exe:yuitagger"
 
-    - path: "app/tagger/Util.hs"
+    - path: "app/yuitagger/Util.hs"
       component: "yuitagger:exe:yuitagger"
 
     - path: "lib"

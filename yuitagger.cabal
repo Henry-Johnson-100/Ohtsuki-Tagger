@@ -94,7 +94,7 @@ executable yuitagger
                       ,tomland
                       ,optparse-applicative                      
 
-  hs-source-dirs:      app/tagger
+  hs-source-dirs:      app/yuitagger
 
 
 library yuitagger-lib
