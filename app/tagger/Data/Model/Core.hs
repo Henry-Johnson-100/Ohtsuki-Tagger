@@ -7,42 +7,46 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Data.Model.Core (
+  -- * Data Models
   TaggerModel (..),
   createTaggerModel,
   FileSelectionModel (..),
-  createFileSelectionModel,
+  AddFileModel (..),
+  QueryModel (..),
   getSelectionChunk,
   selectionChunkLength,
+  FileSelectionTagListModel (..),
   FileInfo (..),
   createFileInfo,
   constructFileInfo,
   FocusedFileModel (..),
   focusedFileDefaultDataFile,
   focusedFileDefaultRecordKey,
+  TagInputModel (..),
+  tagInputOptionPaneLabel,
   DescriptorTreeModel (..),
   DescriptorInfo (..),
   createDescriptorInfo,
   createDescriptorTreeModel,
   Renderability (..),
-  TaggerInfoModel (..),
-  createTaggerInfoModel,
   PositioningModel (..),
   createPositioningModel,
   defaultSelectionAndQueryPositioningModel,
   defaultFileDetailAndDescriptorTreePositioningModel,
 ) where
 
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HM
+import Data.HashSet (HashSet)
+import qualified Data.HashSet as HS
 import Data.HierarchyMap (empty)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Maybe
 import Data.Model.Shared
-import Data.OccurrenceHashMap (OccurrenceHashMap)
-import qualified Data.OccurrenceHashMap as OHM
 import Data.Sequence (Seq)
 import qualified Data.Sequence as S
 import qualified Data.Sequence as Seq
-import Data.Tagger
 import Data.Text (Text)
 import Database.Tagger.Type
 
@@ -50,14 +54,14 @@ data TaggerModel = TaggerModel
   { _taggermodelDescriptorTreeModel :: DescriptorTreeModel
   , _taggermodelFocusedFileModel :: FocusedFileModel
   , _taggermodelFileSelectionModel :: FileSelectionModel
-  , _taggermodelTaggerInfoModel :: TaggerInfoModel
+  , _taggermodelTagInputModel :: TagInputModel
   , _taggermodelPositioningModel :: PositioningModel
   , _taggermodelVisibilityModel :: Visibility
   , _taggermodelConnection :: TaggedConnection
-  , _taggermodelIsTagMode :: Bool
-  , _taggerMassTagText :: Text
-  , _taggerIsMassOpMode :: Bool
-  , _taggerShellText :: Text
+  , -- Is a part of the FileSelectionWidget but is logically connected with
+    -- the FocusedFile and FileSelection models. I am not willing to combine those two
+    -- so this will stay here for now.
+    _taggerShellText :: Text
   }
   deriving (Show, Eq)
 
@@ -72,49 +76,88 @@ createTaggerModel tc d unRelatedD defaultFilePath =
     { _taggermodelDescriptorTreeModel = createDescriptorTreeModel d unRelatedD
     , _taggermodelFocusedFileModel = createFocusedFileModel defaultFilePath
     , _taggermodelFileSelectionModel = createFileSelectionModel
-    , _taggermodelTaggerInfoModel = createTaggerInfoModel
     , _taggermodelPositioningModel = createPositioningModel
+    , _taggermodelTagInputModel = createTagInputModel
     , _taggermodelVisibilityModel = VisibilityMain
     , _taggermodelConnection = tc
-    , _taggermodelIsTagMode = True
-    , _taggerMassTagText = ""
-    , _taggerIsMassOpMode = False
     , _taggerShellText = ""
     }
 
 data FileSelectionModel = FileSelectionModel
-  { _fileselectionSelection :: Seq File
+  { _fileselectionTagList :: FileSelectionTagListModel
+  , _fileselectionQueryModel :: QueryModel
+  , _fileselectionAddFileModel :: AddFileModel
+  , _fileselectionSelection :: Seq File
   , _fileselectionCurrentChunk :: Int
   , _fileselectionChunkSize :: Int
   , _fileselectionChunkSequence :: Seq Int
-  , _fileselectionTagOccurrences :: OccurrenceHashMap Descriptor
-  , _fileselectionTagOrdering :: OrderBy
   , _fileselectionFileSelectionInfoMap :: IntMap FileInfo
-  , _fileselectionSetOp :: SetOp
-  , _fileselectionQueryText :: Text
-  , _fileselectionQueryHistory :: TextHistory
   , _fileselectionFileSelectionVis :: Visibility
-  , _fileselectionAddFileText :: Text
-  , _fileselectionAddFileHistory :: TextHistory
+  , _fileselectionIsMassOpMode :: Bool
+  , _fileselectionTaggingSelection :: HashSet (RecordKey File)
   }
   deriving (Show, Eq)
 
 createFileSelectionModel :: FileSelectionModel
 createFileSelectionModel =
   FileSelectionModel
-    { _fileselectionSelection = S.empty
+    { _fileselectionTagList = createFileSelectionTagListModel
+    , _fileselectionQueryModel = createQueryModel
+    , _fileselectionAddFileModel = createAddFileModel
+    , _fileselectionSelection = S.empty
     , _fileselectionCurrentChunk = 0
     , _fileselectionChunkSize = 50
     , _fileselectionChunkSequence = S.singleton 0
-    , _fileselectionTagOccurrences = OHM.empty
-    , _fileselectionTagOrdering = OrderBy Numeric Desc
     , _fileselectionFileSelectionInfoMap = IntMap.empty
-    , _fileselectionSetOp = Union
-    , _fileselectionQueryText = mempty
-    , _fileselectionQueryHistory = createHistory 10
     , _fileselectionFileSelectionVis = VisibilityMain
-    , _fileselectionAddFileText = mempty
-    , _fileselectionAddFileHistory = createHistory 30
+    , _fileselectionIsMassOpMode = False
+    , _fileselectionTaggingSelection = mempty
+    }
+
+data AddFileModel = AddFileModel
+  { _addfileDirectoryList :: [FilePath]
+  , -- | 'VisibilityMain` is a textfield
+    --
+    -- 'VisibilityAlt` is a list of directories to scan
+    _addfileVisibility :: Visibility
+  , _addfileInput :: TextInput
+  , _addfileInProgress :: Bool
+  }
+  deriving (Show, Eq)
+
+createAddFileModel :: AddFileModel
+createAddFileModel =
+  AddFileModel
+    { _addfileDirectoryList = []
+    , _addfileVisibility = VisibilityMain
+    , _addfileInput = createTextInput 10
+    , _addfileInProgress = False
+    }
+
+data QueryModel = QueryModel
+  { _queryInput :: TextInput
+  }
+  deriving (Show, Eq)
+
+createQueryModel :: QueryModel
+createQueryModel =
+  QueryModel
+    { _queryInput = createTextInput 10
+    }
+
+data FileSelectionTagListModel = FileSelectionTagListModel
+  { _fileselectiontaglistOccurrences :: HashMap Descriptor Int
+  , _fileselectiontaglistOrdering :: OrderBy
+  , _fileselectiontaglistInclude :: HashSet (RecordKey Descriptor)
+  }
+  deriving (Show, Eq)
+
+createFileSelectionTagListModel :: FileSelectionTagListModel
+createFileSelectionTagListModel =
+  FileSelectionTagListModel
+    { _fileselectiontaglistOccurrences = HM.empty
+    , _fileselectiontaglistOrdering = OrderBy Numeric Desc
+    , _fileselectiontaglistInclude = HS.empty
     }
 
 data FileInfo = FileInfo
@@ -130,7 +173,11 @@ constructFileInfo :: Text -> FileInfo
 constructFileInfo t = FileInfo t False
 
 selectionChunkLength :: TaggerModel -> Int
-selectionChunkLength m = 1 + ((Seq.length . _fileselectionSelection . _taggermodelFileSelectionModel $ m) `div` (_fileselectionChunkSize . _taggermodelFileSelectionModel $ m))
+selectionChunkLength m =
+  1
+    + ( (Seq.length . _fileselectionSelection . _taggermodelFileSelectionModel $ m)
+          `div` (_fileselectionChunkSize . _taggermodelFileSelectionModel $ m)
+      )
 
 getSelectionChunk :: TaggerModel -> Seq File
 getSelectionChunk m =
@@ -159,8 +206,6 @@ data FocusedFileModel = FocusedFileModel
   { _focusedfilemodelFocusedFile :: ConcreteTaggedFile
   , _focusedfilemodelRenderability :: Renderability
   , _focusedfilemodelFocusedFileVis :: Visibility
-  , _focusedfilemodelTagText :: Text
-  , _focusedfilemodelTagHistory :: TextHistory
   }
   deriving (Show, Eq)
 
@@ -171,12 +216,30 @@ createFocusedFileModel fp =
         ConcreteTaggedFile (File focusedFileDefaultRecordKey fp) empty
     , _focusedfilemodelRenderability = RenderingNotSupported
     , _focusedfilemodelFocusedFileVis = VisibilityMain
-    , _focusedfilemodelTagText = mempty
-    , _focusedfilemodelTagHistory = createHistory 10
     }
 
+data TagInputModel = TagInputModel
+  { _taginputInput :: TextInput
+  , _taginputVisibility :: Visibility
+  , _taginputIsTagSelection :: Bool
+  , _taginputIsTagDelete :: Bool
+  }
+  deriving (Show, Eq)
+
+createTagInputModel :: TagInputModel
+createTagInputModel =
+  TagInputModel
+    { _taginputInput = createTextInput 10
+    , _taginputVisibility = VisibilityMain
+    , _taginputIsTagSelection = False
+    , _taginputIsTagDelete = False
+    }
+
+tagInputOptionPaneLabel :: Text
+tagInputOptionPaneLabel = "tagInputOptionPaneLabel"
+
 focusedFileDefaultDataFile :: FilePath
-focusedFileDefaultDataFile = "Yui_signature_SS.png"
+focusedFileDefaultDataFile = "resources/Yui_signature_SS.png"
 
 {- |
  placeholder file id for a default file.
@@ -236,26 +299,6 @@ createDescriptorTreeModel n unrelatedD =
     , _descriptortreeDescriptorTreeVis = VisibilityMain
     }
 
-data TaggerInfoModel = TaggerInfoModel
-  { _taggerinfoVersion :: Text
-  , _taggerinfoVersionMessage :: Text
-  , _taggerinfoMessage :: Text
-  , _taggerinfoLastAccessed :: Text
-  , _taggerinfoLastSaved :: Text
-  , _taggerinfoWorkingDirectory :: Text
-  }
-  deriving (Show, Eq)
-
-createTaggerInfoModel :: TaggerInfoModel
-createTaggerInfoModel =
-  TaggerInfoModel
-    mempty
-    mempty
-    mempty
-    mempty
-    mempty
-    mempty
-
 data PositioningModel = PositioningModel
   { _positioningSelectionAndQueryPosV :: Double
   , _positionSelectionAndQueryPosH :: Double
@@ -269,7 +312,7 @@ createPositioningModel =
   PositioningModel
     0.5
     0.2
-    0.5
+    1.0
     0.8
 
 defaultSelectionAndQueryPositioningModel :: PositioningModel -> PositioningModel

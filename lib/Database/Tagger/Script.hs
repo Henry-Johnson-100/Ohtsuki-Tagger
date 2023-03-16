@@ -1,6 +1,5 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE QuasiQuotes #-}
-{-# OPTIONS_HADDOCK prune #-}
+{-# OPTIONS_HADDOCK hide #-}
 
 {- |
 Module      : Database.Tagger.Script
@@ -14,12 +13,13 @@ module Database.Tagger.Script (
   schemaDefinition,
   schemaTeardown,
   update0_3_4_0To0_3_4_2,
+  patch_2_0,
 ) where
 
+import Control.Monad ((<=<))
 import Data.String (IsString (..))
 import Data.Text (Text)
-import Paths_tagger
-import System.IO
+import Paths_tagger (getDataFileName)
 import Text.RawString.QQ (r)
 
 newtype SQLiteScript = SQLiteScript Text deriving (Show, Eq)
@@ -30,14 +30,14 @@ newtype SQLiteScript = SQLiteScript Text deriving (Show, Eq)
 -}
 schemaDefinition :: IO SQLiteScript
 schemaDefinition =
-  getScriptContents "TaggerSchemaDefinition.sql"
+  getScriptContents "resources/TaggerSchemaDefinition.sql"
 
 {- |
  DROPS all tables in a Tagger database.
 -}
 schemaTeardown :: IO SQLiteScript
 schemaTeardown =
-  getScriptContents "TaggerSchemaTeardown.sql"
+  getScriptContents "resources/TaggerSchemaTeardown.sql"
 
 update0_3_4_0To0_3_4_2 :: IO SQLiteScript
 update0_3_4_0To0_3_4_2 =
@@ -48,11 +48,8 @@ update0_3_4_0To0_3_4_2 =
     DROP TABLE IF EXISTS Representative;
     |]
 
+patch_2_0 :: IO SQLiteScript
+patch_2_0 = getScriptContents "resources/Patch/patch_2_0.sql"
+
 getScriptContents :: FilePath -> IO SQLiteScript
-getScriptContents p = do
-  scriptFile <- getDataFileName p
-  scriptHandle <- openFile scriptFile ReadMode
-  scriptContents <- hGetContents scriptHandle
-  let !script = SQLiteScript . fromString $ scriptContents
-  hClose scriptHandle
-  return script
+getScriptContents = fmap (SQLiteScript . fromString) . readFile <=< getDataFileName

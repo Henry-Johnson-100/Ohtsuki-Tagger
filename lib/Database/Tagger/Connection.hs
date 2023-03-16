@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
@@ -10,8 +11,8 @@ Maintainer  : monawasensei@gmail.com
 -}
 module Database.Tagger.Connection (
   -- * Wrapped types
+  openOrCreate,
   open,
-  open',
   close,
   query,
   queryNamed,
@@ -42,61 +43,111 @@ module Database.Tagger.Connection (
   Simple.NamedParam (..),
 ) where
 
-import Control.Monad (unless, when)
-import Data.Maybe
+import Control.Monad (guard, unless, when)
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Except (ExceptT, withExceptT)
+import Control.Monad.Trans.Maybe (MaybeT (..))
+import Control.Monad.Trans.State.Strict (
+  StateT (runStateT),
+  get,
+  put,
+ )
+import Data.Maybe (isNothing, mapMaybe)
+import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Time (getCurrentTime)
-import Data.Version
+import Data.Version (
+  Version,
+  makeVersion,
+  parseVersion,
+  showVersion,
+ )
 import qualified Database.SQLite.Simple as Simple
 import qualified Database.SQLite.Simple.ToField
 import qualified Database.SQLite3 as SQLite3
-import Database.Tagger.Query.Type
+import Database.Tagger.Query.Type (TaggerQuery (TaggerQuery))
 import Database.Tagger.Script (
   SQLiteScript (SQLiteScript),
+  patch_2_0,
   schemaDefinition,
   schemaTeardown,
   update0_3_4_0To0_3_4_2,
  )
-import Database.Tagger.Type
+import Database.Tagger.Type (
+  BareConnection,
+  RecordKey (..),
+  RowId,
+  TaggedConnection (TaggedConnection),
+ )
 import Database.Tagger.Type.Prim (BareConnection (..))
-import System.IO
+import System.Directory (doesFileExist)
+import System.IO (hPutStrLn, stderr)
 import Tagger.Info (taggerVersion)
-import Tagger.Util
+import Tagger.Util (head', last')
 import Text.ParserCombinators.ReadP (readP_to_S)
+
+{- |
+ refinement type wrapper for running IO actions in an environment where
+  the TaggerDBInfo table exists and can be, or is being, updated.
+-}
+newtype DatabaseInfoUpdate a = DatabaseInfoUpdate {runDatabaseInfoUpdate :: IO a}
+  deriving (Functor, Applicative, Monad)
 
 {- |
  Open a new 'TaggedConnection` with the database at the given path.
 
- The connection's label is set to the path and the lastAccessed time and database version
+ The connection's label is set to the path and the database version
  is updated.
 
  If the db info table is not found then the database is initialized, if this is undesired,
-  use open'
+  use 'open`
 
- Most Tagger connections should be made with this function.
+  This is a potentially destructive function if run on any file
+    that's not strictly intended to be a database.
+  It is recommended to use 'open` rather than this.
+    As 'open` does not attempt to initialize the database.
 -}
-open :: FilePath -> IO TaggedConnection
-open p = do
+openOrCreate :: FilePath -> IO TaggedConnection
+openOrCreate p = do
   let tagName = T.pack p
   bc <- fmap BareConnection . Simple.open $ p
   dbInfoTableExists <- taggerDBInfoTableExists bc
   activateForeignKeyPragma bc
   let conn = TaggedConnection tagName bc
-  unless dbInfoTableExists (initializeDatabase conn)
-  updateTaggerDBInfoVersion bc
-  updateTaggerDBInfoLastAccessed bc
+  unless dbInfoTableExists . runDatabaseInfoUpdate . initializeDatabase $ conn
+  runDatabaseInfoUpdate $ do
+    patchDatabaseIfRequired bc
   return conn
 
 {- |
- Like 'open` but does NOT update the table with lastAccessedDateTime or the table version.
+ Like 'openOrCreate` but
+  does NOT initialize the database if there is no TaggerDBInfo table.
 
- Also does not attempt to initialize the database if there is no db info table.
+  WILL attempt to patch the table if there is.
+
+  Returns a Left value if the specified file does not exist or the table TaggerDBInfo
+    cannot be found in it.
 -}
-open' :: FilePath -> IO TaggedConnection
-open' p = do
+open :: FilePath -> ExceptT Text IO TaggedConnection
+open p = do
   let tagName = T.pack p
-  bc <- fmap BareConnection . Simple.open $ p
-  activateForeignKeyPragma bc
+  fileExists <- liftIO $ doesFileExist p
+  withExceptT
+    (const $ "File '" <> tagName <> "' does not exist.")
+    (guard fileExists :: ExceptT () IO ())
+  bc <- liftIO $ do
+    bc' <- BareConnection <$> Simple.open p
+    activateForeignKeyPragma bc'
+    return bc'
+  dbInfoTableExists <- liftIO $ taggerDBInfoTableExists bc
+  withExceptT
+    ( const $
+        "Could not find TaggerDBInfo table in '"
+          <> tagName
+          <> "'. Please reinitialize database."
+    )
+    (guard dbInfoTableExists :: ExceptT () IO ())
+  liftIO . runDatabaseInfoUpdate $ do
+    patchDatabaseIfRequired bc
   return $ TaggedConnection tagName bc
 
 {- |
@@ -206,8 +257,8 @@ lastInsertRowId = withBareConnection bareLastInsertRowId
  Should ideally not do anything on a database that is already up-to-date with the current
  schema definition, but it would be best to avoid doing that anyways.
 -}
-initializeDatabase :: TaggedConnection -> IO ()
-initializeDatabase tc = do
+initializeDatabase :: TaggedConnection -> DatabaseInfoUpdate ()
+initializeDatabase tc = DatabaseInfoUpdate $ do
   initScript <- schemaDefinition
   withBareConnection
     ( withConnection
@@ -265,61 +316,63 @@ taggerDBInfoTableExists c = do
       IO [Simple.Only Int]
   return . all ((> 0) . (\(Simple.Only n) -> n)) $ r
 
-updateTaggerDBInfoLastAccessed :: BareConnection -> IO ()
-updateTaggerDBInfoLastAccessed bc = do
-  dbInfoTableExists <- taggerDBInfoTableExists bc
-  when dbInfoTableExists $ do
-    currentTime <- getCurrentTime
-    withConnection
-      ( \c ->
-          Simple.execute
-            c
-            "UPDATE TaggerDBInfo SET lastAccessed = ?"
-            [currentTime]
-      )
-      bc
+{- |
+ Attempts to read the version number from the TaggerDBInfo table.
+ If the table does not exist then no operation is performed.
 
-updateTaggerDBInfoVersion :: BareConnection -> IO ()
-updateTaggerDBInfoVersion bc = do
-  dbInfoTableExists <- taggerDBInfoTableExists bc
-  maybeCurrentVersion <-
-    head'
-      . mapMaybe (readVersion . (\(Simple.Only x) -> x))
-      <$> bareQuery_ bc "SELECT version FROM TaggerDBInfo LIMIT 1"
-  patchDatabase maybeCurrentVersion
-  when
-    (dbInfoTableExists && isJust maybeCurrentVersion)
-    ( withConnection
+ If it does, the version contained in the \"version\" column is parseable,
+ then it checks if patches are required.
+ If they are required, then are run automatically.
+
+ If patches are run, then the version number is updated in the table.
+-}
+patchDatabaseIfRequired :: BareConnection -> DatabaseInfoUpdate ()
+patchDatabaseIfRequired bc = DatabaseInfoUpdate $ do
+  runPatchesAndUpdateVersion <- runMaybeT $ do
+    currentVersion <-
+      MaybeT $
+        head'
+          . mapMaybe
+            (last' . map fst . readP_to_S parseVersion . (\(Simple.Only x) -> x))
+          <$> bareQuery_ bc "SELECT version FROM TaggerDBInfo LIMIT 1"
+    unless (currentVersion == taggerVersion) . liftIO $ do
+      (_, newVersion) <- runStateT (patchDatabase bc) currentVersion
+      withConnection
         ( \c ->
             Simple.execute
               c
               "UPDATE TaggerDBInfo SET version = ?"
-              [showVersion taggerVersion]
+              [showVersion newVersion]
         )
         bc
+  when
+    (isNothing runPatchesAndUpdateVersion)
+    ( hPutStrLn
+        stderr
+        "Could not determine the version of the database, some operations may fail."
     )
- where
-  readVersion :: String -> Maybe Version
-  readVersion = last' . map fst . readP_to_S parseVersion
-  patchDatabase :: Maybe Version -> IO ()
-  patchDatabase Nothing =
-    hPutStrLn stderr "Unable to determine database version, some operations may fail."
-  patchDatabase (Just v) =
-    if v /= taggerVersion
-      then do
-        when
-          (makeVersion [0, 3, 4, 0] <= v && v < makeVersion [0, 3, 4, 2])
-          v0_3_4_0_v_0_3_4_2
-      else pure ()
-   where
-    v0_3_4_0_v_0_3_4_2 =
-      runPatch =<< update0_3_4_0To0_3_4_2
-    runPatch p =
-      withConnection
-        ( withConnectionHandle
-            (`SQLite3.exec` (\(SQLiteScript s) -> s) p)
-        )
-        bc
+
+patchDatabase :: BareConnection -> StateT Version IO ()
+patchDatabase bc = do
+  _0_3_4_0_to_0_3_4_2 <- do
+    v <- get
+    when (makeVersion [0, 3, 4, 0] <= v && v < makeVersion [0, 3, 4, 2]) $ do
+      liftIO (update0_3_4_0To0_3_4_2 >>= runPatch bc)
+      put (makeVersion [0, 3, 4, 2])
+  _1_0_2_1_to_2_0 <- do
+    v <- get
+    when (makeVersion [0, 3, 4, 2] <= v && v < makeVersion [2, 0, 0, 0]) $ do
+      liftIO (patch_2_0 >>= runPatch bc)
+      put (makeVersion [2, 0, 0, 0])
+  pure ()
+
+runPatch :: BareConnection -> SQLiteScript -> IO ()
+runPatch bc p =
+  withConnection
+    ( withConnectionHandle
+        (`SQLite3.exec` (\(SQLiteScript s) -> s) p)
+    )
+    bc
 
 bareQuery ::
   (Simple.ToRow q, Simple.FromRow r) =>

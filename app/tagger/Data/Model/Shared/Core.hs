@@ -1,5 +1,6 @@
 {-# HLINT ignore "Use newtype instead of data" #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Data.Model.Shared.Core (
@@ -14,6 +15,8 @@ module Data.Model.Shared.Core (
   OrderBy (..),
   cycleOrderCriteria,
   cycleOrderDir,
+  TextInput (..),
+  createTextInput,
   TextHistory (..),
   createHistory,
   nextHist,
@@ -22,11 +25,11 @@ module Data.Model.Shared.Core (
   getHist,
 ) where
 
+import Data.Monoid (Sum (..))
 import Data.Sequence (Seq ((:<|)), (<|))
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as S
-import Data.Tagger (CyclicEnum (next))
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -83,23 +86,44 @@ togglePaneVis x y =
 
 data OrderDirection = Asc | Desc
   deriving
-    (Show, Eq, Ord, Enum, Bounded, CyclicEnum)
+    (Show, Eq, Ord, Enum, Bounded)
 
 data OrderCriteria = Alphabetic | Numeric
   deriving
-    (Show, Eq, Ord, Enum, Bounded, CyclicEnum)
+    (Show, Eq, Ord, Enum, Bounded)
 
-data OrderBy = OrderBy OrderCriteria OrderDirection deriving (Show, Eq)
+data OrderBy = OrderBy
+  { _orderbyOrderCriteria :: OrderCriteria
+  , _orderbyOrderDirection :: OrderDirection
+  }
+  deriving (Show, Eq)
 
 cycleOrderCriteria :: OrderBy -> OrderBy
-cycleOrderCriteria (OrderBy c d) = OrderBy (next c) d
+cycleOrderCriteria (OrderBy c d) =
+  OrderBy (case c of Alphabetic -> Numeric; Numeric -> Alphabetic) d
 
 cycleOrderDir :: OrderBy -> OrderBy
-cycleOrderDir (OrderBy c d) = OrderBy c (next d)
+cycleOrderDir (OrderBy c d) =
+  OrderBy c (case d of Asc -> Desc; Desc -> Asc)
+
+{- |
+ Data type that has Text and a TextHistory
+-}
+data TextInput = TextInput
+  { _textinputText :: Text
+  , _textinputHistory :: TextHistory
+  }
+  deriving (Show, Eq)
+
+{- |
+ Where the Int is the size of the history.
+-}
+createTextInput :: Int -> TextInput
+createTextInput = TextInput mempty . createHistory
 
 data TextHistory = TextHistory
   { _textHistorySize :: Int
-  , _textHistoryIndex :: Int
+  , _textHistoryIndex :: Sum Int
   , _textHistoryContents :: Seq Text
   }
   deriving (Show, Eq)
@@ -108,17 +132,17 @@ createHistory :: Int -> TextHistory
 createHistory n = TextHistory n 0 Seq.empty
 
 getHist :: TextHistory -> Maybe Text
-getHist (TextHistory _ ix h) = Seq.lookup ix h
+getHist (TextHistory _ (getSum -> ix) h) = Seq.lookup ix h
 
 nextHist :: TextHistory -> TextHistory
 nextHist (TextHistory n ix h) =
   TextHistory
     n
-    ( if ix >= n
-        then n
+    ( if getSum ix >= n
+        then Sum n
         else
           let histSize = Seq.length h - 1
-           in if ix >= histSize then histSize else ix + 1
+           in if getSum ix >= histSize then Sum histSize else ix + 1
     )
     h
 

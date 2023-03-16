@@ -23,17 +23,19 @@ import Database.Tagger (
  )
 import Interface.Theme (yuiBlue, yuiOrange, yuiRed)
 import Interface.Widget.Internal.Core (withStyleBasic)
-import Interface.Widget.Internal.Type (TaggerWidget)
 import Monomer (
   CmbAlignCenter (alignCenter),
   CmbBorder (border),
   CmbFitEither (fitEither),
   CmbMergeRequired (mergeRequired),
+  WidgetNode,
   box_,
   dropTargetStyle,
   dropTarget_,
   image_,
  )
+
+type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
 widget :: TaggerModel -> TaggerWidget
 widget

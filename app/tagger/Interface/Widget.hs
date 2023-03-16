@@ -1,5 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Redundant if" #-}
 
 module Interface.Widget (
   taggerApplicationUI,
@@ -8,33 +11,37 @@ module Interface.Widget (
 import Control.Lens ((%~), (&), (.~), (^.))
 import Data.Event (
   FileSelectionEvent (
-    ClearSelection,
     CycleNextFile,
-    CycleNextSetOp,
-    CyclePrevFile,
-    CyclePrevSetOp
+    CyclePrevFile
   ),
-  TaggerEvent (DoFileSelectionEvent, RefreshUI, ToggleMainVisibility),
+  TaggerEvent (
+    DoFileSelectionEvent,
+    RefreshUI,
+    ToggleVisibilityLabel
+  ),
   anonymousEvent,
  )
-import Data.Model (
+import Data.Model.Core (
+  TaggerModel,
+  createPositioningModel,
+  defaultFileDetailAndDescriptorTreePositioningModel,
+  defaultSelectionAndQueryPositioningModel,
+ )
+import Data.Model.Lens (
   HasFileDetailAndDescriptorTreePosH (fileDetailAndDescriptorTreePosH),
   HasFileDetailAndDescriptorTreePosV (fileDetailAndDescriptorTreePosV),
   HasPositioningModel (positioningModel),
   HasSelectionAndQueryPosH (selectionAndQueryPosH),
   HasSelectionAndQueryPosV (selectionAndQueryPosV),
   HasVisibilityModel (visibilityModel),
-  TaggerModel,
-  createPositioningModel,
-  defaultFileDetailAndDescriptorTreePositioningModel,
-  defaultSelectionAndQueryPositioningModel,
+  TaggerLens (TaggerLens),
  )
 import Data.Model.Shared.Core (
   Visibility (VisibilityLabel),
   hasVis,
  )
 import Data.Text (Text)
-import Interface.Theme
+import Interface.Theme (yuiBlack, yuiLightPeach)
 import Interface.Widget.Internal.Core (
   defaultElementOpacity,
   withNodeHidden,
@@ -45,7 +52,6 @@ import qualified Interface.Widget.Internal.FileDetail as FileDetail
 import qualified Interface.Widget.Internal.FilePreview as FilePreview
 import qualified Interface.Widget.Internal.Query as Query
 import qualified Interface.Widget.Internal.Selection as Selection
-import Interface.Widget.Internal.Type (TaggerWidget)
 import Monomer (
   CmbBgColor (bgColor),
   CmbBorderB (borderB),
@@ -60,7 +66,7 @@ import Monomer (
   EventResponse (Event, Model, SetFocusOnKey),
   WidgetEnv,
   WidgetKey (WidgetKey),
-  black,
+  WidgetNode,
   box_,
   hsplit_,
   keystroke_,
@@ -73,14 +79,17 @@ import Monomer (
  )
 import Monomer.Graphics.Lens (HasA (a))
 
+type TaggerWidget = WidgetNode TaggerModel TaggerEvent
+
 taggerApplicationUI ::
   WidgetEnv TaggerModel TaggerEvent ->
   TaggerModel ->
   TaggerWidget
 taggerApplicationUI _ m =
-  globalKeystrokes m
-    . baseZStack m
-    $ [ selectionQueryLayer m
+  globalKeystrokes m $
+    baseZStack
+      m
+      [ selectionQueryLayer m
       , fileDetailAndDescriptorTreeLayer m
       ]
 
@@ -106,18 +115,18 @@ fileDetailAndDescriptorTreeLayer m =
       , splitHandlePos
           (positioningModel . fileDetailAndDescriptorTreePosH)
       ]
-      ( withStyleBasic [maxWidth 10000, borderR 1 $ black & a .~ 0.10]
+      ( withStyleBasic [maxWidth 10000, borderR 1 $ yuiBlack & a .~ 0.10]
           . box_ [ignoreEmptyArea]
           . withStyleBasic [maxWidth 0]
           $ spacer_ [resizeFactor (-1)]
       , withStyleBasic [bgColor $ yuiLightPeach & a .~ defaultElementOpacity]
           . vsplit_
-            [ splitIgnoreChildResize True
+            [ splitIgnoreChildResize False
             , splitHandlePos (positioningModel . fileDetailAndDescriptorTreePosV)
             ]
           . bimap
-            (withStyleBasic [borderB 1 black, paddingB 10])
-            (withStyleBasic [borderT 1 black, paddingT 3])
+            (withStyleBasic [borderB 1 yuiBlack, paddingB 10])
+            (withStyleBasic [borderT 1 yuiBlack, paddingT 3])
           $ (FileDetail.widget m, DescriptorTree.widget m)
       )
 
@@ -145,10 +154,10 @@ selectionQueryLayer m =
                 (positioningModel . selectionAndQueryPosV)
             ]
           . bimap
-            (withStyleBasic [borderB 1 black, paddingB 10])
-            (withStyleBasic [borderT 1 black, paddingT 3])
+            (withStyleBasic [borderB 1 yuiBlack, paddingB 10])
+            (withStyleBasic [borderT 1 yuiBlack, paddingT 3])
           $ (Query.widget m, Selection.widget m)
-      , withStyleBasic [maxWidth 10000, borderL 1 $ black & a .~ 0.10]
+      , withStyleBasic [maxWidth 10000, borderL 1 $ yuiBlack & a .~ 0.10]
           . box_ [ignoreEmptyArea]
           . withStyleBasic [maxWidth 0]
           $ spacer_ [resizeFactor (-1)]
@@ -165,7 +174,10 @@ globalKeystrokes m =
       , anonymousEvent $
           if (m ^. visibilityModel) `hasVis` VisibilityLabel fileDetailDescriptorTreeHide
             then
-              [ Event . ToggleMainVisibility $ fileDetailDescriptorTreeHide
+              [ Event $
+                  ToggleVisibilityLabel
+                    (TaggerLens visibilityModel)
+                    fileDetailDescriptorTreeHide
               , SetFocusOnKey . WidgetKey $ FileDetail.tagTextNodeKey
               ]
             else [SetFocusOnKey . WidgetKey $ FileDetail.tagTextNodeKey]
@@ -173,21 +185,26 @@ globalKeystrokes m =
     ,
       ( "Ctrl-f"
       , anonymousEvent $
-          if (m ^. visibilityModel) `hasVis` VisibilityLabel selectionQueryHideLabel
-            then
-              [ Event . ToggleMainVisibility $ selectionQueryHideLabel
-              , SetFocusOnKey . WidgetKey $ Query.queryTextFieldKey
-              ]
-            else [SetFocusOnKey . WidgetKey $ Query.queryTextFieldKey]
+          let setFocusEvent =
+                SetFocusOnKey . WidgetKey $ Query.queryTextFieldKey
+           in if (m ^. visibilityModel) `hasVis` VisibilityLabel selectionQueryHideLabel
+                then
+                  [ Event $
+                      ToggleVisibilityLabel
+                        (TaggerLens visibilityModel)
+                        selectionQueryHideLabel
+                  , setFocusEvent
+                  ]
+                else [setFocusEvent]
       )
-    , ("Ctrl-g", DoFileSelectionEvent CycleNextSetOp)
-    , ("Ctrl-Shift-g", DoFileSelectionEvent CyclePrevSetOp)
-    , ("Ctrl-u", DoFileSelectionEvent ClearSelection)
     ,
       ( "Ctrl-h"
       , anonymousEvent
           [ Model $ m & positioningModel .~ createPositioningModel
-          , Event . ToggleMainVisibility $ globalWidgetHideLabel
+          , Event $
+              ToggleVisibilityLabel
+                (TaggerLens visibilityModel)
+                globalWidgetHideLabel
           ]
       )
     ,
@@ -196,7 +213,10 @@ globalKeystrokes m =
           [ Model $
               m & positioningModel
                 %~ defaultSelectionAndQueryPositioningModel
-          , Event . ToggleMainVisibility $ selectionQueryHideLabel
+          , Event $
+              ToggleVisibilityLabel
+                (TaggerLens visibilityModel)
+                selectionQueryHideLabel
           ]
       )
     ,
@@ -205,7 +225,10 @@ globalKeystrokes m =
           [ Model $
               m & positioningModel
                 %~ defaultFileDetailAndDescriptorTreePositioningModel
-          , Event . ToggleMainVisibility $ fileDetailDescriptorTreeHide
+          , Event $
+              ToggleVisibilityLabel
+                (TaggerLens visibilityModel)
+                fileDetailDescriptorTreeHide
           ]
       )
     ]

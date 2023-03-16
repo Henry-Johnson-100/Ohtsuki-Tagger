@@ -1,22 +1,30 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# HLINT ignore "Use list comprehension" #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# HLINT ignore "Redundant if" #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# HLINT ignore "Use const" #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
+{-# HLINT ignore "Redundant multi-way if" #-}
+
 module Interface.Handler (
   taggerEventHandler,
 ) where
 
-import Control.Lens
+import Control.Lens ((%~), (&), (.~), (<|), (^.), (|>))
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import Data.Event
 import qualified Data.Foldable as F
+import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
 import Data.HierarchyMap (empty)
 import qualified Data.HierarchyMap as HAM
@@ -24,24 +32,20 @@ import qualified Data.IntMap.Strict as IntMap
 import Data.Maybe
 import Data.Model
 import Data.Model.Shared
-import qualified Data.OccurrenceHashMap as OHM
 import Data.Sequence (Seq ((:<|), (:|>)))
 import qualified Data.Sequence as Seq
-import Data.Tagger
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Version (showVersion)
 import Database.Tagger
 import Interface.Handler.Internal
 import Interface.Widget.Internal.Query (queryTextFieldKey)
 import Interface.Widget.Internal.Selection (fileSelectionScrollWidgetNodeKey)
 import Monomer
 import Paths_tagger
-import System.Directory (getCurrentDirectory)
 import System.FilePath
 import System.IO
-import Tagger.Info (taggerVersion)
-import Text.TaggerQL
+import Text.TaggerQL.Expression.Engine
+import Text.TaggerQL.Expression.Parser
 import Util
 
 taggerEventHandler ::
@@ -56,48 +60,51 @@ taggerEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
+      DoAddFileEvent e -> addFileEventHandler wenv node model e
       DoFocusedFileEvent e -> focusedFileEventHandler wenv node model e
       DoFileSelectionEvent e -> fileSelectionEventHandler wenv node model e
       DoDescriptorTreeEvent e -> descriptorTreeEventHandler wenv node model e
-      DoTaggerInfoEvent e -> taggerInfoEventHandler wenv node model e
+      DoQueryEvent e -> queryEventHandler wenv node model e
+      DoTagInputEvent e -> tagInputEventHandler wenv node model e
       TaggerInit ->
         [ Event (DoDescriptorTreeEvent DescriptorTreeInit)
-        , Task
-            ( DoTaggerInfoEvent . PutWorkingDirectory
-                <$> (T.pack <$> getCurrentDirectory)
-            )
-        , Task
-            ( DoTaggerInfoEvent . PutLastAccessed <$> do
-                la <- runMaybeT $ getLastAccessed conn
-                maybe (return "never") return la
-            )
-        , Task
-            ( DoTaggerInfoEvent . PutLastSaved <$> do
-                la <- runMaybeT $ getLastSaved conn
-                maybe (return "never") return la
-            )
-        , Model $
-            model & taggerInfoModel . Data.Model.version
-              .~ ( T.pack . showVersion $
-                    taggerVersion
-                 )
-              & taggerInfoModel . message
-              .~ "Thank you for using tagger!"
-              & taggerInfoModel . versionMessage
-              .~ mempty
         , SetFocusOnKey . WidgetKey $ queryTextFieldKey
         ]
       RefreshUI ->
-        [ Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
+        [ Event . DoDescriptorTreeEvent $ RefreshBothDescriptorTrees
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
-      ToggleMainVisibility t ->
-        [Model $ model & visibilityModel %~ (flip togglePaneVis . VisibilityLabel $ t)]
-      ToggleTagMode -> [Model $ model & isTagMode %~ not]
-      CloseConnection -> [Task (IOEvent <$> close conn)]
-      IOEvent _ -> []
+      CloseConnection -> [Task (Unit <$> close conn)]
+      Unit _ -> []
       AnonymousEvent (fmap (\(TaggerAnonymousEvent e) -> e) -> es) -> es
-      ClearTextField (TaggerLens l) -> [Model $ model & l .~ ""]
+      Mempty (TaggerLens l) -> [Model $ model & l .~ mempty]
+      NextHistory (TaggerLens l) ->
+        [ Model $
+            model
+              & l . text .~ (fromMaybe "" . getHist $ model ^. l . history)
+              & l . history %~ nextHist
+        ]
+      PrevHistory (TaggerLens l) ->
+        [ Model $
+            model
+              & l . text .~ (fromMaybe "" . getHist $ model ^. l . history)
+              & l . history %~ prevHist
+        ]
+      ToggleVisibilityLabel (TaggerLens l) t ->
+        [Model $ model & l %~ flip togglePaneVis (VisibilityLabel t)]
+      AppendText (TaggerLens l) t ->
+        [ let currentText = model ^. l
+           in Model $
+                model & l
+                  %~ flip
+                    (<>)
+                    ( ( if currentText == ""
+                          then ""
+                          else " "
+                      )
+                        <> t
+                    )
+        ]
 
 fileSelectionEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -111,34 +118,8 @@ fileSelectionEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
-      AddFiles ->
-        [ Task (IOEvent <$> addFiles conn (model ^. fileSelectionModel . addFileText))
-        , Model $
-            model & fileSelectionModel . addFileHistory
-              %~ putHist (T.strip $ model ^. fileSelectionModel . addFileText)
-        , Event (ClearTextField (TaggerLens (fileSelectionModel . addFileText)))
-        ]
-      AppendQueryText t ->
-        [ Model $
-            model
-              & fileSelectionModel
-                . queryText
-              %~ flip
-                T.append
-                ( ( if T.null (model ^. fileSelectionModel . queryText)
-                      then ""
-                      else " "
-                  )
-                    <> t
-                )
-        ]
-      ClearSelection ->
-        [ Model $
-            model & fileSelectionModel . selection .~ Seq.empty
-              & fileSelectionModel . tagOccurrences .~ OHM.empty
-              & fileSelectionModel . fileSelectionInfoMap .~ IntMap.empty
-              & fileSelectionModel . fileSelectionVis .~ VisibilityMain
-        ]
+      ClearTaggingSelection ->
+        [Model $ model & fileSelectionModel . taggingSelection .~ mempty]
       CycleNextFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []
@@ -147,7 +128,10 @@ fileSelectionEventHandler
             [ Event . DoFocusedFileEvent . PutFile $ f
             , Model $ model & fileSelectionModel . selection .~ (f <| (fs |> f'))
             ]
-      CycleNextSetOp -> [Model $ model & fileSelectionModel . setOp %~ next]
+      CycleOrderCriteria ->
+        [Model $ model & fileSelectionTagListModel . ordering %~ cycleOrderCriteria]
+      CycleOrderDirection ->
+        [Model $ model & fileSelectionTagListModel . ordering %~ cycleOrderDir]
       CyclePrevFile ->
         case model ^. fileSelectionModel . selection of
           Seq.Empty -> []
@@ -156,22 +140,19 @@ fileSelectionEventHandler
             [ Event . DoFocusedFileEvent . PutFile $ f
             , Model $ model & fileSelectionModel . selection .~ (f <| (f' <| fs))
             ]
-      CyclePrevSetOp -> [Model $ model & fileSelectionModel . setOp %~ prev]
-      CycleTagOrderCriteria ->
-        [ Model $
-            model & fileSelectionModel . tagOrdering
-              %~ cycleOrderCriteria
-        ]
-      CycleTagOrderDirection ->
-        [ Model $
-            model & fileSelectionModel . tagOrdering
-              %~ cycleOrderDir
-        ]
       DeleteFileFromFileSystem fk ->
-        [ Task (IOEvent <$> rmFile conn fk)
+        [ Task (Unit <$> rmFile conn fk)
         , Event . DoFileSelectionEvent . RemoveFileFromSelection $ fk
         ]
       DoFileSelectionWidgetEvent e -> fileSelectionWidgetEventHandler wenv node model e
+      IncludeTagListInfraToPattern t -> anonymousTask $ do
+        !infraDs <-
+          fmap (HS.fromList . map descriptorId . concat)
+            . mapM (flip getAllInfra conn . descriptorId)
+            <=< flip queryForDescriptorByPattern conn
+            $ t
+        callback
+          [Model $! model & fileSelectionTagListModel . include .~ infraDs]
       MakeFileSelectionInfoMap fseq ->
         [ let fiTuple (File fk fp) = (fromIntegral fk, constructFileInfo fp)
               m = F.toList $ fiTuple <$> fseq
@@ -181,38 +162,6 @@ fileSelectionEventHandler
                     . fileSelectionInfoMap
                   .~ IntMap.fromList m
         ]
-      NextAddFileHist ->
-        [ Model $
-            model
-              & fileSelectionModel . addFileText
-                .~ ( fromMaybe "" . getHist $
-                      (model ^. fileSelectionModel . addFileHistory)
-                   )
-              & fileSelectionModel . addFileHistory %~ nextHist
-        ]
-      NextQueryHist ->
-        [ Model $
-            model
-              & fileSelectionModel . queryText
-                .~ (fromMaybe "" . getHist $ (model ^. fileSelectionModel . queryHistory))
-              & fileSelectionModel . queryHistory %~ nextHist
-        ]
-      PrevAddFileHist ->
-        [ Model $
-            model
-              & fileSelectionModel . addFileText
-                .~ ( fromMaybe "" . getHist $
-                      (model ^. fileSelectionModel . addFileHistory)
-                   )
-              & fileSelectionModel . addFileHistory %~ prevHist
-        ]
-      PrevQueryHist ->
-        [ Model $
-            model
-              & fileSelectionModel . queryText
-                .~ (fromMaybe "" . getHist $ (model ^. fileSelectionModel . queryHistory))
-              & fileSelectionModel . queryHistory %~ prevHist
-        ]
       PutChunkSequence ->
         [ Model $
             model & fileSelectionModel . chunkSequence
@@ -221,22 +170,6 @@ fileSelectionEventHandler
                 .. selectionChunkLength model
                 ]
         ]
-      PutFiles fs ->
-        let currentSet =
-              HS.fromList
-                . F.toList
-                $ model ^. fileSelectionModel . selection
-            combFun =
-              case model ^. fileSelectionModel . setOp of
-                Union -> HS.union
-                Intersect -> HS.intersection
-                Difference -> HS.difference
-            newSeq =
-              Seq.fromList
-                . HS.toList
-                . combFun currentSet
-                $ fs
-         in [Event . DoFileSelectionEvent . PutFilesNoCombine $ newSeq]
       PutFilesNoCombine
         ( uncurry (Seq.><)
             . (\(x, y) -> (y, x))
@@ -264,33 +197,14 @@ fileSelectionEventHandler
                   Seq.Empty -> []
                   (f :<| _) -> [Event . DoFocusedFileEvent . PutFile $ f]
                )
-      PutTagOccurrenceHashMap_ m ->
-        [ Model $
-            model
-              & fileSelectionModel . tagOccurrences .~ m
-        ]
-      Query ->
-        [ Task
-            ( DoFileSelectionEvent
-                . PutFiles
-                <$> taggerQL
-                  (TaggerQLQuery . T.strip $ model ^. fileSelectionModel . queryText)
-                  conn
-            )
-        , Model $
-            model & fileSelectionModel . queryHistory
-              %~ putHist (T.strip $ model ^. fileSelectionModel . queryText)
-        , Event (ClearTextField (TaggerLens (fileSelectionModel . queryText)))
-        , Event (DoFileSelectionEvent ResetQueryHistIndex)
-        ]
+      PutTagOccurrenceHashMap_ ohm ->
+        [Model $ model & fileSelectionTagListModel . occurrences .~ ohm]
       RefreshSpecificFile fk ->
         [ Task
-            ( do
-                f <- runMaybeT $ queryForSingleFileByFileId fk conn
-                maybe
-                  (return . IOEvent $ ())
-                  (return . DoFileSelectionEvent . RefreshSpecificFile_)
-                  f
+            ( maybe
+                (Unit ())
+                (DoFileSelectionEvent . RefreshSpecificFile_)
+                <$> queryForSingleFileByFileId fk conn
             )
         ]
       RefreshSpecificFile_ f@(File fk fp) ->
@@ -318,15 +232,11 @@ fileSelectionEventHandler
         , Event . DoFileSelectionEvent $ PutChunkSequence
         ]
       RefreshTagOccurrences ->
-        [ Task
-            ( DoFileSelectionEvent . PutTagOccurrenceHashMap_
-                <$> getTagOccurrencesByFileKey
-                  (map fileId . F.toList $ model ^. fileSelectionModel . selection)
-                  conn
-            )
+        [ Event . DoFileSelectionEvent . RefreshTagOccurrencesWith . fmap fileId $
+            model ^. fileSelectionModel . selection
         ]
       RemoveFileFromDatabase fk ->
-        [ Task (IOEvent <$> deleteFiles [fk] conn)
+        [ Task (Unit <$> deleteFiles [fk] conn)
         , Event . DoFileSelectionEvent . RemoveFileFromSelection $ fk
         ]
       RemoveFileFromSelection fk ->
@@ -351,30 +261,20 @@ fileSelectionEventHandler
            in Task
                 ( do
                     -- refetch the fk from the db,
-                    -- to put the calculation in the MaybeT monad
-                    result <- runMaybeT $ do
-                      lift $ mvFile conn fk newRenameText
+                    -- to put the calculation in the Maybe monad
+                    result <- do
+                      mvFile conn fk newRenameText
                       queryForSingleFileByFileId fk conn
                     maybe
-                      (return $ IOEvent ())
+                      (return $ Unit ())
                       (return . DoFileSelectionEvent . RefreshSpecificFile_)
                       result
                 )
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
-      ResetAddFileHistIndex ->
-        [ Model $
-            model
-              & fileSelectionModel . addFileHistory . historyIndex .~ 0
-        ]
-      ResetQueryHistIndex ->
-        [ Model $
-            model
-              & fileSelectionModel . queryHistory . historyIndex .~ 0
-        ]
       RunSelectionShellCommand ->
         [ Task
-            ( IOEvent
+            ( Unit
                 <$> runShellCmd
                   (T.strip $ model ^. shellText)
                   ( F.toList
@@ -388,7 +288,20 @@ fileSelectionEventHandler
       RefreshTagOccurrencesWith fks ->
         [ Task
             ( DoFileSelectionEvent . PutTagOccurrenceHashMap_
-                <$> getTagOccurrencesByFileKey fks conn
+                <$> foldM
+                  ( \acc fk ->
+                      HM.unionWith (+) acc
+                        . F.foldl'
+                          ( \acc' d ->
+                              if not (HM.member d acc')
+                                then HM.insert d 1 acc'
+                                else acc'
+                          )
+                          HM.empty
+                        <$> queryForDescriptorByFileId fk conn
+                  )
+                  HM.empty
+                  fks
             )
         ]
       ShuffleSelection ->
@@ -397,10 +310,15 @@ fileSelectionEventHandler
                 <$> shuffleSequence (model ^. fileSelectionModel . selection)
             )
         ]
-      TogglePaneVisibility t ->
+      TagSelect fk ->
         [ Model $
-            model & fileSelectionModel . fileSelectionVis
-              %~ flip togglePaneVis (VisibilityLabel t)
+            model & fileSelectionModel . taggingSelection
+              %~ \hs -> if HS.member fk hs then HS.delete fk hs else HS.insert fk hs
+        ]
+      TagSelectWholeChunk ->
+        [ Model $
+            model & fileSelectionModel . taggingSelection %~ \hs ->
+              F.foldl (\hs' f -> HS.insert (fileId f) hs') hs (getSelectionChunk model)
         ]
       ToggleSelectionView ->
         [ Model $
@@ -409,6 +327,80 @@ fileSelectionEventHandler
                 . fileSelectionVis
               %~ toggleAltVis
         ]
+
+addFileEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  AddFileEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+addFileEventHandler _wenv _wnode model@((^. connection) -> conn) e =
+  case e of
+    AddFiles ->
+      let !currentAddFileText =
+            model
+              ^. fileSelectionModel
+                . addFileModel
+                . input
+                . text
+       in [ Model $
+              model & fileSelectionModel . addFileModel . inProgress .~ True
+                & fileSelectionModel . addFileModel . input . history
+                  %~ putHist (T.strip currentAddFileText)
+          , Task $
+              DoAddFileEvent AddFileDone
+                <$ addFiles conn currentAddFileText
+          ]
+    AddFileDone ->
+      [Model $ model & fileSelectionModel . addFileModel . inProgress .~ False]
+    AddFilePath fp ->
+      [ Model $ model & fileSelectionModel . addFileModel . inProgress .~ True
+      , Task $ DoAddFileEvent AddFileDone <$ addFiles conn (T.pack fp)
+      ]
+    PutDirectoryList fs ->
+      [Model $ model & fileSelectionModel . addFileModel . directoryList .~ fs]
+    ScanDirectories ->
+      [Task $ DoAddFileEvent . PutDirectoryList <$> getDirectories conn]
+    ToggleAddFileVisibility ->
+      let !currentVis = model ^. fileSelectionModel . addFileModel . visibility
+       in [ -- Scan directories if the new visibility is showing the directory list
+            if hasVis VisibilityMain currentVis
+              then Event . DoAddFileEvent $ ScanDirectories
+              else Event (Unit ())
+          , Model $ model & fileSelectionModel . addFileModel . visibility %~ toggleAltVis
+          ]
+
+queryEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  QueryEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+queryEventHandler _wenv _node model@((^. connection) -> conn) event =
+  case event of
+    RunQuery ->
+      let !rawQuery = T.strip $ model ^. fileSelectionModel . queryModel . input . text
+       in [ either (const (Event . Unit $ ())) runQueryExpressionTask
+              . parseQueryExpression
+              $ rawQuery
+          , Model $
+              model
+                & fileSelectionModel
+                  . queryModel
+                  . input
+                  . history
+                  %~ putHist rawQuery
+          ]
+ where
+  runQueryExpressionTask =
+    Task
+      . fmap
+        ( DoFileSelectionEvent
+            . PutFilesNoCombine
+            . Seq.sortBy (\x y -> filePath x `compare` filePath y)
+            . HS.foldl' (Seq.|>) Seq.empty
+        )
+      . yuiQLFileQueryExpression conn
 
 fileSelectionWidgetEventHandler ::
   WidgetEnv TaggerModel TaggerEvent ->
@@ -464,43 +456,8 @@ focusedFileEventHandler
   model@(_taggermodelConnection -> conn)
   event =
     case event of
-      AppendTagText t ->
-        [ Model $
-            model
-              & focusedFileModel
-                . tagText
-              %~ flip
-                T.append
-                ( ( if T.null (model ^. focusedFileModel . tagText)
-                      then ""
-                      else " "
-                  )
-                    <> t
-                )
-        ]
-      CommitTagText ->
-        anonymousTask $ do
-          taggerQLTag
-            ( fileId . concreteTaggedFile $
-                model ^. focusedFileModel . focusedFile
-            )
-            ( TaggerQLTagStmnt . T.strip $
-                model ^. focusedFileModel . tagText
-            )
-            conn
-          callback
-            [ Model $
-                model
-                  & focusedFileModel . tagHistory
-                    %~ putHist
-                      (T.strip $ model ^. focusedFileModel . tagText)
-            , Event
-                . ClearTextField
-                $ TaggerLens (focusedFileModel . tagText)
-            , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
-            ]
       DeleteTag t ->
-        [ Task (IOEvent <$> deleteTags [t] conn)
+        [ Task (Unit <$> deleteTags [t] conn)
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
       MoveTag
@@ -510,9 +467,9 @@ focusedFileEventHandler
                 concreteTaggedFile $
                   model
                     ^. focusedFileModel . focusedFile
-           in anonymousTask $ do
-                moveTagTask fk
-                callback [Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection]
+           in [ Task $
+                  DoFocusedFileEvent RefreshFocusedFileAndSelection <$ moveTagTask fk
+              ]
          where
           moveTagTask :: RecordKey File -> IO ()
           moveTagTask fk = do
@@ -565,21 +522,7 @@ focusedFileEventHandler
                 lift $ moveSubTags ((oldTagKey,) <$> newTags) conn
                 lift $ deleteTags [oldTagKey] conn
             either (hPutStrLn stderr) return result
-      NextTagHist ->
-        [ Model $
-            model
-              & focusedFileModel . tagText
-                .~ (fromMaybe "" . getHist $ (model ^. focusedFileModel . tagHistory))
-              & focusedFileModel . tagHistory %~ nextHist
-        ]
-      PrevTagHist ->
-        [ Model $
-            model
-              & focusedFileModel . tagText
-                .~ (fromMaybe "" . getHist $ (model ^. focusedFileModel . tagHistory))
-              & focusedFileModel . tagHistory %~ prevHist
-        ]
-      PutConcreteFile_ cf@(ConcreteTaggedFile (File _ fp) _) ->
+      PutConcreteFile cf@(ConcreteTaggedFile (File _ fp) _) ->
         [ Model $
             model
               & focusedFileModel . focusedFile .~ cf
@@ -590,7 +533,7 @@ focusedFileEventHandler
             ( do
                 cft <- runMaybeT $ queryForConcreteTaggedFileWithFileId fk conn
                 maybe
-                  ( DoFocusedFileEvent . PutConcreteFile_ <$> do
+                  ( DoFocusedFileEvent . PutConcreteFile <$> do
                       defaultFile <- T.pack <$> getDataFileName focusedFileDefaultDataFile
                       return $
                         ConcreteTaggedFile
@@ -600,7 +543,7 @@ focusedFileEventHandler
                           )
                           empty
                   )
-                  (return . DoFocusedFileEvent . PutConcreteFile_)
+                  (return . DoFocusedFileEvent . PutConcreteFile)
                   cft
             )
         ]
@@ -612,14 +555,9 @@ focusedFileEventHandler
             $ model ^. focusedFileModel . focusedFile
         , Event . DoFileSelectionEvent $ RefreshFileSelection
         ]
-      ResetTagHistIndex ->
-        [ Model $
-            model
-              & focusedFileModel . tagHistory . historyIndex .~ 0
-        ]
       RunFocusedFileShellCommand ->
         [ Task
-            ( IOEvent
+            ( Unit
                 <$> runShellCmd
                   (T.strip $ model ^. shellText)
                   [ T.unpack . filePath . concreteTaggedFile $
@@ -639,22 +577,59 @@ focusedFileEventHandler
                 model
                   ^. focusedFileModel . focusedFile
          in [ Task
-                ( IOEvent
+                ( Unit
                     <$> if or [fk == focusedFileDefaultRecordKey]
                       then hPutStrLn stderr "Cannot tag the default file."
                       else void $ insertTags [(fk, dk, mtk)] conn
                 )
             , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
             ]
-      ToggleFocusedFilePaneVisibility t ->
-        [ Model $
-            model & focusedFileModel . focusedFileVis
-              %~ flip togglePaneVis (VisibilityLabel t)
-        ]
       UnSubTag tk ->
-        [ Task (IOEvent <$> unSubTags [tk] conn)
+        [ Task (Unit <$> unSubTags [tk] conn)
         , Event . DoFocusedFileEvent $ RefreshFocusedFileAndSelection
         ]
+
+tagInputEventHandler ::
+  WidgetEnv TaggerModel TaggerEvent ->
+  WidgetNode TaggerModel TaggerEvent ->
+  TaggerModel ->
+  TagInputEvent ->
+  [AppEventResponse TaggerModel TaggerEvent]
+tagInputEventHandler _wenv _wnode model@((^. connection) -> conn) e =
+  case e of
+    RunTagExpression ->
+      let !rawTagText = T.strip $ model ^. tagInputModel . input . text
+          focusedFileFK =
+            fileId
+              . concreteTaggedFile
+              $ model ^. focusedFileModel . focusedFile
+          !fks =
+            if model ^. tagInputModel . isTagSelection
+              then
+                focusedFileFK :
+                HS.toList (model ^. fileSelectionModel . taggingSelection)
+              else [focusedFileFK]
+       in ( if model ^. tagInputModel . isTagDelete
+              then
+                [ Task $
+                    DoFocusedFileEvent RefreshFocusedFileAndSelection
+                      <$ yuiQLDeleteTags conn fks rawTagText
+                ]
+              else
+                [ Task $
+                    DoFocusedFileEvent RefreshFocusedFileAndSelection
+                      <$ mapM (\fk -> yuiQLTagFile fk conn rawTagText) fks
+                ]
+          )
+            ++ [ Model $
+                  model & tagInputModel . input . history %~ putHist rawTagText
+                    & tagInputModel . input . text .~ mempty
+               ]
+    ToggleTagInputOptionPane ->
+      [ Model $
+          model & tagInputModel . visibility
+            %~ flip togglePaneVis (VisibilityLabel tagInputOptionPaneLabel)
+      ]
 
 {- |
  Performs some IO then executes the returned 'AppEventResponse`s
@@ -695,13 +670,13 @@ descriptorTreeEventHandler
     case event of
       CreateRelation (Descriptor mk _) (Descriptor ik _) ->
         [ Task
-            ( IOEvent <$> do
+            ( Unit <$> do
                 insertDescriptorRelation mk ik conn
             )
         , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
         ]
       DeleteDescriptor (Descriptor dk _) ->
-        [ Task (IOEvent <$> deleteDescriptors [dk] conn)
+        [ Task (Unit <$> deleteDescriptors [dk] conn)
         , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
         ]
       DescriptorTreeInit ->
@@ -717,17 +692,15 @@ descriptorTreeEventHandler
             )
         ]
       InsertDescriptor ->
-        [ Task
-            ( IOEvent <$> do
-                let newDesText =
-                      T.words
-                        . T.strip
-                        $ model ^. descriptorTreeModel . newDescriptorText
-                unless (null newDesText) (insertDescriptors newDesText conn)
-            )
-        , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
-        , Event . ClearTextField $ TaggerLens (descriptorTreeModel . newDescriptorText)
-        ]
+        let !newDesText =
+              T.strip $
+                model ^. descriptorTreeModel . newDescriptorText
+         in [ Task
+                ( DoDescriptorTreeEvent RefreshBothDescriptorTrees
+                    <$ yuiQLCreateDescriptors conn newDesText
+                )
+            , Model $ model & descriptorTreeModel . newDescriptorText .~ mempty
+            ]
       PutFocusedTree_ nodeName ds desInfoMap ->
         [ Model $
             model
@@ -791,15 +764,10 @@ descriptorTreeEventHandler
                       (descriptorId $ model ^. descriptorTreeModel . focusedNode)
                       conn
                 maybe
-                  (pure (IOEvent ()))
+                  (pure (Unit ()))
                   (pure . DoDescriptorTreeEvent . RequestFocusedNode . descriptor)
                   pd
             )
-        ]
-      ToggleDescriptorTreeVisibility l ->
-        [ Model $
-            model & descriptorTreeModel . descriptorTreeVis
-              %~ flip togglePaneVis (VisibilityLabel l)
         ]
       UpdateDescriptor rkd@(RecordKey (fromIntegral -> dk)) ->
         let updateText =
@@ -813,23 +781,11 @@ descriptorTreeEventHandler
               then []
               else
                 [ Task
-                    ( IOEvent
+                    ( Unit
                         <$> updateDescriptors [(updateText, rkd)] conn
                     )
                 , Event (DoDescriptorTreeEvent RefreshBothDescriptorTrees)
                 ]
-
-taggerInfoEventHandler ::
-  WidgetEnv TaggerModel TaggerEvent ->
-  WidgetNode TaggerModel TaggerEvent ->
-  TaggerModel ->
-  TaggerInfoEvent ->
-  [AppEventResponse TaggerModel TaggerEvent]
-taggerInfoEventHandler _ _ model e =
-  case e of
-    PutLastAccessed t -> [Model $ model & taggerInfoModel . lastAccessed .~ t]
-    PutLastSaved t -> [Model $ model & taggerInfoModel . lastSaved .~ t]
-    PutWorkingDirectory t -> [Model $ model & taggerInfoModel . workingDirectory .~ t]
 
 toDescriptorInfo :: TaggedConnection -> Descriptor -> IO (IntMap.IntMap DescriptorInfo)
 toDescriptorInfo tc (Descriptor dk p) = do

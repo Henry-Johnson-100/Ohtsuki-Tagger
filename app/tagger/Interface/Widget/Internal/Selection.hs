@@ -1,7 +1,7 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# HLINT ignore "Use ||" #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Interface.Widget.Internal.Selection (
@@ -11,33 +11,42 @@ module Interface.Widget.Internal.Selection (
 
 import Control.Lens ((&), (.~), (^.))
 import Data.Event (
+  AddFileEvent (AddFilePath, AddFiles, ToggleAddFileVisibility),
   FileSelectionEvent (
-    AddFiles,
-    ClearSelection,
-    CycleTagOrderCriteria,
-    CycleTagOrderDirection,
+    CycleOrderCriteria,
+    CycleOrderDirection,
     DeleteFileFromFileSystem,
     DoFileSelectionWidgetEvent,
-    NextAddFileHist,
-    PrevAddFileHist,
+    IncludeTagListInfraToPattern,
     RefreshFileSelection,
     RemoveFileFromDatabase,
     RemoveFileFromSelection,
     RenameFile,
-    ResetAddFileHistIndex,
     RunSelectionShellCommand,
     ShuffleSelection,
-    TogglePaneVisibility,
+    TagSelect,
+    TagSelectWholeChunk,
     ToggleSelectionView
   ),
   FileSelectionWidgetEvent (CycleNextChunk, CyclePrevChunk),
   FocusedFileEvent (RunFocusedFileShellCommand),
-  TaggerEvent (DoFileSelectionEvent, DoFocusedFileEvent, IOEvent),
+  TaggerEvent (
+    DoAddFileEvent,
+    DoFileSelectionEvent,
+    DoFocusedFileEvent,
+    Mempty,
+    NextHistory,
+    PrevHistory,
+    ToggleVisibilityLabel,
+    Unit
+  ),
+  anonymousEvent,
  )
+import qualified Data.HashMap.Strict as HM
+import qualified Data.HashSet as HS
 import qualified Data.List as L
 import Data.Model.Core (TaggerModel, getSelectionChunk)
 import Data.Model.Lens (
-  HasAddFileText (addFileText),
   HasChunkSequence (chunkSequence),
   HasChunkSize (chunkSize),
   HasCurrentChunk (currentChunk),
@@ -47,37 +56,53 @@ import Data.Model.Lens (
   HasFileSelectionModel (fileSelectionModel),
   HasFileSelectionVis (fileSelectionVis),
   HasIsMassOpMode (isMassOpMode),
+  HasOccurrences (occurrences),
+  HasOrdering (ordering),
   HasSelection (selection),
-  HasSetOp (setOp),
   HasShellText (shellText),
-  HasTagOccurrences (tagOccurrences),
-  HasTagOrdering (tagOrdering),
+  TaggerLens (TaggerLens),
+  addFileModel,
+  directoryList,
   fileInfoAt,
+  fileSelectionTagListModel,
+  inProgress,
+  include,
+  input,
+  isTagSelection,
+  tagInputModel,
+  taggingSelection,
+  visibility,
  )
 import Data.Model.Shared.Core (
   OrderBy (OrderBy),
   OrderCriteria (Alphabetic, Numeric),
   OrderDirection (Asc, Desc),
-  Visibility (VisibilityAlt, VisibilityLabel),
+  Visibility (VisibilityAlt, VisibilityLabel, VisibilityMain),
   hasVis,
  )
-import qualified Data.OccurrenceHashMap as OHM
+import Data.Model.Shared.Lens (
+  HasHistory (history),
+  HasHistoryIndex (historyIndex),
+  HasText (text),
+ )
 import qualified Data.Ord as O
 import Data.Sequence ((|>))
 import qualified Data.Sequence as Seq
-import Data.Tagger (SetOp (Difference, Intersect, Union))
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger (Descriptor (descriptor), File (File))
-import Interface.Theme (yuiLightPeach, yuiRed)
+import Database.Tagger (Descriptor (descriptor), File (File), descriptorId)
+import Interface.Theme (yuiBlack, yuiLightPeach, yuiOrange, yuiRed, yuiWhite)
 import Interface.Widget.Internal.Core (
+  defaultElementOpacity,
+  defaultOpacityModulator,
+  modulateOpacity,
   styledButton_,
+  styledToggleButton_,
   withNodeKey,
   withNodeVisible,
   withStyleBasic,
   withStyleHover,
  )
-import Interface.Widget.Internal.Type (TaggerWidget)
 import Monomer (
   CmbAlignBottom (alignBottom),
   CmbAlignCenter (alignCenter),
@@ -100,10 +125,10 @@ import Monomer (
   CmbTextLeft (textLeft),
   CmbTextRight (textRight),
   CmbWheelRate (wheelRate),
-  black,
+  EventResponse (..),
+  WidgetNode,
   box_,
   draggable,
-  dropdown,
   hgrid_,
   hstack,
   hstack_,
@@ -112,19 +137,23 @@ import Monomer (
   label,
   label_,
   numericField_,
+  onlyTopActive,
   separatorLine,
+  styleIf,
+  textFieldV,
   textField_,
   toggleButton_,
   tooltipDelay,
   tooltip_,
   vscroll_,
   vstack_,
-  white,
   zstack,
   zstack_,
  )
 import Monomer.Core.Lens (fixed)
 import Util (both)
+
+type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
 widget :: TaggerModel -> TaggerWidget
 widget m =
@@ -134,7 +163,10 @@ widget m =
     , zstack_
         []
         [ withNodeVisible (not selectionIsVisible) $ tagListWidget m
-        , withNodeVisible selectionIsVisible $ fileSelectionFileList m
+        , withNodeVisible selectionIsVisible . vstack_ [] $
+            [ fileSelectionFileList m
+            , addFilesWidget m
+            ]
         ]
     ]
  where
@@ -144,23 +176,7 @@ widget m =
     hstack_
       []
       [ selectionSizeLabel m
-      , setOpDrowpdown
       ]
-
-setOpDrowpdown :: TaggerWidget
-setOpDrowpdown =
-  dropdown
-    (fileSelectionModel . setOp)
-    [Union, Intersect, Difference]
-    (flip label_ [resizeFactor (-1)] . T.pack . show)
-    (flip label_ [resizeFactor (-1)] . T.pack . show)
-
-clearSelectionButton :: TaggerWidget
-clearSelectionButton =
-  styledButton_
-    [resizeFactor (-1)]
-    "Clear"
-    (DoFileSelectionEvent ClearSelection)
 
 selectionSizeLabel :: TaggerModel -> TaggerWidget
 selectionSizeLabel ((^. fileSelectionModel . selection) -> selSeq) =
@@ -184,31 +200,44 @@ tagListWidget m =
           , alignCenter
           , mergeRequired
               ( \_ m1 m2 ->
-                  let neq l = m1 ^. fileSelectionModel . l /= m2 ^. fileSelectionModel . l
-                   in or [neq tagOccurrences, neq tagOrdering]
+                  let neq l =
+                        m1 ^. fileSelectionTagListModel . l
+                          /= m2 ^. fileSelectionTagListModel . l
+                   in or [neq occurrences, neq ordering, neq include]
               )
           ]
-        $ vstack_ [] (tagListLeaf <$> sortedOccurrenceMapList)
+        $ vstack_
+          []
+          ( let includeSet = m ^. fileSelectionTagListModel . include
+             in if HS.null includeSet
+                  then map tagListLeaf sortedOccurrenceMapList
+                  else
+                    [ tagListLeaf x
+                    | x <-
+                        sortedOccurrenceMapList
+                    , HS.member (descriptorId . fst $ x) includeSet
+                    ]
+          )
     ]
  where
   tagListHeader =
     hstack_
       []
       [ toggleViewSelectionButton
-      , clearSelectionButton
       , tagListOrderCritCycleButton
       , tagListOrderDirCycleButton
+      , tagListFilterTextField
       ]
   sortedOccurrenceMapList =
-    let (OrderBy ordCrit ordDir) = m ^. fileSelectionModel . tagOrdering
-        !occurrenceMapList = OHM.toList $ m ^. fileSelectionModel . tagOccurrences
+    let (OrderBy ordCrit ordDir) = m ^. fileSelectionTagListModel . ordering
+        occurrenceMapList = HM.toList $ m ^. fileSelectionTagListModel . occurrences
      in case (ordCrit, ordDir) of
           (Alphabetic, Asc) -> L.sortOn (descriptor . fst) occurrenceMapList
           (Alphabetic, Desc) -> L.sortOn (O.Down . descriptor . fst) occurrenceMapList
           (Numeric, Asc) -> L.sortOn snd occurrenceMapList
           (Numeric, Desc) -> L.sortOn (O.Down . snd) occurrenceMapList
   tagListOrderCritCycleButton =
-    let (OrderBy ordCrit _) = m ^. fileSelectionModel . tagOrdering
+    let (OrderBy ordCrit _) = m ^. fileSelectionTagListModel . ordering
         btnText =
           case ordCrit of
             Alphabetic -> "ABC"
@@ -216,13 +245,13 @@ tagListWidget m =
      in styledButton_
           [resizeFactor (-1)]
           btnText
-          (DoFileSelectionEvent CycleTagOrderCriteria)
+          (DoFileSelectionEvent CycleOrderCriteria)
   tagListOrderDirCycleButton =
-    let (OrderBy _ ordDir) = m ^. fileSelectionModel . tagOrdering
+    let (OrderBy _ ordDir) = m ^. fileSelectionTagListModel . ordering
      in styledButton_
           [resizeFactor (-1)]
           (T.pack . show $ ordDir)
-          (DoFileSelectionEvent CycleTagOrderDirection)
+          (DoFileSelectionEvent CycleOrderDirection)
   tagListLeaf (d, n) =
     hgrid_
       [childSpacing_ 0]
@@ -230,7 +259,7 @@ tagListWidget m =
           . flip label_ []
           . descriptor
           $ d
-      , withStyleBasic [paddingL 1.5, borderL 1 black] . label . T.pack . show $ n
+      , withStyleBasic [paddingL 1.5, borderL 1 yuiBlack] . label . T.pack . show $ n
       ]
 
 toggleViewSelectionButton :: TaggerWidget
@@ -260,7 +289,7 @@ fileSelectionFileList m =
         [ wheelRate 50
         ]
       . vstack_ []
-      . flip (|>) (hstack [toggleFileEditMode, addFilesWidget])
+      . flip (|>) toggleFileEditMode
       $ ( fmap fileSelectionLeaf renderedChunks
             Seq.>< Seq.fromList fileListPaginationWidgets
         )
@@ -295,6 +324,11 @@ fileSelectionFileList m =
                     . DoFileSelectionWidgetEvent
                     $ CycleNextChunk
                 )
+            , withNodeVisible (m ^. tagInputModel . isTagSelection) $
+                styledButton_
+                  [resizeFactor (-1)]
+                  "Select"
+                  (DoFileSelectionEvent TagSelectWholeChunk)
             ]
       ]
     fileListMergeRequirement =
@@ -308,7 +342,11 @@ fileSelectionFileList m =
                   , neq chunkSequence
                   , neq chunkSize
                   , neq fileSelectionVis
+                  , neq taggingSelection
                   ]
+                  || ( (m1 ^. tagInputModel . isTagSelection)
+                        /= (m2 ^. tagInputModel . isTagSelection)
+                     )
         )
   renderedChunks =
     getSelectionChunk m
@@ -317,7 +355,6 @@ fileSelectionFileList m =
     hstack_
       []
       [ toggleViewSelectionButton
-      , clearSelectionButton
       , shuffleSelectionButton
       , refreshFileSelectionButton
       , fileSelectionChunkSizeNumField
@@ -332,8 +369,29 @@ fileSelectionFileList m =
           ( not isEditMode
           )
           . draggable f
-          . withStyleBasic [textLeft]
-          $ label_ fp [resizeFactor (-1)]
+          . withStyleBasic
+            [ textLeft
+            , styleIf
+                ( (m ^. tagInputModel . isTagSelection)
+                    && HS.member fk (m ^. fileSelectionModel . taggingSelection)
+                )
+                ( bgColor
+                    . modulateOpacity defaultElementOpacity
+                    $ yuiOrange
+                )
+            ]
+          $ hstack
+            [ withNodeVisible (m ^. tagInputModel . isTagSelection)
+                . withStyleBasic [border 1 yuiBlack]
+                $ styledButton_
+                  [resizeFactor (-1)]
+                  ( if HS.member fk (m ^. fileSelectionModel . taggingSelection)
+                      then "X"
+                      else " "
+                  )
+                  (DoFileSelectionEvent $ TagSelect fk)
+            , label_ fp [resizeFactor (-1)]
+            ]
       , withNodeVisible isEditMode editModeWidget
       ]
    where
@@ -353,8 +411,8 @@ fileSelectionFileList m =
               . tooltip_
                 "Deletes the file from the database and file system."
                 [tooltipDelay 500]
-              . withStyleHover [textColor white, bgColor yuiRed, border 1 black]
-              . withStyleBasic [textColor yuiRed, bgColor yuiLightPeach, border 1 black]
+              . withStyleHover [textColor yuiWhite, bgColor yuiRed, border 1 yuiBlack]
+              . withStyleBasic [textColor yuiRed, bgColor yuiLightPeach, border 1 yuiBlack]
               $ styledButton_
                 [resizeFactor (-1)]
                 "Confirm"
@@ -364,8 +422,8 @@ fileSelectionFileList m =
               . tooltip_
                 "Deletes the file from the database and file system."
                 [tooltipDelay 500]
-              . withStyleHover [textColor white, bgColor yuiRed, border 1 black]
-              . withStyleBasic [textColor yuiRed, bgColor yuiLightPeach, border 1 black]
+              . withStyleHover [textColor yuiWhite, bgColor yuiRed, border 1 yuiBlack]
+              . withStyleBasic [textColor yuiRed, bgColor yuiLightPeach, border 1 yuiBlack]
               $ toggleButton_
                 "Delete"
                 ( fileSelectionModel
@@ -413,10 +471,15 @@ fileSelectionFileList m =
         `hasVis` VisibilityLabel editFileMode
 
 shellCommandWidget :: TaggerModel -> TaggerWidget
-shellCommandWidget ((^. isMassOpMode) -> isMassOpModeIsTrue) =
+shellCommandWidget ((^. fileSelectionModel . isMassOpMode) -> isMassOpModeIsTrue) =
   box_ [sizeReqUpdater (both (& fixed .~ 0))] $
     hstack
-      [ toggleButton_ "MassOp" isMassOpMode []
+      [ withStyleBasic [bgColor yuiLightPeach]
+          . tooltip_
+            "If toggled, \
+            \uses the entire selection as arguments to the given shell command."
+            [tooltipDelay 1000]
+          $ styledToggleButton_ [] "MassOp" (fileSelectionModel . isMassOpMode)
       , keystroke_
           [
             ( "Enter"
@@ -426,14 +489,47 @@ shellCommandWidget ((^. isMassOpMode) -> isMassOpModeIsTrue) =
             )
           ]
           [ignoreChildrenEvts]
-          . withStyleBasic [minWidth 80]
+          . withStyleBasic [bgColor yuiLightPeach]
+          . tooltip_
+            "Run a shell command with the file(s) as arguments."
+            [tooltipDelay 1000]
+          . withStyleBasic
+            [ minWidth 80
+            , bgColor
+                . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+                $ yuiLightPeach
+            ]
           $ textField_ shellText []
       ]
 
+tagListFilterTextField :: TaggerWidget
+tagListFilterTextField =
+  box_ [mergeRequired (\_ _ _ -> False)]
+    . withStyleBasic [bgColor yuiLightPeach]
+    . tooltip_
+      "Filter the list of tag occurrences by a MetaDescriptor pattern"
+      [tooltipDelay 1000]
+    . withStyleBasic
+      [ bgColor
+          . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+          $ yuiLightPeach
+      ]
+    $ textFieldV
+      mempty
+      ( \t ->
+          anonymousEvent
+            [Event . DoFileSelectionEvent . IncludeTagListInfraToPattern $ t]
+      )
+
 fileSelectionChunkSizeNumField :: TaggerWidget
 fileSelectionChunkSizeNumField =
-  withStyleBasic [maxWidth 80] $
-    numericField_ (fileSelectionModel . chunkSize) [minValue 0]
+  withStyleBasic
+    [ maxWidth 80
+    , bgColor
+        . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+        $ yuiLightPeach
+    ]
+    $ numericField_ (fileSelectionModel . chunkSize) [minValue 0]
 
 refreshFileSelectionButton :: TaggerWidget
 refreshFileSelectionButton =
@@ -449,33 +545,121 @@ shuffleSelectionButton =
     "Shuffle"
     (DoFileSelectionEvent ShuffleSelection)
 
-addFilesWidget :: TaggerWidget
-addFilesWidget =
-  keystroke
-    [ ("Enter", DoFileSelectionEvent AddFiles)
-    , ("Up", DoFileSelectionEvent NextAddFileHist)
-    , ("Down", DoFileSelectionEvent PrevAddFileHist)
+addFilesWidget :: TaggerModel -> TaggerWidget
+addFilesWidget m =
+  box_
+    [ mergeRequired $ \_wenv x y ->
+        (x ^. fileSelectionModel . addFileModel)
+          /= (y ^. fileSelectionModel . addFileModel)
     ]
-    $ hstack_
-      []
-      [ styledButton_ [resizeFactor (-1)] "Add" (DoFileSelectionEvent AddFiles)
-      , textField_
-          (fileSelectionModel . addFileText)
+    $ zstack_
+      [onlyTopActive]
+      [ withNodeVisible
+          (hasVis VisibilityMain $ m ^. fileSelectionModel . addFileModel . visibility)
+          addFileMainVisWidget
+      , withNodeVisible
+          (hasVis VisibilityAlt $ m ^. fileSelectionModel . addFileModel . visibility)
+          addFileAltVisWidget
+      ]
+ where
+  addFileMainVisWidget =
+    zstack_
+      [onlyTopActive]
+      [ withNodeVisible (m ^. fileSelectionModel . addFileModel . inProgress) $
+          label_
+            ( "Adding files from '"
+                <> m ^. fileSelectionModel . addFileModel . input . text
+                <> "'"
+            )
+            [resizeFactor (-1)]
+      , withNodeVisible
+          (not $ m ^. fileSelectionModel . addFileModel . inProgress)
+          $ hstack_ [] [addFileTextField, scanDirectoriesButton]
+      ]
+   where
+    addFileTextField =
+      keystroke
+        [ ("Enter", DoAddFileEvent AddFiles)
+        , ("Up", NextHistory $ TaggerLens (fileSelectionModel . addFileModel . input))
+        , ("Down", PrevHistory $ TaggerLens (fileSelectionModel . addFileModel . input))
+        ]
+        . withStyleBasic
+          [ bgColor
+              . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+              $ yuiLightPeach
+          ]
+        . tooltip_ "Enter to add file path" [tooltipDelay 1500]
+        . withStyleBasic
+          [ bgColor
+              . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+              $ yuiLightPeach
+          ]
+        $ textField_
+          (fileSelectionModel . addFileModel . input . text)
           [ onChange
               ( \t ->
                   if T.null t
-                    then DoFileSelectionEvent ResetAddFileHistIndex
-                    else IOEvent ()
+                    then
+                      Mempty $
+                        TaggerLens
+                          ( fileSelectionModel
+                              . addFileModel
+                              . input
+                              . history
+                              . historyIndex
+                          )
+                    else Unit ()
               )
           ]
+
+    scanDirectoriesButton =
+      styledButton_
+        [resizeFactor (-1)]
+        "Directories"
+        (DoAddFileEvent ToggleAddFileVisibility)
+
+  addFileAltVisWidget =
+    zstack_
+      [onlyTopActive]
+      [ withNodeVisible
+          (not $ m ^. fileSelectionModel . addFileModel . inProgress)
+          $ vstack_ [] [directoryListWidget, closeScanDirectoriesButton]
+      , withNodeVisible (m ^. fileSelectionModel . addFileModel . inProgress) $
+          label_ "Adding Files..." [resizeFactor (-1)]
       ]
+   where
+    directoryListWidget =
+      withStyleBasic
+        [ bgColor
+            . modulateOpacity (defaultElementOpacity - defaultOpacityModulator)
+            $ yuiLightPeach
+        ]
+        . tooltip_ "Click a path to add its contents" [tooltipDelay 1500]
+        . vscroll_ [wheelRate 50]
+        . vstack_ []
+        . map
+          ( \dirPath ->
+              styledButton_
+                [resizeFactor (-1)]
+                (T.pack dirPath)
+                (DoAddFileEvent . AddFilePath $ dirPath)
+          )
+        $ m ^. fileSelectionModel . addFileModel . directoryList
+    closeScanDirectoriesButton =
+      styledButton_
+        [resizeFactor (-1)]
+        "Close"
+        (DoAddFileEvent ToggleAddFileVisibility)
 
 toggleFileEditMode :: TaggerWidget
 toggleFileEditMode =
   styledButton_
     [resizeFactor (-1)]
     "Edit"
-    (DoFileSelectionEvent (TogglePaneVisibility editFileMode))
+    ( ToggleVisibilityLabel
+        (TaggerLens $ fileSelectionModel . fileSelectionVis)
+        editFileMode
+    )
 
 editFileMode :: Text
 editFileMode = "edit-file"

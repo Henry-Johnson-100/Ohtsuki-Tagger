@@ -13,7 +13,7 @@ module Database.Tagger.Type.Lens (
   module Database.Tagger.Type.Lens,
 ) where
 
-import Control.Lens (
+import Lens.Micro.TH (
   abbreviatedFields,
   makeLenses,
   makeLensesWith,

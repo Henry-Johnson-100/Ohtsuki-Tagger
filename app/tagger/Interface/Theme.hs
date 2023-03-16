@@ -1,4 +1,3 @@
-{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -6,11 +5,11 @@ module Interface.Theme (
   module Interface.Theme,
 ) where
 
-import Config
-import Control.Monad
-import Control.Monad.Trans.Maybe
+import Config (TaggerConfig (taggerConfigScaleFactor), getOptConf)
+import Control.Monad (join)
+import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
 import Data.Event (TaggerEvent (CloseConnection))
-import Data.Maybe
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import Monomer (
   AppConfig,
@@ -24,8 +23,10 @@ import Monomer (
   appWindowIcon,
   appWindowState,
   appWindowTitle,
+  black,
   lightThemeColors,
   rgbHex,
+  white,
  )
 import Monomer.Core.Themes.BaseTheme (
   BaseThemeColors (
@@ -56,12 +57,18 @@ import System.Directory (makeAbsolute)
 
 themeConfig :: IO [AppConfig TaggerEvent]
 themeConfig = do
-  defaultThinFont <- T.pack <$> (makeAbsolute =<< PT.getDataFileName "iosevka_thin.ttf")
+  defaultThinFont <-
+    T.pack
+      <$> (makeAbsolute =<< PT.getDataFileName "resources/iosevka_thin.ttf")
   defaultRegularFont <-
     T.pack
-      <$> (makeAbsolute =<< PT.getDataFileName "iosevka_regular.ttf")
-  defaultBoldFont <- T.pack <$> (makeAbsolute =<< PT.getDataFileName "iosevka_bold.ttf")
-  dataIcon <- T.pack <$> (makeAbsolute =<< PT.getDataFileName "Yui_signature_SS.bmp")
+      <$> (makeAbsolute =<< PT.getDataFileName "resources/iosevka_regular.ttf")
+  defaultBoldFont <-
+    T.pack
+      <$> (makeAbsolute =<< PT.getDataFileName "resources/iosevka_bold.ttf")
+  dataIcon <-
+    T.pack
+      <$> (makeAbsolute =<< PT.getDataFileName "resources/Yui_signature_SS.bmp")
   maybeDefaultScaleFactor <- join <$> runMaybeT (taggerConfigScaleFactor <$> getOptConf)
   return
     [ appWindowTitle "Tagger"
@@ -124,3 +131,9 @@ yuiOrange = rgbHex "#FF8A44"
 
 yuiBlue :: Color
 yuiBlue = rgbHex "#3554A0"
+
+yuiBlack :: Color
+yuiBlack = black
+
+yuiWhite :: Color
+yuiWhite = white

@@ -16,10 +16,9 @@ import Data.Event (
     RefreshBothDescriptorTrees,
     RequestFocusedNode,
     RequestFocusedNodeParent,
-    ToggleDescriptorTreeVisibility,
     UpdateDescriptor
   ),
-  TaggerEvent (DoDescriptorTreeEvent),
+  TaggerEvent (DoDescriptorTreeEvent, ToggleVisibilityLabel),
  )
 import qualified Data.List as L
 import Data.Model (
@@ -33,6 +32,7 @@ import Data.Model (
   HasRenameText (renameText),
   HasUnrelated (unrelated),
   HasUnrelatedNode (unrelatedNode),
+  TaggerLens (TaggerLens),
   TaggerModel,
   descriptorInfoAt,
  )
@@ -40,10 +40,12 @@ import Data.Model.Shared (Visibility (VisibilityLabel), hasVis)
 import Data.Text (Text)
 import Database.Tagger (Descriptor (Descriptor, descriptor))
 import Interface.Theme (
+  yuiBlack,
   yuiBlue,
   yuiLightPeach,
   yuiOrange,
   yuiRed,
+  yuiWhite,
   yuiYellow,
  )
 import Interface.Widget.Internal.Core (
@@ -56,7 +58,6 @@ import Interface.Widget.Internal.Core (
   withStyleBasic,
   withStyleHover,
  )
-import Interface.Widget.Internal.Type (TaggerWidget)
 import Monomer (
   CmbAlignBottom (alignBottom),
   CmbAlignLeft (alignLeft),
@@ -71,7 +72,7 @@ import Monomer (
   CmbTextColor (textColor),
   CmbTextLeft (textLeft),
   CmbWheelRate (wheelRate),
-  black,
+  WidgetNode,
   box_,
   button,
   button_,
@@ -89,11 +90,12 @@ import Monomer (
   textField_,
   vscroll_,
   vstack_,
-  white,
   zstack_,
  )
 import Monomer.Core.Lens (fixed)
 import Util (both)
+
+type TaggerWidget = WidgetNode TaggerModel TaggerEvent
 
 widget :: TaggerModel -> TaggerWidget
 widget m = descriptorTreeWidget m
@@ -144,7 +146,7 @@ descriptorTreeFocusedNodeWidget m =
             dm1 /= dm2
         )
     ]
-    . withStyleBasic [borderR 1 black]
+    . withStyleBasic [borderR 1 yuiBlack]
     . createRelationDropTarget
     $ descriptorTreeFocusedNodeWidgetBody
  where
@@ -195,7 +197,7 @@ descriptorTreeUnrelatedWidget m =
             dm1 /= dm2
         )
     ]
-    . withStyleBasic [borderL 1 black]
+    . withStyleBasic [borderL 1 yuiBlack]
     . createUnrelationDropTargetWidget
       $descriptorTreeUnrelatedWidgetBody
  where
@@ -274,7 +276,7 @@ descriptorTreeLeaf
                   $ yuiOrange
               ]
             . withStyleBasic
-              [ textColor (if di ^. descriptorIsMeta then yuiBlue else black)
+              [ textColor (if di ^. descriptorIsMeta then yuiBlue else yuiBlack)
               , textLeft
               , bgColor
                   . modulateOpacity
@@ -308,7 +310,7 @@ descriptorTreeLeaf
             . withStyleHover
               [ bgColor
                   . modulateOpacity defaultElementOpacity $yuiRed
-              , textColor white
+              , textColor yuiWhite
               ]
             . withStyleBasic
               [ textColor yuiRed
@@ -364,7 +366,10 @@ descriptorManagementPane =
       styledButton_
         [resizeFactor (-1)]
         "Edit"
-        (DoDescriptorTreeEvent . ToggleDescriptorTreeVisibility $ editDescriptorVis)
+        ( ToggleVisibilityLabel
+            (TaggerLens $ descriptorTreeModel . descriptorTreeVis)
+            editDescriptorVis
+        )
     insertButton =
       styledButton_
         [resizeFactor (-1)]

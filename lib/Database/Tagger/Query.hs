@@ -18,6 +18,10 @@ Maintainer  : monawasensei@gmail.com
 
 Contains basic queries such as searching for files by file pattern or searching for
 Descriptor by Relation.
+
+Some other modules may contain SELECT queries that are specific to them,
+but NO modules other than this contain commands that may modify the contents
+of any of the tables outside of the 'TaggerDBInfo` table.
 -}
 module Database.Tagger.Query (
   -- * Queries
@@ -42,10 +46,12 @@ module Database.Tagger.Query (
   flatQueryForFileOnMetaRelation,
   flatQueryForFileOnMetaRelationPattern,
 
-  -- ** 'TaggedFile` and 'ConcreteTaggedFile` Queries
+  -- *** On 'Tag`
+  queryForFileByTagId,
 
-  -- | Fairly costly compared to most other queries, so should be used sparingly.
-  queryForTaggedFileWithFileId,
+  -- ** 'TaggedFile` and 'ConcreteTaggedFile` Queries
+  derefTag,
+  queryForFileTagHierarchyMapByFileId,
   queryForConcreteTaggedFileWithFileId,
 
   -- ** 'Descriptor` Queries
@@ -64,6 +70,9 @@ module Database.Tagger.Query (
   -- *** On 'Tag`
   queryForSingleDescriptorByTagId,
 
+  -- *** On 'File`
+  queryForDescriptorByFileId,
+
   -- ** 'Tag` Queries
 
   -- | Queries that return 'Tag`s.
@@ -72,6 +81,10 @@ module Database.Tagger.Query (
   queryForTagByFileAndDescriptorKeyAndNullSubTagOf,
   queryForTagByFileKeyAndDescriptorPatternAndNullSubTagOf,
   queryForTagBySubTagTriple,
+
+  -- *** On 'Descriptor`
+  queryForTagByDescriptorPattern,
+  queryForTagByMetaDescriptorPattern,
 
   -- *** On 'File`
   queryForFileTagsByFileId,
@@ -84,9 +97,9 @@ module Database.Tagger.Query (
   -- ** Misc.
   hasInfraRelations,
   getTagOccurrencesByDescriptorKeys,
-  getTagOccurrencesByFileKey,
   getLastAccessed,
   getLastSaved,
+  getDirectories,
 
   -- * Operations
   -- $Operations
@@ -99,9 +112,7 @@ module Database.Tagger.Query (
   -- ** 'Descriptor` Operations
   insertDescriptors,
   deleteDescriptors,
-  deleteDescriptors',
   updateDescriptors,
-  updateDescriptors',
 
   -- ** 'Relation` Operations
   insertDescriptorRelation,
@@ -117,19 +128,16 @@ module Database.Tagger.Query (
   unsafeInsertTag,
 ) where
 
-import Control.Monad (guard, join)
+import Control.Monad (join)
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT, throwE)
-import Control.Monad.Trans.Maybe (MaybeT (runMaybeT))
-import qualified Data.Foldable as F
+import Control.Monad.Trans.Maybe (MaybeT (MaybeT))
+import Data.Bifunctor (second)
 import qualified Data.HashSet as HashSet
+import Data.HierarchyMap (HierarchyMap)
 import qualified Data.HierarchyMap as HAM
+import qualified Data.List as L
 import Data.Maybe (catMaybes, fromMaybe, isNothing)
-import Data.OccurrenceHashMap.Internal (OccurrenceHashMap)
-import qualified Data.OccurrenceHashMap.Internal as OHM (
-  fromList,
-  unions,
- )
 import qualified Data.OccurrenceMap.Internal as OM
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -139,23 +147,22 @@ import Database.Tagger.Connection (
   execute,
   executeMany,
   executeNamed,
-  execute_,
   lastInsertRowId,
   query,
   queryNamed,
   query_,
  )
-import Database.Tagger.Query.Type (TaggerQuery)
 import Database.Tagger.Type (
   ConcreteTag (ConcreteTag),
   ConcreteTaggedFile (ConcreteTaggedFile),
-  Descriptor (Descriptor, descriptor, descriptorId),
+  Descriptor (Descriptor),
   File,
   RecordKey,
   Tag (Tag, tagSubtagOfId),
   TaggedConnection,
-  TaggedFile (TaggedFile),
+  filePath,
  )
+import qualified System.FilePath as FilePath
 import Tagger.Util (catMaybeTM, head', hoistMaybe)
 import Text.RawString.QQ (r)
 
@@ -181,10 +188,8 @@ queryForFileByPattern p tc = query tc q [p]
 {- |
  Query for a single 'File` with its id.
 -}
-queryForSingleFileByFileId :: RecordKey File -> TaggedConnection -> MaybeT IO File
-queryForSingleFileByFileId rk tc = do
-  result <- lift $ query tc q [rk] :: MaybeT IO [File]
-  hoistMaybe . head' $ result
+queryForSingleFileByFileId :: RecordKey File -> TaggedConnection -> IO (Maybe File)
+queryForSingleFileByFileId rk tc = head' <$> query tc q [rk]
  where
   q =
     [r|
@@ -277,6 +282,22 @@ flatQueryForFileOnMetaRelationPattern p tc = queryNamed tc q [":metaDesPattern" 
     |]
 
 {- |
+ Retrieve the 'File` that is tagged with the given 'Tag` if it exists.
+-}
+queryForFileByTagId :: RecordKey Tag -> TaggedConnection -> IO (Maybe File)
+queryForFileByTagId rt tc = head' <$> query tc q [rt]
+ where
+  q =
+    [r|
+      SELECT
+        f.id
+        ,f.filePath
+      FROM File f
+      JOIN Tag t ON f.id = t.fileId
+      WHERE t.id = ?
+    |]
+
+{- |
  Return a set of all 'File`s that have a 'Tag` where the 'Descriptor` matches
  the given pattern.
 
@@ -308,13 +329,51 @@ flatQueryForFileByTagDescriptorPattern p tc = query tc q [p]
     |]
 
 {- |
- Given a 'File` ID, return the corresponding 'TaggedFile` if it exists.
+ Dereference a 'Tag` to a 'ConcreteTag` from its ID.
 -}
-queryForTaggedFileWithFileId :: RecordKey File -> TaggedConnection -> MaybeT IO TaggedFile
-queryForTaggedFileWithFileId rk tc = do
-  guard =<< lift (doesFileExist rk tc)
-  fileTags <- fmap HashSet.fromList . lift $ queryForFileTagsByFileId rk tc
-  return $ TaggedFile rk fileTags
+derefTag :: RecordKey Tag -> TaggedConnection -> MaybeT IO ConcreteTag
+derefTag tid tc = do
+  results <- lift $ query tc q [tid]
+  hoistMaybe . fmap uncurryConcreteTag . head' $ results
+ where
+  uncurryConcreteTag (tid', did, dp, mstid) = ConcreteTag tid' (Descriptor did dp) mstid
+  q =
+    [r|
+    SELECT
+      t.id
+      ,d.id
+      ,d.descriptor
+      ,t.subTagOfId
+    FROM Tag t
+    JOIN Descriptor d
+      ON t.descriptorId = d.id
+    WHERE t.id = ?
+    |]
+
+{- |
+ Given a 'File` ID, return a 'HierarchyMap` of its 'Tag`s.
+
+ The map is empty if the 'File` does not exist or if it has no 'Tag`s.
+-}
+queryForFileTagHierarchyMapByFileId ::
+  RecordKey File ->
+  TaggedConnection ->
+  IO (HierarchyMap ConcreteTag)
+queryForFileTagHierarchyMapByFileId fk tc = do
+  fileTags <- queryForFileTagsByFileId fk tc
+  concreteTagRelationTuples <- catMaybeTM (derefRelationTuple . relationTuple) fileTags
+  return . HAM.fromList . map (second HashSet.fromList) $ concreteTagRelationTuples
+ where
+  relationTuple :: Tag -> (RecordKey Tag, [RecordKey Tag])
+  relationTuple (Tag t _ _ ms) =
+    maybe (t, []) (,[t]) ms
+  derefRelationTuple ::
+    (RecordKey Tag, [RecordKey Tag]) ->
+    MaybeT IO (ConcreteTag, [ConcreteTag])
+  derefRelationTuple (x, xs) =
+    (,)
+      <$> derefTag x tc
+      <*> (lift . catMaybeTM (`derefTag` tc) $ xs)
 
 {- |
  Given a 'File` ID, return the corresponding 'ConcreteTaggedFile` if it exists.
@@ -326,44 +385,10 @@ queryForConcreteTaggedFileWithFileId ::
   RecordKey File ->
   TaggedConnection ->
   MaybeT IO ConcreteTaggedFile
-queryForConcreteTaggedFileWithFileId rk tc = do
-  file <- queryForSingleFileByFileId rk tc
-  fileTags <- lift $ queryForFileTagsByFileId rk tc
-  let tagRelationTuples = getRelationTuple <$> fileTags
-  concreteTagRelationTuples <-
-    map (second HashSet.fromList)
-      <$> mapM traverseRelationTuple tagRelationTuples
-  return $ ConcreteTaggedFile file (HAM.fromList concreteTagRelationTuples)
- where
-  getRelationTuple (Tag t _ _ ms) =
-    maybe (t, []) (,[t]) ms
-  traverseRelationTuple (x, xs) = do
-    md <- derefTag x
-    ids <-
-      lift
-        . catMaybeTM derefTag
-        $ xs
-    return (md, ids)
-  second f (x, y) = (x, f y)
-  derefTag :: RecordKey Tag -> MaybeT IO ConcreteTag
-  derefTag tid = do
-    results <- lift $ query tc q [tid]
-    let result = head' results
-    hoistMaybe (toConcreteTag <$> result)
-   where
-    toConcreteTag (tid', did, dp, mstid) = ConcreteTag tid' (Descriptor did dp) mstid
-    q =
-      [r|
-      SELECT
-        t.id
-        ,d.id
-        ,d.descriptor
-        ,t.subTagOfId
-      FROM Tag t
-      JOIN Descriptor d
-        ON t.descriptorId = d.id
-      WHERE t.id = ?
-      |]
+queryForConcreteTaggedFileWithFileId rk tc =
+  ConcreteTaggedFile
+    <$> MaybeT (queryForSingleFileByFileId rk tc)
+    <*> lift (queryForFileTagHierarchyMapByFileId rk tc)
 
 {- |
  Query for 'File`s without tags.
@@ -447,16 +472,12 @@ updateFilePaths updates tc =
 {- |
  Given a list of labels, create new 'Descriptor` rows in the database.
 
- The new 'Descriptor`s will automatically be related to \#UNRELATED\#.
-
- This should be the only way that new 'Descriptor`s are added to a Tagger database.
- Doing so manually is not really a good idea unless care is taken to also manually relate
- new 'Descriptor`s to \#UNRELATED\#.
+ The new 'Descriptor`s will automatically be related to \#UNRELATED\# via
+  a trigger that fires on @INSERT ON Descriptor@.
 -}
 insertDescriptors :: [T.Text] -> TaggedConnection -> IO ()
 insertDescriptors ps tc = do
   executeMany tc q (Only <$> ps)
-  execute_ tc unrelateUnrelatedTaggerQuery
  where
   q =
     [r|
@@ -465,91 +486,24 @@ insertDescriptors ps tc = do
 
 {- |
  Delete a list of 'Descriptor`s from the database.
- Does not delete any immutable 'Descriptor`s, I.E. 'Descriptor`s infixed by '#'
- Use 'deleteDescriptors'' if this is desired.
 
- Also runs a maintenance execution on the db, inserting all 'Descriptor`s that are not
+ Triggers a maintenance execution on the db, inserting all 'Descriptor`s that are not
  infra to anything as infra to \#UNRELATED\#.
 -}
 deleteDescriptors :: [RecordKey Descriptor] -> TaggedConnection -> IO ()
 deleteDescriptors dks tc = do
-  corrDks <-
-    catMaybes
-      <$> mapM (runMaybeT . flip queryForSingleDescriptorByDescriptorId tc) dks
-  let mutDs =
-        filter
-          ( \(descriptor -> dp) ->
-              not
-                ( "#" `T.isPrefixOf` dp
-                    && "#" `T.isSuffixOf` dp
-                )
-          )
-          corrDks
-  deleteDescriptors' (descriptorId <$> mutDs) tc
-
-{- |
- Delete a list of 'Descriptor`s from the database.
-
- Also runs a maintenance execution on the db, inserting all 'Descriptor`s that are not
- infra to anything as infra to \#UNRELATED\#.
--}
-deleteDescriptors' :: [RecordKey Descriptor] -> TaggedConnection -> IO ()
-deleteDescriptors' ps tc = do
-  executeMany tc q (Only <$> ps)
-  execute_ tc unrelateUnrelatedTaggerQuery
+  executeMany tc q (Only <$> dks)
  where
   q =
     [r|
-    DELETE FROM Descriptor WHERE id = ?
-    |]
-
-unrelateUnrelatedTaggerQuery :: TaggerQuery
-unrelateUnrelatedTaggerQuery =
-  [r|
-    INSERT INTO MetaDescriptor (metaDescriptorId, infraDescriptorId)
-      SELECT
-        (SELECT id FROM Descriptor WHERE descriptor = '#UNRELATED#')
-        ,id
-      FROM Descriptor
-      WHERE id NOT IN (SELECT infraDescriptorId FROM MetaDescriptor)
-        AND id <> (SELECT id FROM Descriptor WHERE descriptor = '#ALL#')
-    |]
+      DELETE FROM Descriptor WHERE id = ?
+      |]
 
 {- |
  Given a tuple of 'Text` and a 'Descriptor`'s primary key, relabel that 'Descriptor`.
-
- Does not update immutable 'Descriptor`s, I.E. infixed by '#'.
- Use 'updateDescriptors'' if this is desired.
 -}
 updateDescriptors :: [(T.Text, RecordKey Descriptor)] -> TaggedConnection -> IO ()
-updateDescriptors updates tc = do
-  corrDkTuples <-
-    catMaybes
-      <$> mapM
-        (runMaybeT . secondM (flip queryForSingleDescriptorByDescriptorId tc))
-        updates
-  let mutDTuples =
-        second descriptorId
-          <$> filter
-            ( \(descriptor . snd -> dp) ->
-                not
-                  ( "#" `T.isPrefixOf` dp
-                      && "#" `T.isSuffixOf` dp
-                  )
-            )
-            corrDkTuples
-  updateDescriptors' mutDTuples tc
- where
-  second f (x, y) = (x, f y)
-  secondM fm (x, y) = do
-    y' <- fm y
-    return (x, y')
-
-{- |
- Given a tuple of 'Text` and a 'Descriptor`'s primary key, relabel that 'Descriptor`.
--}
-updateDescriptors' :: [(T.Text, RecordKey Descriptor)] -> TaggedConnection -> IO ()
-updateDescriptors' updates tc =
+updateDescriptors updates tc =
   executeMany tc q updates
  where
   q =
@@ -719,6 +673,24 @@ getMetaParent rk tc = do
     |]
 
 {- |
+ Get all 'Descriptor`s that are tagged to the given 'File`.
+
+ Can contain duplicates.
+-}
+queryForDescriptorByFileId :: RecordKey File -> TaggedConnection -> IO [Descriptor]
+queryForDescriptorByFileId fk tc = query tc q [fk]
+ where
+  q =
+    [r|
+    SELECT
+      d.id
+      ,d.descriptor
+    FROM Tag t
+    JOIN Descriptor d ON t.descriptorId = d.id
+    WHERE t.fileId = ?
+    |]
+
+{- |
  Return 'True` if the given 'Descriptor` is Meta related to anything.
 -}
 hasInfraRelations :: RecordKey Descriptor -> TaggedConnection -> IO Bool
@@ -757,38 +729,6 @@ getTagOccurrencesByDescriptorKeys ds tc = do
         |]
 
 {- |
- Returns an 'OccurrenceHashMap` with occurrences of each 'Descriptor` that are
- taggond on the 'File`s provided.
--}
-getTagOccurrencesByFileKey ::
-  Traversable t =>
-  t (RecordKey File) ->
-  TaggedConnection ->
-  IO (OccurrenceHashMap Descriptor)
-getTagOccurrencesByFileKey fks tc = do
-  results <-
-    F.toList
-      <$> mapM
-        ( query tc q . Only :: RecordKey File -> IO [(RecordKey Descriptor, Text, Int)]
-        )
-        fks
-  let constructFromTuple (dk, dp, o) = (Descriptor dk dp, o)
-  return . OHM.unions $ OHM.fromList . map constructFromTuple <$> results
- where
-  q =
-    [r|
-    SELECT
-      d.id
-      ,d.descriptor
-      ,COUNT(*)
-    FROM Tag t
-    JOIN Descriptor d
-      ON t.descriptorId = d.id
-    WHERE fileId = ?
-    GROUP BY descriptorId
-    |]
-
-{- |
  Retrieve the first timestamp from the column lastAccessed in the db info table.
 -}
 getLastAccessed :: TaggedConnection -> MaybeT IO Text
@@ -815,6 +755,15 @@ getLastSaved tc = do
     SELECT lastBackup
     FROM TaggerDBInfo
     |]
+
+{- |
+ Returns a sorted list of all directories of files stored in the database.
+-}
+getDirectories :: TaggedConnection -> IO [FilePath]
+getDirectories =
+  fmap
+    (L.sort . L.nub . map (FilePath.dropFileName . T.unpack . filePath))
+    . allFiles
 
 {- |
  For the given Tag Triple, return 'True` if it will violate the UNIQUE constraint in
@@ -952,6 +901,52 @@ queryForTagBySubTagTriple triple tc = query tc q triple
       AND descriptorId = ?
       AND subTagOfId = ?
     |]
+
+{- |
+ Retrieve all 'Tag`s corresponding to 'Descriptor`s that match
+ the given text pattern.
+-}
+queryForTagByDescriptorPattern :: Text -> TaggedConnection -> IO [Tag]
+queryForTagByDescriptorPattern t tc = query tc q [t]
+ where
+  q =
+    [r|
+      SELECT
+        t.id,
+        t.fileId,
+        t.descriptorId,
+        t.subTagOfId
+      FROM Tag t
+      JOIN Descriptor d ON t.descriptorId = d.id
+      WHERE d.descriptor LIKE ? ESCAPE '\'|]
+
+{- |
+ Retrieve all 'Tag`s corresponding to all 'Descriptor`s that are
+ infra to the 'Descriptor`s matching the given text pattern.
+-}
+queryForTagByMetaDescriptorPattern :: Text -> TaggedConnection -> IO [Tag]
+queryForTagByMetaDescriptorPattern t tc = query tc q [t]
+ where
+  q =
+    [r|
+        SELECT
+          t.id
+          ,t.fileId
+          ,t.descriptorId
+          ,t.subTagOfId
+        FROM Tag t
+        JOIN (
+          WITH RECURSIVE r(id) AS (
+            SELECT id
+            FROM Descriptor
+            WHERE descriptor LIKE ? ESCAPE '\'
+            UNION
+            SELECT infraDescriptorId
+            FROM MetaDescriptor md
+            JOIN r ON md.metaDescriptorId = r.id
+          )
+          SELECT id FROM r
+        ) AS d ON t.descriptorId = d.id|]
 
 {- |
  Returns all 'Tag`s for a given 'File`.
@@ -1150,26 +1145,4 @@ unsafeInsertTag toInsert tc = do
     [r|
     INSERT INTO Tag (fileId, descriptorId, subTagOfId)
       VALUES (?,?,?)
-    |]
-
-{- |
- Given a 'File` ID, show if it exists in the database.
--}
-doesFileExist :: RecordKey File -> TaggedConnection -> IO Bool
-doesFileExist rk tc = do
-  result <- query tc q [rk] :: IO [Only Int]
-  return . any ((==) 1 . (\(Only n) -> n)) $ result
- where
-  q =
-    [r|
-    SELECT
-      EXISTS
-        (
-          SELECT
-            *
-          FROM
-            File
-          WHERE
-            id = ?
-        )
     |]

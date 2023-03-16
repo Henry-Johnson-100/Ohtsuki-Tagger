@@ -8,13 +8,134 @@
 
 # Planned
 
+## Front-end Changes
+* Add some feedback when adding files to the database so the user knows then the process
+is complete, optionally how many files were added.
 * A Query builder element in the query widget section.
-* Filter tags showing up in the results pane by pattern and meta-descriptor.
+* Add option to rescan known folders.
+* Bug Fixes
+  * Ensure that shell processes spawned via GUI are non-blocking in the GUI
+
+## Major Library Changes
+* A macro system for storing queries and expanding them as text in a query.
+  * Will be a library change, so will contribute to a major version.
+* Multi-plex databases.
+  * Connect to more than one database at a time.
+  * Join tags and descriptors on virtual tables.
+  * Dispatch new tagging queries to the appropriate database 
+  with the appropriate descriptor.
+
+------
+
+# 2.0.0.0 -- 2023-03-18
+
+## Breaking Changes:
+- TaggerQL Syntax and Interpreter Implementation
+  - TaggerQL was rebuilt from the ground-up as an expression-based query language.
+    Its syntax is very similar in structure but there are some key differences:
+    - Set Operations have been changed from "`U|, I|, and D|`" 
+    to "`|, &, and !`" respectively.
+    - All Set Operations are strongly left-associative.
+    - Sub-expressions (the part of a query between "{" and "}"), now accept
+    Set Operations!
+  - Removed the syntactic token "`U.`" from the language.
+    - Previously corresponded to a query that finds all untagged files in the database.
+      This is a redundant token because that same set can be found trivially with a
+      difference: "`p.% ! d.%`".
+  - Deleted modules
+    - Text.TaggerQL
+    - Text.TaggerQL.Parser.Internal
+    - Text.TaggerQL.AST
+    - All members of the module hierarchy Text.TaggerQL.Engine
+  - Replaced with,
+    - Text.TaggerQL.Expression.Parser
+    - Text.TaggerQL.Expression.AST
+    - Text.TaggerQL.Expression.Engine
+  - Renamed the sum type `QueryCriteria` from the `Data.Tagger` module 
+  to `RingOperation` and moved it to Text.TaggerQL.Expression.AST.
+- Database Changes
+  - The database will be automatically patched and upgraded from version `1.0.2.1` to `2.0.0.0` when it is opened by Tagger.
+  - Added new constraint conflict handlers to `Tag` and `MetaDescriptor` table.
+  - Added many new triggers to encode some of Tagger's behavior into the table itself.
+    This will make interacting with the database outside of Tagger's library
+    much more safe, though this is still not, nor will ever be, a recommended use case.
+  - Removed some database functions:
+    - `deleteDescriptors'` and `updateDescriptors'`.
+  - Replaced the database connection functions, `open` and `open'` with, respectively:
+    - `openOrCreate`
+      - Opens a file, or creates one if it does not exist, then attempts to read the version from the `TaggerDBInfo` table. If this table does not exist, then a database is initialized.
+      - This is a potentially destructive function! Prefer using `open` whenever possible.
+    - `open`
+      - Attempts to open a database file. If the file does not exist or the `TaggerDBInfo` table does not exist, then exit with an error.
+    - Both functions above will attempt to automatically patch the database if they determine it is out of date.
+- Executable Changes
+  - Removed the `taggercli` executable.
+    - Its functionality has been merged with the normal executable, `tagger`
+      - Added operations for adding files, tagging a file, removing files from the database, and deleting files from the database and file system.
+- Library Changes
+  - Types
+    - Removed the `TaggedFile` type.
+      - Consider using the `queryForFileTagsByFileId` query to achieve the same function.
+  - Queries
+    - Added
+      - `queryForDescriptorByFileId`
+        - Returns all `Descriptors` that are tagged to the given file. Most likely contains duplicates.
+    - Removed
+      - `getTagOccurrencesByFileKey`
+        - It was only used in one place and I found I didn't care for it.
+  - Removed the `OccurrenceHashMap` data type.
+    - It can be easily replaced with a plain old `HashMap a Int`.
+  - Renamed
+    - Functions in the Text.TaggerQL.Engine module to be prefixed by yuiQL-
+
+## Non-Breaking Changes
+- Changed how tags ordered when using the --describe CLI command
+  or when they are viewed in the image detail pane.
+  - Tags are ordered in two groups:
+    - Tags that have no subtags
+    - Tags that do
+  - In both of these groups, they are ordered alphabetically.
+- Added a new text field when viewing the tag list of the selection.
+It can be used to filter the tag list by MetaDescriptor patterns.
+Intended to just be a more helpful way to view the current selection or as an aid
+to querying.
+- Changed the tag list to report only the number of files that have a given descriptor
+applied. Not how many times the descriptor is applied.
+  - I think both cases are valid but the intention behind the latter was less helpful
+  and less intuitive than the former.
+- Added some tooltips to the tag list filter and the shell command text field and button.
+- Added some additional helper functions to `HierarchyMap` to make traversals
+  a little bit less painful.
+- An issue where spawned shell commands via the UI would block it from updating
+or receiving any input.
+- Changed the query input into a larger area, much like the tagging text field.
+- Stopped updating a last_accessed field in the db on connection.
+  - Consequently, write locks no longer happen when piping YuiTagger output back into
+  a database a la 
+  '`yuitagger data.db -q "p.%" --relative | xargs yuitagger data.db --describe`'
+  making CLI operations more convenient.
+- Added some visual feedback when files are being added to the database via the textfield.
+- Add a new widget for selecting directories scan for new files.
+  - Accessed via the "Directories" button next to the addFiles text field.
+- When a query is run, the results are sorted alphabetically.
+- Added a function yuiQLDeleteTagExpression which
+  takes a tag expression and deletes the corresponding tags for a given list of files.
+- Added a 'Options' pane below the tagging text field:
+  - There is a toggle option to select many files to tag at a time.
+  - There is an option to enter "Delete Mode" which allows a user to enter
+  a tag expression into the textfield to delete tags from the current file, or selection
+  of files.
+- The text field for inserting descriptors can now accept a YuiQL expression which
+  is used to define a descriptor tree. For example, `#ALL#{#META#{foo{bar}}}` will
+  place the descriptor `bar` under `foo` which is placed under the `#META#` descriptor.
+  - It is not necessary to qualify the absolute path to a descriptor, so the `#ALL#{#META#}`
+  can be left out.
+------
 
 ### 1.0.2.1 -- 2021-10-04
 
 * Limited CLI functionality.
-Exposed through the `taggercli` program.
+  Exposed through the `taggercli` program.
   * Querying
   * Report stats or audit results
 
@@ -246,7 +367,7 @@ Some restrictions:
 * Draggable tag association.
   * In the Image details pane, for tags on a single image only, each tag is draggable.
     * A new zone has been designated `untag` for these tags. When a tag is drag-and-dropped into that zone,
-    that specific tag will be deleted.
+      that specific tag will be deleted.
       * Untagging can still be done via the Tag text field but is less precise and may end up deleting more than you wanted to.
   * New subtags can be made from existing tags by dragging one tag on top of another, this will place the dragged tag as a 
   sub tag of the target.
@@ -328,9 +449,9 @@ The buffer will not flush but rather be unioned, intersected, or diffed appropri
 ### 0.1.2.0 -- 2022-04-26
 
 * Adjusted the Cmd so that, if Solo Tagging Mode is enabled, the shell cmd
-will take the file currently previewed as the command's only argument.
-If Solo Tagging Mode is not enabled or there is no file previewed then all files in the
-selection are arguments to the shell cmd.
+  will take the file currently previewed as the command's only argument.
+  If Solo Tagging Mode is not enabled or there is no file previewed then all files in the
+  selection are arguments to the shell cmd.
   * The argument substitution keyword is still '`%file`'
 
 ------
