@@ -33,7 +33,7 @@ or via the whole tree with a recursive CTE, the 'HierarchyMap` can be queried li
 A 'HierarchyMap` does not check for circular relationships, which would cause an inifite loop
 upon evaluation. Therefore it is imperative that the relations inserted into a 'HierarchyMap`
 are not circular. A 'HierarchyMap` does support multiple meta parents, and branched infra relations,
-which makes it slightly more unique compared to some of the table definitions found in 'Database.Tagger.Script.schemaDefinition`
+which makes it slightly more unique compared to some of the table definitions found in 'Database.YuiTagger.Script.schemaDefinition`
 -}
 module Data.HierarchyMap (
   HierarchyMap,

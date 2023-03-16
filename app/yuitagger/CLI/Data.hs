@@ -9,7 +9,7 @@
 
 module CLI.Data where
 
-import Database.Tagger (Descriptor, File)
+import Database.YuiTagger (Descriptor, File)
 import Control.Lens (abbreviatedFields, makeLensesWith)
 
 data TaggerDBStats = TaggerDBStats

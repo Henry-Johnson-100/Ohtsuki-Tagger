@@ -6,15 +6,15 @@
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 {- |
-Module      : Database.Tagger.Type
+Module      : Database.YuiTagger.Type
 Description : Data types used in tagger-lib and tagger-lib dependencies.
 
 License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
-module Database.Tagger.Type (
-  module Database.Tagger.Type.Prim,
-  Database.Tagger.Type.Prim.BareConnection,
+module Database.YuiTagger.Type (
+  module Database.YuiTagger.Type.Prim,
+  Database.YuiTagger.Type.Prim.BareConnection,
 
   -- * Database Types
   RowId,
@@ -30,7 +30,7 @@ module Database.Tagger.Type (
   ConcreteTaggedFile (..),
 
   -- * Lenses
-  module Database.Tagger.Type.Lens,
+  module Database.YuiTagger.Type.Lens,
 ) where
 
 import Data.Hashable (Hashable)
@@ -41,9 +41,9 @@ import Data.Text (Text)
 import Database.SQLite.Simple (FromRow (..), field)
 import Database.SQLite.Simple.FromField (FromField (..))
 import Database.SQLite.Simple.ToField (ToField (..))
-import Database.Tagger.Type.Lens
-import Database.Tagger.Type.Prim hiding (BareConnection (..))
-import qualified Database.Tagger.Type.Prim
+import Database.YuiTagger.Type.Lens
+import Database.YuiTagger.Type.Prim hiding (BareConnection (..))
+import qualified Database.YuiTagger.Type.Prim
 import GHC.Generics (Generic)
 
 {- |

@@ -34,7 +34,7 @@ import Data.Model.Shared.Lens (
  )
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger (
+import Database.YuiTagger (
   ConcreteTag (concreteTagDescriptor),
   Descriptor (descriptor),
   File (filePath),

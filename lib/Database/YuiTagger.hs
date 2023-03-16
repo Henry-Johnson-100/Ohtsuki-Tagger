@@ -1,16 +1,16 @@
 {-# LANGUAGE ViewPatterns #-}
 
 {- |
-Module      : Database.Tagger
+Module      : Database.YuiTagger
 Description : Exports Database operations.
 
 License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
-module Database.Tagger (
-  module Database.Tagger.Connection,
-  module Database.Tagger.Query,
-  module Database.Tagger.Type,
+module Database.YuiTagger (
+  module Database.YuiTagger.Connection,
+  module Database.YuiTagger.Query,
+  module Database.YuiTagger.Type,
   rmFile,
   mvFile,
 ) where
@@ -28,9 +28,9 @@ import Control.Monad.Trans.Except (
 import qualified Data.Either as E
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger.Connection
-import Database.Tagger.Query
-import Database.Tagger.Type
+import Database.YuiTagger.Connection
+import Database.YuiTagger.Query
+import Database.YuiTagger.Type
 import System.Directory (
   doesFileExist,
   doesPathExist,

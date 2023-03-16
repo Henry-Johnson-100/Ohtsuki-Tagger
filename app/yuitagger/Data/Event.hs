@@ -27,7 +27,7 @@ import Data.Model.Shared.Core (TextInput)
 import Data.Sequence (Seq)
 import Data.String (IsString)
 import Data.Text (Text)
-import Database.Tagger.Type (
+import Database.YuiTagger.Type (
   ConcreteTag,
   ConcreteTaggedFile,
   Descriptor,

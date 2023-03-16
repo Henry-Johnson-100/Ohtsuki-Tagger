@@ -44,7 +44,7 @@ import qualified Data.List as L
 import Data.Maybe (fromJust)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger (
+import Database.YuiTagger (
   Descriptor,
   RecordKey,
   allFiles,
@@ -62,11 +62,11 @@ import Database.Tagger (
   queryForTagByMetaDescriptorPattern,
   tagFileId,
  )
-import Database.Tagger.Query (
+import Database.YuiTagger.Query (
   queryForFileByPattern,
   queryForTagBySubTagTriple,
  )
-import Database.Tagger.Type (
+import Database.YuiTagger.Type (
   File,
   Tag (tagId, tagSubtagOfId),
   TaggedConnection,

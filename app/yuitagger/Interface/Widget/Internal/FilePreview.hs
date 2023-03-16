@@ -15,7 +15,7 @@ import Data.Model (
   HasFocusedFileModel (focusedFileModel),
   TaggerModel,
  )
-import Database.Tagger (
+import Database.YuiTagger (
   ConcreteTag (concreteTagId),
   ConcreteTaggedFile (concreteTaggedFile),
   Descriptor (Descriptor),

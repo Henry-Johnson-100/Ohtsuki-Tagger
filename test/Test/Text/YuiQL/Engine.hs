@@ -15,7 +15,7 @@ import qualified Data.HashSet as HS
 import Data.List (sort)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger
+import Database.YuiTagger
 import Test.Resources
 import Test.Tasty
 import Test.Tasty.HUnit

@@ -48,7 +48,7 @@ import Data.Sequence (Seq)
 import qualified Data.Sequence as S
 import qualified Data.Sequence as Seq
 import Data.Text (Text)
-import Database.Tagger.Type
+import Database.YuiTagger.Type
 
 data TaggerModel = TaggerModel
   { _taggermodelDescriptorTreeModel :: DescriptorTreeModel

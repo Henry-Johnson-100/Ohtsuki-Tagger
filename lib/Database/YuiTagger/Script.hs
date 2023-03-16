@@ -2,13 +2,13 @@
 {-# OPTIONS_HADDOCK hide #-}
 
 {- |
-Module      : Database.Tagger.Script
+Module      : Database.YuiTagger.Script
 Description : Scripts for initialization or maintenance of a Tagger database.
 
 License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
-module Database.Tagger.Script (
+module Database.YuiTagger.Script (
   SQLiteScript (..),
   schemaDefinition,
   schemaTeardown,

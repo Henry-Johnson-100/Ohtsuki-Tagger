@@ -5,13 +5,13 @@
 {-# HLINT ignore "Use newtype instead of data" #-}
 
 {- |
-Module      : Database.Tagger.Query.Type
+Module      : Database.YuiTagger.Query.Type
 Description : Types for different kinds of Queries.
 
 License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
-module Database.Tagger.Query.Type (
+module Database.YuiTagger.Query.Type (
   TaggerQuery (..),
   qcat,
 ) where

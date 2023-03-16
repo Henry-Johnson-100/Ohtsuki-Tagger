@@ -2,17 +2,17 @@
 {-# OPTIONS_HADDOCK hide, ignore-exports, prune #-}
 
 {- |
-Module      : Database.Tagger.Type.Prim
-Description : Types that have lenses defined in "Database.Tagger.Type.Lens"
+Module      : Database.YuiTagger.Type.Prim
+Description : Types that have lenses defined in "Database.YuiTagger.Type.Lens"
 
 License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 
-The types defined here all have lenses defined in the module "Database.Tagger.Type.Lens".
+The types defined here all have lenses defined in the module "Database.YuiTagger.Type.Lens".
 The two modules are separated purely to make exporting lenses and lens instances together
 with non-TemplateHaskell generated code simpler.
 -}
-module Database.Tagger.Type.Prim (
+module Database.YuiTagger.Type.Prim (
   BareConnection (..),
   TaggedConnection (..),
 ) where

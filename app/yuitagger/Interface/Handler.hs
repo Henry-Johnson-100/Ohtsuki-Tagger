@@ -36,7 +36,7 @@ import Data.Sequence (Seq ((:<|), (:|>)))
 import qualified Data.Sequence as Seq
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger
+import Database.YuiTagger
 import Interface.Handler.Internal
 import Interface.Widget.Internal.Query (queryTextFieldKey)
 import Interface.Widget.Internal.Selection (fileSelectionScrollWidgetNodeKey)

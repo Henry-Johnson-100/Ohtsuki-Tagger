@@ -90,7 +90,7 @@ import Data.Sequence ((|>))
 import qualified Data.Sequence as Seq
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger (Descriptor (descriptor), File (File), descriptorId)
+import Database.YuiTagger (Descriptor (descriptor), File (File), descriptorId)
 import Interface.Theme (yuiBlack, yuiLightPeach, yuiOrange, yuiRed, yuiWhite)
 import Interface.Widget.Internal.Core (
   defaultElementOpacity,

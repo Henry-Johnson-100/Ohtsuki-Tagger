@@ -11,7 +11,7 @@ import Data.HierarchyMap (HierarchyMap)
 import qualified Data.HierarchyMap as HRM
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger (ConcreteTag (..), Descriptor (..), TaggedConnection, insertFiles)
+import Database.YuiTagger (ConcreteTag (..), Descriptor (..), TaggedConnection, insertFiles)
 import System.Directory (
   doesDirectoryExist,
   doesFileExist,

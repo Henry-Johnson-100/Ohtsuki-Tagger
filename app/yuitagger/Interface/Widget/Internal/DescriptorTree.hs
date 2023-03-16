@@ -38,7 +38,7 @@ import Data.Model (
  )
 import Data.Model.Shared (Visibility (VisibilityLabel), hasVis)
 import Data.Text (Text)
-import Database.Tagger (Descriptor (Descriptor, descriptor))
+import Database.YuiTagger (Descriptor (Descriptor, descriptor))
 import Interface.Theme (
   yuiBlack,
   yuiBlue,

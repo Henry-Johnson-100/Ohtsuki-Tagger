@@ -3,13 +3,13 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
 {- |
-Module      : Database.Tagger.Connection
+Module      : Database.YuiTagger.Connection
 Description : Module to open, query, and close Tagger database connections.
 
 License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
-module Database.Tagger.Connection (
+module Database.YuiTagger.Connection (
   -- * Wrapped types
   openOrCreate,
   open,
@@ -34,7 +34,7 @@ module Database.Tagger.Connection (
 
   -- * Database.SQLite.Simple types
 
-  -- | Types exported from Database.SQLite.Simple for use in 'Database.Tagger`
+  -- | Types exported from Database.SQLite.Simple for use in 'Database.YuiTagger`
   Simple.Query,
   Simple.ToRow,
   Database.SQLite.Simple.ToField.ToField,
@@ -64,21 +64,21 @@ import Data.Version (
 import qualified Database.SQLite.Simple as Simple
 import qualified Database.SQLite.Simple.ToField
 import qualified Database.SQLite3 as SQLite3
-import Database.Tagger.Query.Type (TaggerQuery (TaggerQuery))
-import Database.Tagger.Script (
+import Database.YuiTagger.Query.Type (TaggerQuery (TaggerQuery))
+import Database.YuiTagger.Script (
   SQLiteScript (SQLiteScript),
   patch_2_0,
   schemaDefinition,
   schemaTeardown,
   update0_3_4_0To0_3_4_2,
  )
-import Database.Tagger.Type (
+import Database.YuiTagger.Type (
   BareConnection,
   RecordKey (..),
   RowId,
   TaggedConnection (TaggedConnection),
  )
-import Database.Tagger.Type.Prim (BareConnection (..))
+import Database.YuiTagger.Type.Prim (BareConnection (..))
 import System.Directory (doesFileExist)
 import System.IO (hPutStrLn, stderr)
 import YuiTagger.Info (yuiTaggerVersion)

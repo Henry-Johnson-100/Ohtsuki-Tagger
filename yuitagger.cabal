@@ -101,8 +101,8 @@ library yuitagger-lib
   import:              haskell-common
                       ,yuitagger-common
 
-  exposed-modules:     Database.Tagger
-                      ,Database.Tagger.Type
+  exposed-modules:     Database.YuiTagger
+                      ,Database.YuiTagger.Type
                       ,Data.HierarchyMap
                       ,Data.OccurrenceMap
                       ,YuiTagger.Info
@@ -110,12 +110,12 @@ library yuitagger-lib
                       ,Text.YuiQL.Engine
                       ,Text.YuiQL.Parser
 
-  other-modules:       Database.Tagger.Script
-                      ,Database.Tagger.Type.Lens
-                      ,Database.Tagger.Type.Prim
-                      ,Database.Tagger.Query
-                      ,Database.Tagger.Query.Type
-                      ,Database.Tagger.Connection
+  other-modules:       Database.YuiTagger.Script
+                      ,Database.YuiTagger.Type.Lens
+                      ,Database.YuiTagger.Type.Prim
+                      ,Database.YuiTagger.Query
+                      ,Database.YuiTagger.Query.Type
+                      ,Database.YuiTagger.Connection
                       ,Data.Hierarchy.Internal
                       ,Data.OccurrenceMap.Internal
                       ,YuiTagger.Util

@@ -10,7 +10,7 @@
 {-# HLINT ignore "Use section" #-}
 
 {- |
-Module      : Database.Tagger.Query.Basic
+Module      : Database.YuiTagger.Query.Basic
 Description : Contains basic queries.
 
 License     : GPL-3
@@ -23,7 +23,7 @@ Some other modules may contain SELECT queries that are specific to them,
 but NO modules other than this contain commands that may modify the contents
 of any of the tables outside of the 'TaggerDBInfo` table.
 -}
-module Database.Tagger.Query (
+module Database.YuiTagger.Query (
   -- * Queries
 
   -- ** File Queries
@@ -141,7 +141,7 @@ import Data.Maybe (catMaybes, fromMaybe, isNothing)
 import qualified Data.OccurrenceMap.Internal as OM
 import Data.Text (Text)
 import qualified Data.Text as T
-import Database.Tagger.Connection (
+import Database.YuiTagger.Connection (
   NamedParam ((:=)),
   Only (Only),
   execute,
@@ -152,7 +152,7 @@ import Database.Tagger.Connection (
   queryNamed,
   query_,
  )
-import Database.Tagger.Type (
+import Database.YuiTagger.Type (
   ConcreteTag (ConcreteTag),
   ConcreteTaggedFile (ConcreteTaggedFile),
   Descriptor (Descriptor),

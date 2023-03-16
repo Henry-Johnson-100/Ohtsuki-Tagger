@@ -4,13 +4,13 @@
 {-# OPTIONS_HADDOCK prune, hide #-}
 
 {- |
-Module      : Database.Tagger.Type.Lens
+Module      : Database.YuiTagger.Type.Lens
 
 License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
-module Database.Tagger.Type.Lens (
-  module Database.Tagger.Type.Lens,
+module Database.YuiTagger.Type.Lens (
+  module Database.YuiTagger.Type.Lens,
 ) where
 
 import Lens.Micro.TH (
@@ -18,7 +18,7 @@ import Lens.Micro.TH (
   makeLenses,
   makeLensesWith,
  )
-import Database.Tagger.Type.Prim (
+import Database.YuiTagger.Type.Prim (
   BareConnection,
   TaggedConnection,
  )

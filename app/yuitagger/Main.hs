@@ -45,7 +45,7 @@ import qualified Data.OccurrenceMap as OM
 import qualified Data.Text as T
 import qualified Data.Text.IO as T.IO
 import Data.Version (showVersion)
-import Database.Tagger (
+import Database.YuiTagger (
   ConcreteTag (ConcreteTag),
   ConcreteTaggedFile (ConcreteTaggedFile),
   Descriptor (..),
