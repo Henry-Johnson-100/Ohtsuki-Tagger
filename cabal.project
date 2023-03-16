@@ -1,4 +1,4 @@
-packages: tagger.cabal
+packages: yuitagger.cabal
           ,./nanovg-hs
 optimization: 0
 haddock-hyperlink-source: True
