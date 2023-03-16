@@ -99,7 +99,7 @@ import System.Directory (
  )
 import System.FilePath (makeRelative, takeDirectory)
 import System.IO (hPutStrLn, stderr)
-import Tagger.Info (taggerVersion)
+import YuiTagger.Info (yuiTaggerVersion)
 import Text.YuiQL.Engine (
   yuiQLCreateDescriptors,
   yuiQLDeleteTags,
@@ -418,7 +418,7 @@ programParser =
           )
 
 mainProgram :: Program -> IO ()
-mainProgram Version = putStrLn . showVersion $ taggerVersion
+mainProgram Version = putStrLn . showVersion $ yuiTaggerVersion
 mainProgram (WithDB dbPath Create) = do
   c <- openOrCreate dbPath
   close c

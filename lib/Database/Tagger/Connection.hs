@@ -81,8 +81,8 @@ import Database.Tagger.Type (
 import Database.Tagger.Type.Prim (BareConnection (..))
 import System.Directory (doesFileExist)
 import System.IO (hPutStrLn, stderr)
-import Tagger.Info (taggerVersion)
-import Tagger.Util (head', last')
+import YuiTagger.Info (yuiTaggerVersion)
+import YuiTagger.Util (head', last')
 import Text.ParserCombinators.ReadP (readP_to_S)
 
 {- |
@@ -335,7 +335,7 @@ patchDatabaseIfRequired bc = DatabaseInfoUpdate $ do
           . mapMaybe
             (last' . map fst . readP_to_S parseVersion . (\(Simple.Only x) -> x))
           <$> bareQuery_ bc "SELECT version FROM TaggerDBInfo LIMIT 1"
-    unless (currentVersion == taggerVersion) . liftIO $ do
+    unless (currentVersion == yuiTaggerVersion) . liftIO $ do
       (_, newVersion) <- runStateT (patchDatabase bc) currentVersion
       withConnection
         ( \c ->

@@ -1,6 +1,6 @@
 {-# OPTIONS_HADDOCK hide #-}
 
-module Tagger.Util (
+module YuiTagger.Util (
   head',
   tail',
   last',

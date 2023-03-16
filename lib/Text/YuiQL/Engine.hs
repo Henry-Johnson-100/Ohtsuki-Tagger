@@ -72,7 +72,7 @@ import Database.Tagger.Type (
   TaggedConnection,
   descriptorId,
  )
-import Tagger.Util (head')
+import YuiTagger.Util (head')
 import Text.Parsec.Error (errorMessages, messageString)
 import Text.YuiQL.AST (
   DTerm (DMetaTerm, DTerm),

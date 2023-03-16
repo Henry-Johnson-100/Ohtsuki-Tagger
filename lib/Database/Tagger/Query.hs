@@ -163,7 +163,7 @@ import Database.Tagger.Type (
   filePath,
  )
 import qualified System.FilePath as FilePath
-import Tagger.Util (catMaybeTM, head', hoistMaybe)
+import YuiTagger.Util (catMaybeTM, head', hoistMaybe)
 import Text.RawString.QQ (r)
 
 {- |

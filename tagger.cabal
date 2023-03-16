@@ -105,7 +105,7 @@ library yuitagger-lib
                       ,Database.Tagger.Type
                       ,Data.HierarchyMap
                       ,Data.OccurrenceMap
-                      ,Tagger.Info
+                      ,YuiTagger.Info
                       ,Text.YuiQL.AST
                       ,Text.YuiQL.Engine
                       ,Text.YuiQL.Parser
@@ -118,7 +118,7 @@ library yuitagger-lib
                       ,Database.Tagger.Connection
                       ,Data.Hierarchy.Internal
                       ,Data.OccurrenceMap.Internal
-                      ,Tagger.Util
+                      ,YuiTagger.Util
                       ,Text.YuiQL.AST.Editor
 
   other-extensions:    DeriveGeneric
