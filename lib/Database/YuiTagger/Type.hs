@@ -7,7 +7,7 @@
 
 {- |
 Module      : Database.YuiTagger.Type
-Description : Data types used in tagger-lib and tagger-lib dependencies.
+Description : Data types used in yuitagger-lib and yuitagger-lib dependencies.
 
 License     : GPL-3
 Maintainer  : monawasensei@gmail.com

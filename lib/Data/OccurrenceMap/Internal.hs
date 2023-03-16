@@ -12,7 +12,7 @@ import Data.Maybe (fromMaybe)
 
 {- |
  An 'IntMap` with some specialized functions. This type is usually used for
- counting how many times something occurs, in the case of Tagger, it's for counting
+ counting how many times something occurs, in the case of YuiTagger, it's for counting
  how many times a 'Tag` occurs.
 -}
 newtype OccurrenceMap = OccurrenceMap {occurrenceMap :: IntMap Int} deriving (Show, Eq)

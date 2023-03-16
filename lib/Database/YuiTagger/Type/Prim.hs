@@ -34,7 +34,7 @@ instance Eq BareConnection where
   _ == _ = True
 
 {- |
- A data type that manages connections to a Tagger database.
+ A data type that manages connections to a YuiTagger database.
 -}
 data TaggedConnection = TaggedConnection
   { -- | Connection name,

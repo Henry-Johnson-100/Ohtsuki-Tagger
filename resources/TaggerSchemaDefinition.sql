@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS "TaggerDBInfo" (
   CONSTRAINT uniqueInfo UNIQUE(_tagger) ON CONFLICT REPLACE
 );
 
--- Default values required for Tagger
+-- Default values required for YuiTagger
 
 -- Note, these are run before triggers are created. Triggers also rely on
 -- the presence of these default values.

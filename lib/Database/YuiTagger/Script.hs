@@ -3,7 +3,7 @@
 
 {- |
 Module      : Database.YuiTagger.Script
-Description : Scripts for initialization or maintenance of a Tagger database.
+Description : Scripts for initialization or maintenance of a YuiTagger database.
 
 License     : GPL-3
 Maintainer  : monawasensei@gmail.com
@@ -25,7 +25,7 @@ import Text.RawString.QQ (r)
 newtype SQLiteScript = SQLiteScript Text deriving (Show, Eq)
 
 {- |
- Defines the tables of a Tagger database and inserts some
+ Defines the tables of a YuiTagger database and inserts some
  default information.
 -}
 schemaDefinition :: IO SQLiteScript
@@ -33,7 +33,7 @@ schemaDefinition =
   getScriptContents "resources/TaggerSchemaDefinition.sql"
 
 {- |
- DROPS all tables in a Tagger database.
+ DROPS all tables in a YuiTagger database.
 -}
 schemaTeardown :: IO SQLiteScript
 schemaTeardown =

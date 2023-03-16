@@ -71,7 +71,7 @@ themeConfig = do
       <$> (makeAbsolute =<< PT.getDataFileName "resources/Yui_signature_SS.bmp")
   maybeDefaultScaleFactor <- join <$> runMaybeT (taggerConfigScaleFactor <$> getOptConf)
   return
-    [ appWindowTitle "Tagger"
+    [ appWindowTitle "YuiTagger"
     , appWindowState MainWindowMaximized
     , appScaleFactor $ fromMaybe 1.0 maybeDefaultScaleFactor
     , appTheme yuiTheme

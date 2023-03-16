@@ -15,7 +15,7 @@ between its members. These relationships take on a tree structure, a 'HierarchyM
 flat encoding of that tree structure.
 
 For the purposes of this library, the 'HierarchyMap` is meant to be used to encode similar
-structures found in the Tagger SQL databases.
+structures found in the YuiTagger SQL databases.
 
 Where a 'HierarchyMap` is roughly equivalent to any set of columns that have this definition:
 

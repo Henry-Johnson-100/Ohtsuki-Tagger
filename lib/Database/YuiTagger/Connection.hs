@@ -4,7 +4,7 @@
 
 {- |
 Module      : Database.YuiTagger.Connection
-Description : Module to open, query, and close Tagger database connections.
+Description : Module to open, query, and close YuiTagger database connections.
 
 License     : GPL-3
 Maintainer  : monawasensei@gmail.com
@@ -252,7 +252,7 @@ lastInsertRowId :: RowId r => TaggedConnection -> IO (RecordKey r)
 lastInsertRowId = withBareConnection bareLastInsertRowId
 
 {- |
- Run the Tagger schema definition script on the given connection.
+ Run the YuiTagger schema definition script on the given connection.
 
  Should ideally not do anything on a database that is already up-to-date with the current
  schema definition, but it would be best to avoid doing that anyways.

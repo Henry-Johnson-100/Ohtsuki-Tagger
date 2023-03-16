@@ -44,7 +44,7 @@ newtype TaggerLens a b = TaggerLens {taggerLens :: Lens' a b}
 
 instance Show (TaggerLens a b) where
   show :: TaggerLens a b -> String
-  show _ = "Tagger Lens'"
+  show _ = "YuiTagger Lens'"
 
 instance Eq (TaggerLens a b) where
   (==) :: TaggerLens a b -> TaggerLens a b -> Bool

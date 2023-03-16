@@ -379,7 +379,7 @@ queryForFileTagHierarchyMapByFileId fk tc = do
  Given a 'File` ID, return the corresponding 'ConcreteTaggedFile` if it exists.
 
  Intended to be called for only one file at a time. Calling it for large numbers of
-  'File`s is quite costly and provides no real benefit in the Tagger GUI front-end.
+  'File`s is quite costly and provides no real benefit in the YuiTagger GUI front-end.
 -}
 queryForConcreteTaggedFileWithFileId ::
   RecordKey File ->
@@ -458,7 +458,7 @@ deleteFiles ps tc = executeMany tc q (Only <$> ps)
   update that 'File`'s filePath field.
 
  This should not be called without also calling the system's equivalent "mv" command.
-  Doing so may cause some Tagger operations to fail.
+  Doing so may cause some YuiTagger operations to fail.
 -}
 updateFilePaths :: [(FilePath, RecordKey File)] -> TaggedConnection -> IO ()
 updateFilePaths updates tc =
@@ -650,7 +650,7 @@ getAllInfra rk tc =
 
  Note that the actual implementation of this function only retrieves the first parent
  returned by the query. Multiple parents should never happen to a UNIQUE constraint
- in a Tagger's database.
+ in a YuiTagger's database.
 -}
 getMetaParent :: RecordKey Descriptor -> TaggedConnection -> MaybeT IO Descriptor
 getMetaParent rk tc = do
