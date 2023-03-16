@@ -67,7 +67,7 @@ is complete, optionally how many files were added.
       - This is a potentially destructive function! Prefer using `open` whenever possible.
     - `open`
       - Attempts to open a database file. If the file does not exist or the `TaggerDBInfo` table does not exist, then exit with an error.
-    - Both functions above will update a time-stamp field in the database as well as attempt to automatically patch the database if they determine it is out of date.
+    - Both functions above will attempt to automatically patch the database if they determine it is out of date.
 - Executable Changes
   - Removed the `taggercli` executable.
     - Its functionality has been merged with the normal executable, `tagger`
