@@ -5,7 +5,7 @@
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-module Test.Text.TaggerQL.Expression.Engine (
+module Test.Text.YuiQL.Engine (
   queryEngineASTTests,
 ) where
 
@@ -20,7 +20,7 @@ import Test.Resources
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.TaggerQL.Expression.AST
-import Text.TaggerQL.Expression.Engine
+import Text.YuiQL.Engine
 import Text.YuiQL.Parser (parseTagExpression)
 
 queryEngineASTTests :: IO TaggedConnection -> TestTree

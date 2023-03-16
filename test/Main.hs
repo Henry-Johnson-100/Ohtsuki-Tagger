@@ -16,7 +16,7 @@ import Test.Tasty (
     withResource,
  )
 import Test.Text.TaggerQL.Expression.AST (astTests)
-import Test.Text.TaggerQL.Expression.Engine (queryEngineASTTests)
+import Test.Text.YuiQL.Engine (queryEngineASTTests)
 import Test.Text.YuiQL.Parser (parserTests)
 
 main :: IO ()

@@ -100,7 +100,7 @@ import System.Directory (
 import System.FilePath (makeRelative, takeDirectory)
 import System.IO (hPutStrLn, stderr)
 import Tagger.Info (taggerVersion)
-import Text.TaggerQL.Expression.Engine (
+import Text.YuiQL.Engine (
   yuiQLCreateDescriptors,
   yuiQLDeleteTags,
   yuiQLFileQuery,

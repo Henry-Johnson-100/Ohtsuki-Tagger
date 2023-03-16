@@ -10,7 +10,7 @@
 {-# HLINT ignore "Use const" #-}
 
 {- |
-Module      : Text.TaggerQL.Expression.Engine
+Module      : Text.YuiQL.Engine
 Description : The interpreter for the TaggerQL query language.
 
 License     : GPL-3
@@ -19,7 +19,7 @@ Maintainer  : monawasensei@gmail.com
 Contains functions that interprets the TaggerQL query language to either run queries
   or tag a file with a certain expression.
 -}
-module Text.TaggerQL.Expression.Engine (
+module Text.YuiQL.Engine (
   yuiQLFileQuery,
   yuiQLTagFile,
   yuiQLDeleteTags,

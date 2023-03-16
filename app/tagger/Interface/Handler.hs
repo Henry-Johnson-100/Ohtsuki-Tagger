@@ -44,7 +44,7 @@ import Monomer
 import Paths_yuitagger
 import System.FilePath
 import System.IO
-import Text.TaggerQL.Expression.Engine
+import Text.YuiQL.Engine
 import Text.YuiQL.Parser
 import Util
 

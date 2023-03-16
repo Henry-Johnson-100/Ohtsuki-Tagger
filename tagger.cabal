@@ -107,7 +107,7 @@ library yuitagger-lib
                       ,Data.OccurrenceMap
                       ,Tagger.Info
                       ,Text.TaggerQL.Expression.AST
-                      ,Text.TaggerQL.Expression.Engine
+                      ,Text.YuiQL.Engine
                       ,Text.YuiQL.Parser
 
   other-modules:       Database.Tagger.Script
@@ -159,7 +159,7 @@ test-suite yuitagger-test
 
   other-modules:
     Test.Text.TaggerQL.Expression.AST
-    ,Test.Text.TaggerQL.Expression.Engine
+    ,Test.Text.YuiQL.Engine
     ,Test.Text.YuiQL.Parser
     ,Test.Resources
 
