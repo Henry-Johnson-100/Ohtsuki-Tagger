@@ -74,7 +74,7 @@ import Database.Tagger.Type (
  )
 import Tagger.Util (head')
 import Text.Parsec.Error (errorMessages, messageString)
-import Text.TaggerQL.Expression.AST (
+import Text.YuiQL.AST (
   DTerm (DMetaTerm, DTerm),
   DescriptorExpression,
   MagmaExpression,

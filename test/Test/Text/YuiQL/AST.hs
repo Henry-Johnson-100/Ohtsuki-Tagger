@@ -2,7 +2,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -Wno-typed-holes #-}
 
-module Test.Text.TaggerQL.Expression.AST (
+module Test.Text.YuiQL.AST (
     astTests,
 ) where
 
@@ -11,7 +11,7 @@ import Test.Resources
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
-import Text.TaggerQL.Expression.AST
+import Text.YuiQL.AST
 
 astTests :: TestTree
 astTests =

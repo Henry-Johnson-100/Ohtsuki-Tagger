@@ -53,7 +53,7 @@ import Test.Tasty.QuickCheck (
   sized,
   suchThat,
  )
-import Text.TaggerQL.Expression.AST
+import Text.YuiQL.AST
 
 instance Arbitrary2 LabeledFreeTree where
   liftArbitrary2 :: Gen a -> Gen b -> Gen (LabeledFreeTree a b)

@@ -49,7 +49,7 @@ import Text.Parsec (
   try,
   (<|>),
  )
-import Text.TaggerQL.Expression.AST (
+import Text.YuiQL.AST (
   DTerm (..),
   FreeDisjunctMonad (T),
   LabeledFreeTree (Node),

@@ -15,7 +15,7 @@ import Test.Tasty (
     testGroup,
     withResource,
  )
-import Test.Text.TaggerQL.Expression.AST (astTests)
+import Test.Text.YuiQL.AST (astTests)
 import Test.Text.YuiQL.Engine (queryEngineASTTests)
 import Test.Text.YuiQL.Parser (parserTests)
 

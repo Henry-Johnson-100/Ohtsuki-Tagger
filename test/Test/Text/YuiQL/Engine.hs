@@ -19,7 +19,7 @@ import Database.Tagger
 import Test.Resources
 import Test.Tasty
 import Test.Tasty.HUnit
-import Text.TaggerQL.Expression.AST
+import Text.YuiQL.AST
 import Text.YuiQL.Engine
 import Text.YuiQL.Parser (parseTagExpression)
 

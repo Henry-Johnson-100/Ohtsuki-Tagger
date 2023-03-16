@@ -7,7 +7,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_HADDOCK hide #-}
 
-module Text.TaggerQL.Expression.AST.Editor (
+module Text.YuiQL.AST.Editor (
   findQueryExpression,
   withQueryExpression,
   findTagExpression,
@@ -32,7 +32,7 @@ import Control.Monad.Trans.Class (MonadTrans (..))
 import Control.Monad.Trans.State.Strict (StateT (..), get, modify)
 import Data.Bifunctor
 import Data.Functor.Identity (runIdentity)
-import Text.TaggerQL.Expression.AST
+import Text.YuiQL.AST
 
 {- |
  Modifies the TagExpression in a TagLeaf of a QueryExpression if it is a ring value

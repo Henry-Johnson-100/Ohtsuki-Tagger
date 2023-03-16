@@ -14,13 +14,13 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {- |
-Module      : Text.TaggerQL.Expression.AST
+Module      : Text.YuiQL.AST
 Description : The syntax tree for the TaggerQL query language.
 
 License     : GPL-3
 Maintainer  : monawasensei@gmail.com
 -}
-module Text.TaggerQL.Expression.AST (
+module Text.YuiQL.AST (
   -- * Language Expressions
 
   -- ** TagExpressions
